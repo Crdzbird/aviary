@@ -1,0 +1,10 @@
+name: blockchainer_dart
+description: dart:ffi binding for the Blockchainer C ABI (libblockchainer_c).
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  ffi: ^2.1.0

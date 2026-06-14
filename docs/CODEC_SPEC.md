@@ -1,0 +1,65 @@
+# Blockchainer Canonical Codec — Specification (DRAFT)
+
+> The byte-exact encoding rules every hashed object obeys. This is the
+> determinism contract (ARCHITECTURE §2, §4): one value has **exactly one** valid
+> encoding; the encoder only ever emits it, and the decoder **rejects** anything
+> else rather than normalizing it (normalization would let two byte strings share
+> a hash → malleability).
+>
+> Status: **DRAFT** for M1. To be implemented in C++ (`src/codec/`) and exercised
+> by `vectors/` golden vectors replayed through every binding.
+
+## Global rules
+
+- **Endianness:** big-endian (network order) for all integers.
+- **No floats. No locale. No map/iteration-order dependence.** Sets that must be
+  hashed are encoded as lists **sorted by canonical key bytes**, ascending, with
+  duplicates rejected.
+- **Struct fields** are encoded in a fixed, declared schema order — never by
+  reflection.
+- **Decoding is total and strict:** every read is bounds-checked; trailing bytes
+  after a top-level decode are an error; any non-canonical form is an error.
+
+## Primitive encodings
+
+| Type | Encoding |
+|------|----------|
+| `u8`,`u16`,`u32`,`u64` | fixed 1/2/4/8 bytes, big-endian, unsigned. `u64` values are `< 2^63` (writer rejects negative; reader rejects the high-bit-set range). |
+| `bool` | one byte: `0x00` (false) / `0x01` (true). Any other byte → error. |
+| `u128` (value/amount) | fixed **16 bytes**, big-endian. Range `[0, 2^128)`. Used for balances/amounts; value math is checked — overflow is a fork. |
+| `bytes` (variable) | `u32` length prefix + raw bytes. Max length bounded (allocation-DoS guard) and checked against bytes remaining. |
+| `fixed_bytes(n)` | exactly `n` raw bytes, **no** length prefix (hashes, public keys — size fixed by schema). |
+| `biguint` | minimal-length big-endian, length-prefixed as `bytes`. **No leading zero byte.** Zero encodes as an empty byte string (`u32` length `0`). Reader rejects a leading zero byte (non-canonical). |
+| `list<T>` | `u32` count prefix + each element encoded in order. Count checked against bytes remaining. Order is part of the canonical form (sort sets before encoding). |
+
+> A reference implementation of exactly these rules (with round-trip,
+> canonical-rejection, and golden-vector tests) was prototyped in Dart during
+> design; M1 ports it to C++ as the single source of truth.
+
+## Hashing & domain separation
+
+Primary hash: **BLAKE3-256** (`blockchainer::crypto::blake3_256`). Every hashed
+structure is prefixed with a 1-byte **domain tag** so a leaf can never collide
+with an internal node or a header:
+
+| Tag | Meaning |
+|-----|---------|
+| `0x00` | Merkle leaf:    `H(0x00 ‖ canonical(x))` |
+| `0x01` | Merkle node:    `H(0x01 ‖ left ‖ right)` |
+| `0x02` | Block header:   `H(0x02 ‖ canonical(header))` |
+| `0x03` | Transaction id: `H(0x03 ‖ canonical(tx))` |
+
+(Tags are provisional; finalized when the block/tx model lands in M1.)
+
+## Merkle commitment
+
+- Binary Merkle tree over `H_leaf(tx)` in block order.
+- **Odd node:** carry the lone node up unchanged (do **not** duplicate-last) — this
+  avoids the CVE-2012-2459 duplicate-node malleability class.
+- Inclusion proof = `(index, sibling_hashes[])`; verification recomputes the root.
+
+## Open items (resolve during M1)
+
+1. `u128` vs arbitrary-precision for value fields (ARCHITECTURE §17.1).
+2. State-trie key/proof format (§17.2).
+3. Final domain-tag table and any additional roots (receipts).

@@ -1,0 +1,12 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: blockchainer_c
+Description: Blockchainer C ABI (DLT core: ledger, BFT, mempool, interop)
+Version: 0.0.1
+# blockchainer_c links cryptolib's C ABI at runtime.
+Requires.private: cryptolib_c
+Libs: -L${libdir} -lblockchainer_c
+Cflags: -I${includedir}

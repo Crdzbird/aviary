@@ -1,0 +1,14 @@
+# Blockchainer golden vectors — BLAKE3-256.
+#
+# Source of truth for cross-language determinism (ARCHITECTURE §2). Every
+# language (C++ core, Dart, Go) must reproduce these EXACTLY. A binding that
+# disagrees on any line fails CI.
+#
+# Format:  <input-hex>  <blake3-256-hex>
+# (empty input is the literal token "" )
+#
+# The empty-input value is the official BLAKE3 test vector and externally
+# verifiable; the rest are snapshotted from the proven implementation.
+
+""            af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262
+626c6f636b636861696e6572  c9ab2bfe296411d91948b0afc12eda63d2a7ef470e95eb1cb390c58821d8c8ce

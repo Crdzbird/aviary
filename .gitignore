@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Blockchainer .gitignore
+# Native libraries and platform build outputs are NOT committed — they are large
+# and machine-built. Rebuild them with the scripts in scripts/ (and the sibling
+# cryptolib checkout). See each binding's README.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Build output (CMake / Gradle / SPM / Flutter, at any depth) ──
+build/
+build-*/
+/cmake-build-*/
+.gradle/
+.cxx/
+.build/
+DerivedData/
+
+# ── Native artifacts (rebuilt via scripts/) ──
+*.o
+*.a
+*.dylib
+*.so
+*.dll
+*.xcframework/
+**/jniLibs/
+**/prebuilds/
+**/native/
+
+# ── Go ──
+# Compiled example servers (extension-less binaries)
+/examples/atlas/server/atlas-server
+/examples/sentinel/server/sentinel-server
+/examples/interop/server/interop-server
+/bridge/bindings/go/**/blockchainer_demo
+
+# ── JVM ──
+/bridge/bindings/jvm/out/
+/bridge/bindings/jvm/demo.jar
+
+# ── Node ──
+node_modules/
+
+# ── Dart / Flutter ──
+.dart_tool/
+.packages
+pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+**/ephemeral/
+**/Flutter/Generated.xcconfig
+**/Flutter/flutter_export_environment.sh
+**/ServiceDefinitions.json
+**/.symlinks/
+**/Pods/
+
+# ── Local machine config / IDE ──
+local.properties
+.swiftpm/
+.idea/
+*.iml
+**/xcuserdata/
+.DS_Store

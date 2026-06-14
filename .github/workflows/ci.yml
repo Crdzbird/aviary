@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout blockchainer
+        uses: actions/checkout@v4
+        with:
+          path: blockchainer
+
+      # cryptolib is a separate repo blockchainer links against. Point CRYPTOLIB_REPO
+      # at your fork/mirror; this builds its self-contained C ABI.
+      - name: Checkout cryptolib
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.CRYPTOLIB_REPO || 'your-org/cryptolib' }}
+          path: cryptolib
+
+      - name: Install native deps
+        run: brew install cmake ninja libsodium liboqs blake3 openssl@3 go
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build cryptolib C ABI
+        working-directory: cryptolib
+        run: |
+          cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/release --target cryptolib_c
+
+      - name: Run blockchainer CI
+        working-directory: blockchainer
+        env:
+          CRYPTOLIB_ROOT: ${{ github.workspace }}/cryptolib
+        run: bash scripts/ci.sh

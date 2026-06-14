@@ -1,0 +1,57 @@
+name: blockchainer_flutter
+description: "Blockchainer for Flutter — a full DLT (ledger, BFT consensus, mempool, observability, light-client verification) plus EVM/Bitcoin/Solana interop, via dart:ffi. The native library is bundled per platform and loaded automatically; the crypto backend comes from the cryptolib_flutter package."
+version: 0.0.1
+# Cannot publish to pub.dev yet: depends on cryptolib_flutter via a local path
+# (cryptolib is not published). Consume via path/git with both repos side by side.
+publish_to: none
+repository: https://example.com/blockchainer
+issue_tracker: https://example.com/blockchainer/issues
+topics:
+  - blockchain
+  - ffi
+  - consensus
+  - crypto
+  - web3
+
+environment:
+  sdk: ^3.12.0
+  # Built-in Kotlin (Android) + Swift Package Manager (iOS/macOS) require 3.44+.
+  flutter: '>=3.44.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.3
+  # The high-level Dart API (FFI types + Node/Account + preload/instance).
+  blockchainer_dart:
+    path: ../dart
+  # Blockchainer links cryptolib's C ABI at runtime. cryptolib_flutter vendors
+  # the cryptolib native (dynamic CryptoLibC.xcframework on iOS/macOS, .so on
+  # Android) so it is present in the process — we depend on it instead of
+  # bundling a copy. Local path until cryptolib is published.
+  cryptolib_flutter:
+    path: ../../../../cryptolib/bridge/bindings/cryptolib_flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    # ffiPlugin: native code is bundled and loaded via dart:ffi (no method
+    # channel / plugin class). The prebuilt Blockchainer binary is vendored per
+    # platform — iOS/macOS as a DYNAMIC framework via the Swift Package
+    # (ios/macos/.../Package.swift), Android via jniLibs. blockchainer_c's
+    # cryptolib_* symbols are left undefined and resolve at runtime against the
+    # CryptoLibC framework / libcryptolib_c.so that cryptolib_flutter embeds.
+    platforms:
+      android:
+        # ffiPlugin bundles libblockchainer_c.so; BlockchainerStartup (a
+        # manifest-registered ContentProvider) warms it off the main thread at
+        # launch (loading libcryptolib_c first, then libblockchainer_c).
+        ffiPlugin: true
+      ios:
+        ffiPlugin: true
+      macos:
+        ffiPlugin: true

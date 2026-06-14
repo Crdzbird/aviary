@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+// Atlas Settlement Network — a wholesale settlement & tokenized-asset platform
+// built on Blockchainer. Operators launch custom settlement chains (BFT, instant
+// finality); institutions hold custodial wallets; settlements finalize with
+// cryptographic balance proofs; and wallets interact with EVM smart contracts
+// (ERC-20) for cross-chain bridging. All blockchain work happens server-side via
+// the Blockchainer Go binding.
+package atlas.v1;
+
+option go_package = "atlas/gen;atlasv1";
+
+service Atlas {
+  // Chains (settlement rails).
+  rpc CreateChain(CreateChainRequest) returns (Chain);
+  rpc ListChains(Empty) returns (ChainList);
+
+  // Wallets (institutional custody accounts).
+  rpc CreateWallet(CreateWalletRequest) returns (Wallet);
+  rpc ListWallets(ChainRef) returns (WalletList);
+  rpc GetWallet(WalletRef) returns (Wallet);
+  rpc IssueFunds(IssueRequest) returns (Wallet);   // treasury issuance (genesis credit)
+
+  // Settlement + finality.
+  rpc Settle(SettleRequest) returns (SettlementReceipt);
+  rpc ProduceBlock(ChainRef) returns (Block);      // finalize the pending batch (BFT)
+
+  // Auditability: a verifiable light-client proof of a wallet's balance.
+  rpc GetBalanceProof(WalletRef) returns (BalanceProof);
+
+  // Smart contracts (EVM): build + sign a real ERC-20 transfer to broadcast.
+  rpc BuildErc20Transfer(Erc20Request) returns (SignedEvmTx);
+  rpc FunctionSelector(SelectorRequest) returns (SelectorReply);
+
+  rpc GetMetrics(ChainRef) returns (Metrics);
+
+  // Live ledger feed (server-streaming): admissions, finalizations, removals.
+  rpc StreamEvents(ChainRef) returns (stream Event);
+}
+
+message Empty {}
+
+message CreateChainRequest {
+  string name = 1;
+  uint64 chain_id = 2;
+  string native_symbol = 3;   // e.g. "EURx", "USDx"
+}
+message Chain {
+  string name = 1;
+  uint64 chain_id = 2;
+  string native_symbol = 3;
+  uint64 height = 4;
+  uint32 wallet_count = 5;
+  uint64 total_issued = 6;
+}
+message ChainList { repeated Chain chains = 1; }
+message ChainRef { uint64 chain_id = 1; }
+
+message CreateWalletRequest {
+  uint64 chain_id = 1;
+  string label = 2;
+  string institution = 3;     // e.g. "Banco Atlas", "Meridian Capital"
+}
+message Wallet {
+  string id = 1;
+  string label = 2;
+  string institution = 3;
+  string address = 4;         // native settlement-chain address (hex)
+  uint64 balance = 5;
+  uint64 nonce = 6;
+  // Cross-chain receive addresses (for bridging external assets in).
+  string eth_address = 7;
+  string btc_address = 8;
+  string sol_address = 9;
+}
+message WalletList { repeated Wallet wallets = 1; }
+message WalletRef { uint64 chain_id = 1; string wallet_id = 2; }
+message IssueRequest { uint64 chain_id = 1; string wallet_id = 2; uint64 amount = 3; }
+
+message SettleRequest {
+  uint64 chain_id = 1;
+  string from_wallet_id = 2;
+  string to_wallet_id = 3;
+  uint64 amount = 4;
+  string memo = 5;
+}
+message SettlementReceipt {
+  string txid = 1;
+  uint64 chain_id = 2;
+  string from_address = 3;
+  string to_address = 4;
+  uint64 amount = 5;
+  bool finalized = 6;         // false = in mempool awaiting the next block
+}
+
+message Block { uint64 height = 1; uint64 tx_count = 2; string state_root = 3; }
+
+message BalanceProof {
+  uint64 balance = 1;
+  string state_root = 2;
+  bool verified = 3;          // re-verified against the root via the light client
+  uint32 proof_bytes = 4;
+}
+
+message Erc20Request {
+  uint64 chain_id = 1;
+  string wallet_id = 2;       // signs with this wallet's secp256k1 key
+  string token_address = 3;   // ERC-20 contract, 0x… (20 bytes)
+  string to_address = 4;      // recipient, 0x…
+  uint64 amount = 5;
+  uint64 nonce = 6;
+  uint64 gas_price = 7;
+  uint64 gas_limit = 8;
+  uint64 evm_chain_id = 9;    // 1 = mainnet, 11155111 = sepolia, …
+}
+message SignedEvmTx {
+  string raw_tx_hex = 1;      // 0x…  ready for eth_sendRawTransaction
+  string calldata_hex = 2;    // the ABI-encoded transfer() call
+  string from_address = 3;    // signer's ETH address (EIP-55)
+}
+message SelectorRequest { string signature = 1; }
+message SelectorReply { string selector_hex = 1; }
+
+message Metrics { uint64 height = 1; uint64 blocks = 2; uint64 transactions = 3; uint64 mempool = 4; }
+
+enum EventType {
+  EVENT_UNSPECIFIED = 0;
+  TX_ADMITTED = 1;
+  BLOCK_FINALIZED = 2;
+  TX_REMOVED = 3;
+}
+message Event {
+  EventType type = 1;
+  uint64 chain_id = 2;
+  uint64 height = 3;
+  uint64 tx_count = 4;
+  string txid = 5;
+  uint64 mempool_size = 6;
+  string state_root = 7;
+  int64 unix_millis = 8;
+}

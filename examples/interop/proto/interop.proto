@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+// Interop — proves the Blockchainer ledger is byte-identical across language
+// bindings. A Go server (blockchainer Go binding, full node) and a Flutter
+// client (blockchainer_flutter, native) each run the ledger independently and
+// cross-check three directions:
+//
+//   • go → flutter : the server builds a chain and returns a light-client proof;
+//                    the client VERIFIES it locally against the state root.
+//   • flutter → go : the client builds a chain and produces a proof; the server
+//                    VERIFIES it.
+//   • go ↔ flutter : both compute the SAME canonical bytes (BLAKE3 hash, canonical
+//                    txid, header hash) and apply the SAME deterministic scenario;
+//                    the state roots must match byte-for-byte. A mismatch is a
+//                    consensus fork between bindings.
+package interop.v1;
+
+option go_package = "interop/gen;interopv1";
+
+service Interop {
+  // go ↔ flutter: compute canonical bytes for identical inputs (determinism).
+  rpc ComputeCanonical(CanonicalInput) returns (CanonicalOutput);
+
+  // go → flutter: the server builds the scenario and returns a verifiable proof.
+  rpc BuildChain(ChainScenario) returns (ChainResult);
+
+  // flutter → go: the server verifies a proof the client produced.
+  rpc VerifyProof(ProofBundle) returns (VerifyResult);
+}
+
+// Inputs for the canonical-bytes handshake.
+message CanonicalInput {
+  bytes message = 1;          // BLAKE3 input
+
+  // canonical txid fields
+  uint32 tx_version = 2;
+  uint64 chain_id = 3;
+  bytes tx_body = 4;
+  bytes tx_author = 5;        // 32-byte public key
+  bytes tx_signature = 6;     // 64-byte signature
+
+  // canonical header-hash fields
+  uint32 hdr_version = 7;
+  uint64 height = 8;
+  bytes parent_hash = 9;      // 32 bytes
+  uint64 timestamp = 10;
+  bytes tx_root = 11;         // 32 bytes
+  bytes state_root = 12;      // 32 bytes
+  bytes consensus = 13;
+}
+message CanonicalOutput {
+  bytes hash = 1;             // BLAKE3-256(message)
+  bytes txid = 2;             // canonical txid
+  bytes header_hash = 3;      // canonical header hash
+}
+
+// A deterministic scenario both sides apply identically. Sharing the secrets
+// makes the accounts (and the Ed25519-signed transfers, which are deterministic)
+// byte-identical, so the resulting state roots must match.
+message ChainScenario {
+  uint64 chain_id = 1;
+  bytes alice_secret = 2;     // 64-byte Ed25519 secret
+  bytes bob_secret = 3;
+  uint64 alice_credit = 4;    // genesis credit to Alice
+  uint64 transfer_amount = 5; // Alice → Bob
+  uint64 timestamp = 6;       // block timestamp
+}
+message ChainResult {
+  uint64 height = 1;
+  bytes state_root = 2;
+  bytes alice_address = 3;
+  bytes bob_address = 4;
+  uint64 alice_balance = 5;
+  uint64 bob_balance = 6;
+  bytes proof = 7;            // state-inclusion proof for Bob
+}
+
+message ProofBundle {
+  bytes state_root = 1;
+  bytes proof = 2;
+}
+message VerifyResult { bool ok = 1; }

@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+      Startup hook: Android instantiates this ContentProvider very early in app
+      launch (before the first frame), so its onCreate() warms libcryptolib_c +
+      libblockchainer_c on a background thread before the first native call.
+      authorities uses ${applicationId} so it is unique per host app. Not
+      exported; never queried.
+    -->
+    <provider
+      android:name="com.blockchainer.android.BlockchainerStartup"
+      android:authorities="${applicationId}.blockchainer-startup"
+      android:exported="false"
+      android:initOrder="90" />
+  </application>
+</manifest>

@@ -1,0 +1,22 @@
+{
+  "name": "blockchainer",
+  "version": "0.0.1",
+  "description": "Blockchainer for Node.js — a full DLT (ledger, BFT consensus, mempool, observability, light-client verification) plus EVM/Bitcoin/Solana interop, via koffi FFI. The native library is bundled and loaded automatically; preload() warms it off the main thread.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "prebuilds/"
+  ],
+  "scripts": {
+    "test": "node test/preload.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  },
+  "license": "MIT"
+}

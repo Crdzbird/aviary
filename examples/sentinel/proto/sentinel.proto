@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+// Sentinel — a tamper-evident DEVICE PROVENANCE LEDGER built on Blockchainer.
+//
+// A device enrolls by sending its hardware information + a credential; the server
+// derives a chain whose GENESIS/ORIGIN block is cryptographically bound to that
+// exact device + credential (its "birth certificate"). Thereafter the device
+// streams data — photos, video chunks, GPS locations, sensor readings — and each
+// item's BLAKE3 content hash is ANCHORED on the device's chain with BFT finality.
+//
+// The raw media never goes on-chain; only its hash + metadata are anchored, so
+// anyone can later prove a given photo/clip/reading existed at a point in time and
+// has not been altered (proof-of-existence + integrity) via a light-client state
+// proof. Real use cases: bodycam/dashcam evidence integrity, field-sensor audit
+// trails, supply-chain telemetry, mobile-device attestation.
+//
+// All ledger work happens server-side through the Blockchainer Go binding; the
+// device app is a thin gRPC client.
+package sentinel.v1;
+
+option go_package = "sentinel/gen;sentinelv1";
+
+service Sentinel {
+  // Enroll a device. The device info + credential generate the genesis/origin
+  // block; the returned chain is bound to this device for its lifetime.
+  rpc ProvisionDevice(DeviceInfo) returns (Provenance);
+
+  // The live capture pipeline: the device streams data records, the server
+  // anchors each one and streams back anchoring receipts (pending → finalized).
+  // Bidirectional so finality receipts arrive asynchronously as blocks seal.
+  rpc StreamData(stream DataRecord) returns (stream AnchorReceipt);
+
+  // Prove a previously-anchored item is committed in the chain (integrity check).
+  rpc VerifyRecord(VerifyRequest) returns (VerifyReply);
+
+  // Ledger status + Prometheus-style metrics for the device chain.
+  rpc GetLedger(DeviceRef) returns (LedgerStatus);
+}
+
+message DeviceInfo {
+  string device_id = 1;        // stable per-install id
+  string model = 2;            // e.g. "iPhone16,2"
+  string platform = 3;         // e.g. "ios", "android"
+  string os_version = 4;
+  string label = 5;            // human label, e.g. "Patrol Unit 7 bodycam"
+  bytes credential = 6;        // device-held secret/public credential (enrollment proof)
+}
+
+message Provenance {
+  uint64 chain_id = 1;         // deterministically derived from the device fingerprint
+  string device_fingerprint = 2; // BLAKE3(device info ‖ credential), hex
+  string genesis_hash = 3;     // origin block state root, hex
+  string device_address = 4;   // device's on-chain identity (hex)
+  uint64 genesis_height = 5;   // 1 once the origin block is sealed
+}
+
+enum DataKind {
+  DATA_UNSPECIFIED = 0;
+  PHOTO = 1;
+  VIDEO = 2;
+  LOCATION = 3;
+  SENSOR = 4;
+}
+
+message DataRecord {
+  uint64 chain_id = 1;
+  DataKind kind = 2;
+  // The captured bytes (a photo, a video chunk). The server hashes these with
+  // BLAKE3. For LOCATION/SENSOR records this may be empty and the canonical
+  // metadata below is hashed instead.
+  bytes payload = 3;
+  string mime = 4;             // e.g. "image/jpeg", "video/mp4"
+  double lat = 5;              // LOCATION
+  double lon = 6;              // LOCATION
+  double accuracy_m = 7;       // LOCATION
+  map<string, double> sensors = 8; // SENSOR readings, e.g. {"temp_c":21.4,"accel_g":1.02}
+  int64 captured_unix_millis = 9;
+  string note = 10;            // optional caption/context, also bound into the hash
+}
+
+message AnchorReceipt {
+  uint64 sequence = 1;         // device-local record index
+  DataKind kind = 2;
+  string content_hash = 3;     // BLAKE3 of the record, hex — the anchored identifier
+  string txid = 4;
+  bool finalized = 5;          // false = anchored in mempool; true = sealed in a block
+  uint64 height = 6;           // block height once finalized
+  string summary = 7;          // human one-liner (e.g. "GPS 37.77,-122.41")
+  int64 anchored_unix_millis = 8;
+}
+
+message VerifyRequest {
+  uint64 chain_id = 1;
+  string content_hash = 2;     // hex
+}
+message VerifyReply {
+  bool anchored = 1;           // the hash is present in chain state
+  bool verified = 2;           // state-inclusion proof re-verified against the root
+  uint64 height = 3;
+  string state_root = 4;
+  uint32 proof_bytes = 5;
+}
+
+message DeviceRef { uint64 chain_id = 1; }
+message LedgerStatus {
+  uint64 chain_id = 1;
+  string device_address = 2;
+  string device_fingerprint = 3;
+  uint64 height = 4;
+  uint64 records = 5;          // total anchored records
+  uint64 mempool = 6;          // pending (not yet finalized)
+  string state_root = 7;
+  map<string, uint64> kind_counts = 8; // anchored counts by kind name
+}

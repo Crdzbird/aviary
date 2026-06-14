@@ -1,0 +1,188 @@
+cmake_minimum_required(VERSION 3.20)
+project(blockchainer VERSION 0.0.1 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# Hidden by default; the C ABI marks its exports explicitly (BLOCKCHAINER_API).
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+
+# Optional AddressSanitizer + UndefinedBehaviorSanitizer over all targets. The
+# deterministic fuzz-lite test then runs under sanitizers in `ctest`.
+option(BLOCKCHAINER_SANITIZE "Build with ASan + UBSan" OFF)
+if(BLOCKCHAINER_SANITIZE)
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
+# Optional libFuzzer targets (needs a libFuzzer-capable clang, e.g. LLVM clang).
+option(BLOCKCHAINER_BUILD_FUZZERS "Build libFuzzer targets" OFF)
+
+# Build the C ABI as a STATIC archive (for an XCFramework / static linking into
+# an app). In this mode we do NOT link cryptolib_c — its symbols are resolved
+# when the final app links (alongside cryptolib's own static lib). Only the
+# header is needed. Forced on for iOS.
+option(BLOCKCHAINER_STATIC "Build blockchainer_c as a STATIC archive" OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(BLOCKCHAINER_STATIC ON CACHE BOOL "Force STATIC on iOS" FORCE)
+endif()
+
+# Cross-compiles only want the library; skip tests/tools/example.
+option(BLOCKCHAINER_BUILD_TESTS "Build the test suite + tools" ON)
+if(BLOCKCHAINER_STATIC OR CMAKE_CROSSCOMPILING)
+  set(BLOCKCHAINER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+endif()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Locate the prebuilt cryptolib_c C ABI.
+# Decision (ARCHITECTURE §3): link cryptolib's self-contained C ABI, not its
+# header-only C++ API — decouples our build from cryptolib's transitive deps.
+# Override the checkout location with -DCRYPTOLIB_ROOT=<path> if not a sibling.
+# ─────────────────────────────────────────────────────────────────────────────
+set(CRYPTOLIB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../cryptolib"
+    CACHE PATH "Path to the cryptolib checkout")
+
+find_path(CRYPTOLIB_C_INCLUDE_DIR
+  NAMES cryptolib_c.h
+  HINTS "${CRYPTOLIB_ROOT}/bridge"
+  NO_DEFAULT_PATH)
+
+if(NOT CRYPTOLIB_C_INCLUDE_DIR)
+  message(FATAL_ERROR "cryptolib_c.h not found — set -DCRYPTOLIB_ROOT=<path>.")
+endif()
+message(STATUS "blockchainer: cryptolib_c header  = ${CRYPTOLIB_C_INCLUDE_DIR}")
+
+# The cryptolib BINARY is only needed when we actually link it (the host SHARED
+# build, or an Android .so). For a STATIC archive its symbols resolve at app
+# link, so the library is optional. Pass -DCRYPTOLIB_C_LIBRARY=<path> to override
+# (e.g. point at the Android libcryptolib_c.so).
+if(NOT BLOCKCHAINER_STATIC)
+  if(NOT CRYPTOLIB_C_LIBRARY)
+    find_library(CRYPTOLIB_C_LIBRARY
+      NAMES cryptolib_c
+      HINTS
+        "${CRYPTOLIB_ROOT}/build/selfcontained"
+        "${CRYPTOLIB_ROOT}/build/release"
+        "${CRYPTOLIB_ROOT}/build"
+      NO_DEFAULT_PATH)
+  endif()
+  if(NOT CRYPTOLIB_C_LIBRARY)
+    message(FATAL_ERROR "cryptolib_c library not found — build it or pass -DCRYPTOLIB_C_LIBRARY=<path>.")
+  endif()
+  get_filename_component(CRYPTOLIB_C_LIBDIR "${CRYPTOLIB_C_LIBRARY}" DIRECTORY)
+  message(STATUS "blockchainer: cryptolib_c library = ${CRYPTOLIB_C_LIBRARY}")
+endif()
+
+# ── Core static library ──────────────────────────────────────────────────────
+add_library(blockchainer_core STATIC
+  src/version.cpp
+  src/crypto/cryptolib_backend.cpp
+  src/codec/codec.cpp
+  src/core/merkle.cpp
+  src/core/types.cpp
+  src/state/account_state.cpp
+  src/state/utxo_state.cpp
+  src/core/ledger.cpp
+  src/consensus/consensus.cpp
+  src/consensus/bft_engine.cpp
+  src/p2p/mempool.cpp
+  src/p2p/secure_session.cpp
+  src/p2p/wire.cpp
+  src/observability/metrics.cpp
+  src/observability/log.cpp
+  src/client/light_client.cpp
+  src/client/proofs.cpp
+  src/interop/rlp.cpp
+  src/interop/evm.cpp
+  src/interop/abi.cpp
+  src/interop/json.cpp
+  src/interop/rpc.cpp
+  src/interop/eth_client.cpp
+  src/interop/encoding.cpp
+  src/interop/solana.cpp
+  src/interop/bitcoin.cpp
+  src/interop/bridge.cpp
+  src/node/demo_node.cpp)
+target_include_directories(blockchainer_core
+  PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  PRIVATE "${CRYPTOLIB_C_INCLUDE_DIR}")
+set_target_properties(blockchainer_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(NOT BLOCKCHAINER_STATIC)
+  target_link_libraries(blockchainer_core PRIVATE "${CRYPTOLIB_C_LIBRARY}")
+endif()
+
+# ── C ABI library: SHARED on host (loaded by bindings), STATIC for XCFramework ─
+if(BLOCKCHAINER_STATIC)
+  add_library(blockchainer_c STATIC bridge/blockchainer_c.cpp)
+else()
+  add_library(blockchainer_c SHARED bridge/blockchainer_c.cpp)
+  target_compile_definitions(blockchainer_c PRIVATE BLOCKCHAINER_BUILD_SHARED)
+  set_target_properties(blockchainer_c PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+endif()
+target_include_directories(blockchainer_c
+  PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/bridge"
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(blockchainer_c PRIVATE blockchainer_core)
+
+if(NOT BLOCKCHAINER_BUILD_TESTS)
+  return()  # cross / static builds only need the library
+endif()
+
+# ── Golden-vector generator (not a test; documents how vectors are derived) ──
+add_executable(print_vectors tools/print_vectors.cpp)
+target_link_libraries(print_vectors PRIVATE blockchainer_core)
+set_target_properties(print_vectors PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+
+# ── Tests (zero-dependency runner, matching cryptolib's convention) ──────────
+enable_testing()
+
+# One executable per test file; each links the core and is registered with ctest.
+function(blockchainer_add_test name source)
+  add_executable(${name} ${source})
+  target_link_libraries(${name} PRIVATE blockchainer_core)
+  target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+  set_target_properties(${name} PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+  add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+blockchainer_add_test(test_smoke tests/test_smoke.cpp)
+blockchainer_add_test(test_codec tests/test_codec.cpp)
+blockchainer_add_test(test_merkle tests/test_merkle.cpp)
+blockchainer_add_test(test_types tests/test_types.cpp)
+blockchainer_add_test(test_ledger tests/test_ledger.cpp)
+blockchainer_add_test(test_utxo tests/test_utxo.cpp)
+blockchainer_add_test(test_codec_fuzz tests/test_codec_fuzz.cpp)
+blockchainer_add_test(test_bls tests/test_bls.cpp)
+blockchainer_add_test(test_consensus tests/test_consensus.cpp)
+blockchainer_add_test(test_bft tests/test_bft.cpp)
+blockchainer_add_test(test_mempool tests/test_mempool.cpp)
+blockchainer_add_test(test_secure_session tests/test_secure_session.cpp)
+blockchainer_add_test(test_wire tests/test_wire.cpp)
+blockchainer_add_test(test_p2p_integration tests/test_p2p_integration.cpp)
+blockchainer_add_test(test_observability tests/test_observability.cpp)
+blockchainer_add_test(test_observability_integration tests/test_observability_integration.cpp)
+blockchainer_add_test(test_verification tests/test_verification.cpp)
+blockchainer_add_test(test_interop_crypto tests/test_interop_crypto.cpp)
+blockchainer_add_test(test_rlp tests/test_rlp.cpp)
+blockchainer_add_test(test_evm tests/test_evm.cpp)
+blockchainer_add_test(test_abi tests/test_abi.cpp)
+blockchainer_add_test(test_eth_rpc tests/test_eth_rpc.cpp)
+blockchainer_add_test(test_encoding tests/test_encoding.cpp)
+blockchainer_add_test(test_solana tests/test_solana.cpp)
+blockchainer_add_test(test_bitcoin tests/test_bitcoin.cpp)
+blockchainer_add_test(test_bridge tests/test_bridge.cpp)
+blockchainer_add_test(test_demo_node tests/test_demo_node.cpp)
+
+if(BLOCKCHAINER_BUILD_FUZZERS)
+  add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
+  target_link_libraries(fuzz_codec PRIVATE blockchainer_core)
+  target_compile_options(fuzz_codec PRIVATE -fsanitize=fuzzer,address,undefined)
+  target_link_options(fuzz_codec PRIVATE -fsanitize=fuzzer,address,undefined)
+  set_target_properties(fuzz_codec PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+endif()
