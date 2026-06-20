@@ -89,17 +89,25 @@ node.produceBlock(DateTime.now().millisecondsSinceEpoch); // BFT finalize
 
 node.balance(bob.address);                     // 250
 
-// Light-client proof
+// Light-client verification
 bc.verifyStateProof(node.stateRoot(), node.proveAccount(bob.address)); // true
+bc.verifyTxInclusion(txRoot, txProof);
+bc.verifyCommit(chainId, validatorSet, commitCert);
 
 // Streaming + observability
 node.drainEvents();                            // JSON event feed
 node.metrics();                                // Prometheus snapshot
 
-// Interop
+// Interop addresses
 bc.ethAddress(secret32);                       // 0x… (EIP-55)
 bc.btcAddress(secret32);                       // bc1…
 bc.solAddress(edSecret64);                     // base58
+
+// EVM smart contracts (sign locally — no server needed)
+bc.ethSelector('transfer(address,uint256)');           // 0xa9059cbb
+final data = bc.ethErc20TransferCalldata(to20, amount);
+final rawTx = bc.ethSignLegacy(nonce: 0, gasPrice: 30e9.toInt(), gasLimit: 60000,
+    to: token20, data: data, chainId: 1, secret32: secp256k1Secret);
 ```
 
 Free a node when done: `node.dispose()`.

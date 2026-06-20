@@ -63,6 +63,18 @@ typedef _HeaderC = _BufResult Function(Uint8, Uint64, Uint64, Pointer<Uint8>,
     Uint64, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Size);
 typedef _HeaderD = _BufResult Function(int, int, int, Pointer<Uint8>, int,
     Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, int);
+typedef _VerifyCommitC = Int32 Function(
+    Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _VerifyCommitD = int Function(
+    int, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _Erc20C = _BufResult Function(Pointer<Uint8>, Uint64);
+typedef _Erc20D = _BufResult Function(Pointer<Uint8>, int);
+typedef _SelectorC = _BufResult Function(Pointer<Utf8>);
+typedef _SelectorD = _BufResult Function(Pointer<Utf8>);
+typedef _SignLegacyC = _BufResult Function(Uint64, Uint64, Uint64, Pointer<Uint8>,
+    Int32, Uint64, Pointer<Uint8>, Size, Uint64, Pointer<Uint8>);
+typedef _SignLegacyD = _BufResult Function(int, int, int, Pointer<Uint8>, int,
+    int, Pointer<Uint8>, int, int, Pointer<Uint8>);
 typedef _BufFreeC = Void Function(Pointer<_Buffer>);
 typedef _BufFreeD = void Function(Pointer<_Buffer>);
 typedef _StrFreeC = Void Function(Pointer<Utf8>);
@@ -261,6 +273,68 @@ class Blockchainer {
   String btcAddress(Uint8List secret32) => _addr('blockchainer_btc_address', secret32);
   String solAddress(Uint8List edSecret64) => _addr('blockchainer_sol_address', edSecret64);
 
+  // ── EVM smart-contract interaction ─────────────────────────────────────────
+
+  /// ABI-encoded calldata for ERC-20 transfer(address,uint256). [to20] is 20 bytes.
+  Uint8List ethErc20TransferCalldata(Uint8List to20, int amount) {
+    final p = _alloc(to20);
+    try {
+      return _take(
+          lib.lookupFunction<_Erc20C, _Erc20D>('blockchainer_eth_erc20_transfer')(p, amount),
+          'ethErc20TransferCalldata');
+    } finally {
+      calloc.free(p);
+    }
+  }
+
+  /// ABI 4-byte function selector for a signature, e.g. "balanceOf(address)".
+  Uint8List ethSelector(String signature) {
+    final s = signature.toNativeUtf8();
+    try {
+      return _take(lib.lookupFunction<_SelectorC, _SelectorD>('blockchainer_eth_selector')(s),
+          'ethSelector');
+    } finally {
+      calloc.free(s);
+    }
+  }
+
+  /// Sign an EVM legacy (EIP-155) transaction with a 32-byte secp256k1 key.
+  /// Pass [to] = null for contract creation; [data] = null for a value transfer.
+  /// Returns the raw signed RLP transaction, ready for eth_sendRawTransaction.
+  Uint8List ethSignLegacy({
+    required int nonce,
+    required int gasPrice,
+    required int gasLimit,
+    Uint8List? to,
+    int value = 0,
+    Uint8List? data,
+    required int chainId,
+    required Uint8List secret32,
+  }) {
+    final pTo = _alloc(to ?? Uint8List(0));
+    final pData = _alloc(data ?? Uint8List(0));
+    final pSecret = _alloc(secret32);
+    try {
+      return _take(
+          lib.lookupFunction<_SignLegacyC, _SignLegacyD>('blockchainer_eth_sign_legacy')(
+              nonce,
+              gasPrice,
+              gasLimit,
+              pTo,
+              to != null && to.length == 20 ? 1 : 0,
+              value,
+              pData,
+              data?.length ?? 0,
+              chainId,
+              pSecret),
+          'ethSignLegacy');
+    } finally {
+      calloc.free(pTo);
+      calloc.free(pData);
+      calloc.free(pSecret);
+    }
+  }
+
   bool verifyStateProof(Uint8List stateRoot, Uint8List proof) {
     final pr = _alloc(stateRoot);
     final pp = _alloc(proof);
@@ -271,6 +345,36 @@ class Blockchainer {
     } finally {
       calloc.free(pr);
       calloc.free(pp);
+    }
+  }
+
+  /// Verify a transaction-inclusion proof against a 32-byte txRoot.
+  bool verifyTxInclusion(Uint8List txRoot, Uint8List proof) {
+    final pr = _alloc(txRoot);
+    final pp = _alloc(proof);
+    try {
+      return lib.lookupFunction<_VerifyC, _VerifyD>('blockchainer_verify_tx_inclusion')(
+              pr, pp, proof.length) ==
+          1;
+    } finally {
+      calloc.free(pr);
+      calloc.free(pp);
+    }
+  }
+
+  /// Verify a BFT commit certificate against an encoded validator set. Returns
+  /// false for any malformed input.
+  bool verifyCommit(int chainId, Uint8List validatorSet, Uint8List cert) {
+    final pv = _alloc(validatorSet);
+    final pc = _alloc(cert);
+    try {
+      return lib.lookupFunction<_VerifyCommitC, _VerifyCommitD>(
+              'blockchainer_verify_commit')(
+              chainId, pv, validatorSet.length, pc, cert.length) ==
+          1;
+    } finally {
+      calloc.free(pv);
+      calloc.free(pc);
     }
   }
 
