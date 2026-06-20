@@ -35,20 +35,34 @@ func main() {
 	_, _, bAddr, _ := node.NewAccount()
 	node.Credit(aAddr, 1_000_000)
 	node.SubmitTransfer(aSec, bAddr, 250_000, node.Nonce(aAddr))
+	fmt.Printf("\nmempool before block: %d\n", node.MempoolSize())
 	height, _ := node.ProduceBlock(1)
 
-	fmt.Printf("\nledger: height %d · alice %d · bob %d\n",
-		height, node.Balance(aAddr), node.Balance(bAddr))
+	fmt.Printf("ledger: height %d · alice %d · bob %d · stateRoot %s…\n",
+		height, node.Balance(aAddr), node.Balance(bAddr),
+		hex.EncodeToString(node.StateRoot())[:16])
 
-	// Light-client proof.
+	// Light-client verification (state proof, tx-inclusion, commit cert).
 	proof := node.ProveAccount(bAddr)
 	fmt.Println("state proof verifies:", bc.VerifyStateProof(node.StateRoot(), proof))
+	fmt.Println("tx-inclusion rejects garbage:", !bc.VerifyTxInclusion(node.StateRoot(), []byte("x")))
+	fmt.Println("commit cert rejects garbage:", !bc.VerifyCommit(1, nil, nil))
 
-	// EVM contract: build + sign an ERC-20 transfer.
+	// Streaming events + observability.
+	fmt.Println("\nevents:", node.DrainEvents())
+	fmt.Print("metrics:\n", node.Metrics())
+
+	// Multi-chain interop address derivation.
 	secp, _ := cryptolib.RandomBytes(32)
 	secp[0] |= 1
+	fmt.Println("\ninterop addresses")
+	fmt.Println("  ethereum:", bc.EthAddress(secp))
+	fmt.Println("  bitcoin :", bc.BtcAddress(secp))
+	fmt.Println("  solana  :", bc.SolAddress(aSec)) // 64-byte ed25519 secret
+
+	// EVM contract: build + sign an ERC-20 transfer.
 	calldata := bc.EthErc20TransferCalldata(make([]byte, 20), 1_000_000)
 	raw, _ := bc.EthSignLegacy(0, 30_000_000_000, 60_000, make([]byte, 20), 0, calldata, 1, secp)
-	fmt.Printf("eth %s · selector 0x%x · signed tx %d bytes\n",
-		bc.EthAddress(secp), bc.EthSelector("transfer(address,uint256)"), len(raw))
+	fmt.Printf("  erc20 transfer selector 0x%x · signed tx %d bytes\n",
+		bc.EthSelector("transfer(address,uint256)"), len(raw))
 }

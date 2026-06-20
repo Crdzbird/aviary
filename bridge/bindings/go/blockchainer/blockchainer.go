@@ -140,3 +140,12 @@ func VerifyTxInclusion(txRoot, proof []byte) bool {
 	ensure()
 	return C.blockchainer_verify_tx_inclusion(bp(txRoot), bp(proof), C.size_t(len(proof))) == 1
 }
+
+// VerifyCommit verifies a BFT commit certificate against an encoded validator
+// set (both produced by the C++ core). Returns false for any malformed input.
+func VerifyCommit(chainID uint64, validatorSet, cert []byte) bool {
+	ensure()
+	return C.blockchainer_verify_commit(C.uint64_t(chainID),
+		bp(validatorSet), C.size_t(len(validatorSet)),
+		bp(cert), C.size_t(len(cert))) == 1
+}

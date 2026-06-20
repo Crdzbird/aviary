@@ -28,9 +28,13 @@ dependencies:
   # Blockchainer links cryptolib's C ABI at runtime. cryptolib_flutter vendors
   # the cryptolib native (dynamic CryptoLibC.xcframework on iOS/macOS, .so on
   # Android) so it is present in the process — we depend on it instead of
-  # bundling a copy. Local path until cryptolib is published.
+  # bundling a copy. Pulled from git so this package is consumable via git
+  # (a relative path would escape the repository under git resolution).
   cryptolib_flutter:
-    path: ../../../../cryptolib/bridge/bindings/cryptolib_flutter
+    git:
+      url: git@github.com:Crdzbird/CryptoLib.git
+      ref: feat/evm-btc-and-go-library
+      path: bridge/bindings/cryptolib_flutter
 
 dev_dependencies:
   flutter_test:
