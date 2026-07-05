@@ -100,6 +100,24 @@ func TestInterop(t *testing.T) {
 	}
 }
 
+// Cross-binding naming aliases forward to the Go-idiomatic names.
+func TestAliases(t *testing.T) {
+	if err := bc.EnsureInitialized(); err != nil { // == Init
+		t.Fatalf("EnsureInitialized: %v", err)
+	}
+	if !bc.IsInitialized() { // == Initialized
+		t.Fatal("IsInitialized false")
+	}
+	if bc.CryptoBackend() != bc.CryptoBackendVersion() {
+		t.Fatal("CryptoBackend alias mismatch")
+	}
+	n := bc.CreateNode(1234) // == NewNode
+	if n == nil {
+		t.Fatal("CreateNode returned nil")
+	}
+	n.Dispose() // == Free
+}
+
 // The verify-only entry points must reject malformed input (never crash). Valid
 // inputs are produced by the core's prove/commit paths.
 func TestVerifyRejectsGarbage(t *testing.T) {

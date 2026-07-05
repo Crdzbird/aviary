@@ -170,6 +170,9 @@ class Blockchainer {
   /// Whether [instance] is ready to use without any load work on this isolate.
   static bool get isInitialized => _singleton != null;
 
+  /// Alias for [isInitialized] (naming parity with the Go binding's Initialized).
+  static bool get initialized => isInitialized;
+
   /// Initialize the native backend **off the UI isolate** and complete when it
   /// is ready to use.
   ///
@@ -200,6 +203,9 @@ class Blockchainer {
     await _warming;
     _singleton ??= Blockchainer.load();
   }
+
+  /// Alias for [ensureInitialized] (naming parity with the Go binding's Init).
+  static Future<void> init() => ensureInitialized();
 
   /// Optionally warm the native library off the UI isolate.
   ///
@@ -233,6 +239,9 @@ class Blockchainer {
   String cryptoBackend() => lib
       .lookupFunction<_PtrVoid, _PtrVoid>('blockchainer_crypto_backend_version')()
       .toDartString();
+
+  /// Alias for [cryptoBackend] (naming parity with Go's CryptoBackendVersion).
+  String cryptoBackendVersion() => cryptoBackend();
 
   Uint8List _take(_BufResult r, String op) {
     if (r.buf.data == nullptr) {
@@ -438,6 +447,9 @@ class Blockchainer {
     if (h == nullptr) throw BlockchainerException('node creation failed');
     return Node._(this, h);
   }
+
+  /// Alias for [createNode] (naming parity with the Go binding's NewNode).
+  Node newNode(int chainId) => createNode(chainId);
 }
 
 /// A running chain node.
@@ -548,4 +560,7 @@ class Node {
 
   void dispose() =>
       _lib.lookupFunction<_NodeFreeC, _NodeFreeD>('blockchainer_node_free')(_h);
+
+  /// Alias for [dispose] (naming parity with the Go binding's Free).
+  void free() => dispose();
 }
