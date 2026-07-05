@@ -8,6 +8,7 @@
 #include <string>
 
 #include "blockchainer/account_state.hpp"
+#include "blockchainer/block_store.hpp"
 #include "blockchainer/consensus.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/interop/bridge.hpp"
@@ -76,6 +77,7 @@ int main() {
     totality_ok &= total([&] { (void)Receipt::decode_all(v); });
     totality_ok &= total([&] { (void)AccountStateMachine::deserialize(v); });
     totality_ok &= total([&] { (void)UtxoStateMachine::deserialize(v); });
+    totality_ok &= total([&] { (void)BlockStore::load(v); });
     totality_ok &= total([&] { (void)consensus::CommitCertificate::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::ConsensusData::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::Evidence::decode_all(v); });

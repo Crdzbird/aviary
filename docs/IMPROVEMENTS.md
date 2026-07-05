@@ -334,10 +334,17 @@ selectors — validated against real-world vectors). Deferred:
   height that resumes the chain (accepts the next block identically). Round-trips
   to a byte-identical state root, fuzzed, ASan-clean (`test_snapshot.cpp`). A node
   can now write the blob to disk and reload — the foundation for a real store and
-  for streaming state-snapshot fast sync. **Remaining:** an actual embedded
-  on-disk backend (`ARCHITECTURE.md` §17.3), a block store with by-height/by-hash/
-  by-tx indexes, height-versioned snapshots + on-disk rollback, and incremental
-  (rather than full-state) snapshotting.
+  for streaming state-snapshot fast sync.
+- **[~] Block store — DONE (in-memory + serializable).** `BlockStore`
+  (`block_store.hpp`) archives finalized blocks + their commit certificates
+  contiguous by height, indexed by block hash and by transaction id
+  (`by_height`/`by_hash`/`find_tx`); `put` enforces contiguity + no overwrite.
+  `serialize()`/`load()` round-trip the whole archive (indexes rebuilt on load),
+  so a node persists its chain and reloads it on restart. Fuzzed, ASan-clean
+  (`test_block_store.cpp`). Together with `Ledger::snapshot` this gives full
+  chain persistence to bytes. **Remaining:** an actual embedded on-disk backend
+  (`ARCHITECTURE.md` §17.3), height-versioned snapshots + on-disk rollback, and
+  incremental (rather than full-state) snapshotting.
 
 ## Testing, fuzzing & CI
 
