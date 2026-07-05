@@ -199,6 +199,12 @@ bool verify_transaction_signature(const Transaction& tx) {
       // hybrid_sig_verify checks both the Ed25519 and ML-DSA parts; a truncated
       // (downgraded) signature or mismatched key fails.
       return crypto::hybrid_sig_verify(view(msg), view(tx.signature), view(tx.author));
+    case SigAlgo::kUtxoWitness:
+      // Per-input witnesses are verified by the UTXO state machine's validate()
+      // (which knows each input's owner). The account model rejects this scheme
+      // (empty author), so it is only ever honoured on a UTXO chain. Envelope
+      // verification is therefore a pass-through here.
+      return true;
     default:
       return false;  // unknown scheme — never accept
   }

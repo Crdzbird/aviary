@@ -25,6 +25,9 @@ enum class StateModel : std::uint8_t { kAccount = 0, kUtxo = 1 };
 enum class SigAlgo : std::uint8_t {
   kEd25519 = 1,             ///< classical Ed25519 (author 32 B, signature 64 B)
   kHybridEd25519MlDsa = 2,  ///< Ed25519 + ML-DSA-65 (concatenated pub / sig blobs)
+  kUtxoWitness = 3,         ///< multi-signer UTXO: author empty, per-input witnesses
+                            ///< in [signature]; verification is done by the UTXO
+                            ///< state machine (one signer per input).
 };
 
 struct Transaction {

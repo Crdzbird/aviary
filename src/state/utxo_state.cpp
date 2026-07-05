@@ -57,6 +57,27 @@ Bytes UtxoStateMachine::encode_body(const Body& b) {
   return w.take();
 }
 
+Bytes UtxoStateMachine::encode_witnesses(const std::vector<Witness>& ws) {
+  codec::CodecWriter w;
+  w.write_list(ws, [](codec::CodecWriter& w, const Witness& x) {
+    w.write_bytes(view(x.pubkey));
+    w.write_bytes(view(x.signature));
+  });
+  return w.take();
+}
+
+std::vector<UtxoStateMachine::Witness> UtxoStateMachine::decode_witnesses(const Bytes& bytes) {
+  codec::CodecReader r(view(bytes));
+  auto ws = r.read_list<Witness>([](codec::CodecReader& r) {
+    Witness x;
+    x.pubkey = r.read_bytes();
+    x.signature = r.read_bytes();
+    return x;
+  });
+  r.assert_fully_consumed();
+  return ws;
+}
+
 namespace {
 Bytes utxo_leaf_preimage(const UtxoStateMachine::Outpoint& op,
                          const UtxoStateMachine::Output& out) {
@@ -170,7 +191,12 @@ StateProof UtxoStateMachine::prove_outpoint(const Outpoint& target) const {
 }
 
 ValidationResult UtxoStateMachine::validate(const Transaction& tx) const {
-  if (tx.author.size() != 32) {
+  // Authorization mode: single-author (one owner for all inputs) or multi-signer
+  // (a per-input witness). verify_transaction_signature already checked the
+  // single-author envelope signature; witness signatures are checked here,
+  // where each input's owner is known.
+  const bool witness_mode = tx.algo() == SigAlgo::kUtxoWitness;
+  if (!witness_mode && tx.author.size() != 32) {
     return ValidationResult::failure("author is not a 32-byte public key");
   }
   Body b;
@@ -183,12 +209,28 @@ ValidationResult UtxoStateMachine::validate(const Transaction& tx) const {
     return ValidationResult::failure("no inputs (minting is not allowed)");
   }
 
-  const Hash author = crypto::address_of(view(tx.author));
+  std::vector<Witness> witnesses;
+  Bytes signing;
+  Hash author_addr{};
+  if (witness_mode) {
+    try {
+      witnesses = decode_witnesses(tx.signature);
+    } catch (const codec::CodecError& e) {
+      return ValidationResult::failure(std::string("malformed witnesses: ") + e.what());
+    }
+    if (witnesses.size() != b.inputs.size()) {
+      return ValidationResult::failure("witness count does not match input count");
+    }
+    signing = tx.signing_bytes();
+  } else {
+    author_addr = crypto::address_of(view(tx.author));
+  }
 
-  // Inputs must be distinct, exist, and be owned by the author.
+  // Inputs must be distinct, exist, and be authorized by their owner.
   std::set<Outpoint> seen;
   codec::u128 in_sum = 0;
-  for (const auto& op : b.inputs) {
+  for (std::size_t i = 0; i < b.inputs.size(); ++i) {
+    const Outpoint& op = b.inputs[i];
     if (!seen.insert(op).second) {
       return ValidationResult::failure("duplicate input (double-spend within tx)");
     }
@@ -196,7 +238,19 @@ ValidationResult UtxoStateMachine::validate(const Transaction& tx) const {
     if (utxo == nullptr) {
       return ValidationResult::failure("input not found / already spent");
     }
-    if (utxo->owner != author) {
+    if (witness_mode) {
+      const Witness& wt = witnesses[i];
+      if (wt.pubkey.size() != 32) {
+        return ValidationResult::failure("witness public key is not 32 bytes");
+      }
+      if (crypto::address_of(view(wt.pubkey)) != utxo->owner) {
+        return ValidationResult::failure("witness does not own its input");
+      }
+      if (wt.signature.size() != 64 ||
+          !crypto::ed25519_verify(view(signing), view(wt.signature), view(wt.pubkey))) {
+        return ValidationResult::failure("invalid witness signature");
+      }
+    } else if (utxo->owner != author_addr) {
       return ValidationResult::failure("input not owned by signer");
     }
     if (in_sum > kU128Max - utxo->amount) {

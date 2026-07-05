@@ -56,6 +56,16 @@ class UtxoStateMachine : public StateMachine {
     std::vector<Output> outputs;
   };
 
+  /// One input's authorization (multi-signer / kUtxoWitness txs): the owner's
+  /// Ed25519 public key + a signature over the tx's signing_bytes. Witnesses are
+  /// carried, one per input in input order, in Transaction::signature.
+  struct Witness {
+    Bytes pubkey;
+    Bytes signature;
+  };
+  static Bytes encode_witnesses(const std::vector<Witness>& ws);
+  static std::vector<Witness> decode_witnesses(const Bytes& bytes);
+
   /// [flat_fee] is the minimum fee (surplus of inputs over outputs) a spend must
   /// pay; 0 (the default) requires exact value conservation.
   explicit UtxoStateMachine(codec::u128 flat_fee = 0);

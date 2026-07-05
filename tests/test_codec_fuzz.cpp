@@ -74,6 +74,7 @@ int main() {
     totality_ok &= total([&] { (void)Block::decode_all(v); });
     totality_ok &= total([&] { (void)AccountStateMachine::decode_transfer(b); });
     totality_ok &= total([&] { (void)UtxoStateMachine::decode_body(b); });
+    totality_ok &= total([&] { (void)UtxoStateMachine::decode_witnesses(b); });
     totality_ok &= total([&] { (void)Receipt::decode_all(v); });
     totality_ok &= total([&] { (void)AccountStateMachine::deserialize(v); });
     totality_ok &= total([&] { (void)UtxoStateMachine::deserialize(v); });

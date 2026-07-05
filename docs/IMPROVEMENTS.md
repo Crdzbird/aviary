@@ -118,8 +118,18 @@
   UTXO model + how the envelope tip interacts with its implicit inputs−outputs fee.
 - **[M] State inclusion proofs.** `StateMachine::prove()` from the design is not
   implemented for either model. Needed for light clients (M5) and bridges (M6).
-- **[M] Multi-signer UTXO.** A UTXO tx has a single `author`, so all inputs must
-  share one owner. Real UTXO needs per-input signatures / scripts.
+- **[~] Multi-signer UTXO — DONE (per-input witnesses).** A new `SigAlgo::
+  kUtxoWitness` (version-2 envelope, empty author) carries one `{pubkey,
+  signature}` witness per input in `Transaction::signature`; each signs the tx's
+  signing_bytes and `UtxoStateMachine::validate` verifies it against that input's
+  owner, so a single tx can spend inputs owned by DIFFERENT parties.
+  `verify_transaction_signature` defers witness txs to the state machine (the
+  account model rejects them — empty author — so they only apply on a UTXO
+  chain). Single-author v1 UTXO and the account model are unchanged.
+  `test_utxo_multisig.cpp`: two-owner spend, wrong-signer / tampered-witness /
+  wrong-count rejection, fee-paying multisig; witness decoder fuzzed; ASan-clean.
+  **Remaining:** full script/covenant support (this is single-sig-per-input,
+  SIGHASH_ALL) and segwit-style witness-excluded txids to kill malleability.
 - **[x] Receipts / execution results + receipt root — DONE.** A per-tx `Receipt`
   (status + fee) is committed via a `receipt_root` in a **version-2** BlockHeader
   — version-gated so v1 encodings (and golden vectors) are byte-identical, and

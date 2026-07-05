@@ -199,6 +199,7 @@ blockchainer_add_test(test_genesis tests/test_genesis.cpp)
 blockchainer_add_test(test_receipts tests/test_receipts.cpp)
 blockchainer_add_test(test_snapshot tests/test_snapshot.cpp)
 blockchainer_add_test(test_block_store tests/test_block_store.cpp)
+blockchainer_add_test(test_utxo_multisig tests/test_utxo_multisig.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
