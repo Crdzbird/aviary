@@ -67,8 +67,8 @@ struct Net {
     for (const auto& t : out.timeouts) timeouts.insert({t.round, static_cast<int>(t.step), from});
   }
 
-  void run(int budget = 200000) {
-    for (std::uint32_t i : correct) apply(i, drv[i]->start());
+  // Drain the network until every correct validator commits its current height.
+  void pump(int budget = 200000) {
     int steps = 0;
     while (steps++ < budget) {
       bool all = true;
@@ -86,6 +86,19 @@ struct Net {
         return;
       }
     }
+  }
+
+  void run() {
+    for (std::uint32_t i : correct) apply(i, drv[i]->start());
+    pump();
+  }
+
+  // Roll every validator into the next height and drive it to commit.
+  void advance_all() {
+    queue.clear();
+    timeouts.clear();
+    for (std::uint32_t i : correct) apply(i, drv[i]->advance());
+    pump();
   }
 };
 }  // namespace
@@ -136,6 +149,57 @@ int main() {
     bool advanced = true;
     for (std::uint32_t i : net.correct) advanced &= net.drv[i]->round() >= 1;
     CHECK(advanced);
+  }
+
+  std::printf("== multi-height chain: LastCommit certifies each parent ==\n");
+  {
+    Net net(4, alice_addr);
+    net.run();  // height 1
+    CHECK(net.ledgers[0]->tip().height == 1);
+    // Height 1 links to genesis and carries NO last commit.
+    const Hash genesis_hash = net.ledgers[0]->tip().parent_hash;
+    CHECK(validate_consensus_data(kChain, net.vset, net.ledgers[0]->tip(), genesis_hash).ok);
+
+    for (std::uint64_t h = 2; h <= 4; ++h) {
+      net.advance_all();
+      // Every ledger advanced to h with the same tip hash + state root.
+      const Hash tip_hash = net.ledgers[0]->tip().hash();
+      const Hash root = net.ledgers[0]->tip().state_root;
+      bool agree = true;
+      for (std::uint32_t i = 0; i < 4; ++i) {
+        agree &= net.drv[i]->committed();
+        agree &= net.ledgers[i]->tip().height == h;
+        agree &= net.ledgers[i]->tip().hash() == tip_hash;
+        agree &= net.ledgers[i]->tip().state_root == root;
+      }
+      CHECK_MSG(agree, "all ledgers agree on the block at this height");
+
+      // The block's embedded LastCommit is a valid >2/3 certificate for its parent.
+      const BlockHeader& tip = net.ledgers[0]->tip();
+      CHECK(validate_consensus_data(kChain, net.vset, tip, tip.parent_hash).ok);
+      ConsensusData cd = ConsensusData::decode_all(
+          codec::ByteView(tip.consensus_data.data(), tip.consensus_data.size()));
+      CHECK(cd.last_commit.has_value());
+      CHECK(cd.last_commit->height == h - 1);
+      CHECK(cd.last_commit->block_id == tip.parent_hash);
+      CHECK(verify_commit(kChain, net.vset, *cd.last_commit).ok);
+    }
+  }
+
+  std::printf("== multi-height with a rotating faulty proposer still chains ==\n");
+  {
+    Net net(4, alice_addr);
+    // Validator that is silent this run is index 3 (never the round-0 proposer of
+    // heights 1..3, but exercises consensus with only 3 of 4 live).
+    net.correct.erase(3);
+    net.run();
+    for (std::uint64_t h = 2; h <= 3; ++h) net.advance_all();
+    bool ok = true;
+    for (std::uint32_t i : net.correct) {
+      ok &= net.drv[i]->committed();
+      ok &= net.ledgers[i]->tip().height == 3;
+    }
+    CHECK_MSG(ok, "3-of-4 validators chained three heights");
   }
 
   std::printf("== 7 validators, silent minority (f=2): the 5 honest commit ==\n");

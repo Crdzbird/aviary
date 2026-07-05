@@ -34,9 +34,15 @@
   driver.cpp`: 4 validators commit the SAME real block (identical state root) with
   a certificate that `verify_commit`s; a faulty round-0 proposer still commits
   after a round change; 7 validators with a silent f=2 minority commit. ASan-clean.
-  **Remaining:** multi-height chaining (thread the last commit across heights),
-  a real socket/timer transport, a proposer-rotation policy beyond round-robin,
-  and equivocation handling within the round SM.
+  **Multi-height DONE:** `RoundDriver::advance()` rolls a committed height into the
+  next — it carries that height's certificate as the new block's LastCommit,
+  resets the round SM, and StartRound(0)s. The chain self-certifies:
+  `test_round_driver.cpp` runs heights 1→4 and verifies each block's embedded
+  LastCommit is a valid >2/3 certificate for its parent (right height + block id),
+  with all ledgers agreeing on the tip hash + state root, incl. a 3-of-4 run
+  chaining three heights through a silent validator. **Remaining:** a real
+  socket/timer transport, a proposer-rotation policy beyond round-robin, and
+  equivocation handling within the round SM.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

@@ -31,10 +31,10 @@ RoundDriver::RoundDriver(std::uint64_t chain_id, ValidatorSet vset, std::uint32_
       sm_(make_config()) {}
 
 Hash RoundDriver::get_value() {
-  // Build an empty block extending the tip; stamp consensus_data (the first
-  // block after genesis carries no last commit).
+  // Build an empty block extending the tip; stamp consensus_data with the
+  // validator-set hash and the LastCommit (absent for the first block).
   Block b = ledger_->build_block({}, timestamp_);
-  b.header.consensus_data = ConsensusData{vset_.hash(), std::nullopt}.encode();
+  b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
   const Hash id = b.header.hash();
   blocks_[id] = std::move(b);
   return id;
@@ -135,6 +135,18 @@ RoundDriver::Output RoundDriver::deliver(const wire::ConsensusMsg& msg) {
 
 RoundDriver::Output RoundDriver::on_timeout(Step step, std::uint32_t round) {
   return run(sm_.on_timeout(step, round));
+}
+
+RoundDriver::Output RoundDriver::advance() {
+  if (!committed_) return {};  // nothing finalized yet
+  last_commit_ = cert_;        // certifies the block we just committed
+  height_ = ledger_->tip().height + 1;
+  sm_ = RoundStateMachine(make_config());
+  blocks_.clear();
+  precommit_sigs_.clear();
+  committed_ = false;
+  cert_.reset();
+  return run(sm_.start());
 }
 
 void RoundDriver::commit(std::uint32_t round, const Value& value) {

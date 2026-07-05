@@ -49,6 +49,12 @@ class RoundDriver {
   /// Fire a previously-armed timeout.
   Output on_timeout(Step step, std::uint32_t round);
 
+  /// After committing, roll into the next height: carry this height's commit
+  /// certificate as the next block's LastCommit, reset the round state machine,
+  /// and StartRound(0). Precondition: committed(). Returns the new height's
+  /// start actions.
+  Output advance();
+
   bool committed() const { return committed_; }
   std::uint32_t round() const { return sm_.round(); }
   std::uint64_t height() const { return height_; }
@@ -70,6 +76,9 @@ class RoundDriver {
   std::uint64_t height_;  // the height being decided (tip + 1)
 
   RoundStateMachine sm_;
+  // The certificate that finalized the parent — embedded as this height's block's
+  // LastCommit. Absent for the first block after genesis.
+  std::optional<CommitCertificate> last_commit_;
   std::map<Hash, Block> blocks_;  // block id → block (self-produced or from a proposal)
   // Precommit signatures collected for cert building: round → value → validator → sig.
   // A nil precommit uses the zero-hash sentinel value.
