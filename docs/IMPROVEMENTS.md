@@ -87,10 +87,22 @@
   re-verifies the embedded work (target + hash<=target) then commits.
   `test_pow.cpp`: mine+submit, insufficient-work + wrong-target rejection, driving
   a chain through a `ConsensusEngine&`, PowData fuzzed. It is a *reference* engine:
-  fixed difficulty (no retargeting) and linear extension. **Remaining:** a PoS
-  engine, a difficulty-retargeting rule, and a real longest-chain **fork choice /
-  reorg** (BFT doesn't reorg, so no block tree exists yet — the biggest gap for a
-  PoW/PoS chain in production).
+  fixed difficulty (no retargeting) and linear extension. **Remaining:** a
+  difficulty-retargeting rule.
+- **[x] Fork choice + reorg — DONE.** `ForkChoice` (`fork_choice.hpp`) is an
+  engine-agnostic block tree: `add_block(block, weight)` validates the block's
+  state transition on its parent (via the Ledger), stores it with cumulative
+  weight, and keeps the canonical head on the heaviest branch — **reorganizing**
+  (rebuilding the ledger by replaying the winning branch from genesis) when a
+  side branch overtakes. The per-block weight is caller-supplied, so the rule is
+  decoupled from consensus (PoW passes work, PoS/BFT pass 1 = longest-chain);
+  ties keep the incumbent (deterministic). `test_fork_choice.cpp`: linear
+  extension, a stored-but-not-canonical side branch, an **observable state
+  reorg** (a heavier branch flips the balances), a fast extension of the new
+  head, and rejection of duplicate / unknown-parent / invalid-transition blocks.
+  ASan-clean. **Remaining:** an incremental reorg (snapshot the common ancestor
+  instead of replaying from genesis — the state-snapshot primitives make this
+  feasible), and finality/checkpoint pruning of the tree.
 - **[x] Embed the commit certificate in the block header (LastCommit) — DONE.**
   `BftEngine::propose` stamps `consensus_data` = `ConsensusData{validator_set_hash,
   last_commit}` (the certificate that finalized the parent), committed by the

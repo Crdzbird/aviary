@@ -93,6 +93,7 @@ add_library(blockchainer_core STATIC
   src/core/ledger.cpp
   src/core/genesis.cpp
   src/core/block_store.cpp
+  src/core/fork_choice.cpp
   src/storage/file_store.cpp
   src/consensus/consensus.cpp
   src/consensus/bft_engine.cpp
@@ -206,6 +207,7 @@ blockchainer_add_test(test_utxo_multisig tests/test_utxo_multisig.cpp)
 blockchainer_add_test(test_storage tests/test_storage.cpp)
 blockchainer_add_test(test_pow tests/test_pow.cpp)
 blockchainer_add_test(test_pos tests/test_pos.cpp)
+blockchainer_add_test(test_fork_choice tests/test_fork_choice.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
