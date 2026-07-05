@@ -147,10 +147,18 @@ test. Still to do:
   selection, announce-then-fetch (Inv/GetData).
 - **[M] Peer discovery & address book.** No discovery, handshake/`Hello`
   negotiation beyond the struct, peer scoring, or ban list.
-- **[M] Mutual identity authentication on the secure session.** The channel is
-  confidential + PQ-hybrid + forward-secret but does not yet bind to a known
-  peer/validator identity (MITM on first contact). Layer a signed handshake
-  transcript, or bridge cryptolib's Noise XX (C++-only) to the C ABI.
+- **[x] Mutual identity authentication on the secure session — DONE.** The
+  channel now binds to long-term identities via a SIGMA-style signed handshake
+  transcript: each side signs (KEM ciphertext ‖ both stream headers ‖ both
+  identity keys ‖ a channel binder derived from the shared secret) with a hybrid
+  Ed25519+ML-DSA-65 key. Verification failure aborts the handshake, and
+  `peer_identity()` exposes the *authenticated* remote key for allow-list
+  pinning. Authentication is **post-quantum** (the ML-DSA half can't be forged
+  even by a quantum adversary who breaks X25519/Ed25519), so "harvest now,
+  impersonate later" MITM is prevented. `test_secure_session.cpp` covers
+  mutual-auth, forged-initiator/responder rejection, wrong-KEM-key abort, and
+  impostor-key visibility. **Remaining:** identity negotiation in the `Hello`/
+  peer-discovery layer (who to expect) and bridging the session to the C ABI.
 - **[M] Streaming state-snapshot fast sync.** Sync is block-by-block. Large-state
   fast sync (stream a state snapshot over SecretStream, then tail blocks) is not
   built — the SecretStream wrappers are ready for it.

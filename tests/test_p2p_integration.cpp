@@ -84,12 +84,15 @@ int main() {
   Node A = make_node(vset, alice_addr);  // proposer/validator
   Node B = make_node(vset, alice_addr);  // follower
 
-  std::printf("== encrypted session A <-> B ==\n");
+  std::printf("== mutually authenticated encrypted session A <-> B ==\n");
+  auto idA = SecureSession::generate_identity();
   auto idB = SecureSession::generate_identity();
-  auto [sa, msg1] = SecureSession::begin_initiator(idB.public_key);
-  auto [sb, msg2] = SecureSession::accept_responder(idB.secret_key, msg1);
+  auto [sa, msg1] = SecureSession::begin_initiator(idB.kem.public_key, idA.sig);
+  auto [sb, msg2] = SecureSession::accept_responder(idB, msg1);
   sa.complete_initiator(msg2);
   CHECK(sa.open() && sb.open());
+  CHECK(sb.peer_identity() == idA.sig.public_key);  // B authenticated A
+  CHECK(sa.peer_identity() == idB.sig.public_key);  // A authenticated B
 
   std::printf("== tx gossip A -> B ==\n");
   Transaction t0 = transfer(alice, bob_addr, 0, 100);
@@ -125,9 +128,10 @@ int main() {
   std::printf("== fresh node C syncs from genesis via GetBlocks ==\n");
   Node C = make_node(vset, alice_addr);
   CHECK(C.height() == 0);
-  auto idA = SecureSession::generate_identity();
-  auto [sc, c1] = SecureSession::begin_initiator(idA.public_key);  // C initiates to A
-  auto [saC, c2] = SecureSession::accept_responder(idA.secret_key, c1);
+  auto idAsync = SecureSession::generate_identity();  // A's identity for this link
+  auto idC = SecureSession::generate_identity();      // C's identity
+  auto [sc, c1] = SecureSession::begin_initiator(idAsync.kem.public_key, idC.sig);  // C → A
+  auto [saC, c2] = SecureSession::accept_responder(idAsync, c1);
   sc.complete_initiator(c2);
 
   // C requests blocks 1.. ; A serves from its archive; C applies in order.
