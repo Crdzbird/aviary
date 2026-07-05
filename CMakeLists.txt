@@ -105,6 +105,7 @@ add_library(blockchainer_core STATIC
   src/p2p/mempool.cpp
   src/p2p/gossip.cpp
   src/p2p/networked_node.cpp
+  src/p2p/tcp_transport.cpp
   src/p2p/secure_session.cpp
   src/p2p/wire.cpp
   src/observability/metrics.cpp
@@ -129,6 +130,12 @@ set_target_properties(blockchainer_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(NOT BLOCKCHAINER_STATIC)
   target_link_libraries(blockchainer_core PRIVATE "${CRYPTOLIB_C_LIBRARY}")
 endif()
+
+# The TCP transport reactor drives one node per thread; the multi-validator test
+# spawns them with std::thread. Link the platform thread library publicly so
+# tests inherit it.
+find_package(Threads REQUIRED)
+target_link_libraries(blockchainer_core PUBLIC Threads::Threads)
 
 # ── C ABI library: SHARED on host (loaded by bindings), STATIC for XCFramework ─
 if(BLOCKCHAINER_STATIC)
@@ -214,6 +221,7 @@ blockchainer_add_test(test_fork_choice tests/test_fork_choice.cpp)
 blockchainer_add_test(test_gossip tests/test_gossip.cpp)
 blockchainer_add_test(test_kvstore tests/test_kvstore.cpp)
 blockchainer_add_test(test_networked_node tests/test_networked_node.cpp)
+blockchainer_add_test(test_tcp_transport tests/test_tcp_transport.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

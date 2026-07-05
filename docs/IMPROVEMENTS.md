@@ -264,11 +264,22 @@ The M3 work built the *transport-agnostic protocol logic* (mempool, wire
 protocol, secure session) and proved it with a two-node in-memory integration
 test. Still to do:
 
-- **[H] Real socket transport + async event loop.** Everything runs over an
-  in-memory transport today. Need an actual TCP (or QUIC) transport, connection
-  lifecycle, and an async I/O loop, behind a `Transport` interface so the logic
-  stays testable.
-- **[~] Multi-validator vote gossip — DONE (in-memory).** `p2p::NetworkedNode` (`networked_node.hpp`) assembles {Ledger, RoundDriver, GossipOverlay} into a runnable validator: consensus broadcasts become gossip originations (+ self-delivery, since the round driver counts its own votes on delivery), gossip deliveries are deduped, fed to the driver, and relayed onward; timeouts arm/fire. `test_networked_node.cpp` runs BFT over partial-mesh topologies and shows **relay tolerance** (line/ring/star — a validator reaches quorum via hops it isn't directly connected to, all commit the same block) and **partition tolerance** (a connected 3-of-4 majority finalizes; an isolated validator stalls at height 0). ASan-clean. **Remaining:** a real socket/event-loop transport (swap the in-memory relay for TCP + the mutually-authenticated secure session — the consensus-over-gossip logic is now proven) and a Byzantine-gossip adversary (equivocation propagation / spam).
+- **[~] Real socket transport + event loop — DONE (TCP reactor).**
+  `p2p::run_tcp_bft_node` (`tcp_transport.hpp` / `src/p2p/tcp_transport.cpp`)
+  drives a `NetworkedNode` over real sockets: a single-threaded `poll(2)` reactor
+  (no locks — one thread owns the node) that listens on loopback, dials the
+  topology (lower id dials higher, sends a 4-byte id hello), framed-reads
+  messages (u32-BE length prefix) into `on_gossip`, sends the node's relays, and
+  fires consensus timeouts against a steady clock. It waits for every peer link
+  before `start()` so the proposer never broadcasts into the void, and buffers
+  frames that race ahead of its own StartRound. `test_tcp_transport.cpp`: four
+  validators, one thread each, own ledgers, commit the SAME block over a
+  fully-connected loopback mesh — ASan/UBSan **and** TSan clean, ~0.36s, 10/10
+  stable. **Remaining:** wrap each frame in the mutually-authenticated secure
+  session (encrypt/authenticate — handshake already built, composes cleanly),
+  connection lifecycle/reconnect, non-blocking sends with backpressure, and a
+  QUIC option.
+- **[~] Multi-validator vote gossip — DONE (in-memory).** `p2p::NetworkedNode` (`networked_node.hpp`) assembles {Ledger, RoundDriver, GossipOverlay} into a runnable validator: consensus broadcasts become gossip originations (+ self-delivery, since the round driver counts its own votes on delivery), gossip deliveries are deduped, fed to the driver, and relayed onward; timeouts arm/fire. `test_networked_node.cpp` runs BFT over partial-mesh topologies and shows **relay tolerance** (line/ring/star — a validator reaches quorum via hops it isn't directly connected to, all commit the same block) and **partition tolerance** (a connected 3-of-4 majority finalizes; an isolated validator stalls at height 0). ASan-clean. Now also driven over **real TCP** by `run_tcp_bft_node` (see the socket-transport item above). **Remaining:** a Byzantine-gossip adversary (equivocation propagation / spam).
 - **[~] Gossip overlay manager — CORE DONE.** `p2p::GossipOverlay` (`gossip.hpp`) is the mesh on top of the wire/secure-session transport: it dedups messages by content hash (BLAKE3) and floods a new one to peers except the sender, so a message reaches every connected node exactly once over any (partial) topology, loop-free. Transport-agnostic (returns relays to send). `test_gossip.cpp`: ring, partial mesh, and clique all propagate to every node with the redundant paths deduped. **Remaining:** peer scoring / ban list, message TTL + expiry of the seen-set, and topic-scoped subscriptions.
 - **[M] Peer discovery & address book.** No discovery, handshake/`Hello`
   negotiation beyond the struct, peer scoring, or ban list.
