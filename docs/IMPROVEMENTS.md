@@ -122,10 +122,17 @@
   share one owner. Real UTXO needs per-input signatures / scripts.
 - **[M] Receipts / execution results + receipt root.** Header has the field
   designed but no receipts are produced.
-- **[M] Formal genesis.** Genesis is ad-hoc (`credit_genesis` /
-  `add_genesis_utxo`). No genesis file/spec format, no genesis state root or
-  validator set bound into `ChainSpec`. `ChainSpec` is minimal (chain_id +
-  state_model) — add consensus params, genesis hash, validator set.
+- **[~] Formal genesis — DONE (account model).** `GenesisSpec` (`genesis.hpp`) is
+  the canonical, hashable description of a chain's initial conditions: chain
+  params (chain_id, state_model, accepted_sig_algos, flat_fee, block limits,
+  timestamp), the genesis accounts, and the validator set. `encode`/`decode_all`
+  are canonical (accounts are address-sorted, so the hash is insertion-order
+  independent); `hash()` (domain `kGenesis`) is the chain's identity; `chain_spec()`
+  derives the runtime `ChainSpec`; `validator_set()` recovers the vset;
+  `ledger_from_genesis()` builds a seeded `Ledger`. Same spec → same hash + state
+  root + params (`test_genesis.cpp`, fuzzed). **Remaining:** UTXO genesis outputs,
+  and binding the genesis hash + validator set into a chain handshake / the
+  `ChainSpec` used by the running node.
 - **[L] Account address width.** `address_of` = full 32-byte BLAKE3(pubkey).
   Revisit a 20-byte (EVM-style) form for interop (M6).
 - **[L] Block timestamp policy.** Only `timestamp >= parent` is enforced. No

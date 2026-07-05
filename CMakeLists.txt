@@ -90,6 +90,7 @@ add_library(blockchainer_core STATIC
   src/state/account_state.cpp
   src/state/utxo_state.cpp
   src/core/ledger.cpp
+  src/core/genesis.cpp
   src/consensus/consensus.cpp
   src/consensus/bft_engine.cpp
   src/consensus/round_state.cpp
@@ -192,6 +193,7 @@ blockchainer_add_test(test_consensus_hardening tests/test_consensus_hardening.cp
 blockchainer_add_test(test_keyring tests/test_keyring.cpp)
 blockchainer_add_test(test_round_state tests/test_round_state.cpp)
 blockchainer_add_test(test_round_driver tests/test_round_driver.cpp)
+blockchainer_add_test(test_genesis tests/test_genesis.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
