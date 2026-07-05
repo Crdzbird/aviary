@@ -523,13 +523,11 @@ class Node {
       'state_root');
 
   /// The streaming surface: chain events as JSON since the last drain.
-  List<Map<String, dynamic>> drainEvents() {
-    final json = _bc._takeStr(
-        _lib.lookupFunction<_BufOfNodeC, _BufOfNodeD>('blockchainer_node_drain_events')(_h),
-        'drain_events');
-    final list = jsonDecode(json) as List<dynamic>;
-    return list.cast<Map<String, dynamic>>();
-  }
+  /// Drain collected chain events as a JSON array string (the streaming
+  /// surface). Parse with `jsonDecode` if you need structured events.
+  String drainEvents() => _bc._takeStr(
+      _lib.lookupFunction<_BufOfNodeC, _BufOfNodeD>('blockchainer_node_drain_events')(_h),
+      'drain_events');
 
   /// Prometheus-format metrics snapshot.
   String metrics() => _bc._takeStr(

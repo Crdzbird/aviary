@@ -16,7 +16,8 @@
   `Preload()` warms it on a goroutine; `Init()` / `Initialized()` for explicit
   control.
 - Crypto backend via the depended-on cryptolib Go binding (full crypto surface
-  available alongside the ledger). `CryptoVersion()` proves the link.
+  available alongside the ledger). `CryptoBackendVersion()` reports the linked
+  backend version, proving the link.
 - Linking: `cgo_local.go` (default), `cgo_pkgconfig.go` (`-tags
   blockchainer_pkgconfig`), `cgo_static.go` (`-tags blockchainer_static`, fully
   self-contained), and a `!cgo` build guard.

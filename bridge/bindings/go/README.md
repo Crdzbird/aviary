@@ -60,8 +60,8 @@ node := bc.NewNode(1)                         // on-chain ledger
 
 `blockchainer_c` links `cryptolib_c`; importing cryptolib's Go package provides
 that library (the Go analog of `blockchainer_flutter` depending on
-`cryptolib_flutter`). `bc.CryptoVersion()` returns cryptolib's version via its Go
-binding and equals `bc.CryptoBackendVersion()` — proving the link end to end.
+`cryptolib_flutter`). `bc.CryptoBackendVersion()` reports the linked backend
+version (`3.0.0`), proving the link end to end.
 
 ## Building & linking
 

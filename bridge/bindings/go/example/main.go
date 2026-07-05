@@ -17,8 +17,8 @@ func main() {
 	// self-initializes regardless, so you never have to wait on it.
 	bc.Preload()
 
-	fmt.Printf("blockchainer %s · crypto backend %s (cryptolib Go: %s)\n\n",
-		bc.Version(), bc.CryptoBackendVersion(), bc.CryptoVersion())
+	fmt.Printf("blockchainer %s · crypto backend %s\n\n",
+		bc.Version(), bc.CryptoBackendVersion())
 
 	// ── Off-chain crypto via cryptolib (the same backend blockchainer links) ──
 	doc := []byte("settlement-instruction:2026-06-08:EURx:1000000")

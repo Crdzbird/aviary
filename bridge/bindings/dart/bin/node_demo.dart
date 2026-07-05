@@ -1,6 +1,7 @@
 // Drives the full Blockchainer stack from Dart: create a chain, accounts,
 // transfer, produce blocks, stream events, read metrics, verify a proof, and
 // derive multi-chain interop addresses.
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -42,7 +43,7 @@ void main(List<String> args) {
 
   // ── Streaming: chain events ─────────────────────────────────────────────────
   print('\n── streamed events ──');
-  for (final e in node.drainEvents()) {
+  for (final e in jsonDecode(node.drainEvents()) as List) {
     print('  $e');
   }
 

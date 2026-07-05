@@ -249,8 +249,12 @@ func (s *server) produceBlock(w http.ResponseWriter, r *http.Request) {
 > Serialize every call on a given node with its mutex; different chains run in
 > parallel. Never share a node pointer across a write without the lock.
 
-> **Genesis ordering:** `Credit` is only valid **before the first block**. After
-> a block is produced, fund accounts via `transfers`.
+> **Genesis ordering:** `Credit` is only valid **before the first block and
+> before any state read** on a fresh chain — the node's lazy genesis is finalized
+> by the first read (`Height`/`Balance`/`StateRoot`) or block, after which credits
+> are silently dropped. So fund all genesis accounts first, then read/produce
+> blocks; afterwards, fund via `transfers`. The ledger layer enforces this:
+> `Credit` never reads node state first, and returns `409` once a block is sealed.
 
 ---
 

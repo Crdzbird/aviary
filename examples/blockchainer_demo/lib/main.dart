@@ -3,6 +3,7 @@
 // a live event stream, read observability metrics, verify a light-client proof,
 // and derive multi-chain interop addresses.
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:blockchainer_flutter/blockchainer_flutter.dart';
@@ -102,10 +103,15 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  /// drainEvents() returns a JSON array string (same as every binding); parse it
+  /// into structured events for the UI.
+  List<Map<String, dynamic>> _drainEvents(Node node) =>
+      (jsonDecode(node.drainEvents()) as List).cast<Map<String, dynamic>>();
+
   void _tick() {
     final node = _node;
     if (node == null) return;
-    final newEvents = node.drainEvents();
+    final newEvents = _drainEvents(node);
     if (_autoMine && node.mempoolSize() > 0) {
       node.produceBlock(_ts++);
       _refresh();
@@ -117,7 +123,7 @@ class _DashboardState extends State<Dashboard> {
   void _refresh({List<Map<String, dynamic>>? drained}) {
     final node = _node;
     if (node == null) return;
-    final events = drained ?? node.drainEvents();
+    final events = drained ?? _drainEvents(node);
     setState(() {
       _events.insertAll(0, events.reversed);
       if (_events.length > 50) _events.removeRange(50, _events.length);

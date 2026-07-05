@@ -18,13 +18,7 @@ package blockchainer
 
 import cryptolib "github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
 
-// cryptoInit initializes cryptolib's Go binding (called once during Init).
+// cryptoInit initializes cryptolib's Go binding (called once during Init). This
+// also links libcryptolib_c, which blockchainer_c needs. Use CryptoBackendVersion
+// for the backend version (parity with the other bindings).
 func cryptoInit() error { return cryptolib.Init() }
-
-// CryptoVersion returns the cryptolib version reported by its Go binding. A
-// non-empty value matching CryptoBackendVersion proves the dependency is wired
-// end to end.
-func CryptoVersion() string {
-	ensure()
-	return cryptolib.Version()
-}

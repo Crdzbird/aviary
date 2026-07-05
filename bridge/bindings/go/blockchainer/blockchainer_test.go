@@ -14,8 +14,8 @@ func TestLazyInitAndVersions(t *testing.T) {
 	if got := bc.Version(); got == "" {
 		t.Fatal("empty version")
 	}
-	if bc.CryptoBackendVersion() != bc.CryptoVersion() {
-		t.Fatalf("backend mismatch: C=%q Go=%q", bc.CryptoBackendVersion(), bc.CryptoVersion())
+	if got := bc.CryptoBackendVersion(); got == "" {
+		t.Fatal("empty crypto backend version")
 	}
 	if err := bc.Init(); err != nil { // idempotent
 		t.Fatalf("Init: %v", err)
@@ -116,7 +116,7 @@ func TestVerifyRejectsGarbage(t *testing.T) {
 // authoritative check is scripts-level (compare C.blockchainer_* call sites to
 // bridge/blockchainer_c.h); this lists the surface so a reviewer can eyeball it.
 func TestFullABICoverage(t *testing.T) {
-	// Top-level: Init, Version, CryptoBackendVersion, CryptoVersion, Hash, Txid,
+	// Top-level: Init, Version, CryptoBackendVersion, Hash, Txid,
 	// HeaderHash, VerifyStateProof, VerifyTxInclusion, VerifyCommit, AccountAddress,
 	// EthAddress, BtcAddress, SolAddress, EthErc20TransferCalldata, EthSelector,
 	// EthSignLegacy, Preload, Initialized, NewNode.
