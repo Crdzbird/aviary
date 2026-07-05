@@ -82,5 +82,53 @@ int main() {
     CHECK(evm::recover_sender(tx, st) == evm::address_from_secret(view(sk)));
   }
 
+  std::printf("== EIP-1559 (type-2): sign, recover, envelope shape ==\n");
+  {
+    evm::Eip1559Tx tx;
+    tx.chain_id = 1;
+    tx.nonce = 7;
+    tx.max_priority_fee_per_gas = 2000000000ull;      // 2 gwei tip
+    tx.max_fee_per_gas = 100000000000ull;             // 100 gwei cap
+    tx.gas_limit = 21000;
+    evm::Address to{};
+    to.fill(0xAB);
+    tx.to = to;
+    tx.value = 1000000000000000000ull;                // 1 ETH
+    // A non-empty access list (address + one storage key).
+    evm::AccessListEntry entry;
+    entry.address.fill(0xCD);
+    crypto::Hash key{};
+    key.fill(0x11);
+    entry.storage_keys.push_back(key);
+    tx.access_list.push_back(entry);
+
+    evm::SignedEip1559 st = evm::sign(tx, view(sk));
+    // The raw tx is an EIP-2718 type-2 envelope.
+    CHECK(!st.raw.empty() && st.raw[0] == 0x02);
+    // The signing preimage is domain-separated by the same type byte.
+    CHECK(evm::signing_bytes(tx)[0] == 0x02);
+    // y_parity is 0/1 — NOT the legacy v (recid + 35 + 2*chainId).
+    CHECK(st.y_parity == 0 || st.y_parity == 1);
+    CHECK(st.r.size() == 32 && st.s.size() == 32);
+    // Sign → recover round-trips to the signer's address.
+    CHECK(evm::recover_sender(tx, st) == evm::address_from_secret(view(sk)));
+    // Deterministic (RFC 6979): signing again yields the identical raw tx.
+    CHECK(evm::sign(tx, view(sk)).raw == st.raw);
+
+    // A contract-creation type-2 tx (to = nullopt) also round-trips.
+    evm::Eip1559Tx create = tx;
+    create.to = std::nullopt;
+    create.data = unhex("6000600055");
+    create.access_list.clear();  // empty access list encodes as an empty rlp list
+    evm::SignedEip1559 cs = evm::sign(create, view(sk));
+    CHECK(cs.raw[0] == 0x02);
+    CHECK(evm::recover_sender(create, cs) == evm::address_from_secret(view(sk)));
+
+    // Changing a field changes the signing hash (all fields are committed).
+    evm::Eip1559Tx bumped = tx;
+    bumped.max_fee_per_gas += 1;
+    CHECK(evm::signing_hash(bumped) != evm::signing_hash(tx));
+  }
+
   return bctest::summary();
 }

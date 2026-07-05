@@ -367,7 +367,7 @@ selectors — validated against real-world vectors). Deferred:
   (sighash + DER + witness assembly + SegWit serialization) are byte-exact vs the
   BIP143 spec example. Remaining: legacy/P2SH sighash, Taproot (BIP341)/bech32m,
   PSBT, coin-selection/fee helpers, and a Bitcoin RPC/Esplora client.
-- **[M] EIP-1559 / typed (EIP-2718) transactions.** Only legacy (type-0) txs.
+- **[~] EIP-1559 / typed (EIP-2718) transactions — DONE (type-2).** `evm::Eip1559Tx` + `sign`/`recover_sender`/`signing_hash`: the EIP-2718 type-2 dynamic-fee tx (chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gas, to, value, data, accessList), RLP payload prefixed with 0x02, keccak signing hash, secp256k1 signature with a 0/1 y-parity (not the legacy v), and an access list (address + storage keys). `test_evm.cpp`: envelope shape, sign→recover round-trip (incl. contract creation + non-empty access list), determinism, and field-commitment. **Remaining:** type-1 (EIP-2930) and type-3 (EIP-4844 blob) txs, and full uint256 for values > 2^128.
 - **[M] Dynamic ABI types.** Only static (address/uintN/bool/bytes32); no
   string/bytes/arrays/tuples (head-tail offset encoding).
 - **[L] Full uint256.** ABI/value use u128; large token amounts (>2^128) need a

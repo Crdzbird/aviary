@@ -124,4 +124,85 @@ Address recover_sender(const LegacyTx& tx, const SignedTx& signed_tx) {
   return address_from_pubkey(view(pk));
 }
 
+// ── EIP-1559 (type-2) ───────────────────────────────────────────────────────────
+
+namespace {
+constexpr std::uint8_t kEip1559Type = 0x02;
+
+rlp::Item access_list_item(const std::vector<AccessListEntry>& list) {
+  std::vector<rlp::Item> entries;
+  for (const auto& e : list) {
+    std::vector<rlp::Item> keys;
+    for (const auto& k : e.storage_keys) keys.push_back(str_item(Bytes(k.begin(), k.end())));
+    std::vector<rlp::Item> pair;
+    pair.push_back(str_item(Bytes(e.address.begin(), e.address.end())));
+    pair.push_back(rlp::Item::list(std::move(keys)));
+    entries.push_back(rlp::Item::list(std::move(pair)));
+  }
+  return rlp::Item::list(std::move(entries));
+}
+
+// The nine payload fields common to the signing preimage and the signed tx.
+std::vector<rlp::Item> payload_fields(const Eip1559Tx& tx) {
+  std::vector<rlp::Item> f;
+  f.push_back(str_item(rlp::uint_bytes(tx.chain_id)));
+  f.push_back(str_item(rlp::uint_bytes(tx.nonce)));
+  f.push_back(str_item(rlp::uint_bytes_u128(tx.max_priority_fee_per_gas)));
+  f.push_back(str_item(rlp::uint_bytes_u128(tx.max_fee_per_gas)));
+  f.push_back(str_item(rlp::uint_bytes(tx.gas_limit)));
+  f.push_back(str_item(tx.to ? Bytes(tx.to->begin(), tx.to->end()) : Bytes{}));
+  f.push_back(str_item(rlp::uint_bytes_u128(tx.value)));
+  f.push_back(str_item(tx.data));
+  f.push_back(access_list_item(tx.access_list));
+  return f;
+}
+}  // namespace
+
+Bytes signing_bytes(const Eip1559Tx& tx) {
+  Bytes rlp_payload = rlp::encode(rlp::Item::list(payload_fields(tx)));
+  Bytes out;
+  out.reserve(rlp_payload.size() + 1);
+  out.push_back(kEip1559Type);  // EIP-2718 type prefix
+  out.insert(out.end(), rlp_payload.begin(), rlp_payload.end());
+  return out;
+}
+
+Hash signing_hash(const Eip1559Tx& tx) {
+  Bytes pre = signing_bytes(tx);
+  return crypto::keccak256(view(pre));
+}
+
+SignedEip1559 sign(const Eip1559Tx& tx, codec::ByteView secret_key) {
+  Hash h = signing_hash(tx);
+  Bytes sig = crypto::secp256k1_sign(codec::ByteView(h.data(), 32), secret_key);  // 65B
+  if (sig.size() != 65) throw std::runtime_error("evm: bad signature size");
+
+  SignedEip1559 out;
+  out.r = Bytes(sig.begin(), sig.begin() + 32);
+  out.s = Bytes(sig.begin() + 32, sig.begin() + 64);
+  out.y_parity = sig[64];  // 0 or 1 for type-2
+
+  std::vector<rlp::Item> fields = payload_fields(tx);
+  fields.push_back(str_item(rlp::uint_bytes(out.y_parity)));  // 0 → empty, 1 → 0x01
+  fields.push_back(str_item(strip_leading_zeros(out.r)));
+  fields.push_back(str_item(strip_leading_zeros(out.s)));
+
+  Bytes rlp_signed = rlp::encode(rlp::Item::list(std::move(fields)));
+  out.raw.reserve(rlp_signed.size() + 1);
+  out.raw.push_back(kEip1559Type);
+  out.raw.insert(out.raw.end(), rlp_signed.begin(), rlp_signed.end());
+  out.tx_hash = crypto::keccak256(view(out.raw));
+  return out;
+}
+
+Address recover_sender(const Eip1559Tx& tx, const SignedEip1559& signed_tx) {
+  Bytes sig65;
+  sig65.insert(sig65.end(), signed_tx.r.begin(), signed_tx.r.end());
+  sig65.insert(sig65.end(), signed_tx.s.begin(), signed_tx.s.end());
+  sig65.push_back(signed_tx.y_parity);
+  Hash h = signing_hash(tx);
+  Bytes pk = crypto::secp256k1_recover(codec::ByteView(h.data(), 32), view(sig65));
+  return address_from_pubkey(view(pk));
+}
+
 }  // namespace blockchainer::interop::evm
