@@ -64,7 +64,22 @@
   extras. The pipeline above consensus can be written once against the interface;
   a second engine (PoW/PoS) slots in underneath. `test_bft.cpp` drives a chain
   through a `ConsensusEngine&`.
-- **[~] PoW reference engine — DONE; PoS remaining.** `PowEngine`
+- **[~] PoS reference engine — DONE.** `PosEngine` (`pos_engine.hpp`) implements
+  `ConsensusEngine` as a THIRD family: each height has one deterministic,
+  stake-weighted **slot leader**; the block's justification is that leader's BLS
+  signature over the block id (a third justification type — distinct from the BFT
+  certificate and the PoW nonce, all behind the same `submit`). More stake → more
+  slots; a slashed (0-power) validator never leads (reusing the stake + slashing
+  machinery). **Decoupling:** proposer selection is an injectable `ProposerPolicy`
+  (default stake-weighted; swappable for round-robin / VRF / epoch schedule
+  without touching the engine). `submit` verifies the block was produced by the
+  legitimate leader for its height AND the leader's signature, then commits.
+  `test_pos.cpp`: stake-weighted distribution (~70/20/10, 0-stake excluded),
+  a 3-validator chain reaching agreement, adversarial rejection (wrong leader /
+  tampered sig / impostor index), a round-robin policy swap, and driving via a
+  `ConsensusEngine&`; PosData fuzzed. Reference-grade (no fork choice / no
+  finality gadget beyond the leader signature).
+- **[~] PoW reference engine — DONE.** `PowEngine`
   (`pow_engine.hpp`) implements `ConsensusEngine` as a second consensus family: a
   block is justified by *work* — its header hash must be <= a difficulty target,
   with the nonce carried in `consensus_data` (so it is committed by the hash).

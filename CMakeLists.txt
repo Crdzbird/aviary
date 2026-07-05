@@ -99,6 +99,7 @@ add_library(blockchainer_core STATIC
   src/consensus/round_state.cpp
   src/consensus/round_driver.cpp
   src/consensus/pow_engine.cpp
+  src/consensus/pos_engine.cpp
   src/p2p/mempool.cpp
   src/p2p/secure_session.cpp
   src/p2p/wire.cpp
@@ -204,6 +205,7 @@ blockchainer_add_test(test_block_store tests/test_block_store.cpp)
 blockchainer_add_test(test_utxo_multisig tests/test_utxo_multisig.cpp)
 blockchainer_add_test(test_storage tests/test_storage.cpp)
 blockchainer_add_test(test_pow tests/test_pow.cpp)
+blockchainer_add_test(test_pos tests/test_pos.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
