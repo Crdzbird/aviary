@@ -142,5 +142,44 @@ int main() {
     CHECK(as_account(ledger).account(bob_addr).balance == 150);
   }
 
+  std::printf("== flat protocol fee: burned from sender, chain param ==\n");
+  {
+    constexpr codec::u128 kFee = 10;
+    // The genesis state machine's fee must match the chain spec's flat_fee.
+    auto g = std::make_unique<AccountStateMachine>(kFee);
+    g->credit_genesis(alice_addr, 1000);
+    ChainSpec spec{kChain, StateModel::kAccount};
+    spec.flat_fee = kFee;
+    Ledger fl(spec, std::move(g));
+
+    Transaction t = make_transfer(alice, bob_addr, 0, 100, kChain);
+    Block fb = fl.build_block({t}, 1);
+    CHECK_MSG(fl.process_block(fb).ok, "fee block accepted");
+    // Sender pays amount + fee; recipient gets amount; fee is burned.
+    CHECK(as_account(fl).account(alice_addr).balance == 1000 - 100 - kFee);  // 890
+    CHECK(as_account(fl).account(bob_addr).balance == 100);
+
+    // Determinism: same inputs → same block hash (fee folded into the root).
+    auto g2 = std::make_unique<AccountStateMachine>(kFee);
+    g2->credit_genesis(alice_addr, 1000);
+    Ledger fl2(spec, std::move(g2));
+    Block fb2 = fl2.build_block({make_transfer(alice, bob_addr, 0, 100, kChain)}, 1);
+    CHECK(fb2.header.hash() == fb.header.hash());
+
+    // A non-zero fee changes the committed state vs a feeless chain.
+    auto gz = std::make_unique<AccountStateMachine>(0);
+    gz->credit_genesis(alice_addr, 1000);
+    Ledger flz(ChainSpec{kChain, StateModel::kAccount}, std::move(gz));
+    Block fbz = flz.build_block({make_transfer(alice, bob_addr, 0, 100, kChain)}, 1);
+    CHECK(fbz.header.state_root != fb.header.state_root);
+
+    // Sender must cover amount + fee: 995 + fee(10) > 1000 → rejected.
+    CHECK_THROWS(fl.build_block({make_transfer(alice, bob_addr, 1, 995, kChain)}, 2));
+    // Exactly 890 balance can send at most 880 (+10 fee).
+    Block ok = fl.build_block({make_transfer(alice, bob_addr, 1, 880, kChain)}, 2);
+    CHECK_MSG(fl.process_block(ok).ok, "spend-to-the-fee-limit accepted");
+    CHECK(as_account(fl).account(alice_addr).balance == 0);
+  }
+
   return bctest::summary();
 }

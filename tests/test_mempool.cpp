@@ -91,6 +91,35 @@ int main() {
     CHECK(small.add(transfer(alice, bob_addr, 2, 1, kChain), kChain) == AddResult::kFull);
   }
 
+  std::printf("== per-account cap: one sender cannot flood the pool ==\n");
+  {
+    MempoolConfig cfg;
+    cfg.max_per_account = 2;
+    Mempool capped(cfg);
+    CHECK(capped.add(transfer(alice, bob_addr, 0, 1, kChain), kChain) == AddResult::kAdded);
+    CHECK(capped.add(transfer(alice, bob_addr, 1, 1, kChain), kChain) == AddResult::kAdded);
+    // Third alice tx exceeds her cap even though the pool has plenty of room.
+    CHECK(capped.add(transfer(alice, bob_addr, 2, 1, kChain), kChain) ==
+          AddResult::kAccountLimit);
+    // A different sender is unaffected.
+    CHECK(capped.add(transfer(bob, alice_addr, 0, 1, kChain), kChain) == AddResult::kAdded);
+    // Freeing one of alice's slots lets her back in (count is decremented).
+    Transaction a0 = transfer(alice, bob_addr, 0, 1, kChain);
+    capped.remove({a0.txid()});
+    CHECK(capped.add(transfer(alice, bob_addr, 2, 1, kChain), kChain) == AddResult::kAdded);
+  }
+
+  std::printf("== block byte limit bounds selection ==\n");
+  {
+    const std::size_t one_tx = transfer(alice, bob_addr, 0, 1, kChain).encode().size();
+    MempoolConfig lim;
+    lim.max_block_bytes = one_tx;  // room for exactly one tx
+    Mempool tight(lim);
+    tight.add(transfer(alice, bob_addr, 0, 1, kChain), kChain);
+    tight.add(transfer(alice, bob_addr, 1, 1, kChain), kChain);
+    CHECK(tight.select(state, 100).size() == 1);  // byte budget binds before count
+  }
+
   std::printf("== remove ==\n");
   {
     Transaction t = transfer(alice, bob_addr, 0, 100, kChain);

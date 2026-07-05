@@ -64,9 +64,15 @@
   vs the old full rebuild (4.6ms→799ms) — up to ~1600× at 256k. **Remaining:**
   apply the same COW/incremental commitment to `utxo_state.cpp` (still a full
   rebuild); optional persistent-map so `clone()` sheds its O(N) account-map copy.
-- **[H] Fees / gas.** Neither model charges fees. UTXO enforces *exact* value
-  conservation (no fee output); account has no fee/nonce-priced execution. No fee
-  market or mempool priority follows from this.
+- **[~] Fees / gas.** **Account model DONE (flat fee):** `ChainSpec.flat_fee`
+  (default 0 → feeless, byte-identical to no-fee) is a fixed protocol fee burned
+  from the sender on every transfer, enforced in `AccountStateMachine::validate/
+  apply` (sender must cover amount + fee, overflow-guarded; fee deducted, not
+  credited). It gives spam a real per-tx economic cost and folds into the state
+  root deterministically (`test_ledger.cpp` fee section). **Remaining:** variable
+  per-tx fees (needed for a real fee market + fee-priority mempool eviction) —
+  requires a version-gated fee field in the account body; UTXO fee output (still
+  enforces exact value conservation); gas metering for richer execution.
 - **[M] State inclusion proofs.** `StateMachine::prove()` from the design is not
   implemented for either model. Needed for light clients (M5) and bridges (M6).
 - **[M] Multi-signer UTXO.** A UTXO tx has a single `author`, so all inputs must
@@ -81,8 +87,13 @@
   Revisit a 20-byte (EVM-style) form for interop (M6).
 - **[L] Block timestamp policy.** Only `timestamp >= parent` is enforced. No
   upper drift bound or median-time rule (`ARCHITECTURE.md` §17.4).
-- **[L] Block size / tx-count limits.** Beyond codec ceilings, the pipeline
-  enforces no max block size or max txs/block (DoS surface for a real network).
+- **[~] Block size / tx-count limits.** **Mempool-side DONE:** `select()` now
+  stops at whichever binds first — the tx-count `max` or `MempoolConfig.
+  max_block_bytes` — so a produced block's size is bounded (`test_mempool.cpp`).
+  Plus a per-account pending cap (`max_per_account`, default 64) that stops one
+  sender flooding the pool and starving others (`AddResult::kAccountLimit`).
+  **Remaining:** enforce a consensus-level max block size / tx-count in
+  `process_block` so *received* blocks (not just self-produced ones) are bounded.
 
 ## Codec (M1)
 

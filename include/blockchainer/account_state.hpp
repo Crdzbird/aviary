@@ -35,7 +35,13 @@ class AccountStateMachine : public StateMachine {
     std::uint64_t nonce = 0;
   };
 
-  AccountStateMachine();
+  /// [flat_fee] is a fixed protocol fee burned from the sender on every applied
+  /// transfer (a chain parameter, not committed per-block state). 0 (the default)
+  /// is a feeless chain and leaves the state transition byte-identical to a chain
+  /// with no fee concept — so existing golden vectors are unaffected.
+  explicit AccountStateMachine(codec::u128 flat_fee = 0);
+
+  codec::u128 flat_fee() const { return flat_fee_; }
 
   /// Genesis helper: credit an address before the chain starts.
   void credit_genesis(const Hash& address, codec::u128 amount);
@@ -88,6 +94,7 @@ class AccountStateMachine : public StateMachine {
   // of the node.
   mutable std::shared_ptr<const Snapshot> base_;
   mutable std::map<Hash, Account> overlay_;
+  codec::u128 flat_fee_ = 0;  // burned per transfer; a fixed chain parameter
 
   const Account* lookup(const Hash& address) const;  // overlay-then-base
   void put(const Hash& address, const Account& acc); // write to overlay

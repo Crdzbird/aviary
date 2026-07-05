@@ -19,6 +19,11 @@ struct ChainSpec {
   /// signatures by setting this to {kHybridEd25519MlDsa}.
   std::vector<std::uint8_t> accepted_sig_algos{};
 
+  /// Flat protocol fee burned from the sender on every transfer (account model).
+  /// 0 = feeless; the state transition is then byte-identical to a chain with no
+  /// fee concept. A non-zero fee gives spam a real, per-tx economic cost.
+  codec::u128 flat_fee = 0;
+
   /// Whether [algo] is permitted on this chain.
   bool accepts(SigAlgo algo) const {
     if (accepted_sig_algos.empty()) return true;

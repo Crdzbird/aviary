@@ -20,8 +20,16 @@ class EventBus;
 namespace blockchainer {
 
 struct MempoolConfig {
-  std::size_t max_txs = 4096;          ///< capacity (tx count)
+  std::size_t max_txs = 4096;             ///< capacity (tx count)
   std::size_t max_tx_bytes = 128 * 1024;  ///< reject txs larger than this
+  /// Max pending txs from a single sender (address = BLAKE3(author)). Bounds the
+  /// classic griefing lever where one account floods the pool and starves
+  /// others. 0 disables the per-account cap. Only applies to txs with a single
+  /// author (the account model); authorless/multi-author txs are not capped.
+  std::size_t max_per_account = 64;
+  /// Max total encoded bytes a produced block may contain. select() stops once
+  /// the next tx would exceed it — bounds block size independent of the tx count.
+  std::size_t max_block_bytes = 1024 * 1024;
 };
 
 enum class AddResult {
@@ -31,6 +39,7 @@ enum class AddResult {
   kWrongChain,
   kTooLarge,
   kFull,
+  kAccountLimit,  ///< sender already has max_per_account pending txs
 };
 
 class Mempool {
@@ -61,6 +70,9 @@ class Mempool {
   MempoolConfig cfg_;
   // Keyed by txid → deterministic iteration order for selection.
   std::map<Hash, Transaction> pool_;
+  // Pending-tx count per sender address (BLAKE3(author)), for the per-account
+  // cap. Only tracks txs with a non-empty author.
+  std::map<Hash, std::size_t> per_account_;
   observe::EventBus* bus_ = nullptr;
 };
 

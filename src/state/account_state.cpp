@@ -40,7 +40,8 @@ Hash leaf_hash(const Hash& addr, const AccountStateMachine::Account& acc) {
 }
 }  // namespace
 
-AccountStateMachine::AccountStateMachine() : base_(std::make_shared<Snapshot>()) {}
+AccountStateMachine::AccountStateMachine(codec::u128 flat_fee)
+    : base_(std::make_shared<Snapshot>()), flat_fee_(flat_fee) {}
 
 AccountStateMachine::Transfer AccountStateMachine::decode_transfer(const Bytes& body) {
   codec::CodecReader r(view(body));
@@ -200,8 +201,13 @@ ValidationResult AccountStateMachine::validate(const Transaction& tx) const {
   if (t.nonce != acc.nonce) {
     return ValidationResult::failure("nonce mismatch");
   }
-  if (acc.balance < t.amount) {
-    return ValidationResult::failure("insufficient balance");
+  // Sender must cover the transfer plus the flat protocol fee. Guard the sum
+  // against u128 overflow (an overflow would be a fork).
+  if (flat_fee_ > kU128Max - t.amount) {
+    return ValidationResult::failure("amount + fee overflow");
+  }
+  if (acc.balance < t.amount + flat_fee_) {
+    return ValidationResult::failure("insufficient balance for amount + fee");
   }
   // Guard recipient credit against u128 overflow (overflow would be a fork).
   if (sender != t.recipient) {
@@ -219,10 +225,10 @@ void AccountStateMachine::apply(const Transaction& tx) {
   const Hash sender = crypto::address_of(view(tx.author));
 
   Account s = account(sender);
-  s.balance -= t.amount;
+  s.balance -= t.amount + flat_fee_;  // fee is burned (not credited anywhere)
   s.nonce += 1;
   put(sender, s);
-  // Read the recipient AFTER writing the sender so a self-transfer nets to zero
+  // Read the recipient AFTER writing the sender so a self-transfer nets to −fee
   // (overlay reflects the just-debited balance).
   Account r = account(t.recipient);
   r.balance += t.amount;
@@ -230,7 +236,7 @@ void AccountStateMachine::apply(const Transaction& tx) {
 }
 
 std::unique_ptr<StateMachine> AccountStateMachine::clone() const {
-  auto c = std::make_unique<AccountStateMachine>();
+  auto c = std::make_unique<AccountStateMachine>(flat_fee_);
   c->base_ = base_;        // share the immutable committed snapshot (O(1))
   c->overlay_ = overlay_;  // copy only the uncommitted changes
   return c;
