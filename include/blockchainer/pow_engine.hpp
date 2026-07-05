@@ -62,6 +62,17 @@ class PowEngine : public ConsensusEngine {
     return block_hash <= target;
   }
 
+  /// Adjust the difficulty so mining tracks [desired_interval] given the
+  /// [actual_interval] the last block(s) took: new_target ≈ current × actual /
+  /// desired. Blocks that came too SLOW (actual > desired) make the target
+  /// LARGER (easier); too fast makes it smaller (harder). The per-step change is
+  /// clamped to [1/4, 4]× (Bitcoin-style) and saturates at the all-ones max.
+  static Hash retarget(const Hash& current, std::uint64_t actual_interval,
+                       std::uint64_t desired_interval);
+
+  /// Install a new difficulty target (e.g. the result of retarget()).
+  void set_target(const Hash& target) { target_ = target; }
+
  private:
   Hash target_;
   std::unique_ptr<Ledger> ledger_;

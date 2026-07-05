@@ -87,8 +87,7 @@
   re-verifies the embedded work (target + hash<=target) then commits.
   `test_pow.cpp`: mine+submit, insufficient-work + wrong-target rejection, driving
   a chain through a `ConsensusEngine&`, PowData fuzzed. It is a *reference* engine:
-  fixed difficulty (no retargeting) and linear extension. **Remaining:** a
-  difficulty-retargeting rule.
+  linear extension. **Difficulty retargeting DONE:** `PowEngine::retarget(current, actual, desired)` scales the 256-bit target by the clamped ([1/4,4]×) ratio of actual to desired block time (slower→easier, faster→harder, saturating at all-ones), via 256×64/64 big-integer math; `set_target` installs it. `test_pow.cpp`. **Remaining:** a windowed (multi-block) retarget + the full fork-choice weight = accumulated work.
 - **[x] Fork choice + reorg — DONE.** `ForkChoice` (`fork_choice.hpp`) is an
   engine-agnostic block tree: `add_block(block, weight)` validates the block's
   state transition on its parent (via the Ledger), stores it with cumulative
