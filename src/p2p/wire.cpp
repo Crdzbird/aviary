@@ -7,7 +7,7 @@ codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()
 
 bool valid_type(std::uint8_t t) {
   return t >= static_cast<std::uint8_t>(MessageType::kHello) &&
-         t <= static_cast<std::uint8_t>(MessageType::kGetBlocks);
+         t <= static_cast<std::uint8_t>(MessageType::kEvidence);
 }
 
 void expect(const Message& m, MessageType t) {
@@ -105,6 +105,17 @@ GetBlocks as_get_blocks(const Message& m) {
   g.count = r.read_u32();
   r.assert_fully_consumed();
   return g;
+}
+
+// ── Evidence (double-signing proof) ──────────────────────────────────────────
+
+Message make(const EvidenceMsg& e) {
+  return Message{MessageType::kEvidence, e.evidence.encode()};
+}
+
+EvidenceMsg as_evidence(const Message& m) {
+  expect(m, MessageType::kEvidence);
+  return EvidenceMsg{consensus::Evidence::decode_all(view(m.payload))};
 }
 
 }  // namespace blockchainer::wire

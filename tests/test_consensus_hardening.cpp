@@ -7,6 +7,7 @@
 #include "blockchainer/bft_engine.hpp"
 #include "blockchainer/ledger.hpp"
 #include "blockchainer/version.hpp"
+#include "blockchainer/wire.hpp"
 #include "check.hpp"
 
 using namespace blockchainer;
@@ -91,6 +92,39 @@ int main() {
     CHECK(slashed.total_power() == vset.total_power() - 1);
     CHECK(slashed.at(2).power == 0);
     CHECK(slashed.quorum() == (3 * 2) / 3 + 1);  // 3 remaining → quorum 3
+  }
+
+  std::printf("== evidence gossips over the wire and drives an engine evidence pool ==\n");
+  {
+    // Validator 1 double-signs; build the proof.
+    Vote a = sign_vote(kChain, 9, 0, A, 1, v1);
+    Vote b = sign_vote(kChain, 9, 0, B, 1, v1);
+    auto ev = detect_equivocation(9, 0, {{A, a}, {B, b}});
+    CHECK(ev.has_value());
+
+    // Round-trips as a wire message.
+    const Bytes wire_bytes = wire::make(wire::EvidenceMsg{*ev}).encode();
+    wire::Message back =
+        wire::Message::decode_all(codec::ByteView(wire_bytes.data(), wire_bytes.size()));
+    wire::EvidenceMsg em = wire::as_evidence(back);
+    CHECK(verify_equivocation(kChain, vset, em.evidence).ok);
+
+    // An engine records it, exposes the offender, and can hand back a slashed set.
+    auto g = std::make_unique<AccountStateMachine>();
+    auto led = std::make_unique<Ledger>(ChainSpec{kChain, StateModel::kAccount}, std::move(g));
+    BftEngine engine(vset, std::move(led));
+    CHECK(engine.record_evidence(em.evidence));
+    CHECK(engine.record_evidence(em.evidence));  // idempotent
+    CHECK(engine.equivocators().count(1) == 1);
+    ValidatorSet slashed = engine.slashed_validator_set();
+    CHECK(slashed.at(1).power == 0);
+    CHECK(slashed.total_power() == vset.total_power() - 1);
+
+    // Invalid evidence (tampered signature) is neither accepted nor recorded.
+    Evidence forged = em.evidence;
+    forged.signature_a[0] ^= 0x01;
+    CHECK(!engine.record_evidence(forged));
+    CHECK(engine.equivocators().size() == 1);  // unchanged
   }
 
   // ── Validator-set binding + LastCommit, exercised through a real engine ──────

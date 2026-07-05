@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <set>
 #include <vector>
 
 #include "blockchainer/consensus.hpp"
@@ -68,12 +69,29 @@ class BftEngine {
   /// side-channel — never affects consensus or state.
   void set_observability(observe::EventBus* bus, observe::MetricsRegistry* metrics);
 
+  // ── Equivocation evidence pool (S4) ────────────────────────────────────────
+
+  /// Verify and record gossiped double-signing evidence. Returns true iff the
+  /// evidence is a valid proof against this chain's validator set (and thus the
+  /// offender is now recorded). Idempotent — re-submitting the same offender is
+  /// a no-op that still returns true.
+  bool record_evidence(const Evidence& ev);
+
+  /// Validator indices proven to have equivocated (recorded via record_evidence).
+  const std::set<std::uint32_t>& equivocators() const { return equivocators_; }
+
+  /// The current validator set with every recorded equivocator's power zeroed.
+  /// This is the set a governance/validator-set-change action would install; the
+  /// engine does not rotate to it automatically (that needs epoch machinery).
+  ValidatorSet slashed_validator_set() const;
+
  private:
   ValidatorSet vset_;
   std::unique_ptr<Ledger> ledger_;
   // The certificate that finalized the current tip — embedded as the next
   // block's last commit. Absent until the first block finalizes.
   std::optional<CommitCertificate> last_commit_;
+  std::set<std::uint32_t> equivocators_;  // proven double-signers
   observe::EventBus* bus_ = nullptr;
   observe::MetricsRegistry* metrics_ = nullptr;
 };

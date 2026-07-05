@@ -17,6 +17,7 @@ enum class MessageType : std::uint8_t {
   kTx = 2,         ///< gossip a transaction
   kBlock = 3,      ///< gossip a finalized block + its commit certificate
   kGetBlocks = 4,  ///< request a range of blocks (sync)
+  kEvidence = 5,   ///< gossip proof that a validator double-signed
 };
 
 struct Message {
@@ -49,14 +50,20 @@ struct GetBlocks {
   std::uint32_t count = 0;
 };
 
+struct EvidenceMsg {
+  consensus::Evidence evidence;
+};
+
 Message make(const Hello&);
 Message make(const TxMsg&);
 Message make(const BlockMsg&);
 Message make(const GetBlocks&);
+Message make(const EvidenceMsg&);
 
 Hello as_hello(const Message&);
 TxMsg as_tx(const Message&);
 BlockMsg as_block(const Message&);
 GetBlocks as_get_blocks(const Message&);
+EvidenceMsg as_evidence(const Message&);
 
 }  // namespace blockchainer::wire

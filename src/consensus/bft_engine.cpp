@@ -12,6 +12,18 @@ void BftEngine::set_observability(observe::EventBus* bus,
   metrics_ = metrics;
 }
 
+bool BftEngine::record_evidence(const Evidence& ev) {
+  if (!verify_equivocation(ledger_->spec().chain_id, vset_, ev).ok) return false;
+  equivocators_.insert(ev.validator_index);
+  return true;
+}
+
+ValidatorSet BftEngine::slashed_validator_set() const {
+  ValidatorSet slashed = vset_;
+  for (std::uint32_t idx : equivocators_) slashed = slashed.with_slashed(idx);
+  return slashed;
+}
+
 Vote BftEngine::precommit(const Block& b, std::uint32_t validator_index,
                           const crypto::KeyPair& bls_key,
                           std::uint32_t round) const {
