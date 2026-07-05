@@ -82,6 +82,7 @@ int main() {
     totality_ok &= total([&] { (void)wire::as_hello(wire::Message{wire::MessageType::kHello, b}); });
     totality_ok &= total([&] { (void)wire::as_get_blocks(wire::Message{wire::MessageType::kGetBlocks, b}); });
     totality_ok &= total([&] { (void)wire::as_evidence(wire::Message{wire::MessageType::kEvidence, b}); });
+    totality_ok &= total([&] { (void)wire::as_consensus(wire::Message{wire::MessageType::kConsensus, b}); });
   }
   CHECK_MSG(totality_ok,
             "all decoders are total (success or CodecError only) on random input");

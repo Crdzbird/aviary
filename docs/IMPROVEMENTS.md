@@ -25,8 +25,17 @@
   the happy path, round-change + termination with a faulty round-0 proposer, a
   silent minority (f=2 of 7), a 10-validator set, and locking; ASan/UBSan-clean.
   Added ALONGSIDE the existing single-shot `BftEngine` (which `DemoNode` still
-  uses). **Remaining:** drive it from a real networked engine (wire the actions
-  to signing + gossip + a timer), proposer-rotation policy beyond round-robin,
+  uses). **Driver DONE:** `RoundDriver` (`round_driver.hpp`) binds the SM to the
+  real world — it builds/validates/commits blocks through the `Ledger`, signs and
+  verifies BLS votes against the validator set, aggregates a real >2/3
+  `CommitCertificate` on decide, and gossips `wire::ConsensusMsg`. It's still a
+  pure input/output object (returns messages to gossip + timeouts to arm), so a
+  multi-node in-memory network is deterministic and testable. `test_round_
+  driver.cpp`: 4 validators commit the SAME real block (identical state root) with
+  a certificate that `verify_commit`s; a faulty round-0 proposer still commits
+  after a round change; 7 validators with a silent f=2 minority commit. ASan-clean.
+  **Remaining:** multi-height chaining (thread the last commit across heights),
+  a real socket/timer transport, a proposer-rotation policy beyond round-robin,
   and equivocation handling within the round SM.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
