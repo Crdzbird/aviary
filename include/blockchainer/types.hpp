@@ -20,12 +20,30 @@ enum class StateModel : std::uint8_t { kAccount = 0, kUtxo = 1 };
 /// A signed transaction. The signature (Ed25519) covers [signing_bytes]
 /// (everything but the signature itself). [chain_id] is bound in, giving
 /// cross-chain replay protection.
+/// Transaction signature schemes. Serialized as `sig_algo` only in the extended
+/// (version >= 2) envelope; version 1 is implicitly kEd25519.
+enum class SigAlgo : std::uint8_t {
+  kEd25519 = 1,             ///< classical Ed25519 (author 32 B, signature 64 B)
+  kHybridEd25519MlDsa = 2,  ///< Ed25519 + ML-DSA-65 (concatenated pub / sig blobs)
+};
+
 struct Transaction {
+  /// 1 = legacy Ed25519 envelope (no sig_algo byte); 2 = extended envelope that
+  /// carries [sig_algo]. Bumping the version — not adding an unconditional field
+  /// — keeps every version-1 canonical encoding (and its golden vectors) intact.
   std::uint8_t version = 1;
   std::uint64_t chain_id = 0;
+  /// Signature scheme (a SigAlgo). Only serialized when version >= 2. Committed
+  /// to by signing_bytes(), so an algorithm downgrade fails verification.
+  std::uint8_t sig_algo = static_cast<std::uint8_t>(SigAlgo::kEd25519);
   Bytes body;       ///< model-specific canonical payload
-  Bytes author;     ///< Ed25519 public key (32 B) — the signer
-  Bytes signature;  ///< Ed25519 signature (64 B) over signing_bytes()
+  Bytes author;     ///< signer public key (32 B Ed25519, or hybrid pub blob)
+  Bytes signature;  ///< signature over signing_bytes()
+
+  /// The effective signature scheme: sig_algo for version >= 2, else kEd25519.
+  SigAlgo algo() const {
+    return version >= 2 ? static_cast<SigAlgo>(sig_algo) : SigAlgo::kEd25519;
+  }
 
   /// Canonical bytes the signature commits to (excludes [signature]).
   Bytes signing_bytes() const;

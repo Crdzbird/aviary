@@ -96,6 +96,30 @@ Hash address_of(ByteView public_key) {
   return blake3_256(public_key.data(), public_key.size());
 }
 
+// ── Hybrid signature: Ed25519 + ML-DSA-65 ────────────────────────────────────
+
+KeyPair hybrid_sig_keygen() {
+  CryptoKeyPair kp = cryptolib_hybrid_sig_keygen();
+  KeyPair out{take_buffer(kp.public_key), take_buffer(kp.secret_key)};
+  return out;
+}
+
+Bytes hybrid_sig_sign(ByteView msg, ByteView secret_key) {
+  CryptoBufferResult r =
+      cryptolib_hybrid_sig_sign(msg.data(), msg.size(), secret_key.data(), secret_key.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "hybrid_sig_sign failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+bool hybrid_sig_verify(ByteView msg, ByteView sig, ByteView public_key) {
+  return cryptolib_hybrid_sig_verify(msg.data(), msg.size(), sig.data(), sig.size(),
+                                     public_key.data(), public_key.size()) == 1;
+}
+
 // ── BLS12-381 ────────────────────────────────────────────────────────────────
 
 KeyPair bls_keygen_from_ikm(ByteView ikm) {

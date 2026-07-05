@@ -279,3 +279,16 @@ selectors — validated against real-world vectors). Deferred:
 ## Security hardening — Phase 1 (S1/S2) — DONE (2026)
 - **[x] Genesis-seal-on-read (fund-loss bug) FIXED.** Reads (height/balance/state_root/metrics/prove) on a fresh `DemoNode` no longer start the engine or finalize the lazy genesis — only `produce_block()` seals. Credit after sealing throws `GenesisSealedError` (never a silent no-op). Regression tests in `test_demo_node.cpp` + the Go binding.
 - **[x] C ABI error taxonomy (start).** `BlockchainerStatus` enum (`BLOCKCHAINER_OK`, `BLOCKCHAINER_ERR`, `BLOCKCHAINER_ERR_GENESIS_SEALED`, `BLOCKCHAINER_ERR_BAD_INPUT`). `blockchainer_node_credit` returns codes; all six bindings surface them (Go `Credit() error` + `ErrGenesisSealed`, Dart/Node/Swift/JVM throw, C++ typed exception). Extend to submit/produce next.
+
+## Post-quantum tx signatures — Q1a (core) — DONE (2026)
+- **[x] Hybrid Ed25519+ML-DSA-65 signatures in the tx path.** Extended tx envelope
+  gated on the `version` byte: v1 = legacy Ed25519 (unchanged, all golden vectors
+  intact); v2 carries a `sig_algo` byte (1=Ed25519, 2=hybrid). `sig_algo` is in
+  `signing_bytes()` so it's committed to — a downgrade that strips the ML-DSA part
+  fails, as does flipping the scheme. `verify_transaction_signature` dispatches on
+  the effective algo and rejects unknown schemes. `crypto::hybrid_sig_*` wrap
+  cryptolib's hybrid_sig. `ChainSpec.accepted_sig_algos` gates which schemes a
+  chain accepts (empty = all; `{2}` = PQ-required), enforced in the ledger.
+  Tested: `tests/test_hybrid_sig.cpp` (28/28 suite green). **Q1b (next): expose
+  hybrid accounts through the DemoNode + C ABI + bindings, and cross-binding
+  differential vectors (A2).**

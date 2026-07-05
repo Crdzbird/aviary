@@ -66,6 +66,21 @@ bool ed25519_verify(ByteView msg, ByteView sig, ByteView public_key);
 /// Account address derived from a public key: BLAKE3-256(public_key).
 Hash address_of(ByteView public_key);
 
+// ── Hybrid signature: Ed25519 + ML-DSA-65 (post-quantum tx path) ─────────────
+// Keys and signatures are concatenations of the classical then PQ parts
+// (ed25519_part ‖ ml_dsa_part). BOTH parts must verify — a "harvest now, forge
+// later" quantum adversary that breaks Ed25519 still faces ML-DSA, and a
+// downgrade that strips the PQ part fails verification.
+
+/// Hybrid keypair. public_key = ed_pub(32) ‖ mldsa_pub; secret_key = ed_sec ‖ mldsa_sec.
+KeyPair hybrid_sig_keygen();
+
+/// Hybrid signature over [msg]: ed_sig(64) ‖ mldsa_sig. Throws on backend failure.
+Bytes hybrid_sig_sign(ByteView msg, ByteView secret_key);
+
+/// Verifies a hybrid signature (both parts must pass). Never throws.
+bool hybrid_sig_verify(ByteView msg, ByteView sig, ByteView public_key);
+
 // ── BLS12-381 (consensus votes; ARCHITECTURE §7) ─────────────────────────────
 
 /// Deterministic BLS keypair from input key material (>= 32 bytes).

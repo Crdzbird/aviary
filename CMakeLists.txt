@@ -178,6 +178,7 @@ blockchainer_add_test(test_solana tests/test_solana.cpp)
 blockchainer_add_test(test_bitcoin tests/test_bitcoin.cpp)
 blockchainer_add_test(test_bridge tests/test_bridge.cpp)
 blockchainer_add_test(test_demo_node tests/test_demo_node.cpp)
+blockchainer_add_test(test_hybrid_sig tests/test_hybrid_sig.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

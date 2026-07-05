@@ -30,6 +30,9 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp)
     if (tx.chain_id != spec_.chain_id) {
       throw std::runtime_error("build_block: tx chain_id mismatch");
     }
+    if (!spec_.accepts(tx.algo())) {
+      throw std::runtime_error("build_block: signature scheme not accepted by chain");
+    }
     if (!verify_transaction_signature(tx)) {
       throw std::runtime_error("build_block: bad signature");
     }
@@ -65,6 +68,9 @@ BlockError Ledger::process_block(const Block& block) {
   for (const auto& tx : block.transactions) {
     if (tx.chain_id != spec_.chain_id) {
       return BlockError::failure("tx chain_id mismatch");
+    }
+    if (!spec_.accepts(tx.algo())) {
+      return BlockError::failure("signature scheme not accepted by chain");
     }
     if (!verify_transaction_signature(tx)) {
       return BlockError::failure("invalid tx signature");

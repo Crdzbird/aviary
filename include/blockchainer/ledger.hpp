@@ -14,6 +14,19 @@ namespace blockchainer {
 struct ChainSpec {
   std::uint64_t chain_id = 0;
   StateModel state_model = StateModel::kAccount;
+  /// Transaction signature schemes this chain accepts (SigAlgo values). Empty =
+  /// accept every scheme the node knows. A chain can require post-quantum
+  /// signatures by setting this to {kHybridEd25519MlDsa}.
+  std::vector<std::uint8_t> accepted_sig_algos{};
+
+  /// Whether [algo] is permitted on this chain.
+  bool accepts(SigAlgo algo) const {
+    if (accepted_sig_algos.empty()) return true;
+    for (std::uint8_t a : accepted_sig_algos) {
+      if (a == static_cast<std::uint8_t>(algo)) return true;
+    }
+    return false;
+  }
 };
 
 struct BlockError {

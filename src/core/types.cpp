@@ -22,6 +22,7 @@ Bytes Transaction::signing_bytes() const {
   codec::CodecWriter w;
   w.write_u8(version);
   w.write_u64(chain_id);
+  if (version >= 2) w.write_u8(sig_algo);  // commit to the scheme (anti-downgrade)
   w.write_bytes(view(body));
   w.write_bytes(view(author));
   return w.take();
@@ -31,6 +32,7 @@ Bytes Transaction::encode() const {
   codec::CodecWriter w;
   w.write_u8(version);
   w.write_u64(chain_id);
+  if (version >= 2) w.write_u8(sig_algo);
   w.write_bytes(view(body));
   w.write_bytes(view(author));
   w.write_bytes(view(signature));
@@ -41,6 +43,7 @@ Transaction Transaction::decode(codec::CodecReader& r) {
   Transaction tx;
   tx.version = r.read_u8();
   tx.chain_id = r.read_u64();
+  if (tx.version >= 2) tx.sig_algo = r.read_u8();
   tx.body = r.read_bytes();
   tx.author = r.read_bytes();
   tx.signature = r.read_bytes();
@@ -136,15 +139,31 @@ Hash compute_tx_root(const std::vector<Transaction>& txs) {
 }
 
 void sign_transaction(Transaction& tx, const crypto::KeyPair& kp) {
+  // The caller sets version + sig_algo first; author is committed to by
+  // signing_bytes(), so set it before computing the message.
   tx.author = kp.public_key;
   Bytes msg = tx.signing_bytes();
-  tx.signature = crypto::ed25519_sign(view(msg), view(kp.secret_key));
+  if (tx.algo() == SigAlgo::kHybridEd25519MlDsa) {
+    tx.signature = crypto::hybrid_sig_sign(view(msg), view(kp.secret_key));
+  } else {
+    tx.signature = crypto::ed25519_sign(view(msg), view(kp.secret_key));
+  }
 }
 
 bool verify_transaction_signature(const Transaction& tx) {
-  if (tx.author.size() != 32 || tx.signature.size() != 64) return false;
-  Bytes msg = tx.signing_bytes();
-  return crypto::ed25519_verify(view(msg), view(tx.signature), view(tx.author));
+  const Bytes msg = tx.signing_bytes();
+  switch (tx.algo()) {
+    case SigAlgo::kEd25519:
+      // Fixed sizes: reject malformed before touching the backend.
+      if (tx.author.size() != 32 || tx.signature.size() != 64) return false;
+      return crypto::ed25519_verify(view(msg), view(tx.signature), view(tx.author));
+    case SigAlgo::kHybridEd25519MlDsa:
+      // hybrid_sig_verify checks both the Ed25519 and ML-DSA parts; a truncated
+      // (downgraded) signature or mismatched key fails.
+      return crypto::hybrid_sig_verify(view(msg), view(tx.signature), view(tx.author));
+    default:
+      return false;  // unknown scheme — never accept
+  }
 }
 
 }  // namespace blockchainer
