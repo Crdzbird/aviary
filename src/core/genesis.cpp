@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "blockchainer/account_state.hpp"
+#include "blockchainer/utxo_state.hpp"
 
 namespace blockchainer {
 
@@ -36,6 +37,12 @@ Bytes GenesisSpec::encode() const {
     w.write_fixed_bytes(hview(a.address), 32);
     w.write_u128(a.balance);
   });
+  // UTXOs in the given order — the position assigns each output's genesis
+  // outpoint, so order is significant and must NOT be re-sorted.
+  w.write_list(utxos, [](codec::CodecWriter& w, const GenesisUtxo& u) {
+    w.write_fixed_bytes(hview(u.owner), 32);
+    w.write_u128(u.amount);
+  });
   // Validators, in the given (index-significant) order.
   w.write_list(validators, [](codec::CodecWriter& w, const consensus::Validator& v) {
     w.write_bytes(view(v.bls_pubkey));
@@ -59,6 +66,12 @@ GenesisSpec GenesisSpec::decode_all(codec::ByteView bytes) {
     a.address = to_hash(r.read_fixed_bytes(32));
     a.balance = r.read_u128();
     return a;
+  });
+  g.utxos = r.read_list<GenesisUtxo>([](codec::CodecReader& r) {
+    GenesisUtxo u;
+    u.owner = to_hash(r.read_fixed_bytes(32));
+    u.amount = r.read_u128();
+    return u;
   });
   g.validators = r.read_list<consensus::Validator>([](codec::CodecReader& r) {
     consensus::Validator v;
@@ -86,11 +99,15 @@ ChainSpec GenesisSpec::chain_spec() const {
 }
 
 std::unique_ptr<StateMachine> GenesisSpec::build_state() const {
-  if (state_model != StateModel::kAccount) {
-    throw std::runtime_error("genesis: only the account model is supported so far");
+  if (state_model == StateModel::kAccount) {
+    auto state = std::make_unique<AccountStateMachine>(flat_fee);
+    for (const auto& a : accounts) state->credit_genesis(a.address, a.balance);
+    return state;
   }
-  auto state = std::make_unique<AccountStateMachine>(flat_fee);
-  for (const auto& a : accounts) state->credit_genesis(a.address, a.balance);
+  auto state = std::make_unique<UtxoStateMachine>(flat_fee);
+  for (const auto& u : utxos) {
+    state->add_genesis_utxo(UtxoStateMachine::Output{u.owner, u.amount});  // order = outpoint index
+  }
   return state;
 }
 

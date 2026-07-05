@@ -5,6 +5,7 @@
 
 #include "blockchainer/account_state.hpp"
 #include "blockchainer/genesis.hpp"
+#include "blockchainer/utxo_state.hpp"
 #include "blockchainer/version.hpp"
 #include "check.hpp"
 
@@ -109,6 +110,36 @@ int main() {
     Block b = l->build_block({}, g.timestamp + 1);
     CHECK(l->process_block(b).ok);
     CHECK(l->tip().height == 1);
+  }
+
+  std::printf("== UTXO genesis: outputs seeded in order, spendable, deterministic ==\n");
+  {
+    GenesisSpec g;
+    g.chain_id = 9;
+    g.state_model = StateModel::kUtxo;
+    g.timestamp = 1;
+    const Hash alice = crypto::address_of(view(ed(1).public_key));
+    const Hash bob = crypto::address_of(view(ed(2).public_key));
+    g.utxos = {{alice, 1000}, {bob, 250}, {alice, 40}};
+
+    auto l = ledger_from_genesis(g);
+    const auto& u = dynamic_cast<const UtxoStateMachine&>(l->state());
+    CHECK(u.utxo_count() == 3);
+    // Outpoints are assigned by order: index 0,1,2 under the zero txid.
+    CHECK(u.get(UtxoStateMachine::Outpoint{crypto::zero_hash(), 0}).owner == alice);
+    CHECK(u.get(UtxoStateMachine::Outpoint{crypto::zero_hash(), 0}).amount == 1000);
+    CHECK(u.get(UtxoStateMachine::Outpoint{crypto::zero_hash(), 1}).owner == bob);
+    CHECK(u.get(UtxoStateMachine::Outpoint{crypto::zero_hash(), 2}).amount == 40);
+
+    // Determinism + round-trip.
+    CHECK(GenesisSpec::decode_all(view(g.encode())).hash() == g.hash());
+    auto l2 = ledger_from_genesis(g);
+    CHECK(l->tip().state_root == l2->tip().state_root);
+
+    // Order is significant: reordering the outputs changes the genesis hash.
+    GenesisSpec g2 = g;
+    std::swap(g2.utxos[0], g2.utxos[1]);
+    CHECK(g2.hash() != g.hash());
   }
 
   return bctest::summary();

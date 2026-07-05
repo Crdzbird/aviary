@@ -24,6 +24,13 @@ struct GenesisAccount {
   codec::u128 balance = 0;
 };
 
+/// An unspent output created at genesis (UTXO model). Order is significant — each
+/// output is assigned a genesis outpoint by its position.
+struct GenesisUtxo {
+  Hash owner{};
+  codec::u128 amount = 0;
+};
+
 /// The complete, canonical genesis of a chain.
 struct GenesisSpec {
   std::uint64_t chain_id = 0;
@@ -36,8 +43,10 @@ struct GenesisSpec {
   std::uint32_t max_block_txs = 0;
   std::uint64_t max_block_bytes = 0;
 
-  // Initial state (account model). UTXO genesis outputs are a follow-up.
+  // Initial state. Use `accounts` for the account model, `utxos` for the UTXO
+  // model (the other stays empty).
   std::vector<GenesisAccount> accounts;
+  std::vector<GenesisUtxo> utxos;
 
   // The initial validator set (each {48-byte BLS pubkey, power}).
   std::vector<consensus::Validator> validators;
@@ -56,8 +65,9 @@ struct GenesisSpec {
   /// The initial validator set (throws if malformed — see ValidatorSet).
   consensus::ValidatorSet validator_set() const { return consensus::ValidatorSet(validators); }
 
-  /// Build the initial state machine (account model): a state credited with the
-  /// genesis accounts, carrying the genesis flat fee.
+  /// Build the initial state machine carrying the genesis flat fee: an account
+  /// state credited with the genesis accounts, or a UTXO state seeded with the
+  /// genesis outputs, per [state_model].
   std::unique_ptr<StateMachine> build_state() const;
 };
 
