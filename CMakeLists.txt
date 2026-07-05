@@ -185,6 +185,7 @@ blockchainer_add_test(test_bridge tests/test_bridge.cpp)
 blockchainer_add_test(test_demo_node tests/test_demo_node.cpp)
 blockchainer_add_test(test_hybrid_sig tests/test_hybrid_sig.cpp)
 blockchainer_add_test(test_state_incremental tests/test_state_incremental.cpp)
+blockchainer_add_test(test_consensus_hardening tests/test_consensus_hardening.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

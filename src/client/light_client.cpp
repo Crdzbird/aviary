@@ -15,6 +15,15 @@ LightClient::Result LightClient::accept(const BlockHeader& h,
     return Result::failure("invalid commit certificate: " + ce.error);
   }
 
+  // The header must bind to our validator set and carry a valid last commit for
+  // the current tip (its parent) — so a follower detects a validator-set swap
+  // and confirms every ancestor was finalized, not merely linked.
+  if (consensus::CommitError ce =
+          consensus::validate_consensus_data(chain_id_, vset_, h, tip_.hash());
+      !ce.ok) {
+    return Result::failure("invalid consensus data: " + ce.error);
+  }
+
   tip_ = h;  // header chain verified up to here, no state needed
   return Result::success();
 }

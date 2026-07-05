@@ -22,18 +22,28 @@
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
-- **[H] Equivocation evidence & slashing.** We *prevent* conflicting
-  finalization (quorum intersection), but a double-signing validator is not
-  detected, evidenced, or punished. Need evidence types + a slashing hook.
+- **[~] Equivocation evidence & slashing — DETECTION DONE.** `Evidence` +
+  `detect_equivocation` (scan precommits at one height/round for a validator that
+  signed two different block ids) + `verify_equivocation` (both signatures valid
+  under the signer's key, distinct block ids) prove a double-sign; `ValidatorSet::
+  with_slashed(i)` zeroes the offender's power (`test_consensus_hardening.cpp`).
+  **Remaining:** gossip evidence over the wire and *apply* slashing as a
+  validator-set change at a height (needs the validator-set-change machinery
+  below) + an economic/stake layer for the actual penalty.
 - **[M] Extract the abstract `ConsensusEngine` interface.** `BftEngine` is
   concrete. Extract the interface from `ARCHITECTURE.md` §7 when a second engine
   (PoS/PoW) lands, so the abstraction is informed, not guessed.
 - **[M] PoS and PoW reference engines.** Designed as pluggable; not implemented.
   These also need a real fork-choice rule (BFT doesn't reorg, so none exists yet).
-- **[M] Embed the commit certificate in the block header (LastCommit pattern).**
-  The certificate is currently passed alongside the block, not carried in the
-  next header. Embedding it makes the chain self-justifying for sync/light
-  clients. Revisit `consensus_data` usage and `block_id` definition when doing so.
+- **[x] Embed the commit certificate in the block header (LastCommit) — DONE.**
+  `BftEngine::propose` stamps `consensus_data` = `ConsensusData{validator_set_hash,
+  last_commit}` (the certificate that finalized the parent), committed by the
+  header hash so validators sign it. `check_finalization` and `LightClient::accept`
+  now run `validate_consensus_data`: the validator-set hash must match (anti
+  vset-swap) and the embedded last commit must be a valid >2/3 certificate for
+  the parent (height-1). The first block after genesis carries none. The chain is
+  now self-certifying — a follower confirms every ancestor was *finalized*, not
+  merely linked (`test_consensus_hardening.cpp`, `test_verification.cpp`).
 - **[L] `FastAggregateVerify` option.** Votes bind the validator index so BLS
   *core* `AggregateVerify` (distinct-message) applies — rogue-key-safe, no PoP,
   no cryptolib change. A same-message `FastAggregateVerify` in cryptolib would be

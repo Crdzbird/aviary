@@ -33,6 +33,13 @@ CommitError BftEngine::check_finalization(const Block& b,
   if (cert.height != b.header.height) {
     return CommitError::failure("certificate height does not match block");
   }
+  // The block must bind to this validator set and carry a valid last commit for
+  // its parent (self-certifying history + anti validator-set-swap).
+  if (CommitError ce = validate_consensus_data(ledger_->spec().chain_id, vset_, b.header,
+                                               b.header.parent_hash);
+      !ce.ok) {
+    return ce;
+  }
   return verify_commit(ledger_->spec().chain_id, vset_, cert);
 }
 
@@ -46,6 +53,7 @@ BlockError BftEngine::finalize(const Block& b, const CommitCertificate& cert) {
   BlockError be = ledger_->process_block(b);
 
   if (be.ok) {
+    last_commit_ = cert;  // becomes the next block's certified last commit
     if (bus_) {
       bus_->publish(observe::BlockFinalized{b.header.height, block_id(b),
                                             b.header.state_root,

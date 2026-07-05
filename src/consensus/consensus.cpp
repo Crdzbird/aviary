@@ -1,6 +1,7 @@
 #include "blockchainer/consensus.hpp"
 
 #include <algorithm>
+#include <map>
 #include <set>
 
 namespace blockchainer::consensus {
@@ -36,6 +37,12 @@ Hash ValidatorSet::hash() const {
     w.write_u64(v.power);
   });
   return crypto::hash_tagged(crypto::Domain::kHeader, w.take());
+}
+
+ValidatorSet ValidatorSet::with_slashed(std::uint32_t index) const {
+  std::vector<Validator> next = validators_;
+  if (index < next.size()) next[index].power = 0;
+  return ValidatorSet(std::move(next));
 }
 
 Bytes ValidatorSet::encode() const {
@@ -178,6 +185,122 @@ CommitError verify_commit(std::uint64_t chain_id, const ValidatorSet& vset,
     return CommitError::failure("invalid aggregate signature");
   }
   return CommitError::success();
+}
+
+// ── Consensus header payload (S4) ───────────────────────────────────────────
+
+Bytes ConsensusData::encode() const {
+  codec::CodecWriter w;
+  w.write_fixed_bytes(view(validator_set_hash), 32);
+  w.write_u8(last_commit ? 1 : 0);
+  if (last_commit) w.write_bytes(view(last_commit->encode()));
+  return w.take();
+}
+
+ConsensusData ConsensusData::decode_all(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  ConsensusData cd;
+  cd.validator_set_hash = to_hash(r.read_fixed_bytes(32));
+  if (r.read_u8() != 0) {
+    cd.last_commit = CommitCertificate::decode_all(view(r.read_bytes()));
+  }
+  r.assert_fully_consumed();
+  return cd;
+}
+
+CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& vset,
+                                    const BlockHeader& h, const Hash& parent_hash) {
+  ConsensusData cd;
+  try {
+    cd = ConsensusData::decode_all(view(h.consensus_data));
+  } catch (...) {
+    return CommitError::failure("malformed consensus data");
+  }
+  if (cd.validator_set_hash != vset.hash()) {
+    return CommitError::failure("validator-set hash mismatch");
+  }
+  // The first block after genesis (height 1) has no finalized parent to certify.
+  if (h.height <= 1) {
+    if (cd.last_commit) return CommitError::failure("first block must not carry a last commit");
+    return CommitError::success();
+  }
+  if (!cd.last_commit) return CommitError::failure("missing last commit");
+  const CommitCertificate& lc = *cd.last_commit;
+  if (lc.height != h.height - 1) return CommitError::failure("last-commit height mismatch");
+  if (lc.block_id != parent_hash) {
+    return CommitError::failure("last commit does not certify the parent");
+  }
+  return verify_commit(chain_id, vset, lc);
+}
+
+// ── Equivocation evidence (S4) ──────────────────────────────────────────────
+
+Bytes Evidence::encode() const {
+  codec::CodecWriter w;
+  w.write_u32(validator_index);
+  w.write_u64(height);
+  w.write_u32(round);
+  w.write_fixed_bytes(view(block_id_a), 32);
+  w.write_bytes(view(signature_a));
+  w.write_fixed_bytes(view(block_id_b), 32);
+  w.write_bytes(view(signature_b));
+  return w.take();
+}
+
+Evidence Evidence::decode_all(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  Evidence ev;
+  ev.validator_index = r.read_u32();
+  ev.height = r.read_u64();
+  ev.round = r.read_u32();
+  ev.block_id_a = to_hash(r.read_fixed_bytes(32));
+  ev.signature_a = r.read_bytes();
+  ev.block_id_b = to_hash(r.read_fixed_bytes(32));
+  ev.signature_b = r.read_bytes();
+  r.assert_fully_consumed();
+  return ev;
+}
+
+CommitError verify_equivocation(std::uint64_t chain_id, const ValidatorSet& vset,
+                                const Evidence& ev) {
+  if (ev.validator_index >= vset.size()) {
+    return CommitError::failure("signer index out of range");
+  }
+  if (ev.block_id_a == ev.block_id_b) {
+    return CommitError::failure("not conflicting: same block id");
+  }
+  const Bytes pk = vset.at(ev.validator_index).bls_pubkey;
+  const Bytes msg_a =
+      vote_signing_bytes(chain_id, ev.height, ev.round, ev.block_id_a, ev.validator_index);
+  const Bytes msg_b =
+      vote_signing_bytes(chain_id, ev.height, ev.round, ev.block_id_b, ev.validator_index);
+  if (!crypto::bls_verify(view(msg_a), view(ev.signature_a), view(pk))) {
+    return CommitError::failure("first signature invalid");
+  }
+  if (!crypto::bls_verify(view(msg_b), view(ev.signature_b), view(pk))) {
+    return CommitError::failure("second signature invalid");
+  }
+  return CommitError::success();  // proven double-sign
+}
+
+std::optional<Evidence> detect_equivocation(std::uint64_t height, std::uint32_t round,
+                                            const std::vector<AttributedVote>& votes) {
+  std::map<std::uint32_t, AttributedVote> seen;  // first vote per validator
+  for (const auto& av : votes) {
+    auto [it, fresh] = seen.emplace(av.vote.validator_index, av);
+    if (fresh) continue;
+    if (it->second.block_id == av.block_id) continue;  // same block → not a conflict
+    Evidence ev;
+    ev.validator_index = av.vote.validator_index;
+    ev.height = height;
+    ev.round = round;
+    ev.block_id_a = it->second.block_id;
+    ev.signature_a = it->second.vote.signature;
+    ev.block_id_b = av.block_id;
+    ev.signature_b = av.vote.signature;
+    return ev;
+  }
+  return std::nullopt;
 }
 
 }  // namespace blockchainer::consensus

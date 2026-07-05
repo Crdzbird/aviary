@@ -37,9 +37,14 @@ class BftEngine {
   /// The id validators vote on for [b].
   static Hash block_id(const Block& b) { return b.header.hash(); }
 
-  /// Proposer step: assemble the next block from [txs].
+  /// Proposer step: assemble the next block from [txs], stamping its
+  /// consensus_data with the validator-set hash and the last commit (the
+  /// certificate that finalized the parent) — so the produced chain is
+  /// self-certifying and bound to this validator set.
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) {
-    return ledger_->build_block(std::move(txs), timestamp);
+    Block b = ledger_->build_block(std::move(txs), timestamp);
+    b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
+    return b;
   }
 
   /// A validator precommits a proposed block.
@@ -66,6 +71,9 @@ class BftEngine {
  private:
   ValidatorSet vset_;
   std::unique_ptr<Ledger> ledger_;
+  // The certificate that finalized the current tip — embedded as the next
+  // block's last commit. Absent until the first block finalizes.
+  std::optional<CommitCertificate> last_commit_;
   observe::EventBus* bus_ = nullptr;
   observe::MetricsRegistry* metrics_ = nullptr;
 };

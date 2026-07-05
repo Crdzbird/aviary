@@ -43,6 +43,13 @@ class ValidatorSet {
   /// Canonical commitment to the set.
   Hash hash() const;
 
+  /// A copy with validator [index]'s voting power zeroed — the punishment for
+  /// proven equivocation (it can no longer contribute to any quorum). Indices
+  /// are preserved so existing certificates still resolve. Applying it is a
+  /// protocol/governance action (a validator-set change at some height); this
+  /// just produces the slashed set.
+  ValidatorSet with_slashed(std::uint32_t index) const;
+
   Bytes encode() const;
   static ValidatorSet decode_all(codec::ByteView bytes);
 
@@ -98,5 +105,64 @@ std::optional<CommitCertificate> aggregate_commit(
 /// valid BLS aggregate signature. Never throws.
 CommitError verify_commit(std::uint64_t chain_id, const ValidatorSet& vset,
                           const CommitCertificate& cert);
+
+// ── Consensus header payload (S4) ───────────────────────────────────────────
+//
+// What the BFT engine stores in BlockHeader::consensus_data (opaque to the
+// ledger, but committed by the header hash — so validators sign it). It binds
+// the block to a specific validator set and carries the previous block's commit
+// certificate, so a stored/relayed chain self-certifies: each block proves its
+// parent was finalized by >2/3, not merely that headers link.
+struct ConsensusData {
+  Hash validator_set_hash{};
+  std::optional<CommitCertificate> last_commit;  ///< absent only for the first block
+
+  Bytes encode() const;
+  static ConsensusData decode_all(codec::ByteView bytes);
+};
+
+/// Validate a header's consensus_data against [vset] and its parent: the
+/// committed validator-set hash must match (catches a validator-set swap), and
+/// the embedded last commit must be a valid certificate for [parent_hash] at
+/// height-1 (the first block after genesis carries none). Never throws.
+CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& vset,
+                                    const BlockHeader& h, const Hash& parent_hash);
+
+// ── Equivocation evidence (S4) ──────────────────────────────────────────────
+//
+// Proof that a validator double-signed: two valid precommits at the same
+// (height, round) for DIFFERENT block ids — a deliberate attempt to violate
+// safety, and the canonical slashable offense.
+struct Evidence {
+  std::uint32_t validator_index = 0;
+  std::uint64_t height = 0;
+  std::uint32_t round = 0;
+  Hash block_id_a{};
+  Bytes signature_a;
+  Hash block_id_b{};
+  Bytes signature_b;
+
+  Bytes encode() const;
+  static Evidence decode_all(codec::ByteView bytes);
+};
+
+/// A precommit annotated with the block id it was cast for (what a node collects
+/// while gossiping votes; the raw Vote does not carry the id it signed).
+struct AttributedVote {
+  Hash block_id{};
+  Vote vote;
+};
+
+/// Verify [ev] genuinely proves equivocation: same in-range signer, same
+/// (height, round), two DISTINCT block ids, and BOTH signatures valid under the
+/// signer's key. Never throws.
+CommitError verify_equivocation(std::uint64_t chain_id, const ValidatorSet& vset,
+                                const Evidence& ev);
+
+/// Scan precommits at one (height, round) for a validator that signed two
+/// different block ids; returns the first such conflict as Evidence (its
+/// signatures still to be confirmed with verify_equivocation), else nullopt.
+std::optional<Evidence> detect_equivocation(std::uint64_t height, std::uint32_t round,
+                                            const std::vector<AttributedVote>& votes);
 
 }  // namespace blockchainer::consensus
