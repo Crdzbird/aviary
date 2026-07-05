@@ -216,3 +216,82 @@ func TestFullABICoverage(t *testing.T) {
 		t.Fatal("backend not initialized")
 	}
 }
+
+func TestKeyStoreCustodialSigning(t *testing.T) {
+	n := bc.NewNode(0x9101)
+	defer n.Free()
+	aSec, aPub, aAddr, err := n.NewAccount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, bAddr, _ := n.NewAccount()
+
+	ks, err := bc.NewKeyStore("hunter2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr, err := ks.AddAccount(aPub, aSec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(addr, aAddr) {
+		t.Fatalf("keystore address %x != account address %x", addr, aAddr)
+	}
+
+	// Persist, reload LOCKED, unlock, reveal.
+	blob, err := ks.Serialise()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ks.Free()
+
+	loaded, err := bc.LoadKeyStore(blob)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer loaded.Free()
+	if loaded.Unlocked() {
+		t.Fatal("keystore should be locked immediately after load")
+	}
+	// The serialised blob must not leak the plaintext secret.
+	if bytes.Contains(blob, aSec) {
+		t.Fatal("serialised keystore leaked the plaintext secret")
+	}
+	if _, err := loaded.Reveal(aAddr); err == nil {
+		t.Fatal("reveal must fail while locked")
+	}
+	if err := loaded.Unlock("hunter2"); err != nil {
+		t.Fatal(err)
+	}
+	secret, err := loaded.Reveal(aAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(secret, aSec) {
+		t.Fatal("revealed secret does not match")
+	}
+
+	// Sign from custody: the revealed key moves funds.
+	if err := n.Credit(aAddr, 1000); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := n.SubmitTransfer(secret, bAddr, 250, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := n.ProduceBlock(1); err != nil {
+		t.Fatal(err)
+	}
+	if got := n.Balance(aAddr); got != 750 {
+		t.Fatalf("alice balance = %d, want 750", got)
+	}
+	if got := n.Balance(bAddr); got != 250 {
+		t.Fatalf("bob balance = %d, want 250", got)
+	}
+
+	// Wrong passphrase must not unlock.
+	l2, _ := bc.LoadKeyStore(blob)
+	defer l2.Free()
+	if err := l2.Unlock("nope"); err == nil {
+		t.Fatal("wrong passphrase unlocked the keystore")
+	}
+}

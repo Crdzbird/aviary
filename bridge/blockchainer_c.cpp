@@ -12,6 +12,7 @@
 #include "blockchainer/interop/abi.hpp"
 #include "blockchainer/interop/evm.hpp"
 #include "blockchainer/interop/solana.hpp"
+#include "blockchainer/keyring.hpp"
 #include "blockchainer/node/demo_node.hpp"
 #include "blockchainer/proofs.hpp"
 #include "blockchainer/types.hpp"
@@ -54,6 +55,10 @@ blockchainer::crypto::Hash to_hash32(const std::uint8_t* p) {
 
 blockchainer::node::DemoNode* as_node(BlockchainerNode n) {
   return static_cast<blockchainer::node::DemoNode*>(n);
+}
+
+blockchainer::custody::KeyStore* as_ks(BlockchainerKeyStore k) {
+  return static_cast<blockchainer::custody::KeyStore*>(k);
 }
 
 }  // namespace
@@ -334,6 +339,72 @@ BlockchainerBufferResult blockchainer_node_prove_account(BlockchainerNode node, 
   try { return bytes_result(as_node(node)->prove_account(to_hash32(address)).encode()); }
   catch (const std::exception& e) { return error_result(e.what()); }
 }
+
+// ── Custodial key store ───────────────────────────────────────────────────────
+
+BlockchainerKeyStore blockchainer_keystore_new(const char* passphrase) {
+  try {
+    return new blockchainer::custody::KeyStore(
+        blockchainer::custody::KeyStore::create_with_passphrase(passphrase ? passphrase : ""));
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+int blockchainer_keystore_add_account(BlockchainerKeyStore ks, const uint8_t* public_key,
+                                      size_t pk_len, const uint8_t* secret, size_t sk_len,
+                                      uint8_t* out_address) {
+  try {
+    blockchainer::crypto::Hash addr = as_ks(ks)->add_account(
+        blockchainer::crypto::ByteView(public_key, pk_len),
+        blockchainer::crypto::ByteView(secret, sk_len));
+    std::memcpy(out_address, addr.data(), 32);
+    return 0;
+  } catch (...) {
+    return 1;
+  }
+}
+
+BlockchainerBufferResult blockchainer_keystore_reveal(BlockchainerKeyStore ks,
+                                                      const uint8_t* address) {
+  try {
+    return bytes_result(as_ks(ks)->reveal_secret(to_hash32(address)));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_keystore_serialise(BlockchainerKeyStore ks) {
+  try {
+    return bytes_result(as_ks(ks)->serialise());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerKeyStore blockchainer_keystore_load(const uint8_t* blob, size_t len) {
+  try {
+    return new blockchainer::custody::KeyStore(
+        blockchainer::custody::KeyStore::load(blockchainer::crypto::ByteView(blob, len)));
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+int blockchainer_keystore_unlock(BlockchainerKeyStore ks, const char* passphrase) {
+  try {
+    as_ks(ks)->unlock_with_passphrase(passphrase ? passphrase : "");
+    return 0;
+  } catch (...) {
+    return 1;
+  }
+}
+
+int blockchainer_keystore_unlocked(BlockchainerKeyStore ks) {
+  return as_ks(ks)->unlocked() ? 1 : 0;
+}
+
+void blockchainer_keystore_free(BlockchainerKeyStore ks) { delete as_ks(ks); }
 
 // ── Interop addresses ─────────────────────────────────────────────────────────
 

@@ -81,6 +81,70 @@ public enum Blockchainer {
         }
         return Node(handle: h)
     }
+
+    /// Create a custodial key store protected by [passphrase] (returned unlocked).
+    public static func makeKeyStore(passphrase: String) throws -> KeyStore {
+        ensureReady()
+        guard let h = blockchainer_keystore_new(passphrase) else {
+            throw BlockchainerError(message: "keystore creation failed")
+        }
+        return KeyStore(handle: h)
+    }
+
+    /// Load a serialised key store. It comes back LOCKED — call `unlock`.
+    public static func loadKeyStore(_ blob: Data) throws -> KeyStore {
+        ensureReady()
+        guard let h = blob.withC({ p, l in blockchainer_keystore_load(p, l) }) else {
+            throw BlockchainerError(message: "keystore load failed")
+        }
+        return KeyStore(handle: h)
+    }
+}
+
+/// A custodial store that seals account signing secrets at rest. Add accounts,
+/// serialise the (encrypted) blob, reload it locked, unlock, then reveal a secret
+/// only to sign.
+public final class KeyStore {
+    private let handle: OpaquePointer
+    init(handle: UnsafeMutableRawPointer) { self.handle = OpaquePointer(handle) }
+    deinit { blockchainer_keystore_free(UnsafeMutableRawPointer(handle)) }
+
+    private var h: UnsafeMutableRawPointer { UnsafeMutableRawPointer(handle) }
+
+    /// Seal an account's [secret]; returns its 32-byte address. Requires unlocked.
+    public func addAccount(publicKey: Data, secret: Data) throws -> Data {
+        var address = Data(count: 32)
+        let rc = publicKey.withC { pp, pl in
+            secret.withC { sp, sl in
+                address.withUnsafeMutableBytes { ap in
+                    blockchainer_keystore_add_account(h, pp, pl, sp, sl,
+                                                      ap.bindMemory(to: UInt8.self).baseAddress!)
+                }
+            }
+        }
+        if rc != 0 { throw BlockchainerError(message: "keystore add account failed (locked?)") }
+        return address
+    }
+
+    /// Decrypt the sealed secret for [address]. Requires unlocked.
+    public func reveal(address: Data) throws -> Data {
+        try consume(address.withC { p, _ in blockchainer_keystore_reveal(h, p) }, "keystore_reveal")
+    }
+
+    /// The persistable (encrypted) blob — no plaintext key.
+    public func serialise() throws -> Data {
+        try consume(blockchainer_keystore_serialise(h), "keystore_serialise")
+    }
+
+    /// Recover the master key from [passphrase]. Throws on a wrong passphrase.
+    public func unlock(passphrase: String) throws {
+        if blockchainer_keystore_unlock(h, passphrase) != 0 {
+            throw BlockchainerError(message: "keystore unlock failed")
+        }
+    }
+
+    /// Whether secrets can currently be revealed.
+    public var unlocked: Bool { blockchainer_keystore_unlocked(h) == 1 }
 }
 
 /// A live in-memory chain node (ledger + BFT + mempool + observability).

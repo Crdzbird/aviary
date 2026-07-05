@@ -67,6 +67,14 @@ function ensureLoaded() {
     credit: f('int blockchainer_node_credit(void*, uint8_t*, uint64_t)'),
     submit: f('BlockchainerBufferResult blockchainer_node_submit_transfer(void*, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     submitFee: f('BlockchainerBufferResult blockchainer_node_submit_transfer_fee(void*, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t, uint64_t)'),
+    ksNew: f('void *blockchainer_keystore_new(const char*)'),
+    ksAdd: f('int blockchainer_keystore_add_account(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*)'),
+    ksReveal: f('BlockchainerBufferResult blockchainer_keystore_reveal(void*, uint8_t*)'),
+    ksSerialise: f('BlockchainerBufferResult blockchainer_keystore_serialise(void*)'),
+    ksLoad: f('void *blockchainer_keystore_load(uint8_t*, size_t)'),
+    ksUnlock: f('int blockchainer_keystore_unlock(void*, const char*)'),
+    ksUnlocked: f('int blockchainer_keystore_unlocked(void*)'),
+    ksFree: f('void blockchainer_keystore_free(void*)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -202,6 +210,33 @@ class Node {
   proveAccount(address) { return consume(fn.proveAccount(this._h, u8(address)), 'prove_account'); }
 }
 
+// A custodial store that seals account signing secrets at rest.
+class KeyStore {
+  constructor(passphrase) {
+    this._h = fn.ksNew(passphrase);
+    if (!this._h) throw new Error('keystore create failed');
+  }
+  static _wrap(h) { const k = Object.create(KeyStore.prototype); k._h = h; return k; }
+  static load(blob) {
+    const b = u8(blob);
+    const h = fn.ksLoad(b, b.length);
+    if (!h) throw new Error('keystore load failed');
+    return KeyStore._wrap(h);  // LOCKED — call unlock()
+  }
+  free() { if (this._h) { fn.ksFree(this._h); this._h = null; } }
+  addAccount(publicKey, secret) {
+    const pk = u8(publicKey), sk = u8(secret), out = Buffer.alloc(32);
+    if (fn.ksAdd(this._h, pk, pk.length, sk, sk.length, out) !== 0) {
+      throw new Error('keystore add account failed (locked?)');
+    }
+    return out;
+  }
+  reveal(address) { return consume(fn.ksReveal(this._h, u8(address)), 'keystore_reveal'); }
+  serialise() { return consume(fn.ksSerialise(this._h), 'keystore_serialise'); }
+  unlock(passphrase) { if (fn.ksUnlock(this._h, passphrase) !== 0) throw new Error('keystore unlock failed'); }
+  get unlocked() { return fn.ksUnlocked(this._h) === 1; }
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 module.exports = {
   preload,
@@ -217,6 +252,10 @@ module.exports = {
   newNode: (chainId) => new Node(chainId),
   Node,
   accountAddress: Node.accountAddress,
+
+  newKeyStore: (passphrase) => new KeyStore(passphrase),
+  loadKeyStore: (blob) => KeyStore.load(blob),
+  KeyStore,
 
   ethAddress: (secret32) => consume(fn.ethAddr(u8(secret32)), 'eth_address').toString('utf8'),
   btcAddress: (secret32) => consume(fn.btcAddr(u8(secret32)), 'btc_address').toString('utf8'),

@@ -174,6 +174,43 @@ BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_metrics(Blockchainer
 BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_prove_account(
     BlockchainerNode node, const uint8_t* address);
 
+/* ── Custodial key store (S3) ──────────────────────────────────────────────────
+ * A container that seals account signing secrets at rest. A node never needs to
+ * hold a plaintext key: create a store under a passphrase, add accounts, persist
+ * the (encrypted) blob, reload it LOCKED, unlock, then reveal a secret only to
+ * sign. Each secret is bound to its account address as AAD. */
+
+typedef void* BlockchainerKeyStore;
+
+/** Create a new key store protected by [passphrase] (returned unlocked). NULL on failure. */
+BLOCKCHAINER_API BlockchainerKeyStore blockchainer_keystore_new(const char* passphrase);
+
+/** Seal an account's secret; writes its 32-byte address into [out_address] (>=32 bytes).
+ *  Returns 0 on success, nonzero on failure (e.g. store locked). */
+BLOCKCHAINER_API int blockchainer_keystore_add_account(
+    BlockchainerKeyStore ks, const uint8_t* public_key, size_t pk_len,
+    const uint8_t* secret, size_t sk_len, uint8_t* out_address);
+
+/** Reveal the sealed secret for [address] (32 bytes). Requires unlocked. Returns
+ *  the secret buffer or an error. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_keystore_reveal(
+    BlockchainerKeyStore ks, const uint8_t* address);
+
+/** Serialise the store (keyring envelope + sealed entries; no plaintext key). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_keystore_serialise(BlockchainerKeyStore ks);
+
+/** Load a serialised store. Comes back LOCKED — call unlock before revealing. NULL on error. */
+BLOCKCHAINER_API BlockchainerKeyStore blockchainer_keystore_load(const uint8_t* blob, size_t len);
+
+/** Unlock with a passphrase. Returns 0 on success, nonzero on wrong passphrase. */
+BLOCKCHAINER_API int blockchainer_keystore_unlock(BlockchainerKeyStore ks, const char* passphrase);
+
+/** 1 if currently unlocked, else 0. */
+BLOCKCHAINER_API int blockchainer_keystore_unlocked(BlockchainerKeyStore ks);
+
+/** Destroy a key-store handle. */
+BLOCKCHAINER_API void blockchainer_keystore_free(BlockchainerKeyStore ks);
+
 /* ── Interop address derivation (showcase) ─────────────────────────────────── */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */

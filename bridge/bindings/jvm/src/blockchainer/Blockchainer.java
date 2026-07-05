@@ -23,7 +23,8 @@ public final class Blockchainer implements AutoCloseable {
     private final MethodHandle init, version, backend, nodeNew, nodeFree, newAccount, addr, credit,
             submit, submitFee, produce, height, balance, nonce, mempool, stateRoot, drain, metrics, prove,
             verifyProof, ethAddr, btcAddr, solAddr, bufFree, strFree,
-            newAccountHybrid, submitHybrid;
+            newAccountHybrid, submitHybrid,
+            ksNew, ksAdd, ksReveal, ksSerialise, ksLoad, ksUnlock, ksUnlocked, ksFree;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -54,6 +55,14 @@ public final class Blockchainer implements AutoCloseable {
         solAddr    = h("blockchainer_sol_address", FunctionDescriptor.of(RES, ADDRESS));
         bufFree    = h("blockchainer_buffer_free", FunctionDescriptor.ofVoid(ADDRESS));
         strFree    = h("blockchainer_str_free", FunctionDescriptor.ofVoid(ADDRESS));
+        ksNew      = h("blockchainer_keystore_new", FunctionDescriptor.of(ADDRESS, ADDRESS));
+        ksAdd      = h("blockchainer_keystore_add_account", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS));
+        ksReveal   = h("blockchainer_keystore_reveal", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        ksSerialise= h("blockchainer_keystore_serialise", FunctionDescriptor.of(RES, ADDRESS));
+        ksLoad     = h("blockchainer_keystore_load", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG));
+        ksUnlock   = h("blockchainer_keystore_unlock", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
+        ksUnlocked = h("blockchainer_keystore_unlocked", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+        ksFree     = h("blockchainer_keystore_free", FunctionDescriptor.ofVoid(ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -78,6 +87,69 @@ public final class Blockchainer implements AutoCloseable {
             if (h.address() == 0) throw new IllegalStateException("node create failed");
             return new Node(h);
         } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    /** Create a custodial key store protected by {@code passphrase} (unlocked). */
+    public KeyStore createKeyStore(String passphrase) {
+        try {
+            MemorySegment h = (MemorySegment) ksNew.invoke(arena.allocateFrom(passphrase));
+            if (h.address() == 0) throw new IllegalStateException("keystore create failed");
+            return new KeyStore(h);
+        } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    /** Load a serialised key store. It comes back LOCKED — call unlock(). */
+    public KeyStore loadKeyStore(byte[] blob) {
+        try {
+            MemorySegment h = (MemorySegment) ksLoad.invoke(seg(blob), (long) blob.length);
+            if (h.address() == 0) throw new IllegalStateException("keystore load failed");
+            return new KeyStore(h);
+        } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    /** A custodial store that seals account signing secrets at rest. */
+    public final class KeyStore implements AutoCloseable {
+        private final MemorySegment ks;
+        private KeyStore(MemorySegment ks) { this.ks = ks; }
+
+        /** Seal an account's secret; returns its 32-byte address. Requires unlocked. */
+        public byte[] addAccount(byte[] pub, byte[] secret) {
+            try {
+                MemorySegment out = arena.allocate(32);
+                int rc = (int) ksAdd.invoke(ks, seg(pub), (long) pub.length, seg(secret),
+                                            (long) secret.length, out);
+                if (rc != 0) throw new IllegalStateException("keystore add account failed (locked?)");
+                return out.reinterpret(32).toArray(JAVA_BYTE);
+            } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        /** Decrypt the sealed secret for {@code address}. Requires unlocked. */
+        public byte[] reveal(byte[] address) {
+            try { return consume((MemorySegment) ksReveal.invoke(arena.allocate(RES), ks, seg(address))); }
+            catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        /** The persistable (encrypted) blob — no plaintext key. */
+        public byte[] serialise() {
+            try { return consume((MemorySegment) ksSerialise.invoke(arena.allocate(RES), ks)); }
+            catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        /** Recover the master key from {@code passphrase}. Throws on a wrong passphrase. */
+        public void unlock(String passphrase) {
+            try {
+                if ((int) ksUnlock.invoke(ks, arena.allocateFrom(passphrase)) != 0) {
+                    throw new IllegalStateException("keystore unlock failed");
+                }
+            } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        /** Whether secrets can currently be revealed. */
+        public boolean unlocked() {
+            try { return (int) ksUnlocked.invoke(ks) == 1; } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+
+        @Override public void close() { try { ksFree.invoke(ks); } catch (Throwable ignored) {} }
     }
 
     /** A running chain node. */

@@ -49,6 +49,17 @@ typedef _SubmitFeeC = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Uint64, Uint64, Uint64);
 typedef _SubmitFeeD = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int);
+typedef _KsNewC = Pointer<Void> Function(Pointer<Utf8>);
+typedef _KsNewD = Pointer<Void> Function(Pointer<Utf8>);
+typedef _KsAddC = Int32 Function(
+    Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>);
+typedef _KsAddD = int Function(Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>);
+typedef _KsLoadC = Pointer<Void> Function(Pointer<Uint8>, Size);
+typedef _KsLoadD = Pointer<Void> Function(Pointer<Uint8>, int);
+typedef _KsUnlockC = Int32 Function(Pointer<Void>, Pointer<Utf8>);
+typedef _KsUnlockD = int Function(Pointer<Void>, Pointer<Utf8>);
+typedef _IntOfPtrC = Int32 Function(Pointer<Void>);
+typedef _IntOfPtrD = int Function(Pointer<Void>);
 typedef _SubmitHybridC = _BufResult Function(Pointer<Void>, Pointer<Uint8>, Size,
     Pointer<Uint8>, Size, Pointer<Uint8>, Uint64, Uint64);
 typedef _SubmitHybridD = _BufResult Function(Pointer<Void>, Pointer<Uint8>, int,
@@ -458,6 +469,30 @@ class Blockchainer {
 
   /// Alias for [createNode] (naming parity with the Go binding's NewNode).
   Node newNode(int chainId) => createNode(chainId);
+
+  /// Create a custodial [KeyStore] protected by [passphrase] (returned unlocked).
+  KeyStore createKeyStore(String passphrase) {
+    final cp = passphrase.toNativeUtf8();
+    try {
+      final h = lib.lookupFunction<_KsNewC, _KsNewD>('blockchainer_keystore_new')(cp);
+      if (h == nullptr) throw BlockchainerException('keystore creation failed');
+      return KeyStore._(this, h);
+    } finally {
+      calloc.free(cp);
+    }
+  }
+
+  /// Load a serialised [KeyStore]. It comes back LOCKED — call [KeyStore.unlock].
+  KeyStore loadKeyStore(Uint8List blob) {
+    final p = _alloc(blob);
+    try {
+      final h = lib.lookupFunction<_KsLoadC, _KsLoadD>('blockchainer_keystore_load')(p, blob.length);
+      if (h == nullptr) throw BlockchainerException('keystore load failed');
+      return KeyStore._(this, h);
+    } finally {
+      calloc.free(p);
+    }
+  }
 }
 
 /// A running chain node.
@@ -630,4 +665,69 @@ class Node {
 
   /// Alias for [dispose] (naming parity with the Go binding's Free).
   void free() => dispose();
+}
+
+/// A custodial store that seals account signing secrets at rest. Add accounts,
+/// serialise the (encrypted) blob, reload it LOCKED, unlock, then reveal a
+/// secret only to sign. Create via [Blockchainer.createKeyStore] /
+/// [Blockchainer.loadKeyStore].
+class KeyStore {
+  KeyStore._(this._bc, this._h);
+
+  final Blockchainer _bc;
+  final Pointer<Void> _h;
+  DynamicLibrary get _lib => _bc.lib;
+
+  /// Seal an account's [secret]; returns its 32-byte address. Requires unlocked.
+  Uint8List addAccount(Uint8List publicKey, Uint8List secret) {
+    final pp = _bc._alloc(publicKey);
+    final ps = _bc._alloc(secret);
+    final pa = calloc<Uint8>(32);
+    try {
+      final rc = _lib.lookupFunction<_KsAddC, _KsAddD>('blockchainer_keystore_add_account')(
+          _h, pp, publicKey.length, ps, secret.length, pa);
+      if (rc != 0) throw BlockchainerException('keystore add account failed (locked?)');
+      return Uint8List.fromList(pa.asTypedList(32));
+    } finally {
+      calloc.free(pp);
+      calloc.free(ps);
+      calloc.free(pa);
+    }
+  }
+
+  /// Decrypt and return the sealed secret for [address]. Requires unlocked.
+  Uint8List reveal(Uint8List address) {
+    final pa = _bc._alloc(address);
+    try {
+      return _bc._take(
+          _lib.lookupFunction<_BufNodeAddrC, _BufNodeAddrD>('blockchainer_keystore_reveal')(_h, pa),
+          'keystore_reveal');
+    } finally {
+      calloc.free(pa);
+    }
+  }
+
+  /// The persistable (encrypted) blob — contains no plaintext key.
+  Uint8List serialise() => _bc._take(
+      _lib.lookupFunction<_BufOfNodeC, _BufOfNodeD>('blockchainer_keystore_serialise')(_h),
+      'keystore_serialise');
+
+  /// Recover the master key from [passphrase]. Throws on a wrong passphrase.
+  void unlock(String passphrase) {
+    final cp = passphrase.toNativeUtf8();
+    try {
+      if (_lib.lookupFunction<_KsUnlockC, _KsUnlockD>('blockchainer_keystore_unlock')(_h, cp) != 0) {
+        throw BlockchainerException('keystore unlock failed');
+      }
+    } finally {
+      calloc.free(cp);
+    }
+  }
+
+  /// Whether secrets can currently be revealed.
+  bool get unlocked =>
+      _lib.lookupFunction<_IntOfPtrC, _IntOfPtrD>('blockchainer_keystore_unlocked')(_h) == 1;
+
+  void dispose() =>
+      _lib.lookupFunction<_NodeFreeC, _NodeFreeD>('blockchainer_keystore_free')(_h);
 }
