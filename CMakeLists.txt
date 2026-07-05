@@ -92,6 +92,7 @@ add_library(blockchainer_core STATIC
   src/core/ledger.cpp
   src/consensus/consensus.cpp
   src/consensus/bft_engine.cpp
+  src/consensus/round_state.cpp
   src/p2p/mempool.cpp
   src/p2p/secure_session.cpp
   src/p2p/wire.cpp
@@ -188,6 +189,7 @@ blockchainer_add_test(test_hybrid_sig tests/test_hybrid_sig.cpp)
 blockchainer_add_test(test_state_incremental tests/test_state_incremental.cpp)
 blockchainer_add_test(test_consensus_hardening tests/test_consensus_hardening.cpp)
 blockchainer_add_test(test_keyring tests/test_keyring.cpp)
+blockchainer_add_test(test_round_state tests/test_round_state.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

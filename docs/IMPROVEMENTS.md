@@ -14,11 +14,20 @@
 
 ## Consensus (M2)
 
-- **[H] Full async BFT round state machine.** Round is fixed at `0`. No propose
-  timeouts, prevote step, locking/POLC (proof-of-lock-change), nil-votes, or
-  proposer rotation. The current engine is the safety-critical *certificate*
-  core; the liveness machinery (Tendermint rounds) is not built.
-  (`src/consensus/bft_engine.cpp`)
+- **[~] Full async BFT round state machine — CORE DONE.** `RoundStateMachine`
+  (`round_state.hpp`) is a faithful, deterministic transcription of Tendermint
+  Algorithm 1: propose/prevote/precommit steps, deterministic proposer rotation,
+  round-change on timeouts, nil votes, and the locking / valid-value (POLC) rules
+  that preserve safety across rounds. It is a pure state machine (no clock/net/
+  crypto) — the driver feeds authenticated messages + timeout events and performs
+  the returned `Action`s (broadcast / schedule-timeout / decide). `test_round_
+  state.cpp` runs an N-validator in-memory simulation: agreement + termination on
+  the happy path, round-change + termination with a faulty round-0 proposer, a
+  silent minority (f=2 of 7), a 10-validator set, and locking; ASan/UBSan-clean.
+  Added ALONGSIDE the existing single-shot `BftEngine` (which `DemoNode` still
+  uses). **Remaining:** drive it from a real networked engine (wire the actions
+  to signing + gossip + a timer), proposer-rotation policy beyond round-robin,
+  and equivocation handling within the round SM.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
