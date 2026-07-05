@@ -83,6 +83,7 @@ endif()
 add_library(blockchainer_core STATIC
   src/version.cpp
   src/crypto/cryptolib_backend.cpp
+  src/crypto/keyring.cpp
   src/codec/codec.cpp
   src/core/merkle.cpp
   src/core/types.cpp
@@ -186,6 +187,7 @@ blockchainer_add_test(test_demo_node tests/test_demo_node.cpp)
 blockchainer_add_test(test_hybrid_sig tests/test_hybrid_sig.cpp)
 blockchainer_add_test(test_state_incremental tests/test_state_incremental.cpp)
 blockchainer_add_test(test_consensus_hardening tests/test_consensus_hardening.cpp)
+blockchainer_add_test(test_keyring tests/test_keyring.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

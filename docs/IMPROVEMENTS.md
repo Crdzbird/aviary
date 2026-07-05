@@ -126,6 +126,21 @@
 
 ## Crypto seam (M1/M2)
 
+- **[x] Custodial key management (S3) — DONE.** `blockchainer::custody`
+  (`keyring.hpp`) wraps cryptolib into three pieces: `Vault` (a committing-AEAD
+  envelope-encryptor keyed by a 32-byte master, AAD-bound, stateless so a blob
+  seals now and opens after reload), `Keyring` (a random master key wrapped by
+  device / passphrase slots — the same master unlocks through any slot;
+  serialise/deserialise), and `KeyStore` (account signing secrets sealed at rest,
+  keyed by address with the address bound as AAD; serialise/load returns it
+  *locked*; unlock with a passphrase/device factor to reveal a key for signing).
+  A node need never persist a plaintext key. `test_keyring.cpp` proves the slot
+  equivalence, seal/open tamper + wrong-key + wrong-AAD rejection, the "no
+  plaintext in the serialised blob" property, reload→unlock→reveal, and a
+  revealed key producing a valid signature; ASan/UBSan-clean. **Remaining:** wire
+  the KeyStore into `DemoNode` (sign from custody instead of raw secrets), expose
+  it through the C ABI + language bindings, and zeroize master/secret buffers on
+  drop.
 - **[H] PQ / hybrid signatures in the tx path.** Only Ed25519 is wired for
   transactions. The hybrid Ed25519+ML-DSA option (cryptolib has it) and
   `ChainSpec`-driven suite selection are designed but not implemented — no PQC
