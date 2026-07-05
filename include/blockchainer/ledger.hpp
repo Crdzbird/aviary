@@ -24,6 +24,13 @@ struct ChainSpec {
   /// fee concept. A non-zero fee gives spam a real, per-tx economic cost.
   codec::u128 flat_fee = 0;
 
+  /// Consensus-level block bounds enforced on EVERY block (self-produced and
+  /// received), so a peer cannot force O(huge) work with one oversized block.
+  /// 0 = unlimited. These are the hard protocol ceilings; the mempool's own
+  /// limits (which shape self-produced blocks) should sit at or below them.
+  std::uint32_t max_block_txs = 0;
+  std::uint64_t max_block_bytes = 0;  ///< sum of encoded tx sizes
+
   /// Whether [algo] is permitted on this chain.
   bool accepts(SigAlgo algo) const {
     if (accepted_sig_algos.empty()) return true;

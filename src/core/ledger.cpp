@@ -4,6 +4,26 @@
 
 namespace blockchainer {
 
+namespace {
+// Total encoded size of a block's transactions — the quantity ChainSpec bounds.
+std::uint64_t total_tx_bytes(const std::vector<Transaction>& txs) {
+  std::uint64_t n = 0;
+  for (const auto& tx : txs) n += tx.encode().size();
+  return n;
+}
+
+// Whether [txs] fits the chain's block ceilings. Empty message = fits.
+std::string block_limit_error(const ChainSpec& spec, const std::vector<Transaction>& txs) {
+  if (spec.max_block_txs != 0 && txs.size() > spec.max_block_txs) {
+    return "block exceeds max tx count";
+  }
+  if (spec.max_block_bytes != 0 && total_tx_bytes(txs) > spec.max_block_bytes) {
+    return "block exceeds max byte size";
+  }
+  return {};
+}
+}  // namespace
+
 Ledger::Ledger(ChainSpec spec, std::unique_ptr<StateMachine> genesis_state,
                std::uint64_t genesis_timestamp)
     : spec_(spec), state_(std::move(genesis_state)) {
@@ -25,6 +45,9 @@ BlockError Ledger::check_header(const BlockHeader& h) const {
 }
 
 Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp) {
+  if (std::string e = block_limit_error(spec_, txs); !e.empty()) {
+    throw std::runtime_error("build_block: " + e);
+  }
   auto working = state_->clone();
   for (const auto& tx : txs) {
     if (tx.chain_id != spec_.chain_id) {
@@ -56,6 +79,12 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp)
 BlockError Ledger::process_block(const Block& block) {
   // 2. Header checks (1. decode happened to construct the Block).
   if (BlockError he = check_header(block.header); !he.ok) return he;
+
+  // 2a. Block-size ceilings: reject an oversized block before doing per-tx work,
+  // so a peer cannot force O(huge) verification with one message.
+  if (std::string e = block_limit_error(spec_, block.transactions); !e.empty()) {
+    return BlockError::failure(e);
+  }
 
   // 3. Recompute and compare the transaction root.
   if (compute_tx_root(block.transactions) != block.header.tx_root) {

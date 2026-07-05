@@ -181,5 +181,39 @@ int main() {
     CHECK(as_account(fl).account(alice_addr).balance == 0);
   }
 
+  std::printf("== consensus block limits reject oversized blocks (produced + received) ==\n");
+  {
+    auto g = std::make_unique<AccountStateMachine>();
+    g->credit_genesis(alice_addr, 1000);
+    ChainSpec spec{kChain, StateModel::kAccount};
+    spec.max_block_txs = 1;  // at most one tx per block
+    Ledger l(spec, std::move(g));
+
+    Transaction t0v = make_transfer(alice, bob_addr, 0, 10, kChain);
+    Transaction t1v = make_transfer(alice, bob_addr, 1, 10, kChain);
+    // Producer side: build_block refuses to over-fill.
+    CHECK_THROWS(l.build_block({t0v, t1v}, 1));
+
+    // A single-tx block is fine and advances the chain.
+    Block ok = l.build_block({t0v}, 1);
+    CHECK_MSG(l.process_block(ok).ok, "one-tx block accepted");
+
+    // Received side: a hand-built two-tx block is rejected before per-tx work,
+    // and the ledger is left untouched.
+    Block big;
+    big.header.version = 1;
+    big.header.chain_id = kChain;
+    big.header.height = 2;
+    big.header.parent_hash = l.tip().hash();
+    big.header.timestamp = 2;
+    big.transactions = {make_transfer(alice, bob_addr, 1, 10, kChain),
+                        make_transfer(alice, bob_addr, 2, 10, kChain)};
+    big.header.tx_root = compute_tx_root(big.transactions);
+    big.header.state_root = l.tip().state_root;
+    BlockError er = l.process_block(big);
+    CHECK(!er.ok);
+    CHECK(l.tip().height == 1);  // not advanced
+  }
+
   return bctest::summary();
 }

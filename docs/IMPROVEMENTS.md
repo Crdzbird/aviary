@@ -87,13 +87,15 @@
   Revisit a 20-byte (EVM-style) form for interop (M6).
 - **[L] Block timestamp policy.** Only `timestamp >= parent` is enforced. No
   upper drift bound or median-time rule (`ARCHITECTURE.md` §17.4).
-- **[~] Block size / tx-count limits.** **Mempool-side DONE:** `select()` now
-  stops at whichever binds first — the tx-count `max` or `MempoolConfig.
-  max_block_bytes` — so a produced block's size is bounded (`test_mempool.cpp`).
-  Plus a per-account pending cap (`max_per_account`, default 64) that stops one
-  sender flooding the pool and starving others (`AddResult::kAccountLimit`).
-  **Remaining:** enforce a consensus-level max block size / tx-count in
-  `process_block` so *received* blocks (not just self-produced ones) are bounded.
+- **[x] Block size / tx-count limits — DONE.** Consensus-level ceilings
+  (`ChainSpec.max_block_txs` / `max_block_bytes`, 0 = unlimited) are enforced on
+  EVERY block in both `Ledger::build_block` (producer) and `process_block`
+  (receiver, before per-tx work) — a peer cannot force O(huge) verification with
+  one oversized block (`test_ledger.cpp`). Mempool-side, `select()` stops at
+  whichever binds first — the tx-count `max` or `MempoolConfig.max_block_bytes` —
+  and a per-account pending cap (`max_per_account`, default 64) stops one sender
+  flooding the pool and starving others (`AddResult::kAccountLimit`,
+  `test_mempool.cpp`).
 
 ## Codec (M1)
 
