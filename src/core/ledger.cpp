@@ -133,4 +133,29 @@ BlockError Ledger::process_block(const Block& block) {
   return BlockError::success();
 }
 
+Bytes Ledger::snapshot() const {
+  codec::CodecWriter w;
+  const Bytes tip_bytes = tip_.encode();
+  const Bytes state_bytes = state_->serialize();
+  w.write_bytes(codec::ByteView(tip_bytes.data(), tip_bytes.size()));
+  w.write_bytes(codec::ByteView(state_bytes.data(), state_bytes.size()));
+  return w.take();
+}
+
+std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot) {
+  codec::CodecReader r(snapshot);
+  const Bytes tip_bytes = r.read_bytes();
+  const Bytes state_bytes = r.read_bytes();
+  r.assert_fully_consumed();
+
+  BlockHeader tip = BlockHeader::decode_all(codec::ByteView(tip_bytes.data(), tip_bytes.size()));
+  auto state = deserialize_state(spec.state_model, codec::ByteView(state_bytes.data(), state_bytes.size()));
+
+  // The public constructor seeds a genesis tip; overwrite it with the restored
+  // tip so the chain resumes at the snapshotted height.
+  auto ledger = std::make_unique<Ledger>(spec, std::move(state), tip.timestamp);
+  ledger->tip_ = tip;
+  return ledger;
+}
+
 }  // namespace blockchainer

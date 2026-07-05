@@ -254,4 +254,34 @@ std::unique_ptr<StateMachine> AccountStateMachine::clone() const {
   return c;
 }
 
+Bytes AccountStateMachine::serialize() const {
+  seal();  // materialise the overlay so base_ holds the full committed state
+  codec::CodecWriter w;
+  w.write_u128(flat_fee_);
+  w.write_u32(static_cast<std::uint32_t>(base_->accounts.size()));
+  for (const auto& [addr, acc] : base_->accounts) {  // map → address-sorted, canonical
+    w.write_fixed_bytes(view(addr), 32);
+    w.write_u128(acc.balance);
+    w.write_u64(acc.nonce);
+  }
+  return w.take();
+}
+
+std::unique_ptr<AccountStateMachine> AccountStateMachine::deserialize(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  const codec::u128 flat_fee = r.read_u128();
+  auto sm = std::make_unique<AccountStateMachine>(flat_fee);
+  const std::uint32_t n = r.read_u32();
+  for (std::uint32_t i = 0; i < n; ++i) {
+    Hash addr = to_hash(r.read_fixed_bytes(32));
+    Account acc;
+    acc.balance = r.read_u128();
+    acc.nonce = r.read_u64();
+    sm->overlay_[addr] = acc;
+  }
+  r.assert_fully_consumed();
+  sm->seal();  // commit into the base snapshot
+  return sm;
+}
+
 }  // namespace blockchainer

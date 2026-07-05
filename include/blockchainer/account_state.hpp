@@ -54,6 +54,8 @@ class AccountStateMachine : public StateMachine {
   void apply(const Transaction& tx) override;
   codec::u128 tx_fee(const Transaction& tx) const override;
   std::unique_ptr<StateMachine> clone() const override;
+  Bytes serialize() const override;
+  static std::unique_ptr<AccountStateMachine> deserialize(codec::ByteView bytes);
 
   /// Decodes the account-model transaction body. Throws codec::CodecError on a
   /// malformed body.

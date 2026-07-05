@@ -261,4 +261,32 @@ std::unique_ptr<StateMachine> UtxoStateMachine::clone() const {
   return c;
 }
 
+Bytes UtxoStateMachine::serialize() const {
+  seal();  // materialise the overlay so base_ holds the full committed UTXO set
+  codec::CodecWriter w;
+  w.write_u128(flat_fee_);
+  w.write_u64(genesis_counter_);
+  w.write_u32(static_cast<std::uint32_t>(base_->utxos.size()));
+  for (const auto& [op, out] : base_->utxos) {  // map → outpoint-sorted, canonical
+    encode_outpoint(w, op);
+    encode_output(w, out);
+  }
+  return w.take();
+}
+
+std::unique_ptr<UtxoStateMachine> UtxoStateMachine::deserialize(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  const codec::u128 flat_fee = r.read_u128();
+  auto sm = std::make_unique<UtxoStateMachine>(flat_fee);
+  sm->genesis_counter_ = r.read_u64();
+  const std::uint32_t n = r.read_u32();
+  for (std::uint32_t i = 0; i < n; ++i) {
+    Outpoint op = decode_outpoint(r);
+    sm->overlay_[op] = decode_output(r);
+  }
+  r.assert_fully_consumed();
+  sm->seal();
+  return sm;
+}
+
 }  // namespace blockchainer

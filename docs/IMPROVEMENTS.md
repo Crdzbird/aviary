@@ -323,12 +323,21 @@ selectors — validated against real-world vectors). Deferred:
 - **[L] C ABI exposure of interop.** Dart/Go can't yet build/sign an EVM tx
   through the bridge.
 
-## Storage (design §13, not started)
+## Storage (design §13, partially started)
 
-- **[H] No persistence.** All state is in-memory `std::map`. No `StateStore`
-  abstraction, no block store, no by-height/by-hash/by-tx indexes, no
-  height-versioned snapshots or on-disk rollback. Pick the embedded backend
-  (`ARCHITECTURE.md` §17.3).
+- **[~] Persistence — SNAPSHOT SERIALIZATION DONE.** The committed state now
+  serializes to a self-describing byte blob: `StateMachine::serialize()` +
+  `deserialize_state(model, bytes)` for both models (account = flat_fee +
+  address-sorted {addr,balance,nonce}; UTXO = flat_fee + genesis_counter +
+  outpoint-sorted {outpoint,output}). `Ledger::snapshot()` bundles the tip header
+  + state; `Ledger::restore(spec, blob)` rebuilds a ledger at the snapshotted
+  height that resumes the chain (accepts the next block identically). Round-trips
+  to a byte-identical state root, fuzzed, ASan-clean (`test_snapshot.cpp`). A node
+  can now write the blob to disk and reload — the foundation for a real store and
+  for streaming state-snapshot fast sync. **Remaining:** an actual embedded
+  on-disk backend (`ARCHITECTURE.md` §17.3), a block store with by-height/by-hash/
+  by-tx indexes, height-versioned snapshots + on-disk rollback, and incremental
+  (rather than full-state) snapshotting.
 
 ## Testing, fuzzing & CI
 

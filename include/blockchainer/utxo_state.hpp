@@ -76,6 +76,8 @@ class UtxoStateMachine : public StateMachine {
   void apply(const Transaction& tx) override;
   codec::u128 tx_fee(const Transaction& tx) const override;
   std::unique_ptr<StateMachine> clone() const override;
+  Bytes serialize() const override;
+  static std::unique_ptr<UtxoStateMachine> deserialize(codec::ByteView bytes);
 
   static Body decode_body(const Bytes& body);
   static Bytes encode_body(const Body& b);

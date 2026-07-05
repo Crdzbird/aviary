@@ -43,6 +43,15 @@ class StateMachine {
   /// Deep copy, so the pipeline can apply a block atomically on a working copy
   /// and commit only on success.
   virtual std::unique_ptr<StateMachine> clone() const = 0;
+
+  /// Serialize the full committed state to a self-describing byte blob (carries
+  /// its own flat fee), so a chain can be snapshotted and reloaded. Round-trips
+  /// with the model's `deserialize` to a byte-identical state root.
+  virtual Bytes serialize() const = 0;
 };
+
+/// Reconstruct a state machine of [model] from bytes produced by
+/// StateMachine::serialize(). Throws on a malformed blob.
+std::unique_ptr<StateMachine> deserialize_state(StateModel model, codec::ByteView bytes);
 
 }  // namespace blockchainer

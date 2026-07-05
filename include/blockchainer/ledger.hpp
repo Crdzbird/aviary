@@ -80,6 +80,14 @@ class Ledger {
   /// failure it is left completely unchanged.
   BlockError process_block(const Block& block);
 
+  /// Serialize the chain tip + full committed state to a self-describing blob a
+  /// node can persist and reload (foundation for storage + fast sync).
+  Bytes snapshot() const;
+
+  /// Rebuild a ledger from a [snapshot] under [spec]. The restored ledger is at
+  /// the snapshotted height and accepts the next block. Throws on a bad blob.
+  static std::unique_ptr<Ledger> restore(ChainSpec spec, codec::ByteView snapshot);
+
  private:
   BlockError check_header(const BlockHeader& h) const;
 
