@@ -273,9 +273,7 @@ test. Still to do:
   single validator (quorum 1). Collecting precommits across the network needs the
   async BFT round state machine (also deferred, under Consensus) plus a
   vote-gossip message + aggregation across peers.
-- **[M] Gossip overlay manager.** Wire messages exist, but no mesh: seen-set
-  dedup cache, flood/rate control, message TTL/hop limits, eclipse-resistant peer
-  selection, announce-then-fetch (Inv/GetData).
+- **[~] Gossip overlay manager — CORE DONE.** `p2p::GossipOverlay` (`gossip.hpp`) is the mesh on top of the wire/secure-session transport: it dedups messages by content hash (BLAKE3) and floods a new one to peers except the sender, so a message reaches every connected node exactly once over any (partial) topology, loop-free. Transport-agnostic (returns relays to send). `test_gossip.cpp`: ring, partial mesh, and clique all propagate to every node with the redundant paths deduped. **Remaining:** peer scoring / ban list, message TTL + expiry of the seen-set, and topic-scoped subscriptions.
 - **[M] Peer discovery & address book.** No discovery, handshake/`Hello`
   negotiation beyond the struct, peer scoring, or ban list.
 - **[x] Mutual identity authentication on the secure session — DONE.** The
