@@ -302,5 +302,9 @@ selectors — validated against real-world vectors). Deferred:
   authors for non-Ed25519 schemes (sig verify enforces key validity first).
   `TestHybridTransferEndToEnd` (Go) drives create→credit→hybrid-transfer→block→
   proof; 28/28 C++ suite still green.
-- **Remaining for full A2:** expose `NewAccountHybrid`/`SubmitTransferHybrid` in the
-  Dart/Node/Swift/JVM bindings + a cross-binding differential vector.
+- **[x] A2 complete.** `NewAccountHybrid`/`SubmitTransferHybrid` exposed in Dart,
+  Node, Swift, and JVM (all verified: 1984-byte PQ pubkeys, PQ transfer applied,
+  proof verifies). Cross-binding differential (`scripts/hybrid_differential.sh`):
+  Go emits a hybrid scenario, Dart replays it from the shared keys and reaches a
+  byte-identical state root — PQ ledger state is deterministic across bindings
+  even though ML-DSA signatures differ per run.

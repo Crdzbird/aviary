@@ -22,7 +22,8 @@ public final class Blockchainer implements AutoCloseable {
 
     private final MethodHandle init, version, backend, nodeNew, nodeFree, newAccount, addr, credit,
             submit, produce, height, balance, nonce, mempool, stateRoot, drain, metrics, prove,
-            verifyProof, ethAddr, btcAddr, solAddr, bufFree, strFree;
+            verifyProof, ethAddr, btcAddr, solAddr, bufFree, strFree,
+            newAccountHybrid, submitHybrid;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -35,6 +36,8 @@ public final class Blockchainer implements AutoCloseable {
         addr       = h("blockchainer_account_address", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
         credit     = h("blockchainer_node_credit", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
         submit     = h("blockchainer_node_submit_transfer", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
+        newAccountHybrid = h("blockchainer_node_new_account_hybrid", FunctionDescriptor.of(RES, ADDRESS));
+        submitHybrid = h("blockchainer_node_submit_transfer_hybrid", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
         produce    = h("blockchainer_node_produce_block", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, ADDRESS));
         height     = h("blockchainer_node_height", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
         balance    = h("blockchainer_node_balance", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
@@ -85,6 +88,22 @@ public final class Blockchainer implements AutoCloseable {
             byte[] secret = consume(invokeRes(newAccount, node));
             byte[] pub = java.util.Arrays.copyOfRange(secret, 32, 64);
             return new Account(secret, pub, accountAddress(pub));
+        }
+        /** Fresh hybrid (Ed25519 + ML-DSA-65) post-quantum account. */
+        public Account newAccountHybrid() {
+            byte[] blob = consume(invokeRes(newAccountHybrid, node));
+            // [pub_len: 4 bytes big-endian][public][secret]
+            int pl = ((blob[0] & 0xFF) << 24) | ((blob[1] & 0xFF) << 16) | ((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF);
+            byte[] pub = java.util.Arrays.copyOfRange(blob, 4, 4 + pl);
+            byte[] sec = java.util.Arrays.copyOfRange(blob, 4 + pl, blob.length);
+            return new Account(sec, pub, accountAddress(pub));
+        }
+        /** Build, sign, and admit a hybrid (post-quantum) transfer. */
+        public byte[] submitTransferHybrid(byte[] secret, byte[] pub, byte[] to, long amount, long n) {
+            try {
+                return consume((MemorySegment) submitHybrid.invoke(arena.allocate(RES), node,
+                    seg(secret), (long) secret.length, seg(pub), (long) pub.length, seg(to), amount, n));
+            } catch (Throwable t) { throw new RuntimeException(t); }
         }
         public byte[] accountAddress(byte[] pub) {
             try { return consume((MemorySegment) addr.invoke(arena.allocate(RES), seg(pub), (long) pub.length)); }

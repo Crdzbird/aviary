@@ -45,6 +45,10 @@ typedef _SubmitC = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Uint64, Uint64);
 typedef _SubmitD = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int, int);
+typedef _SubmitHybridC = _BufResult Function(Pointer<Void>, Pointer<Uint8>, Size,
+    Pointer<Uint8>, Size, Pointer<Uint8>, Uint64, Uint64);
+typedef _SubmitHybridD = _BufResult Function(Pointer<Void>, Pointer<Uint8>, int,
+    Pointer<Uint8>, int, Pointer<Uint8>, int, int);
 typedef _ProduceC = Int32 Function(Pointer<Void>, Uint64, Pointer<Uint64>);
 typedef _ProduceD = int Function(Pointer<Void>, int, Pointer<Uint64>);
 typedef _U64NodeC = Uint64 Function(Pointer<Void>);
@@ -468,6 +472,19 @@ class Node {
     return Account(secret, pub, accountAddress(pub));
   }
 
+  /// Generate a fresh hybrid (Ed25519 + ML-DSA-65) post-quantum account. The
+  /// returned [Account] holds the hybrid key blobs; spend with [submitTransferHybrid].
+  Account newAccountHybrid() {
+    final blob = _bc._take(
+        _lib.lookupFunction<_BufOfNodeC, _BufOfNodeD>('blockchainer_node_new_account_hybrid')(_h),
+        'new_account_hybrid');
+    // Layout: [pub_len: 4 bytes big-endian][public][secret].
+    final pl = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+    final pub = Uint8List.sublistView(blob, 4, 4 + pl);
+    final secret = Uint8List.sublistView(blob, 4 + pl);
+    return Account(secret, pub, accountAddress(pub));
+  }
+
   Uint8List accountAddress(Uint8List publicKey) {
     final p = _bc._alloc(publicKey);
     try {
@@ -508,6 +525,26 @@ class Node {
           'submit_transfer');
     } finally {
       calloc.free(ps);
+      calloc.free(pt);
+    }
+  }
+
+  /// Build, sign, and admit a hybrid (post-quantum) transfer using the hybrid
+  /// key blobs from [newAccountHybrid]. Returns the txid.
+  Uint8List submitTransferHybrid(
+      Uint8List secret, Uint8List public, Uint8List to, int amount, int nonce) {
+    final ps = _bc._alloc(secret);
+    final pp = _bc._alloc(public);
+    final pt = _bc._alloc(to);
+    try {
+      return _bc._take(
+          _lib.lookupFunction<_SubmitHybridC, _SubmitHybridD>(
+              'blockchainer_node_submit_transfer_hybrid')(
+              _h, ps, secret.length, pp, public.length, pt, amount, nonce),
+          'submit_transfer_hybrid');
+    } finally {
+      calloc.free(ps);
+      calloc.free(pp);
       calloc.free(pt);
     }
   }

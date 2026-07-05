@@ -66,6 +66,8 @@ function ensureLoaded() {
     accountAddress: f('BlockchainerBufferResult blockchainer_account_address(uint8_t*, size_t)'),
     credit: f('int blockchainer_node_credit(void*, uint8_t*, uint64_t)'),
     submit: f('BlockchainerBufferResult blockchainer_node_submit_transfer(void*, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
+    newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
+    submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
     height: f('uint64_t blockchainer_node_height(void*)'),
     balance: f('uint64_t blockchainer_node_balance(void*, uint8_t*)'),
@@ -166,6 +168,19 @@ class Node {
   }
   submitTransfer(secret, toAddress, amount, nonce) {
     return consume(fn.submit(this._h, u8(secret), u8(secret).length, u8(toAddress), BigInt(amount), BigInt(nonce)), 'submit_transfer');
+  }
+  // Hybrid (Ed25519 + ML-DSA-65) post-quantum account. Returns {secret, publicKey, address}.
+  newAccountHybrid() {
+    const blob = consume(fn.newAccountHybrid(this._h), 'new_account_hybrid');
+    // [pub_len: 4 bytes big-endian][public][secret]
+    const pl = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+    const publicKey = blob.subarray(4, 4 + pl);
+    const secret = blob.subarray(4 + pl);
+    return { secret, publicKey, address: Node.accountAddress(publicKey) };
+  }
+  submitTransferHybrid(secret, publicKey, toAddress, amount, nonce) {
+    return consume(fn.submitHybrid(this._h, u8(secret), u8(secret).length,
+      u8(publicKey), u8(publicKey).length, u8(toAddress), BigInt(amount), BigInt(nonce)), 'submit_transfer_hybrid');
   }
   produceBlock(timestamp) {
     const out = [0n];

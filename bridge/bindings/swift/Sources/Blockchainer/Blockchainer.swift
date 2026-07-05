@@ -118,6 +118,30 @@ public final class Node {
         }, "submit_transfer")
     }
 
+    /// Generate a fresh hybrid (Ed25519 + ML-DSA-65) post-quantum account.
+    public func newAccountHybrid() throws -> Account {
+        let blob = try consume(blockchainer_node_new_account_hybrid(h), "new_account_hybrid")
+        // [pub_len: 4 bytes big-endian][public][secret]
+        let pl = Int(blob[0]) << 24 | Int(blob[1]) << 16 | Int(blob[2]) << 8 | Int(blob[3])
+        let publicKey = blob.subdata(in: 4..<(4 + pl))
+        let secret = blob.subdata(in: (4 + pl)..<blob.count)
+        let address = try consume(publicKey.withC { blockchainer_account_address($0, $1) }, "account_address")
+        return Account(secret: secret, publicKey: publicKey, address: address)
+    }
+
+    /// Build, sign, and admit a hybrid (post-quantum) transfer.
+    @discardableResult
+    public func submitTransferHybrid(secret: Data, publicKey: Data, to: Data,
+                                     amount: UInt64, nonce: UInt64) throws -> Data {
+        try consume(secret.withC { sp, sl in
+            publicKey.withC { pp, pl in
+                to.withC { tp, _ in
+                    blockchainer_node_submit_transfer_hybrid(h, sp, sl, pp, pl, tp, amount, nonce)
+                }
+            }
+        }, "submit_transfer_hybrid")
+    }
+
     @discardableResult
     public func produceBlock(timestamp: UInt64) throws -> UInt64 {
         var height: UInt64 = 0
