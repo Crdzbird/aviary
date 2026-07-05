@@ -1,8 +1,12 @@
+#include <algorithm>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <random>
 #include <vector>
 
 #include "blockchainer/ledger.hpp"
+#include "blockchainer/merkle.hpp"
 #include "blockchainer/utxo_state.hpp"
 #include "blockchainer/version.hpp"
 #include "check.hpp"
@@ -17,6 +21,22 @@ codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()
 crypto::KeyPair key_from(std::uint8_t s) {
   Bytes seed(32, s);
   return crypto::ed25519_keygen_from_seed(view(seed));
+}
+
+// Naive reference root: the pre-COW definition — compute_root over the sorted
+// UTXO leaves. The copy-on-write fast path must equal this for every state.
+Hash naive_utxo_root(const std::map<Outpoint, Output>& utxos) {
+  std::vector<Hash> leaves;
+  leaves.reserve(utxos.size());
+  for (const auto& [op, out] : utxos) {
+    codec::CodecWriter w;
+    w.write_fixed_bytes(codec::ByteView(op.txid.data(), 32), 32);
+    w.write_u32(op.index);
+    w.write_fixed_bytes(codec::ByteView(out.owner.data(), 32), 32);
+    w.write_u128(out.amount);
+    leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, w.take()));
+  }
+  return merkle::compute_root(leaves);
 }
 
 Transaction make_spend(const crypto::KeyPair& signer,
@@ -93,9 +113,20 @@ int main() {
   CHECK_THROWS(ledger.build_block(
       {make_spend(alice, {to_bob}, {Output{alice_addr, 100}}, kChain)}, 2));
 
-  // Value not conserved: spend 900 change, emit only 800.
+  // Minting: outputs exceed inputs (spend 900 change, emit 1000). Rejected —
+  // a spend may burn value as a fee (in > out) but can never create it (out > in).
   CHECK_THROWS(ledger.build_block(
-      {make_spend(alice, {alice_change}, {Output{bob_addr, 800}}, kChain)}, 2));
+      {make_spend(alice, {alice_change}, {Output{bob_addr, 1000}}, kChain)}, 2));
+
+  // But spending 900 and emitting only 800 is now VALID — the 100 surplus is a
+  // burned fee (a feeless chain requires only out <= in). build_block accepts it
+  // (throws only on an invalid tx); we don't commit it, to leave the chain at
+  // height 1 for the cases below.
+  {
+    Block feeblk = ledger.build_block(
+        {make_spend(alice, {alice_change}, {Output{bob_addr, 800}}, kChain)}, 2);
+    CHECK(feeblk.transactions.size() == 1);  // built ⇒ the in>out fee spend is valid
+  }
 
   // Tampered state_root rejected; ledger unchanged.
   {
@@ -118,6 +149,94 @@ int main() {
     CHECK_MSG(er.ok, er.ok ? "block 2 accepted" : er.error.c_str());
     CHECK(ledger.tip().height == 2);
     CHECK(!as_utxo(ledger).has(to_bob));
+  }
+
+  std::printf("== fee floor: a spend must clear the chain minimum ==\n");
+  {
+    UtxoStateMachine s(/*flat_fee=*/10);
+    Outpoint op = s.add_genesis_utxo(Output{alice_addr, 1000});
+    // in 1000, out 995 → fee 5 < 10 → rejected.
+    CHECK(!s.validate(make_spend(alice, {op}, {Output{bob_addr, 995}}, kChain)).ok);
+    // in 1000, out 990 → fee 10 == minimum → accepted.
+    CHECK(s.validate(make_spend(alice, {op}, {Output{bob_addr, 990}}, kChain)).ok);
+    // Exact conservation (fee 0) is below the minimum on a fee'd chain → rejected.
+    CHECK(!s.validate(make_spend(alice, {op}, {Output{bob_addr, 1000}}, kChain)).ok);
+    // Minting (out > in) is always rejected.
+    CHECK(!s.validate(make_spend(alice, {op}, {Output{bob_addr, 1001}}, kChain)).ok);
+  }
+
+  std::printf("== copy-on-write differential: fast root tracks the naive root ==\n");
+  {
+    auto owner = key_from(9);
+    const Hash owner_addr = crypto::address_of(view(owner.public_key));
+    UtxoStateMachine sm;  // feeless
+    std::map<Outpoint, Output> ref;
+    std::vector<Outpoint> live;
+    std::mt19937_64 rng(0xC0FFEEULL);
+
+    auto add = [&](codec::u128 amt) {
+      Outpoint op = sm.add_genesis_utxo(Output{owner_addr, amt});
+      ref[op] = Output{owner_addr, amt};
+      live.push_back(op);
+    };
+    for (int i = 0; i < 20; ++i) add(1000 + i);
+    CHECK(sm.state_root() == naive_utxo_root(ref));
+
+    for (int step = 0; step < 600; ++step) {
+      if (live.empty() || rng() % 3 == 0) {
+        add(500 + rng() % 500);
+      } else {
+        // Spend 1..3 distinct live outpoints into 1..2 outputs, burning a fee.
+        const int k = 1 + static_cast<int>(rng() % std::min<std::size_t>(3, live.size()));
+        std::vector<Outpoint> ins;
+        codec::u128 in_sum = 0;
+        for (int j = 0; j < k && !live.empty(); ++j) {
+          const std::size_t idx = rng() % live.size();
+          ins.push_back(live[idx]);
+          in_sum += ref[live[idx]].amount;
+          live.erase(live.begin() + idx);
+        }
+        codec::u128 fee = in_sum == 0 ? 0 : rng() % std::min<codec::u128>(50, in_sum);
+        const codec::u128 out_total = in_sum - fee;
+        const codec::u128 first = out_total / 2;
+        std::vector<Output> outs = {Output{owner_addr, first},
+                                    Output{owner_addr, out_total - first}};
+        Transaction tx = make_spend(owner, ins, outs, kChain);
+        CHECK(sm.validate(tx).ok);
+        sm.apply(tx);
+        for (const auto& op : ins) ref.erase(op);
+        const Hash txid = tx.txid();
+        for (std::uint32_t i = 0; i < outs.size(); ++i) {
+          Outpoint np{txid, i};
+          ref[np] = outs[i];
+          live.push_back(np);
+        }
+      }
+      if (step < 120 || step % 5 == 0) {
+        CHECK_MSG(sm.state_root() == naive_utxo_root(ref), "root matches naive after op");
+      }
+    }
+    CHECK_MSG(sm.state_root() == naive_utxo_root(ref), "final root matches naive");
+    CHECK(sm.utxo_count() == ref.size());
+    if (!live.empty()) CHECK(sm.prove_outpoint(live.front()).present);
+  }
+
+  std::printf("== clone is copy-on-write independent ==\n");
+  {
+    auto owner = key_from(8);
+    const Hash owner_addr = crypto::address_of(view(owner.public_key));
+    UtxoStateMachine a;
+    std::vector<Outpoint> ops;
+    for (int i = 0; i < 50; ++i) ops.push_back(a.add_genesis_utxo(Output{owner_addr, 100}));
+    const Hash root_a = a.state_root();
+
+    auto b = a.clone();
+    auto* bp = dynamic_cast<UtxoStateMachine*>(b.get());
+    bp->apply(make_spend(owner, {ops[0]}, {Output{owner_addr, 100}}, kChain));  // mutate clone
+
+    CHECK_MSG(a.state_root() == root_a, "original root unchanged after clone mutated");
+    CHECK(a.has(ops[0]));       // original still holds the spent outpoint
+    CHECK(!bp->has(ops[0]));    // clone spent it
   }
 
   return bctest::summary();

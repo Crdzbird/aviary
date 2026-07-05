@@ -71,9 +71,14 @@
   (`test_state_incremental.cpp`, 4000-op naive cross-check, MerkleIndex vs
   `compute_root`, COW independence). Benchmark (`tools/bench_state.cpp`): the
   per-block commit is flat as accounts grow (208µs→488µs over 1k→256k accounts)
-  vs the old full rebuild (4.6ms→799ms) — up to ~1600× at 256k. **Remaining:**
-  apply the same COW/incremental commitment to `utxo_state.cpp` (still a full
-  rebuild); optional persistent-map so `clone()` sheds its O(N) account-map copy.
+  vs the old full rebuild (4.6ms→799ms) — up to ~1600× at 256k. **UTXO model DONE
+  too:** `UtxoStateMachine` uses the same shared-`Snapshot` + `overlay_` (a
+  tombstone marks a spent outpoint), so `clone()` is O(changed) not O(state).
+  UTXO blocks are inherently structural (add/remove outpoints), so `state_root()`
+  reseals rather than incrementally updating — but the committed root is
+  byte-identical and clone no longer scales with the set size
+  (`test_utxo.cpp` 600-op COW differential + clone independence). **Remaining:**
+  optional persistent map so `clone()` sheds its residual O(N) map copy at seal.
 - **[~] Fees / gas.** **Account model DONE (flat base + variable tip):**
   `ChainSpec.flat_fee` (default 0 → feeless, byte-identical to no-fee) is a fixed
   base fee, and the v2 envelope carries an explicit per-tx `fee` (priority tip,

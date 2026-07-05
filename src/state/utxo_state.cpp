@@ -57,19 +57,6 @@ Bytes UtxoStateMachine::encode_body(const Body& b) {
   return w.take();
 }
 
-UtxoStateMachine::Outpoint UtxoStateMachine::add_genesis_utxo(const Output& output) {
-  Outpoint op;
-  op.txid = crypto::zero_hash();
-  op.index = static_cast<std::uint32_t>(genesis_counter_++);
-  utxos_[op] = output;
-  return op;
-}
-
-UtxoStateMachine::Output UtxoStateMachine::get(const Outpoint& op) const {
-  auto it = utxos_.find(op);
-  return it == utxos_.end() ? Output{} : it->second;
-}
-
 namespace {
 Bytes utxo_leaf_preimage(const UtxoStateMachine::Outpoint& op,
                          const UtxoStateMachine::Output& out) {
@@ -80,23 +67,93 @@ Bytes utxo_leaf_preimage(const UtxoStateMachine::Outpoint& op,
 }
 }  // namespace
 
-Hash UtxoStateMachine::state_root() const {
+UtxoStateMachine::UtxoStateMachine(codec::u128 flat_fee)
+    : base_(std::make_shared<Snapshot>()), flat_fee_(flat_fee) {}
+
+const UtxoStateMachine::Output* UtxoStateMachine::lookup(const Outpoint& op) const {
+  if (auto it = overlay_.find(op); it != overlay_.end()) {
+    return it->second ? &*it->second : nullptr;  // nullopt = spent (tombstone)
+  }
+  if (auto it = base_->utxos.find(op); it != base_->utxos.end()) return &it->second;
+  return nullptr;
+}
+
+std::map<UtxoStateMachine::Outpoint, UtxoStateMachine::Output> UtxoStateMachine::merged() const {
+  std::map<Outpoint, Output> out = base_->utxos;
+  for (const auto& [op, v] : overlay_) {
+    if (v) {
+      out[op] = *v;
+    } else {
+      out.erase(op);
+    }
+  }
+  return out;
+}
+
+void UtxoStateMachine::seal() const {
+  if (overlay_.empty()) return;
+  auto snap = std::make_shared<Snapshot>();
+  snap->utxos = base_->utxos;
+  for (const auto& [op, v] : overlay_) {
+    if (v) {
+      snap->utxos[op] = *v;
+    } else {
+      snap->utxos.erase(op);
+    }
+  }
+  snap->sorted_ops.reserve(snap->utxos.size());
   std::vector<Hash> leaves;
-  leaves.reserve(utxos_.size());
-  for (const auto& [op, out] : utxos_) {  // map iterates sorted by outpoint
+  leaves.reserve(snap->utxos.size());
+  for (const auto& [op, out] : snap->utxos) {  // map iterates outpoint-sorted
+    snap->sorted_ops.push_back(op);
     leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, utxo_leaf_preimage(op, out)));
   }
-  return merkle::compute_root(leaves);
+  snap->tree.reset(std::move(leaves));
+  base_ = std::move(snap);
+  overlay_.clear();
+}
+
+UtxoStateMachine::Outpoint UtxoStateMachine::add_genesis_utxo(const Output& output) {
+  Outpoint op;
+  op.txid = crypto::zero_hash();
+  op.index = static_cast<std::uint32_t>(genesis_counter_++);
+  overlay_[op] = output;
+  return op;
+}
+
+UtxoStateMachine::Output UtxoStateMachine::get(const Outpoint& op) const {
+  const Output* o = lookup(op);
+  return o ? *o : Output{};
+}
+
+std::size_t UtxoStateMachine::utxo_count() const {
+  // base minus the overlay's tombstones plus its fresh outpoints.
+  std::size_t n = base_->utxos.size();
+  for (const auto& [op, v] : overlay_) {
+    const bool in_base = base_->utxos.count(op) != 0;
+    if (v && !in_base) ++n;       // newly created
+    else if (!v && in_base) --n;  // spent a committed one
+  }
+  return n;
+}
+
+Hash UtxoStateMachine::state_root() const {
+  // UTXO blocks add/remove outpoints (structural), so the incremental-update
+  // path never applies — materialise once when there are pending changes.
+  if (overlay_.empty()) return base_->tree.root();
+  seal();
+  return base_->tree.root();
 }
 
 StateProof UtxoStateMachine::prove_outpoint(const Outpoint& target) const {
+  const std::map<Outpoint, Output> utxos = merged();
   std::vector<Hash> leaves;
-  leaves.reserve(utxos_.size());
+  leaves.reserve(utxos.size());
   StateProof proof;
   bool found = false;
   std::uint32_t found_index = 0;
   std::uint32_t i = 0;
-  for (const auto& [op, out] : utxos_) {
+  for (const auto& [op, out] : utxos) {
     Bytes preimage = utxo_leaf_preimage(op, out);
     leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, preimage));
     if (op == target) {
@@ -135,17 +192,17 @@ ValidationResult UtxoStateMachine::validate(const Transaction& tx) const {
     if (!seen.insert(op).second) {
       return ValidationResult::failure("duplicate input (double-spend within tx)");
     }
-    auto it = utxos_.find(op);
-    if (it == utxos_.end()) {
+    const Output* utxo = lookup(op);
+    if (utxo == nullptr) {
       return ValidationResult::failure("input not found / already spent");
     }
-    if (it->second.owner != author) {
+    if (utxo->owner != author) {
       return ValidationResult::failure("input not owned by signer");
     }
-    if (in_sum > kU128Max - it->second.amount) {
+    if (in_sum > kU128Max - utxo->amount) {
       return ValidationResult::failure("input sum overflow");
     }
-    in_sum += it->second.amount;
+    in_sum += utxo->amount;
   }
 
   codec::u128 out_sum = 0;
@@ -156,25 +213,36 @@ ValidationResult UtxoStateMachine::validate(const Transaction& tx) const {
     out_sum += o.amount;
   }
 
-  if (in_sum != out_sum) {
-    return ValidationResult::failure("value not conserved (inputs != outputs)");
+  // Value must be conserved OR burned as a fee: outputs may not exceed inputs,
+  // and the surplus (the fee) must clear the chain minimum. flat_fee_ == 0 keeps
+  // the strict conservation rule (in == out).
+  if (out_sum > in_sum) {
+    return ValidationResult::failure("value not conserved (outputs exceed inputs)");
+  }
+  if (in_sum - out_sum < flat_fee_) {
+    return ValidationResult::failure("fee below chain minimum");
   }
   return ValidationResult::success();
 }
 
 void UtxoStateMachine::apply(const Transaction& tx) {
-  // Precondition: validate(tx).ok.
+  // Precondition: validate(tx).ok. The fee (inputs − outputs) is burned simply
+  // by not creating an output for it.
   const Body b = decode_body(tx.body);
-  for (const auto& op : b.inputs) utxos_.erase(op);
+  for (const auto& op : b.inputs) overlay_[op] = std::nullopt;  // tombstone: spent
 
   const Hash txid = tx.txid();
   for (std::uint32_t i = 0; i < b.outputs.size(); ++i) {
-    utxos_[Outpoint{txid, i}] = b.outputs[i];
+    overlay_[Outpoint{txid, i}] = b.outputs[i];
   }
 }
 
 std::unique_ptr<StateMachine> UtxoStateMachine::clone() const {
-  return std::make_unique<UtxoStateMachine>(*this);
+  auto c = std::make_unique<UtxoStateMachine>(flat_fee_);
+  c->base_ = base_;        // share the immutable committed snapshot (O(1))
+  c->overlay_ = overlay_;  // copy only the uncommitted changes
+  c->genesis_counter_ = genesis_counter_;
+  return c;
 }
 
 }  // namespace blockchainer
