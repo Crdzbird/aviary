@@ -246,6 +246,38 @@ BlockchainerBufferResult blockchainer_node_submit_transfer(
   }
 }
 
+BlockchainerBufferResult blockchainer_node_new_account_hybrid(BlockchainerNode node) {
+  try {
+    auto kp = as_node(node)->new_account_hybrid();
+    std::vector<std::uint8_t> out;
+    const std::uint32_t pl = static_cast<std::uint32_t>(kp.public_key.size());
+    out.push_back(static_cast<std::uint8_t>((pl >> 24) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>((pl >> 16) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>((pl >> 8) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>(pl & 0xFF));
+    out.insert(out.end(), kp.public_key.begin(), kp.public_key.end());
+    out.insert(out.end(), kp.secret_key.begin(), kp.secret_key.end());
+    return bytes_result(out);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(
+    BlockchainerNode node, const uint8_t* secret, size_t sk_len,
+    const uint8_t* public_key, size_t pk_len,
+    const uint8_t* to_address, uint64_t amount, uint64_t nonce) {
+  try {
+    auto txid = as_node(node)->submit_transfer_hybrid(
+        blockchainer::codec::ByteView(secret, sk_len),
+        blockchainer::codec::ByteView(public_key, pk_len), to_hash32(to_address),
+        static_cast<blockchainer::codec::u128>(amount), nonce);
+    return bytes_result(txid.data(), txid.size());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
 int blockchainer_node_produce_block(BlockchainerNode node, uint64_t timestamp, uint64_t* out_height) {
   try {
     uint64_t h = as_node(node)->produce_block(timestamp);

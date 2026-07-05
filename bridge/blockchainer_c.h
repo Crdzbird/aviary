@@ -138,6 +138,19 @@ BLOCKCHAINER_API int blockchainer_node_credit(BlockchainerNode node,
 BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_submit_transfer(
     BlockchainerNode node, const uint8_t* secret, size_t sk_len,
     const uint8_t* to_address, uint64_t amount, uint64_t nonce);
+
+/** Generate a fresh HYBRID post-quantum account (Ed25519 + ML-DSA-65). Returns a
+ *  buffer laid out as [pub_len: 4 bytes big-endian][public_key][secret_key]. The
+ *  account address is BLAKE3-256(public_key). Free with blockchainer_buffer_free. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_new_account_hybrid(BlockchainerNode node);
+
+/** Build, sign, and submit a HYBRID (post-quantum) transfer. [secret]/[public_key]
+ *  are the hybrid key blobs from blockchainer_node_new_account_hybrid. Returns the
+ *  txid (32 bytes) or an error. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(
+    BlockchainerNode node, const uint8_t* secret, size_t sk_len,
+    const uint8_t* public_key, size_t pk_len,
+    const uint8_t* to_address, uint64_t amount, uint64_t nonce);
 /** Produce + finalize a block. Writes the new height to *out_height. Returns 0 on success. */
 BLOCKCHAINER_API int blockchainer_node_produce_block(BlockchainerNode node,
                                                      uint64_t timestamp, uint64_t* out_height);

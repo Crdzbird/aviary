@@ -40,12 +40,18 @@ class DemoNode {
   void credit(const Hash& address, codec::u128 amount);
   /// Generate a fresh Ed25519 account keypair.
   crypto::KeyPair new_account();
+  /// Generate a fresh hybrid (Ed25519 + ML-DSA-65) post-quantum account keypair.
+  crypto::KeyPair new_account_hybrid();
 
   // ── Transactions ────────────────────────────────────────────────────────────
-  /// Build, sign, and admit a transfer to the mempool. [from_secret] is the
-  /// 64-byte Ed25519 secret key. Returns the txid.
+  /// Build, sign, and admit an Ed25519 transfer. [from_secret] is the 64-byte
+  /// Ed25519 secret key. Returns the txid.
   Hash submit_transfer(codec::ByteView from_secret, const Hash& to,
                        codec::u128 amount, std::uint64_t nonce);
+  /// Build, sign, and admit a hybrid-signed (post-quantum) transfer. [secret] and
+  /// [public_key] are the hybrid key blobs (from new_account_hybrid). Returns the txid.
+  Hash submit_transfer_hybrid(codec::ByteView secret, codec::ByteView public_key,
+                              const Hash& to, codec::u128 amount, std::uint64_t nonce);
 
   // ── Consensus ────────────────────────────────────────────────────────────────
   /// Produce + finalize a block from the mempool (this node is the validator).

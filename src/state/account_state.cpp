@@ -100,8 +100,16 @@ AccountStateMachine::AccountLeaf AccountStateMachine::decode_account_leaf(
 }
 
 ValidationResult AccountStateMachine::validate(const Transaction& tx) const {
-  if (tx.author.size() != 32) {
-    return ValidationResult::failure("author is not a 32-byte public key");
+  // The sender address is BLAKE3(author) for any scheme. Ed25519 keys are a
+  // fixed 32 bytes; hybrid (PQ) public keys are larger, and their exact shape is
+  // validated by signature verification (run before validate/apply in the ledger
+  // and mempool). So enforce the fixed size only for Ed25519.
+  if (tx.algo() == SigAlgo::kEd25519) {
+    if (tx.author.size() != 32) {
+      return ValidationResult::failure("Ed25519 author is not a 32-byte public key");
+    }
+  } else if (tx.author.empty()) {
+    return ValidationResult::failure("empty author");
   }
   Transfer t;
   try {

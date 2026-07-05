@@ -101,6 +101,43 @@ func TestInterop(t *testing.T) {
 	}
 }
 
+// Q1 end-to-end: a hybrid (post-quantum) account funds, transfers, finalizes,
+// and its balance is provable — the full PQ tx path through the C ABI.
+func TestHybridTransferEndToEnd(t *testing.T) {
+	node := bc.NewNode(0x9001)
+	defer node.Free()
+
+	aSec, aPub, aAddr, err := node.NewAccountHybrid()
+	if err != nil {
+		t.Fatalf("NewAccountHybrid: %v", err)
+	}
+	if len(aPub) < 1900 || len(aSec) < 1900 {
+		t.Fatalf("hybrid key sizes: pub=%d sec=%d", len(aPub), len(aSec))
+	}
+	_, _, bAddr, _ := node.NewAccountHybrid()
+
+	if err := node.Credit(aAddr, 1_000_000); err != nil {
+		t.Fatalf("Credit: %v", err)
+	}
+	txid, err := node.SubmitTransferHybrid(aSec, aPub, bAddr, 250_000, 0)
+	if err != nil {
+		t.Fatalf("SubmitTransferHybrid: %v", err)
+	}
+	if len(txid) != 32 {
+		t.Fatalf("txid len = %d", len(txid))
+	}
+	if _, err := node.ProduceBlock(1); err != nil {
+		t.Fatalf("ProduceBlock (hybrid tx must be accepted): %v", err)
+	}
+	if node.Balance(aAddr) != 750_000 || node.Balance(bAddr) != 250_000 {
+		t.Fatalf("hybrid transfer not applied: alice=%d bob=%d", node.Balance(aAddr), node.Balance(bAddr))
+	}
+	// Light-client proof of the PQ-funded account.
+	if !bc.VerifyStateProof(node.StateRoot(), node.ProveAccount(bAddr)) {
+		t.Fatal("state proof of hybrid account failed")
+	}
+}
+
 // S1 regression: reads must not seal genesis, and credit after a block errors.
 func TestGenesisOrdering(t *testing.T) {
 	node := bc.NewNode(4242)

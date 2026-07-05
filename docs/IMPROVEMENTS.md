@@ -292,3 +292,15 @@ selectors — validated against real-world vectors). Deferred:
   Tested: `tests/test_hybrid_sig.cpp` (28/28 suite green). **Q1b (next): expose
   hybrid accounts through the DemoNode + C ABI + bindings, and cross-binding
   differential vectors (A2).**
+
+## Post-quantum tx signatures — Q1b (end-to-end) — DONE (2026)
+- **[x] Hybrid PQ path exposed through DemoNode + C ABI + Go binding.**
+  `new_account_hybrid()` / `submit_transfer_hybrid()` in the core; C ABI
+  `blockchainer_node_new_account_hybrid` (returns `[pub_len:4 BE][public][secret]`)
+  + `blockchainer_node_submit_transfer_hybrid`; Go `NewAccountHybrid` /
+  `SubmitTransferHybrid`. Account state machine relaxed to accept non-32-byte
+  authors for non-Ed25519 schemes (sig verify enforces key validity first).
+  `TestHybridTransferEndToEnd` (Go) drives create→credit→hybrid-transfer→block→
+  proof; 28/28 C++ suite still green.
+- **Remaining for full A2:** expose `NewAccountHybrid`/`SubmitTransferHybrid` in the
+  Dart/Node/Swift/JVM bindings + a cross-binding differential vector.

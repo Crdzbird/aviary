@@ -73,6 +73,28 @@ void DemoNode::credit(const Hash& address, codec::u128 amount) {
 
 crypto::KeyPair DemoNode::new_account() { return crypto::ed25519_keygen(); }
 
+crypto::KeyPair DemoNode::new_account_hybrid() { return crypto::hybrid_sig_keygen(); }
+
+Hash DemoNode::submit_transfer_hybrid(codec::ByteView secret, codec::ByteView public_key,
+                                      const Hash& to, codec::u128 amount, std::uint64_t nonce) {
+  ensure_started();
+  crypto::KeyPair kp;
+  kp.secret_key = Bytes(secret.begin(), secret.end());
+  kp.public_key = Bytes(public_key.begin(), public_key.end());
+
+  Transaction tx;
+  tx.version = 2;  // extended envelope
+  tx.sig_algo = static_cast<std::uint8_t>(SigAlgo::kHybridEd25519MlDsa);
+  tx.chain_id = chain_id_;
+  tx.body = AccountStateMachine::encode_transfer({nonce, to, amount});
+  sign_transaction(tx, kp);
+  Hash id = tx.txid();
+  if (mempool_.add(tx, chain_id_) != AddResult::kAdded) {
+    throw std::runtime_error("demo_node: hybrid transfer rejected by mempool");
+  }
+  return id;
+}
+
 Hash DemoNode::submit_transfer(codec::ByteView from_secret, const Hash& to,
                                codec::u128 amount, std::uint64_t nonce) {
   ensure_started();

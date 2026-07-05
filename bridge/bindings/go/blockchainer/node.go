@@ -45,6 +45,35 @@ func AccountAddress(public []byte) []byte {
 	return b
 }
 
+// NewAccountHybrid generates a fresh hybrid (Ed25519 + ML-DSA-65) post-quantum
+// account. Returns (secret, public, address). Use SubmitTransferHybrid to spend.
+func (n *Node) NewAccountHybrid() (secret, public, address []byte, err error) {
+	blob, e := takeBuf(C.blockchainer_node_new_account_hybrid(n.h))
+	if e != nil {
+		return nil, nil, nil, e
+	}
+	// Layout: [pub_len: 4 bytes big-endian][public][secret].
+	if len(blob) < 4 {
+		return nil, nil, nil, errors.New("hybrid account: short buffer")
+	}
+	pl := int(blob[0])<<24 | int(blob[1])<<16 | int(blob[2])<<8 | int(blob[3])
+	if 4+pl > len(blob) {
+		return nil, nil, nil, errors.New("hybrid account: bad public length")
+	}
+	public = blob[4 : 4+pl]
+	secret = blob[4+pl:]
+	address = AccountAddress(public)
+	return secret, public, address, nil
+}
+
+// SubmitTransferHybrid builds, signs, and admits a post-quantum transfer using
+// the hybrid key blobs from NewAccountHybrid.
+func (n *Node) SubmitTransferHybrid(secret, public, to []byte, amount, nonce uint64) ([]byte, error) {
+	return takeBuf(C.blockchainer_node_submit_transfer_hybrid(
+		n.h, bp(secret), C.size_t(len(secret)), bp(public), C.size_t(len(public)),
+		bp(to), C.uint64_t(amount), C.uint64_t(nonce)))
+}
+
 // ErrGenesisSealed is returned by Credit once a block has been produced —
 // genesis credits are no longer valid; fund accounts with transfers instead.
 var ErrGenesisSealed = errors.New("blockchainer: genesis is sealed (a block was produced); fund accounts with transfers")
