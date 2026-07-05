@@ -268,10 +268,7 @@ test. Still to do:
   in-memory transport today. Need an actual TCP (or QUIC) transport, connection
   lifecycle, and an async I/O loop, behind a `Transport` interface so the logic
   stays testable.
-- **[H] Multi-validator vote gossip.** The integration test finalizes with a
-  single validator (quorum 1). Collecting precommits across the network needs the
-  async BFT round state machine (also deferred, under Consensus) plus a
-  vote-gossip message + aggregation across peers.
+- **[~] Multi-validator vote gossip — DONE (in-memory).** `p2p::NetworkedNode` (`networked_node.hpp`) assembles {Ledger, RoundDriver, GossipOverlay} into a runnable validator: consensus broadcasts become gossip originations (+ self-delivery, since the round driver counts its own votes on delivery), gossip deliveries are deduped, fed to the driver, and relayed onward; timeouts arm/fire. `test_networked_node.cpp` runs BFT over partial-mesh topologies and shows **relay tolerance** (line/ring/star — a validator reaches quorum via hops it isn't directly connected to, all commit the same block) and **partition tolerance** (a connected 3-of-4 majority finalizes; an isolated validator stalls at height 0). ASan-clean. **Remaining:** a real socket/event-loop transport (swap the in-memory relay for TCP + the mutually-authenticated secure session — the consensus-over-gossip logic is now proven) and a Byzantine-gossip adversary (equivocation propagation / spam).
 - **[~] Gossip overlay manager — CORE DONE.** `p2p::GossipOverlay` (`gossip.hpp`) is the mesh on top of the wire/secure-session transport: it dedups messages by content hash (BLAKE3) and floods a new one to peers except the sender, so a message reaches every connected node exactly once over any (partial) topology, loop-free. Transport-agnostic (returns relays to send). `test_gossip.cpp`: ring, partial mesh, and clique all propagate to every node with the redundant paths deduped. **Remaining:** peer scoring / ban list, message TTL + expiry of the seen-set, and topic-scoped subscriptions.
 - **[M] Peer discovery & address book.** No discovery, handshake/`Hello`
   negotiation beyond the struct, peer scoring, or ban list.
