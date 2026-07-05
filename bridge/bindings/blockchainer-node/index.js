@@ -66,6 +66,7 @@ function ensureLoaded() {
     accountAddress: f('BlockchainerBufferResult blockchainer_account_address(uint8_t*, size_t)'),
     credit: f('int blockchainer_node_credit(void*, uint8_t*, uint64_t)'),
     submit: f('BlockchainerBufferResult blockchainer_node_submit_transfer(void*, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
+    submitFee: f('BlockchainerBufferResult blockchainer_node_submit_transfer_fee(void*, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t, uint64_t)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -168,6 +169,10 @@ class Node {
   }
   submitTransfer(secret, toAddress, amount, nonce) {
     return consume(fn.submit(this._h, u8(secret), u8(secret).length, u8(toAddress), BigInt(amount), BigInt(nonce)), 'submit_transfer');
+  }
+  // Ed25519 transfer carrying a priority-fee tip (version-2 envelope) for fee-market priority.
+  submitTransferFee(secret, toAddress, amount, nonce, fee) {
+    return consume(fn.submitFee(this._h, u8(secret), u8(secret).length, u8(toAddress), BigInt(amount), BigInt(nonce), BigInt(fee)), 'submit_transfer_fee');
   }
   // Hybrid (Ed25519 + ML-DSA-65) post-quantum account. Returns {secret, publicKey, address}.
   newAccountHybrid() {

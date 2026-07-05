@@ -116,6 +116,28 @@ Hash DemoNode::submit_transfer(codec::ByteView from_secret, const Hash& to,
   return id;
 }
 
+Hash DemoNode::submit_transfer_fee(codec::ByteView from_secret, const Hash& to,
+                                   codec::u128 amount, std::uint64_t nonce, codec::u128 tip) {
+  ensure_started();
+  if (from_secret.size() != 64) throw std::runtime_error("demo_node: ed25519 secret must be 64 bytes");
+  crypto::KeyPair kp;
+  kp.secret_key = Bytes(from_secret.begin(), from_secret.end());
+  kp.public_key = Bytes(from_secret.begin() + 32, from_secret.end());
+
+  Transaction tx;
+  tx.version = 2;  // extended envelope carries the fee
+  tx.sig_algo = static_cast<std::uint8_t>(SigAlgo::kEd25519);
+  tx.fee = tip;
+  tx.chain_id = chain_id_;
+  tx.body = AccountStateMachine::encode_transfer({nonce, to, amount});
+  sign_transaction(tx, kp);
+  Hash id = tx.txid();
+  if (mempool_.add(tx, chain_id_) != AddResult::kAdded) {
+    throw std::runtime_error("demo_node: fee transfer rejected by mempool");
+  }
+  return id;
+}
+
 std::uint64_t DemoNode::produce_block(std::uint64_t timestamp) {
   ensure_started();
   auto txs = mempool_.select(engine_->ledger().state(), 1000);

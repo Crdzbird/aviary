@@ -98,6 +98,14 @@ func (n *Node) SubmitTransfer(secret, to []byte, amount, nonce uint64) ([]byte, 
 		C.uint64_t(amount), C.uint64_t(nonce)))
 }
 
+// SubmitTransferFee submits an Ed25519 transfer carrying a priority-fee tip (a
+// version-2 envelope), used for fee-market mempool priority.
+func (n *Node) SubmitTransferFee(secret, to []byte, amount, nonce, fee uint64) ([]byte, error) {
+	return takeBuf(C.blockchainer_node_submit_transfer_fee(
+		n.h, bp(secret), C.size_t(len(secret)), bp(to),
+		C.uint64_t(amount), C.uint64_t(nonce), C.uint64_t(fee)))
+}
+
 func (n *Node) ProduceBlock(ts uint64) (uint64, error) {
 	var h C.uint64_t
 	if C.blockchainer_node_produce_block(n.h, C.uint64_t(ts), &h) != 0 {

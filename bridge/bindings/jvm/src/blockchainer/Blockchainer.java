@@ -21,7 +21,7 @@ public final class Blockchainer implements AutoCloseable {
     static final long B = BUF.byteSize();
 
     private final MethodHandle init, version, backend, nodeNew, nodeFree, newAccount, addr, credit,
-            submit, produce, height, balance, nonce, mempool, stateRoot, drain, metrics, prove,
+            submit, submitFee, produce, height, balance, nonce, mempool, stateRoot, drain, metrics, prove,
             verifyProof, ethAddr, btcAddr, solAddr, bufFree, strFree,
             newAccountHybrid, submitHybrid;
 
@@ -36,6 +36,7 @@ public final class Blockchainer implements AutoCloseable {
         addr       = h("blockchainer_account_address", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
         credit     = h("blockchainer_node_credit", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
         submit     = h("blockchainer_node_submit_transfer", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
+        submitFee  = h("blockchainer_node_submit_transfer_fee", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG, JAVA_LONG));
         newAccountHybrid = h("blockchainer_node_new_account_hybrid", FunctionDescriptor.of(RES, ADDRESS));
         submitHybrid = h("blockchainer_node_submit_transfer_hybrid", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
         produce    = h("blockchainer_node_produce_block", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, ADDRESS));
@@ -121,6 +122,11 @@ public final class Blockchainer implements AutoCloseable {
         }
         public byte[] submitTransfer(byte[] secret, byte[] to, long amount, long n) {
             try { return consume((MemorySegment) submit.invoke(arena.allocate(RES), node, seg(secret), (long) secret.length, seg(to), amount, n)); }
+            catch (Throwable t) { throw new RuntimeException(t); }
+        }
+        /** Ed25519 transfer carrying a priority-fee tip (version-2 envelope) for fee-market priority. */
+        public byte[] submitTransferFee(byte[] secret, byte[] to, long amount, long n, long fee) {
+            try { return consume((MemorySegment) submitFee.invoke(arena.allocate(RES), node, seg(secret), (long) secret.length, seg(to), amount, n, fee)); }
             catch (Throwable t) { throw new RuntimeException(t); }
         }
         public long produceBlock(long ts) {

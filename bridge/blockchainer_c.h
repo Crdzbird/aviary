@@ -139,6 +139,12 @@ BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_submit_transfer(
     BlockchainerNode node, const uint8_t* secret, size_t sk_len,
     const uint8_t* to_address, uint64_t amount, uint64_t nonce);
 
+/** Build, sign, and submit a transfer carrying a priority-fee [fee] (a version-2
+ *  envelope). [secret] is the 64-byte Ed25519 key. Returns the txid or an error. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_submit_transfer_fee(
+    BlockchainerNode node, const uint8_t* secret, size_t sk_len,
+    const uint8_t* to_address, uint64_t amount, uint64_t nonce, uint64_t fee);
+
 /** Generate a fresh HYBRID post-quantum account (Ed25519 + ML-DSA-65). Returns a
  *  buffer laid out as [pub_len: 4 bytes big-endian][public_key][secret_key]. The
  *  account address is BLAKE3-256(public_key). Free with blockchainer_buffer_free. */

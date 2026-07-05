@@ -45,6 +45,10 @@ typedef _SubmitC = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Uint64, Uint64);
 typedef _SubmitD = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int, int);
+typedef _SubmitFeeC = _BufResult Function(
+    Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Uint64, Uint64, Uint64);
+typedef _SubmitFeeD = _BufResult Function(
+    Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int);
 typedef _SubmitHybridC = _BufResult Function(Pointer<Void>, Pointer<Uint8>, Size,
     Pointer<Uint8>, Size, Pointer<Uint8>, Uint64, Uint64);
 typedef _SubmitHybridD = _BufResult Function(Pointer<Void>, Pointer<Uint8>, int,
@@ -523,6 +527,23 @@ class Node {
           _lib.lookupFunction<_SubmitC, _SubmitD>('blockchainer_node_submit_transfer')(
               _h, ps, secret.length, pt, amount, nonce),
           'submit_transfer');
+    } finally {
+      calloc.free(ps);
+      calloc.free(pt);
+    }
+  }
+
+  /// Submit an Ed25519 transfer carrying a priority-fee [fee] (a version-2
+  /// envelope), used for fee-market mempool priority.
+  Uint8List submitTransferFee(
+      Uint8List secret, Uint8List to, int amount, int nonce, int fee) {
+    final ps = _bc._alloc(secret);
+    final pt = _bc._alloc(to);
+    try {
+      return _bc._take(
+          _lib.lookupFunction<_SubmitFeeC, _SubmitFeeD>(
+              'blockchainer_node_submit_transfer_fee')(_h, ps, secret.length, pt, amount, nonce, fee),
+          'submit_transfer_fee');
     } finally {
       calloc.free(ps);
       calloc.free(pt);

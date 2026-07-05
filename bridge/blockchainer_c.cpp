@@ -246,6 +246,20 @@ BlockchainerBufferResult blockchainer_node_submit_transfer(
   }
 }
 
+BlockchainerBufferResult blockchainer_node_submit_transfer_fee(
+    BlockchainerNode node, const uint8_t* secret, size_t sk_len,
+    const uint8_t* to_address, uint64_t amount, uint64_t nonce, uint64_t fee) {
+  try {
+    auto txid = as_node(node)->submit_transfer_fee(
+        blockchainer::codec::ByteView(secret, sk_len), to_hash32(to_address),
+        static_cast<blockchainer::codec::u128>(amount), nonce,
+        static_cast<blockchainer::codec::u128>(fee));
+    return bytes_result(txid.data(), txid.size());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
 BlockchainerBufferResult blockchainer_node_new_account_hybrid(BlockchainerNode node) {
   try {
     auto kp = as_node(node)->new_account_hybrid();

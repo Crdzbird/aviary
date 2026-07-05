@@ -48,6 +48,10 @@ class DemoNode {
   /// Ed25519 secret key. Returns the txid.
   Hash submit_transfer(codec::ByteView from_secret, const Hash& to,
                        codec::u128 amount, std::uint64_t nonce);
+  /// Build, sign, and admit an Ed25519 transfer carrying a priority-fee [tip]
+  /// (a version-2 envelope). Returns the txid.
+  Hash submit_transfer_fee(codec::ByteView from_secret, const Hash& to,
+                           codec::u128 amount, std::uint64_t nonce, codec::u128 tip);
   /// Build, sign, and admit a hybrid-signed (post-quantum) transfer. [secret] and
   /// [public_key] are the hybrid key blobs (from new_account_hybrid). Returns the txid.
   Hash submit_transfer_hybrid(codec::ByteView secret, codec::ByteView public_key,

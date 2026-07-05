@@ -87,9 +87,10 @@
   market: **fee-priority eviction** (a full pool drops its cheapest resident only
   if the newcomer outbids it) and **fee-ordered selection** (highest tip offered
   to the block first) — `test_ledger.cpp` + `test_mempool.cpp`. v1 txs pay tip 0,
-  so nothing changes for them. **Remaining:** UTXO fee output (still enforces
-  exact value conservation); gas metering for richer execution; expose the tip in
-  the language bindings' submit helpers (currently 0).
+  so nothing changes for them. The tip is exposed across every binding
+  (`SubmitTransferFee`/`submitTransferFee`) via `blockchainer_node_submit_transfer_fee`.
+  **Remaining:** gas metering for richer execution; a variable per-tx fee for the
+  UTXO model + how the envelope tip interacts with its implicit inputs−outputs fee.
 - **[M] State inclusion proofs.** `StateMachine::prove()` from the design is not
   implemented for either model. Needed for light clients (M5) and bridges (M6).
 - **[M] Multi-signer UTXO.** A UTXO tx has a single `author`, so all inputs must

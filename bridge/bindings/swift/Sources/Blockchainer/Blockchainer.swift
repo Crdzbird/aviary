@@ -118,6 +118,15 @@ public final class Node {
         }, "submit_transfer")
     }
 
+    /// Submit an Ed25519 transfer carrying a priority-fee `fee` (version-2 envelope).
+    @discardableResult
+    public func submitTransferFee(secret: Data, to: Data, amount: UInt64, nonce: UInt64,
+                                  fee: UInt64) throws -> Data {
+        try consume(secret.withC { sp, sl in
+            to.withC { tp, _ in blockchainer_node_submit_transfer_fee(h, sp, sl, tp, amount, nonce, fee) }
+        }, "submit_transfer_fee")
+    }
+
     /// Generate a fresh hybrid (Ed25519 + ML-DSA-65) post-quantum account.
     public func newAccountHybrid() throws -> Account {
         let blob = try consume(blockchainer_node_new_account_hybrid(h), "new_account_hybrid")
