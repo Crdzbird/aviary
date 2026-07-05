@@ -352,9 +352,18 @@ selectors — validated against real-world vectors). Deferred:
   `serialize()`/`load()` round-trip the whole archive (indexes rebuilt on load),
   so a node persists its chain and reloads it on restart. Fuzzed, ASan-clean
   (`test_block_store.cpp`). Together with `Ledger::snapshot` this gives full
-  chain persistence to bytes. **Remaining:** an actual embedded on-disk backend
-  (`ARCHITECTURE.md` §17.3), height-versioned snapshots + on-disk rollback, and
-  incremental (rather than full-state) snapshotting.
+  chain persistence to bytes.
+- **[~] On-disk backend — DONE (crash-safe file store).** `storage::FileStore`
+  (`storage.hpp`) is a key→bytes directory backend with **atomic writes** (temp
+  file + rename, so a crash mid-write never corrupts an existing value);
+  `storage::save_chain`/`load_chain` persist the block archive + ledger state
+  snapshot and reload them, so a node survives restart. `test_storage.cpp`:
+  put/get/has/remove, and a chain finalized through the BFT engine → saved to a
+  temp dir → in-memory objects dropped → reloaded from disk → resumed (block 4
+  applies), with balances/nonces/tip/certs all intact; ASan-clean. **Remaining:**
+  an embedded KV engine (LMDB/RocksDB) for large state instead of whole-file
+  rewrites, height-versioned snapshots + on-disk rollback, incremental
+  snapshotting, and a write-ahead log for the mempool.
 
 ## Testing, fuzzing & CI
 
