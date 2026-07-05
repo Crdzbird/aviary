@@ -15,6 +15,7 @@
 #include "blockchainer/interop/encoding.hpp"
 #include "blockchainer/interop/json.hpp"
 #include "blockchainer/interop/rlp.hpp"
+#include "blockchainer/pow_engine.hpp"
 #include "blockchainer/types.hpp"
 #include "blockchainer/utxo_state.hpp"
 #include "blockchainer/version.hpp"
@@ -82,6 +83,7 @@ int main() {
     totality_ok &= total([&] { (void)consensus::CommitCertificate::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::ConsensusData::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::Evidence::decode_all(v); });
+    totality_ok &= total([&] { (void)consensus::PowData::decode_all(v); });
     totality_ok &= total([&] { (void)GenesisSpec::decode_all(v); });
     totality_ok &= total([&] { (void)wire::Message::decode_all(v); });
     // Typed wire payload decoders on arbitrary payloads.

@@ -64,8 +64,18 @@
   extras. The pipeline above consensus can be written once against the interface;
   a second engine (PoW/PoS) slots in underneath. `test_bft.cpp` drives a chain
   through a `ConsensusEngine&`.
-- **[M] PoS and PoW reference engines.** Designed as pluggable; not implemented.
-  These also need a real fork-choice rule (BFT doesn't reorg, so none exists yet).
+- **[~] PoW reference engine — DONE; PoS remaining.** `PowEngine`
+  (`pow_engine.hpp`) implements `ConsensusEngine` as a second consensus family: a
+  block is justified by *work* — its header hash must be <= a difficulty target,
+  with the nonce carried in `consensus_data` (so it is committed by the hash).
+  `propose` yields an unsolved candidate, `mine` searches nonces, `submit`
+  re-verifies the embedded work (target + hash<=target) then commits.
+  `test_pow.cpp`: mine+submit, insufficient-work + wrong-target rejection, driving
+  a chain through a `ConsensusEngine&`, PowData fuzzed. It is a *reference* engine:
+  fixed difficulty (no retargeting) and linear extension. **Remaining:** a PoS
+  engine, a difficulty-retargeting rule, and a real longest-chain **fork choice /
+  reorg** (BFT doesn't reorg, so no block tree exists yet — the biggest gap for a
+  PoW/PoS chain in production).
 - **[x] Embed the commit certificate in the block header (LastCommit) — DONE.**
   `BftEngine::propose` stamps `consensus_data` = `ConsensusData{validator_set_hash,
   last_commit}` (the certificate that finalized the parent), committed by the
