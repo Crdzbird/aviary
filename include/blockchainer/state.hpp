@@ -36,6 +36,10 @@ class StateMachine {
   /// Applies a previously-validated tx. Precondition: validate(tx).ok.
   virtual void apply(const Transaction& tx) = 0;
 
+  /// The fee a valid [tx] pays against the CURRENT (pre-apply) state — 0 for a
+  /// model with no fee. Used to build execution receipts; call before apply().
+  virtual codec::u128 tx_fee(const Transaction& /*tx*/) const { return 0; }
+
   /// Deep copy, so the pipeline can apply a block atomically on a working copy
   /// and commit only on success.
   virtual std::unique_ptr<StateMachine> clone() const = 0;

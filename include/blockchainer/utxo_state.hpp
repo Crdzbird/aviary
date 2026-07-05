@@ -74,6 +74,7 @@ class UtxoStateMachine : public StateMachine {
   Hash state_root() const override;
   ValidationResult validate(const Transaction& tx) const override;
   void apply(const Transaction& tx) override;
+  codec::u128 tx_fee(const Transaction& tx) const override;
   std::unique_ptr<StateMachine> clone() const override;
 
   static Body decode_body(const Bytes& body);

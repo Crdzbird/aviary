@@ -31,6 +31,11 @@ struct ChainSpec {
   std::uint32_t max_block_txs = 0;
   std::uint64_t max_block_bytes = 0;  ///< sum of encoded tx sizes
 
+  /// When true, produced blocks are version-2 and commit an execution
+  /// `receipt_root` (one receipt per tx). Default false → version-1 blocks, no
+  /// receipts, byte-identical to before.
+  bool produce_receipts = false;
+
   /// Whether [algo] is permitted on this chain.
   bool accepts(SigAlgo algo) const {
     if (accepted_sig_algos.empty()) return true;
@@ -61,6 +66,11 @@ class Ledger {
   const BlockHeader& tip() const { return tip_; }
   const StateMachine& state() const { return *state_; }
 
+  /// Execution receipts of the most recently committed block (empty if that
+  /// block was version 1 / carried no receipts). Lets a prover build a
+  /// receipt-inclusion proof against the committed receipt_root.
+  const std::vector<Receipt>& last_receipts() const { return last_receipts_; }
+
   /// Single-node producer: assemble the next block from [txs]. Does NOT mutate
   /// the ledger; the returned block commits the resulting tx/state roots. Throws
   /// std::runtime_error (with the reason) if any tx is invalid.
@@ -76,6 +86,7 @@ class Ledger {
   ChainSpec spec_;
   std::unique_ptr<StateMachine> state_;
   BlockHeader tip_;
+  std::vector<Receipt> last_receipts_;
 };
 
 }  // namespace blockchainer

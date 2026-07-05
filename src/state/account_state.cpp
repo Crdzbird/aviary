@@ -241,6 +241,12 @@ void AccountStateMachine::apply(const Transaction& tx) {
   put(t.recipient, r);
 }
 
+codec::u128 AccountStateMachine::tx_fee(const Transaction& tx) const {
+  // The fee is state-independent for the account model: the flat base fee plus
+  // the sender's declared priority tip.
+  return flat_fee_ + tx.declared_fee();
+}
+
 std::unique_ptr<StateMachine> AccountStateMachine::clone() const {
   auto c = std::make_unique<AccountStateMachine>(flat_fee_);
   c->base_ = base_;        // share the immutable committed snapshot (O(1))

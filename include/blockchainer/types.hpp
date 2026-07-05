@@ -65,6 +65,9 @@ struct Transaction {
 };
 
 struct BlockHeader {
+  /// 1 = base header; 2 = also commits [receipt_root]. Bumping the version — not
+  /// adding an unconditional field — keeps every version-1 encoding (and its
+  /// golden vectors) byte-identical.
   std::uint8_t version = 1;
   std::uint64_t chain_id = 0;
   std::uint64_t height = 0;
@@ -72,6 +75,7 @@ struct BlockHeader {
   std::uint64_t timestamp = 0;
   Hash tx_root{};
   Hash state_root{};
+  Hash receipt_root{};   ///< only serialized when version >= 2
   Bytes consensus_data;  ///< opaque to the ledger; owned by the consensus engine
 
   Bytes encode() const;
@@ -89,6 +93,19 @@ struct Block {
   Bytes encode() const;
   static Block decode_all(codec::ByteView bytes);
 };
+
+/// A transaction's execution result, committed via a block's receipt_root
+/// (version-2 headers). `status` is 1 for success; `fee` is what the tx paid.
+struct Receipt {
+  std::uint8_t status = 1;
+  codec::u128 fee = 0;
+
+  Bytes encode() const;
+  static Receipt decode_all(codec::ByteView bytes);
+};
+
+/// Merkle root over hash_tagged(kLeaf, receipt.encode()) for each receipt, in order.
+Hash compute_receipt_root(const std::vector<Receipt>& receipts);
 
 /// Merkle root over hash_tagged(kLeaf, tx.encode()) for each tx, in order.
 Hash compute_tx_root(const std::vector<Transaction>& txs);

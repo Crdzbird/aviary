@@ -93,4 +93,43 @@ bool verify_tx_inclusion(const Hash& tx_root, const TxInclusionProof& p) {
   return merkle::verify_proof(tx_root, leaf, p.proof, p.leaf_count);
 }
 
+// ── Receipt inclusion ──────────────────────────────────────────────────────────
+
+Bytes ReceiptProof::encode() const {
+  codec::CodecWriter w;
+  w.write_bytes(view(receipt_encoding));
+  w.write_u32(leaf_count);
+  encode_merkle_proof(w, proof);
+  return w.take();
+}
+
+ReceiptProof ReceiptProof::decode_all(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  ReceiptProof p;
+  p.receipt_encoding = r.read_bytes();
+  p.leaf_count = r.read_u32();
+  p.proof = decode_merkle_proof(r);
+  r.assert_fully_consumed();
+  return p;
+}
+
+ReceiptProof receipt_inclusion_proof(const std::vector<Receipt>& receipts,
+                                     std::uint32_t index) {
+  std::vector<Hash> leaves;
+  leaves.reserve(receipts.size());
+  for (const auto& rc : receipts) {
+    leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, rc.encode()));
+  }
+  ReceiptProof p;
+  p.receipt_encoding = receipts.at(index).encode();
+  p.leaf_count = static_cast<std::uint32_t>(leaves.size());
+  p.proof = merkle::make_proof(leaves, index);
+  return p;
+}
+
+bool verify_receipt_inclusion(const Hash& receipt_root, const ReceiptProof& p) {
+  const Hash leaf = crypto::hash_tagged(crypto::Domain::kLeaf, p.receipt_encoding);
+  return merkle::verify_proof(receipt_root, leaf, p.proof, p.leaf_count);
+}
+
 }  // namespace blockchainer

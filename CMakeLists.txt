@@ -194,6 +194,7 @@ blockchainer_add_test(test_keyring tests/test_keyring.cpp)
 blockchainer_add_test(test_round_state tests/test_round_state.cpp)
 blockchainer_add_test(test_round_driver tests/test_round_driver.cpp)
 blockchainer_add_test(test_genesis tests/test_genesis.cpp)
+blockchainer_add_test(test_receipts tests/test_receipts.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

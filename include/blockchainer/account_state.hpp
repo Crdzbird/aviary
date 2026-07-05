@@ -52,6 +52,7 @@ class AccountStateMachine : public StateMachine {
   Hash state_root() const override;
   ValidationResult validate(const Transaction& tx) const override;
   void apply(const Transaction& tx) override;
+  codec::u128 tx_fee(const Transaction& tx) const override;
   std::unique_ptr<StateMachine> clone() const override;
 
   /// Decodes the account-model transaction body. Throws codec::CodecError on a

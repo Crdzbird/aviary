@@ -73,6 +73,7 @@ int main() {
     totality_ok &= total([&] { (void)Block::decode_all(v); });
     totality_ok &= total([&] { (void)AccountStateMachine::decode_transfer(b); });
     totality_ok &= total([&] { (void)UtxoStateMachine::decode_body(b); });
+    totality_ok &= total([&] { (void)Receipt::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::CommitCertificate::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::ConsensusData::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::Evidence::decode_all(v); });
@@ -138,6 +139,7 @@ int main() {
     for (auto& x : h.parent_hash) x = static_cast<std::uint8_t>(rng.next());
     for (auto& x : h.tx_root) x = static_cast<std::uint8_t>(rng.next());
     for (auto& x : h.state_root) x = static_cast<std::uint8_t>(rng.next());
+    for (auto& x : h.receipt_root) x = static_cast<std::uint8_t>(rng.next());  // only serialized when version>=2
     h.consensus_data = random_bytes(rng, rng.below(48));
     Bytes enc = h.encode();
     BlockHeader back = BlockHeader::decode_all(view(enc));

@@ -49,6 +49,7 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp)
     throw std::runtime_error("build_block: " + e);
   }
   auto working = state_->clone();
+  std::vector<Receipt> receipts;
   for (const auto& tx : txs) {
     if (tx.chain_id != spec_.chain_id) {
       throw std::runtime_error("build_block: tx chain_id mismatch");
@@ -61,17 +62,19 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp)
     }
     const ValidationResult vr = working->validate(tx);
     if (!vr.ok) throw std::runtime_error("build_block: invalid tx: " + vr.error);
+    if (spec_.produce_receipts) receipts.push_back(Receipt{1, working->tx_fee(tx)});  // pre-apply
     working->apply(tx);
   }
 
   Block block;
-  block.header.version = 1;
+  block.header.version = spec_.produce_receipts ? 2 : 1;
   block.header.chain_id = spec_.chain_id;
   block.header.height = tip_.height + 1;
   block.header.parent_hash = tip_.hash();
   block.header.timestamp = timestamp;
   block.header.tx_root = compute_tx_root(txs);
   block.header.state_root = working->state_root();
+  if (spec_.produce_receipts) block.header.receipt_root = compute_receipt_root(receipts);
   block.transactions = std::move(txs);
   return block;
 }
@@ -94,6 +97,8 @@ BlockError Ledger::process_block(const Block& block) {
   // 4. Per-tx: signature verify → state validate → apply, on a working copy so
   // the commit is all-or-nothing.
   auto working = state_->clone();
+  const bool with_receipts = block.header.version >= 2;
+  std::vector<Receipt> receipts;
   for (const auto& tx : block.transactions) {
     if (tx.chain_id != spec_.chain_id) {
       return BlockError::failure("tx chain_id mismatch");
@@ -106,6 +111,7 @@ BlockError Ledger::process_block(const Block& block) {
     }
     const ValidationResult vr = working->validate(tx);
     if (!vr.ok) return BlockError::failure("invalid tx: " + vr.error);
+    if (with_receipts) receipts.push_back(Receipt{1, working->tx_fee(tx)});  // pre-apply
     working->apply(tx);
   }
 
@@ -114,9 +120,15 @@ BlockError Ledger::process_block(const Block& block) {
     return BlockError::failure("state_root mismatch");
   }
 
+  // 5a. Recompute and compare the execution receipt root (version-2 headers).
+  if (with_receipts && compute_receipt_root(receipts) != block.header.receipt_root) {
+    return BlockError::failure("receipt_root mismatch");
+  }
+
   // 6. (consensus verification — M2)
   // 7. Commit atomically.
   state_ = std::move(working);
+  last_receipts_ = std::move(receipts);
   tip_ = block.header;
   return BlockError::success();
 }

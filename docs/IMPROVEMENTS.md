@@ -120,8 +120,17 @@
   implemented for either model. Needed for light clients (M5) and bridges (M6).
 - **[M] Multi-signer UTXO.** A UTXO tx has a single `author`, so all inputs must
   share one owner. Real UTXO needs per-input signatures / scripts.
-- **[M] Receipts / execution results + receipt root.** Header has the field
-  designed but no receipts are produced.
+- **[x] Receipts / execution results + receipt root — DONE.** A per-tx `Receipt`
+  (status + fee) is committed via a `receipt_root` in a **version-2** BlockHeader
+  — version-gated so v1 encodings (and golden vectors) are byte-identical, and
+  opt-in via `ChainSpec.produce_receipts` (default off). `StateMachine::tx_fee`
+  reports the pre-apply fee (account: flat + declared tip; UTXO: inputs−outputs);
+  `Ledger` builds receipts in `build_block`/`process_block`, commits the root,
+  validates it on receive (`receipt_root mismatch` → reject), and exposes
+  `last_receipts()`. Receipt-inclusion proofs (`receipt_inclusion_proof` /
+  `verify_receipt_inclusion`) let a light client prove a tx executed with a given
+  result against a verified header. `test_receipts.cpp` (both models, proof +
+  tamper, v1 unchanged), fuzzed, ASan-clean; Go golden vectors still replay.
 - **[~] Formal genesis — DONE (account model).** `GenesisSpec` (`genesis.hpp`) is
   the canonical, hashable description of a chain's initial conditions: chain
   params (chain_id, state_model, accepted_sig_algos, flat_fee, block limits,

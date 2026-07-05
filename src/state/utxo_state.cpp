@@ -237,6 +237,22 @@ void UtxoStateMachine::apply(const Transaction& tx) {
   }
 }
 
+codec::u128 UtxoStateMachine::tx_fee(const Transaction& tx) const {
+  // The implicit fee is sum(inputs) − sum(outputs) against the current UTXO set.
+  Body b;
+  try {
+    b = decode_body(tx.body);
+  } catch (const codec::CodecError&) {
+    return 0;
+  }
+  codec::u128 in_sum = 0, out_sum = 0;
+  for (const auto& op : b.inputs) {
+    if (const Output* u = lookup(op)) in_sum += u->amount;
+  }
+  for (const auto& o : b.outputs) out_sum += o.amount;
+  return in_sum >= out_sum ? in_sum - out_sum : 0;
+}
+
 std::unique_ptr<StateMachine> UtxoStateMachine::clone() const {
   auto c = std::make_unique<UtxoStateMachine>(flat_fee_);
   c->base_ = base_;        // share the immutable committed snapshot (O(1))

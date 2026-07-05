@@ -81,6 +81,7 @@ Bytes BlockHeader::encode() const {
   w.write_u64(timestamp);
   w.write_fixed_bytes(view(tx_root), 32);
   w.write_fixed_bytes(view(state_root), 32);
+  if (version >= 2) w.write_fixed_bytes(view(receipt_root), 32);  // execution commitment
   w.write_bytes(view(consensus_data));
   return w.take();
 }
@@ -94,6 +95,7 @@ BlockHeader BlockHeader::decode(codec::CodecReader& r) {
   h.timestamp = r.read_u64();
   h.tx_root = to_hash(r.read_fixed_bytes(32));
   h.state_root = to_hash(r.read_fixed_bytes(32));
+  if (h.version >= 2) h.receipt_root = to_hash(r.read_fixed_bytes(32));
   h.consensus_data = r.read_bytes();
   return h;
 }
@@ -136,6 +138,24 @@ Block Block::decode_all(codec::ByteView bytes) {
   return b;
 }
 
+// ── Receipt ──────────────────────────────────────────────────────────────────
+
+Bytes Receipt::encode() const {
+  codec::CodecWriter w;
+  w.write_u8(status);
+  w.write_u128(fee);
+  return w.take();
+}
+
+Receipt Receipt::decode_all(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  Receipt rc;
+  rc.status = r.read_u8();
+  rc.fee = r.read_u128();
+  r.assert_fully_consumed();
+  return rc;
+}
+
 // ── Free functions ───────────────────────────────────────────────────────────
 
 Hash compute_tx_root(const std::vector<Transaction>& txs) {
@@ -143,6 +163,15 @@ Hash compute_tx_root(const std::vector<Transaction>& txs) {
   leaves.reserve(txs.size());
   for (const auto& tx : txs) {
     leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, tx.encode()));
+  }
+  return merkle::compute_root(leaves);
+}
+
+Hash compute_receipt_root(const std::vector<Receipt>& receipts) {
+  std::vector<Hash> leaves;
+  leaves.reserve(receipts.size());
+  for (const auto& rc : receipts) {
+    leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, rc.encode()));
   }
   return merkle::compute_root(leaves);
 }

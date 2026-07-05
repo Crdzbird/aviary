@@ -48,4 +48,21 @@ TxInclusionProof tx_inclusion_proof(const Block& block, std::uint32_t index);
 /// Verify a tx-inclusion proof against [tx_root].
 bool verify_tx_inclusion(const Hash& tx_root, const TxInclusionProof& p);
 
+/// Proof that an execution receipt is committed under a block's receipt_root
+/// (version-2 headers).
+struct ReceiptProof {
+  Bytes receipt_encoding;  ///< leaf = hash_tagged(kLeaf, receipt_encoding)
+  std::uint32_t leaf_count = 0;
+  merkle::Proof proof;
+
+  Bytes encode() const;
+  static ReceiptProof decode_all(codec::ByteView bytes);
+};
+
+/// Build an inclusion proof for receipt [index] within [receipts] (block order).
+ReceiptProof receipt_inclusion_proof(const std::vector<Receipt>& receipts, std::uint32_t index);
+
+/// Verify a receipt-inclusion proof against [receipt_root].
+bool verify_receipt_inclusion(const Hash& receipt_root, const ReceiptProof& p);
+
 }  // namespace blockchainer
