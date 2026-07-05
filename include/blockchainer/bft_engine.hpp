@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "blockchainer/consensus.hpp"
+#include "blockchainer/consensus_engine.hpp"
 #include "blockchainer/ledger.hpp"
 
 namespace blockchainer::observe {
@@ -25,15 +26,15 @@ class MetricsRegistry;
 /// intersection in the consensus layer.
 namespace blockchainer::consensus {
 
-class BftEngine {
+class BftEngine : public ConsensusEngine {
  public:
   BftEngine(ValidatorSet vset, std::unique_ptr<Ledger> ledger)
       : vset_(std::move(vset)), ledger_(std::move(ledger)) {}
 
-  const Ledger& ledger() const { return *ledger_; }
+  const Ledger& ledger() const override { return *ledger_; }
   const ValidatorSet& validators() const { return vset_; }
-  std::uint64_t height() const { return ledger_->tip().height; }
-  const BlockHeader& tip() const { return ledger_->tip(); }
+  std::uint64_t height() const override { return ledger_->tip().height; }
+  const BlockHeader& tip() const override { return ledger_->tip(); }
 
   /// The id validators vote on for [b].
   static Hash block_id(const Block& b) { return b.header.hash(); }
@@ -42,11 +43,15 @@ class BftEngine {
   /// consensus_data with the validator-set hash and the last commit (the
   /// certificate that finalized the parent) — so the produced chain is
   /// self-certifying and bound to this validator set.
-  Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) {
+  Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override {
     Block b = ledger_->build_block(std::move(txs), timestamp);
     b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
     return b;
   }
+
+  /// ConsensusEngine seam: the justification is an encoded CommitCertificate.
+  /// Decodes it and finalizes the block (verify certificate → apply).
+  BlockError submit(const Block& b, codec::ByteView justification) override;
 
   /// A validator precommits a proposed block.
   Vote precommit(const Block& b, std::uint32_t validator_index,

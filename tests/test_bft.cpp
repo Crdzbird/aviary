@@ -107,5 +107,28 @@ int main() {
   std::printf("== chain links: each block's parent is the prior header ==\n");
   CHECK(engine.tip().height == 2);
 
+  std::printf("== drive through the abstract ConsensusEngine interface ==\n");
+  {
+    // The pipeline above consensus sees only ConsensusEngine: propose a block,
+    // and submit it with an opaque justification (a BFT commit certificate).
+    ConsensusEngine& ce = engine;
+    CHECK(ce.height() == 2);
+    Block b3 = ce.propose({transfer(alice, bob_addr, 2, 25, kChain)}, 3);
+    auto cert3 = engine.try_commit(
+        b3, {engine.precommit(b3, 0, vkeys[0]), engine.precommit(b3, 1, vkeys[1]),
+             engine.precommit(b3, 2, vkeys[2])});
+    CHECK(cert3.has_value());
+    // The justification is the encoded certificate — engine-specific bytes.
+    const Bytes justification = cert3->encode();
+    CHECK_MSG(ce.submit(b3, view(justification)).ok, "submit(block, cert) commits");
+    CHECK(ce.height() == 3);
+    CHECK(acc(engine).account(bob_addr).balance == 175);
+
+    // A malformed justification is rejected, chain unchanged.
+    Block b4 = ce.propose({transfer(alice, bob_addr, 3, 10, kChain)}, 4);
+    CHECK(!ce.submit(b4, view(Bytes{0x01, 0x02, 0x03})).ok);
+    CHECK(ce.height() == 3);
+  }
+
   return bctest::summary();
 }

@@ -54,9 +54,16 @@
   **Remaining:** gossip evidence over the wire and *apply* slashing as a
   validator-set change at a height (needs the validator-set-change machinery
   below) + an economic/stake layer for the actual penalty.
-- **[M] Extract the abstract `ConsensusEngine` interface.** `BftEngine` is
-  concrete. Extract the interface from `ARCHITECTURE.md` §7 when a second engine
-  (PoS/PoW) lands, so the abstraction is informed, not guessed.
+- **[x] Extract the abstract `ConsensusEngine` interface — DONE.**
+  `consensus_engine.hpp` defines the family-agnostic seam — `ledger()` /
+  `height()` / `tip()` / `propose()` plus `submit(block, justification)` where the
+  justification is an OPAQUE byte string (a BFT commit certificate, a PoW
+  solution, a PoS finality proof — each engine defines + verifies its own). The
+  now-concrete `BftEngine` implements it (`submit` decodes a `CommitCertificate`
+  and finalizes), keeping its BFT-specific `precommit`/`try_commit`/`finalize` as
+  extras. The pipeline above consensus can be written once against the interface;
+  a second engine (PoW/PoS) slots in underneath. `test_bft.cpp` drives a chain
+  through a `ConsensusEngine&`.
 - **[M] PoS and PoW reference engines.** Designed as pluggable; not implemented.
   These also need a real fork-choice rule (BFT doesn't reorg, so none exists yet).
 - **[x] Embed the commit certificate in the block header (LastCommit) — DONE.**

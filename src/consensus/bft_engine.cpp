@@ -24,6 +24,16 @@ ValidatorSet BftEngine::slashed_validator_set() const {
   return slashed;
 }
 
+BlockError BftEngine::submit(const Block& b, codec::ByteView justification) {
+  CommitCertificate cert;
+  try {
+    cert = CommitCertificate::decode_all(justification);
+  } catch (const codec::CodecError& e) {
+    return BlockError::failure(std::string("consensus: malformed justification: ") + e.what());
+  }
+  return finalize(b, cert);
+}
+
 Vote BftEngine::precommit(const Block& b, std::uint32_t validator_index,
                           const crypto::KeyPair& bls_key,
                           std::uint32_t round) const {
