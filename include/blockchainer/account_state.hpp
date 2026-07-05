@@ -2,8 +2,11 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
+#include <vector>
 
 #include "blockchainer/codec.hpp"
+#include "blockchainer/merkle.hpp"
 #include "blockchainer/proofs.hpp"
 #include "blockchainer/state.hpp"
 
@@ -15,12 +18,24 @@ namespace blockchainer {
 /// per-account nonce.
 ///
 /// Transaction body layout (canonical): `u64 nonce ‖ fixed32 recipient ‖ u128 amount`.
+///
+/// **Commitment performance (copy-on-write).** The committed accounts and their
+/// cached Merkle tree live in an immutable, shared `Snapshot`; uncommitted
+/// changes accumulate in a small `overlay_`. So `clone()` — done once per block
+/// to apply it atomically — shares the snapshot and copies only the overlay
+/// (O(changed accounts)), not the whole state. `state_root()` recomputes only
+/// the changed leaves' root-paths against the cached tree (O(K·log N)) when the
+/// block merely moves value between existing accounts, and rebuilds fully only
+/// when new accounts appear or the overlay grows large. The committed root is
+/// byte-identical to `merkle::compute_root` over the sorted leaves.
 class AccountStateMachine : public StateMachine {
  public:
   struct Account {
     codec::u128 balance = 0;
     std::uint64_t nonce = 0;
   };
+
+  AccountStateMachine();
 
   /// Genesis helper: credit an address before the chain starts.
   void credit_genesis(const Hash& address, codec::u128 amount);
@@ -56,8 +71,28 @@ class AccountStateMachine : public StateMachine {
   static AccountLeaf decode_account_leaf(const Bytes& preimage);
 
  private:
-  // std::map keeps keys sorted → deterministic state_root.
-  std::map<Hash, Account> accounts_;
+  // An immutable, shareable committed baseline: the accounts (sorted by
+  // address), the same addresses in leaf order, and the cached Merkle tree over
+  // their leaf hashes. Shared across clones via shared_ptr — never mutated once
+  // published; a new Snapshot is built by seal().
+  struct Snapshot {
+    std::map<Hash, Account> accounts;    // std::map → deterministic sorted order
+    std::vector<Hash> sorted_addrs;      // accounts' keys, in leaf order
+    merkle::MerkleIndex tree;            // over leaf hashes, in the same order
+  };
+
+  // Committed baseline (shared) plus uncommitted absolute-valued changes.
+  // Both are mutable so the const commitment path (state_root/prove_account) can
+  // fold the overlay into a fresh snapshot (logical constness: the value is
+  // unchanged, only the cache is materialised). Single-threaded, like the rest
+  // of the node.
+  mutable std::shared_ptr<const Snapshot> base_;
+  mutable std::map<Hash, Account> overlay_;
+
+  const Account* lookup(const Hash& address) const;  // overlay-then-base
+  void put(const Hash& address, const Account& acc); // write to overlay
+  void seal() const;                                 // fold overlay → new base_
+  std::map<Hash, Account> merged() const;            // base ∪ overlay
 };
 
 }  // namespace blockchainer

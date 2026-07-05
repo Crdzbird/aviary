@@ -49,13 +49,21 @@
 
 ## State machines & ledger (M1)
 
-- **[H] Incremental/persistent state commitment.** `state_root()` rebuilds a
-  binary Merkle tree over *all* sorted leaves every call — O(state size) per
-  block. Production needs an incremental Merkle/Patricia/Verkle trie with
-  copy-on-write. (`account_state.cpp`, `utxo_state.cpp`)
-- **[H] `clone()` is a full deep copy.** Block processing clones the entire state
-  for atomicity (`Ledger::process_block`). Fine for tests, O(state) per block at
-  scale — want a persistent/COW structure or a journaled overlay.
+- **[x] Incremental state commitment — DONE (account model).** `AccountStateMachine`
+  now commits copy-on-write: the committed accounts + their cached Merkle tree
+  live in an immutable, shared `Snapshot`; uncommitted changes sit in a small
+  `overlay_`. `state_root()` for a block that moves value between existing
+  accounts recomputes only the changed leaves' root-paths against the cached
+  tree via `merkle::MerkleIndex::root_with_updates` — O(K·log N), byte-identical
+  to `compute_root`. New accounts / a large overlay trigger a rebuild, amortised
+  by sealing above ~1/8 of the state. `clone()` shares the snapshot and copies
+  only the overlay → O(changed), not O(state). Differential + property tests
+  (`test_state_incremental.cpp`, 4000-op naive cross-check, MerkleIndex vs
+  `compute_root`, COW independence). Benchmark (`tools/bench_state.cpp`): the
+  per-block commit is flat as accounts grow (208µs→488µs over 1k→256k accounts)
+  vs the old full rebuild (4.6ms→799ms) — up to ~1600× at 256k. **Remaining:**
+  apply the same COW/incremental commitment to `utxo_state.cpp` (still a full
+  rebuild); optional persistent-map so `clone()` sheds its O(N) account-map copy.
 - **[H] Fees / gas.** Neither model charges fees. UTXO enforces *exact* value
   conservation (no fee output); account has no fee/nonce-priced execution. No fee
   market or mempool priority follows from this.

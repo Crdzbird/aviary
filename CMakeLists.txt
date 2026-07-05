@@ -139,6 +139,11 @@ add_executable(print_vectors tools/print_vectors.cpp)
 target_link_libraries(print_vectors PRIVATE blockchainer_core)
 set_target_properties(print_vectors PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
 
+# ── State-commitment micro-benchmark (not a test; documents the P1 win) ──────
+add_executable(bench_state tools/bench_state.cpp)
+target_link_libraries(bench_state PRIVATE blockchainer_core)
+set_target_properties(bench_state PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+
 # ── Tests (zero-dependency runner, matching cryptolib's convention) ──────────
 enable_testing()
 
@@ -179,6 +184,7 @@ blockchainer_add_test(test_bitcoin tests/test_bitcoin.cpp)
 blockchainer_add_test(test_bridge tests/test_bridge.cpp)
 blockchainer_add_test(test_demo_node tests/test_demo_node.cpp)
 blockchainer_add_test(test_hybrid_sig tests/test_hybrid_sig.cpp)
+blockchainer_add_test(test_state_incremental tests/test_state_incremental.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

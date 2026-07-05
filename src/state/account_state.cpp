@@ -1,5 +1,6 @@
 #include "blockchainer/account_state.hpp"
 
+#include <algorithm>
 #include <vector>
 
 #include "blockchainer/merkle.hpp"
@@ -18,6 +19,13 @@ Hash to_hash(const Bytes& b) {
 
 constexpr codec::u128 kU128Max = ~static_cast<codec::u128>(0);
 
+// Seal the overlay into a fresh baseline when it grows past this fraction of the
+// committed state (1/kSealDivisor), amortising the O(N) rebuild over many
+// blocks. Below the threshold, state_root() stays on the O(K·log N) incremental
+// path. Also a small absolute floor so tiny states just rebuild.
+constexpr std::size_t kSealDivisor = 8;
+constexpr std::size_t kSealFloor = 64;
+
 // Canonical leaf preimage for an account: addr(32) ‖ balance(u128) ‖ nonce(u64).
 Bytes account_leaf_preimage(const Hash& addr, const AccountStateMachine::Account& acc) {
   codec::CodecWriter w;
@@ -26,7 +34,13 @@ Bytes account_leaf_preimage(const Hash& addr, const AccountStateMachine::Account
   w.write_u64(acc.nonce);
   return w.take();
 }
+
+Hash leaf_hash(const Hash& addr, const AccountStateMachine::Account& acc) {
+  return crypto::hash_tagged(crypto::Domain::kLeaf, account_leaf_preimage(addr, acc));
+}
 }  // namespace
+
+AccountStateMachine::AccountStateMachine() : base_(std::make_shared<Snapshot>()) {}
 
 AccountStateMachine::Transfer AccountStateMachine::decode_transfer(const Bytes& body) {
   codec::CodecReader r(view(body));
@@ -46,33 +60,95 @@ Bytes AccountStateMachine::encode_transfer(const Transfer& t) {
   return w.take();
 }
 
+const AccountStateMachine::Account* AccountStateMachine::lookup(const Hash& address) const {
+  if (auto it = overlay_.find(address); it != overlay_.end()) return &it->second;
+  if (auto it = base_->accounts.find(address); it != base_->accounts.end()) return &it->second;
+  return nullptr;
+}
+
+void AccountStateMachine::put(const Hash& address, const Account& acc) {
+  overlay_[address] = acc;
+}
+
+std::map<Hash, AccountStateMachine::Account> AccountStateMachine::merged() const {
+  std::map<Hash, Account> out = base_->accounts;
+  for (const auto& [addr, acc] : overlay_) out[addr] = acc;
+  return out;
+}
+
+void AccountStateMachine::seal() const {
+  if (overlay_.empty()) return;
+  auto snap = std::make_shared<Snapshot>();
+  snap->accounts = base_->accounts;
+  for (const auto& [addr, acc] : overlay_) snap->accounts[addr] = acc;
+
+  snap->sorted_addrs.reserve(snap->accounts.size());
+  std::vector<Hash> leaves;
+  leaves.reserve(snap->accounts.size());
+  for (const auto& [addr, acc] : snap->accounts) {  // map iterates address-sorted
+    snap->sorted_addrs.push_back(addr);
+    leaves.push_back(leaf_hash(addr, acc));
+  }
+  snap->tree.reset(std::move(leaves));
+
+  base_ = std::move(snap);
+  overlay_.clear();
+}
+
 void AccountStateMachine::credit_genesis(const Hash& address, codec::u128 amount) {
-  accounts_[address].balance += amount;
+  Account acc = account(address);
+  acc.balance += amount;
+  put(address, acc);
 }
 
 AccountStateMachine::Account AccountStateMachine::account(const Hash& address) const {
-  auto it = accounts_.find(address);
-  return it == accounts_.end() ? Account{} : it->second;
+  const Account* a = lookup(address);
+  return a ? *a : Account{};
 }
 
 Hash AccountStateMachine::state_root() const {
-  std::vector<Hash> leaves;
-  leaves.reserve(accounts_.size());
-  for (const auto& [addr, acc] : accounts_) {  // map iterates sorted by address
-    leaves.push_back(
-        crypto::hash_tagged(crypto::Domain::kLeaf, account_leaf_preimage(addr, acc)));
+  if (overlay_.empty()) return base_->tree.root();
+
+  // Any brand-new account shifts leaf positions, so the incremental path (which
+  // only rewrites existing positions) does not apply — rebuild. Likewise once
+  // the overlay is a big fraction of the state, rebuilding amortises better than
+  // repeatedly walking a large change set.
+  bool has_inserts = false;
+  for (const auto& [addr, acc] : overlay_) {
+    if (!base_->accounts.count(addr)) {
+      has_inserts = true;
+      break;
+    }
   }
-  return merkle::compute_root(leaves);
+  const std::size_t base_leaves = base_->sorted_addrs.size();
+  const std::size_t seal_threshold = std::max(kSealFloor, base_leaves / kSealDivisor);
+  if (has_inserts || overlay_.size() > seal_threshold) {
+    seal();
+    return base_->tree.root();
+  }
+
+  // Updates-only, small overlay: recompute just the changed leaves' root-paths
+  // against the cached committed tree — O(K·log N), no rebuild, no mutation.
+  std::map<std::size_t, Hash> changes;
+  for (const auto& [addr, acc] : overlay_) {
+    auto it = std::lower_bound(base_->sorted_addrs.begin(), base_->sorted_addrs.end(), addr);
+    const std::size_t idx = static_cast<std::size_t>(it - base_->sorted_addrs.begin());
+    changes[idx] = leaf_hash(addr, acc);
+  }
+  return base_->tree.root_with_updates(changes);
 }
 
 StateProof AccountStateMachine::prove_account(const Hash& address) const {
+  // Proofs are off the hot path; materialise so we prove against a coherent
+  // committed tree.
+  const std::map<Hash, Account> accounts = merged();
   std::vector<Hash> leaves;
-  leaves.reserve(accounts_.size());
+  leaves.reserve(accounts.size());
   StateProof proof;
   bool found = false;
   std::uint32_t found_index = 0;
   std::uint32_t i = 0;
-  for (const auto& [addr, acc] : accounts_) {
+  for (const auto& [addr, acc] : accounts) {
     Bytes preimage = account_leaf_preimage(addr, acc);
     leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, preimage));
     if (addr == address) {
@@ -142,13 +218,22 @@ void AccountStateMachine::apply(const Transaction& tx) {
   const Transfer t = decode_transfer(tx.body);
   const Hash sender = crypto::address_of(view(tx.author));
 
-  accounts_[sender].balance -= t.amount;
-  accounts_[sender].nonce += 1;
-  accounts_[t.recipient].balance += t.amount;  // self-transfer nets to zero
+  Account s = account(sender);
+  s.balance -= t.amount;
+  s.nonce += 1;
+  put(sender, s);
+  // Read the recipient AFTER writing the sender so a self-transfer nets to zero
+  // (overlay reflects the just-debited balance).
+  Account r = account(t.recipient);
+  r.balance += t.amount;
+  put(t.recipient, r);
 }
 
 std::unique_ptr<StateMachine> AccountStateMachine::clone() const {
-  return std::make_unique<AccountStateMachine>(*this);
+  auto c = std::make_unique<AccountStateMachine>();
+  c->base_ = base_;        // share the immutable committed snapshot (O(1))
+  c->overlay_ = overlay_;  // copy only the uncommitted changes
+  return c;
 }
 
 }  // namespace blockchainer

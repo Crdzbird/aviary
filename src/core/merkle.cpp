@@ -1,6 +1,8 @@
 #include "blockchainer/merkle.hpp"
 
+#include <set>
 #include <stdexcept>
+#include <utility>
 
 namespace blockchainer::merkle {
 
@@ -75,6 +77,63 @@ bool verify_proof(const Hash& root, const Hash& leaf, const Proof& proof,
     level_size = (level_size + 1) / 2;
   }
   return si == proof.siblings.size() && h == root;
+}
+
+// ── MerkleIndex ────────────────────────────────────────────────────────────────
+
+void MerkleIndex::reset(std::vector<Hash> leaves) {
+  levels_.clear();
+  if (leaves.empty()) return;  // root() returns the fixed empty root
+  levels_.push_back(std::move(leaves));
+  while (levels_.back().size() > 1) {
+    levels_.push_back(next_level(levels_.back()));
+  }
+}
+
+Hash MerkleIndex::root() const {
+  if (levels_.empty() || levels_.front().empty()) {
+    return crypto::hash_tagged(crypto::Domain::kNode, {});
+  }
+  return levels_.back().front();
+}
+
+Hash MerkleIndex::root_with_updates(const std::map<std::size_t, Hash>& changes) const {
+  if (levels_.empty() || levels_.front().empty()) {
+    return crypto::hash_tagged(crypto::Domain::kNode, {});
+  }
+  if (changes.empty()) return levels_.back().front();
+
+  // Sparse overlay of recomputed nodes, keyed by (level, index). Every read
+  // falls back to the cached level when a node was not recomputed, so only the
+  // O(K·log N) nodes on the changed leaves' root-paths are ever hashed.
+  std::map<std::pair<std::size_t, std::size_t>, Hash> ov;
+  std::set<std::size_t> dirty;
+  for (const auto& [i, h] : changes) {
+    if (i >= levels_.front().size()) {
+      throw std::out_of_range("MerkleIndex::root_with_updates: index out of range");
+    }
+    ov[{0, i}] = h;
+    dirty.insert(i);
+  }
+
+  for (std::size_t L = 0; L + 1 < levels_.size(); ++L) {
+    const auto& level = levels_[L];
+    std::set<std::size_t> parents;
+    for (std::size_t i : dirty) parents.insert(i / 2);
+    for (std::size_t p : parents) {
+      auto at = [&](std::size_t idx) -> const Hash& {
+        auto it = ov.find({L, idx});
+        return it != ov.end() ? it->second : level[idx];
+      };
+      const std::size_t l = 2 * p, r = 2 * p + 1;
+      ov[{L + 1, p}] =
+          (r < level.size()) ? crypto::hash_node(at(l), at(r)) : at(l);  // lone carry-up
+    }
+    dirty = std::move(parents);
+  }
+
+  auto it = ov.find({levels_.size() - 1, 0});
+  return it != ov.end() ? it->second : levels_.back().front();
 }
 
 }  // namespace blockchainer::merkle
