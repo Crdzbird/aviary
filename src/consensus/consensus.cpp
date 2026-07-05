@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <stdexcept>
+#include <utility>
 
 namespace blockchainer::consensus {
 
@@ -22,7 +24,21 @@ constexpr std::uint8_t kPrecommit = 0x01;
 
 ValidatorSet::ValidatorSet(std::vector<Validator> validators)
     : validators_(std::move(validators)) {
-  for (const auto& v : validators_) total_power_ += v.power;
+  // Reject malformed sets at construction — a bad set is a consensus footgun.
+  // (A zero-power *validator* is allowed: that is exactly a slashed validator;
+  // what is rejected is a set with no live power at all.)
+  if (validators_.empty()) throw std::invalid_argument("ValidatorSet: empty set");
+  std::set<Bytes> seen;
+  for (const auto& v : validators_) {
+    if (v.bls_pubkey.size() != 48) {
+      throw std::invalid_argument("ValidatorSet: BLS public key must be 48 bytes");
+    }
+    if (!seen.insert(v.bls_pubkey).second) {
+      throw std::invalid_argument("ValidatorSet: duplicate validator public key");
+    }
+    total_power_ += v.power;
+  }
+  if (total_power_ == 0) throw std::invalid_argument("ValidatorSet: total voting power is zero");
 }
 
 std::uint64_t ValidatorSet::quorum() const {
@@ -36,7 +52,7 @@ Hash ValidatorSet::hash() const {
     w.write_bytes(view(v.bls_pubkey));
     w.write_u64(v.power);
   });
-  return crypto::hash_tagged(crypto::Domain::kHeader, w.take());
+  return crypto::hash_tagged(crypto::Domain::kValidatorSet, w.take());
 }
 
 ValidatorSet ValidatorSet::with_slashed(std::uint32_t index) const {
@@ -115,8 +131,7 @@ std::optional<CommitCertificate> aggregate_commit(
     std::uint64_t chain_id, const ValidatorSet& vset, std::uint64_t height,
     std::uint32_t round, const Hash& block_id, const std::vector<Vote>& votes) {
   std::set<std::uint32_t> included;
-  std::vector<std::uint32_t> signers;
-  std::vector<Bytes> sigs;
+  std::vector<std::pair<std::uint32_t, Bytes>> collected;  // (index, signature)
   std::uint64_t power = 0;
 
   for (const auto& v : votes) {
@@ -129,24 +144,23 @@ std::optional<CommitCertificate> aggregate_commit(
       included.erase(v.validator_index);
       continue;  // drop invalid vote
     }
-    signers.push_back(v.validator_index);
-    sigs.push_back(v.signature);
+    collected.emplace_back(v.validator_index, v.signature);
     power += vset.at(v.validator_index).power;
   }
 
   if (power < vset.quorum()) return std::nullopt;
 
-  std::sort(signers.begin(), signers.end());
-  // sigs were pushed in signers' pre-sort order; re-derive sorted sigs.
+  // Sort (index, signature) together so signers ascend and the aggregated
+  // signatures stay aligned — O(n log n), no per-signer re-scan.
+  std::sort(collected.begin(), collected.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::vector<std::uint32_t> signers;
   std::vector<Bytes> sorted_sigs;
-  sorted_sigs.reserve(signers.size());
-  for (std::uint32_t idx : signers) {
-    for (const auto& v : votes) {
-      if (v.validator_index == idx) {
-        sorted_sigs.push_back(v.signature);
-        break;
-      }
-    }
+  signers.reserve(collected.size());
+  sorted_sigs.reserve(collected.size());
+  for (auto& [idx, sig] : collected) {
+    signers.push_back(idx);
+    sorted_sigs.push_back(std::move(sig));
   }
 
   CommitCertificate cert;

@@ -23,6 +23,7 @@ enum class Domain : std::uint8_t {
   kNode = 0x01,
   kHeader = 0x02,
   kTxId = 0x03,
+  kValidatorSet = 0x04,  ///< commitment to a validator set (distinct from a header)
 };
 
 /// BLAKE3-256 over [data, data+len). The chain's primary hash primitive.

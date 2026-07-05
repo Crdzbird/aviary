@@ -49,13 +49,14 @@
   no cryptolib change. A same-message `FastAggregateVerify` in cryptolib would be
   ~1 pairing vs N and shrink the signed message; weigh the perf win vs the new C
   ABI surface. (See the design note in the status memory.)
-- **[L] `ValidatorSet` construction validation.** Does not reject duplicate
-  pubkeys, zero-power validators, or wrong-length (≠48B) BLS keys. Validate at
-  construction. (`src/consensus/consensus.cpp`)
-- **[L] `aggregate_commit` signature re-sort is O(n²).** Re-scans `votes` per
-  signer to order signatures. Zip (index, sig) instead. Negligible for small N.
-- **[L] Distinct domain tag for the validator-set hash.** `ValidatorSet::hash()`
-  reuses `Domain::kHeader`. Give consensus structures their own tag(s).
+- **[x] `ValidatorSet` construction validation — DONE.** The constructor now
+  rejects an empty set, a wrong-length (≠48B) BLS key, duplicate public keys, and
+  a set with zero total voting power (a single zero-power/slashed validator among
+  live ones is still allowed). `test_consensus_hardening.cpp`.
+- **[x] `aggregate_commit` signature re-sort O(n²) → O(n log n) — DONE.** Now zips
+  (index, signature) and sorts once; no per-signer re-scan.
+- **[x] Distinct domain tag for the validator-set hash — DONE.** `ValidatorSet::hash()`
+  now uses `Domain::kValidatorSet` (0x04), separated from `kHeader`.
 
 ## State machines & ledger (M1)
 

@@ -86,6 +86,24 @@ int main() {
     CHECK(!verify_equivocation(kChain, vset, wrong_signer).ok);
   }
 
+  std::printf("== validator set rejects malformed construction ==\n");
+  {
+    // Empty set.
+    CHECK(::bctest::throws([&] { ValidatorSet(std::vector<Validator>{}); }));
+    // Wrong-length BLS key.
+    CHECK(::bctest::throws(
+        [&] { ValidatorSet(std::vector<Validator>{{Bytes(32, 0x01), 1}}); }));
+    // Duplicate public keys.
+    CHECK(::bctest::throws([&] {
+      ValidatorSet(std::vector<Validator>{{v0.public_key, 1}, {v0.public_key, 1}});
+    }));
+    // No live power at all.
+    CHECK(::bctest::throws(
+        [&] { ValidatorSet(std::vector<Validator>{{v0.public_key, 0}}); }));
+    // A single slashed validator among live ones is fine (zero power allowed).
+    CHECK(!::bctest::throws([&] { (void)vset.with_slashed(0); }));
+  }
+
   std::printf("== slashing zeroes the equivocator's power ==\n");
   {
     ValidatorSet slashed = vset.with_slashed(2);
