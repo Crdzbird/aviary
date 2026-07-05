@@ -74,15 +74,17 @@
   vs the old full rebuild (4.6ms→799ms) — up to ~1600× at 256k. **Remaining:**
   apply the same COW/incremental commitment to `utxo_state.cpp` (still a full
   rebuild); optional persistent-map so `clone()` sheds its O(N) account-map copy.
-- **[~] Fees / gas.** **Account model DONE (flat fee):** `ChainSpec.flat_fee`
-  (default 0 → feeless, byte-identical to no-fee) is a fixed protocol fee burned
-  from the sender on every transfer, enforced in `AccountStateMachine::validate/
-  apply` (sender must cover amount + fee, overflow-guarded; fee deducted, not
-  credited). It gives spam a real per-tx economic cost and folds into the state
-  root deterministically (`test_ledger.cpp` fee section). **Remaining:** variable
-  per-tx fees (needed for a real fee market + fee-priority mempool eviction) —
-  requires a version-gated fee field in the account body; UTXO fee output (still
-  enforces exact value conservation); gas metering for richer execution.
+- **[~] Fees / gas.** **Account model DONE (flat base + variable tip):**
+  `ChainSpec.flat_fee` (default 0 → feeless, byte-identical to no-fee) is a fixed
+  base fee, and the v2 envelope carries an explicit per-tx `fee` (priority tip,
+  committed by signing_bytes). `AccountStateMachine::validate/apply` charge
+  `flat_fee + tip` (overflow-guarded, burned). The mempool is now a real fee
+  market: **fee-priority eviction** (a full pool drops its cheapest resident only
+  if the newcomer outbids it) and **fee-ordered selection** (highest tip offered
+  to the block first) — `test_ledger.cpp` + `test_mempool.cpp`. v1 txs pay tip 0,
+  so nothing changes for them. **Remaining:** UTXO fee output (still enforces
+  exact value conservation); gas metering for richer execution; expose the tip in
+  the language bindings' submit helpers (currently 0).
 - **[M] State inclusion proofs.** `StateMachine::prove()` from the design is not
   implemented for either model. Needed for light clients (M5) and bridges (M6).
 - **[M] Multi-signer UTXO.** A UTXO tx has a single `author`, so all inputs must

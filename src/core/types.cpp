@@ -22,7 +22,10 @@ Bytes Transaction::signing_bytes() const {
   codec::CodecWriter w;
   w.write_u8(version);
   w.write_u64(chain_id);
-  if (version >= 2) w.write_u8(sig_algo);  // commit to the scheme (anti-downgrade)
+  if (version >= 2) {
+    w.write_u8(sig_algo);   // commit to the scheme (anti-downgrade)
+    w.write_u128(fee);      // commit to the declared fee (anti-tamper)
+  }
   w.write_bytes(view(body));
   w.write_bytes(view(author));
   return w.take();
@@ -32,7 +35,10 @@ Bytes Transaction::encode() const {
   codec::CodecWriter w;
   w.write_u8(version);
   w.write_u64(chain_id);
-  if (version >= 2) w.write_u8(sig_algo);
+  if (version >= 2) {
+    w.write_u8(sig_algo);
+    w.write_u128(fee);
+  }
   w.write_bytes(view(body));
   w.write_bytes(view(author));
   w.write_bytes(view(signature));
@@ -43,7 +49,10 @@ Transaction Transaction::decode(codec::CodecReader& r) {
   Transaction tx;
   tx.version = r.read_u8();
   tx.chain_id = r.read_u64();
-  if (tx.version >= 2) tx.sig_algo = r.read_u8();
+  if (tx.version >= 2) {
+    tx.sig_algo = r.read_u8();
+    tx.fee = r.read_u128();
+  }
   tx.body = r.read_bytes();
   tx.author = r.read_bytes();
   tx.signature = r.read_bytes();

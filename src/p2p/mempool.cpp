@@ -1,7 +1,10 @@
 #include "blockchainer/mempool.hpp"
 
+#include <algorithm>
 #include <optional>
 #include <set>
+#include <utility>
+#include <vector>
 
 #include "blockchainer/observability/event_bus.hpp"
 #include "blockchainer/observability/events.hpp"
@@ -37,10 +40,32 @@ AddResult Mempool::add(const Transaction& tx, std::uint64_t chain_id) {
     }
   }
 
-  // Capacity: reject when full. (No variable-fee market yet, so no fee-priority
-  // eviction — the per-account cap is what bounds single-sender griefing; see
-  // docs/IMPROVEMENTS.md.)
-  if (pool_.size() >= cfg_.max_txs) return AddResult::kFull;
+  // Capacity: when full, run a fee-priority eviction — the cheapest resident is
+  // dropped only if the newcomer outbids it. So a full pool keeps the highest
+  // paying txs; a spammer must outbid to displace anyone.
+  if (pool_.size() >= cfg_.max_txs) {
+    auto victim = pool_.end();
+    for (auto it = pool_.begin(); it != pool_.end(); ++it) {
+      // Lowest declared fee wins the eviction lottery; tie broken by the larger
+      // txid so the choice is deterministic.
+      if (victim == pool_.end() ||
+          it->second.declared_fee() < victim->second.declared_fee() ||
+          (it->second.declared_fee() == victim->second.declared_fee() &&
+           victim->first < it->first)) {
+        victim = it;
+      }
+    }
+    if (victim == pool_.end() || tx.declared_fee() <= victim->second.declared_fee()) {
+      return AddResult::kFull;  // newcomer does not outbid the cheapest resident
+    }
+    if (const std::optional<Hash> vb = sender_bucket(victim->second)) {
+      auto pit = per_account_.find(*vb);
+      if (pit != per_account_.end() && --pit->second == 0) per_account_.erase(pit);
+    }
+    const Hash victim_id = victim->first;
+    pool_.erase(victim);
+    if (bus_) bus_->publish(observe::TxRemoved{victim_id, pool_.size()});
+  }
 
   pool_.emplace(id, tx);
   if (bucket) ++per_account_[*bucket];
@@ -55,10 +80,21 @@ std::vector<Transaction> Mempool::select(const StateMachine& state,
   std::set<Hash> used;
   std::size_t block_bytes = 0;
 
+  // Candidate order: highest declared fee first (txid ascending as a
+  // deterministic tiebreak). Higher-paying txs are offered to the block first.
+  std::vector<std::pair<Hash, const Transaction*>> ordered;
+  ordered.reserve(pool_.size());
+  for (const auto& [id, tx] : pool_) ordered.emplace_back(id, &tx);
+  std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) {
+    const codec::u128 fa = a.second->declared_fee(), fb = b.second->declared_fee();
+    if (fa != fb) return fa > fb;   // higher fee first
+    return a.first < b.first;       // then lowest txid
+  });
+
   // Fixed-point: repeatedly apply any pending tx that validates against the
   // evolving state. A tx that depends on another (account nonce n needs n-1
   // applied; a UTXO spending a not-yet-created output) becomes ready in a later
-  // pass. Iteration over pool_ (txid order) makes selection deterministic.
+  // pass. The fee-ordered scan makes selection deterministic and fee-priority.
   //
   // Selection stops at whichever block limit binds first — tx count [max] or the
   // configured total-bytes budget — so a block's size is bounded regardless of
@@ -66,9 +102,10 @@ std::vector<Transaction> Mempool::select(const StateMachine& state,
   bool progress = true;
   while (progress && out.size() < max) {
     progress = false;
-    for (const auto& [id, tx] : pool_) {
+    for (const auto& [id, txp] : ordered) {
       if (out.size() >= max) break;
       if (used.count(id) != 0) continue;
+      const Transaction& tx = *txp;
       const std::size_t tx_bytes = tx.encode().size();
       if (cfg_.max_block_bytes != 0 && block_bytes + tx_bytes > cfg_.max_block_bytes) {
         // Skip this tx (too big for the remaining budget) but keep scanning —

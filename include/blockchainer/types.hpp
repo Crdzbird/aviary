@@ -36,6 +36,11 @@ struct Transaction {
   /// Signature scheme (a SigAlgo). Only serialized when version >= 2. Committed
   /// to by signing_bytes(), so an algorithm downgrade fails verification.
   std::uint8_t sig_algo = static_cast<std::uint8_t>(SigAlgo::kEd25519);
+  /// Priority fee (tip) the sender offers, on top of any chain base fee. Only
+  /// serialized when version >= 2 (version 1 pays no tip). Committed to by
+  /// signing_bytes(), so it can't be tampered after signing. The mempool orders
+  /// and evicts by this; the state machine burns it.
+  codec::u128 fee = 0;
   Bytes body;       ///< model-specific canonical payload
   Bytes author;     ///< signer public key (32 B Ed25519, or hybrid pub blob)
   Bytes signature;  ///< signature over signing_bytes()
@@ -44,6 +49,9 @@ struct Transaction {
   SigAlgo algo() const {
     return version >= 2 ? static_cast<SigAlgo>(sig_algo) : SigAlgo::kEd25519;
   }
+
+  /// The declared priority fee: fee for version >= 2, else 0.
+  codec::u128 declared_fee() const { return version >= 2 ? fee : 0; }
 
   /// Canonical bytes the signature commits to (excludes [signature]).
   Bytes signing_bytes() const;

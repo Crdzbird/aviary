@@ -201,12 +201,18 @@ ValidationResult AccountStateMachine::validate(const Transaction& tx) const {
   if (t.nonce != acc.nonce) {
     return ValidationResult::failure("nonce mismatch");
   }
-  // Sender must cover the transfer plus the flat protocol fee. Guard the sum
-  // against u128 overflow (an overflow would be a fork).
-  if (flat_fee_ > kU128Max - t.amount) {
+  // Sender must cover the transfer plus the total fee: the flat protocol base
+  // fee plus the sender's declared priority tip. Guard every sum against u128
+  // overflow (an overflow would be a fork).
+  const codec::u128 tip = tx.declared_fee();
+  if (flat_fee_ > kU128Max - tip) {
+    return ValidationResult::failure("fee overflow");
+  }
+  const codec::u128 total_fee = flat_fee_ + tip;
+  if (total_fee > kU128Max - t.amount) {
     return ValidationResult::failure("amount + fee overflow");
   }
-  if (acc.balance < t.amount + flat_fee_) {
+  if (acc.balance < t.amount + total_fee) {
     return ValidationResult::failure("insufficient balance for amount + fee");
   }
   // Guard recipient credit against u128 overflow (overflow would be a fork).
@@ -225,7 +231,7 @@ void AccountStateMachine::apply(const Transaction& tx) {
   const Hash sender = crypto::address_of(view(tx.author));
 
   Account s = account(sender);
-  s.balance -= t.amount + flat_fee_;  // fee is burned (not credited anywhere)
+  s.balance -= t.amount + flat_fee_ + tx.declared_fee();  // fees burned, not credited
   s.nonce += 1;
   put(sender, s);
   // Read the recipient AFTER writing the sender so a self-transfer nets to −fee

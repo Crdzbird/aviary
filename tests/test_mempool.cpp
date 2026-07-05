@@ -24,6 +24,19 @@ Transaction transfer(const crypto::KeyPair& from, const Hash& to,
   sign_transaction(tx, from);
   return tx;
 }
+
+// A version-2 transfer with a declared priority-fee tip.
+Transaction transfer_tip(const crypto::KeyPair& from, const Hash& to, std::uint64_t nonce,
+                         codec::u128 amount, codec::u128 tip, std::uint64_t chain) {
+  Transaction tx;
+  tx.version = 2;
+  tx.chain_id = chain;
+  tx.sig_algo = static_cast<std::uint8_t>(SigAlgo::kEd25519);
+  tx.fee = tip;
+  tx.body = AccountStateMachine::encode_transfer({nonce, to, amount});
+  sign_transaction(tx, from);
+  return tx;
+}
 std::uint64_t nonce_of(const Transaction& tx) {
   return AccountStateMachine::decode_transfer(tx.body).nonce;
 }
@@ -118,6 +131,44 @@ int main() {
     tight.add(transfer(alice, bob_addr, 0, 1, kChain), kChain);
     tight.add(transfer(alice, bob_addr, 1, 1, kChain), kChain);
     CHECK(tight.select(state, 100).size() == 1);  // byte budget binds before count
+  }
+
+  std::printf("== fee-priority eviction: a full pool keeps the highest bidders ==\n");
+  {
+    auto s1 = ed(10), s2 = ed(11), s3 = ed(12), s4 = ed(13);
+    MempoolConfig cfg;
+    cfg.max_txs = 2;
+    Mempool fee(cfg);
+    Transaction t5 = transfer_tip(s1, bob_addr, 0, 1, /*tip=*/5, kChain);
+    Transaction t7 = transfer_tip(s2, bob_addr, 0, 1, /*tip=*/7, kChain);
+    CHECK(fee.add(t5, kChain) == AddResult::kAdded);
+    CHECK(fee.add(t7, kChain) == AddResult::kAdded);  // pool full (fees 5,7)
+    // A higher bid (10) evicts the cheapest resident (5).
+    Transaction t10 = transfer_tip(s3, bob_addr, 0, 1, /*tip=*/10, kChain);
+    CHECK(fee.add(t10, kChain) == AddResult::kAdded);
+    CHECK(!fee.contains(t5.txid()));  // fee-5 evicted
+    CHECK(fee.contains(t7.txid()) && fee.contains(t10.txid()));
+    // A low bid (1) cannot displace the cheapest remaining resident (7).
+    Transaction t1 = transfer_tip(s4, bob_addr, 0, 1, /*tip=*/1, kChain);
+    CHECK(fee.add(t1, kChain) == AddResult::kFull);
+  }
+
+  std::printf("== selection is fee-priority ordered ==\n");
+  {
+    auto s1 = ed(20), s2 = ed(21), s3 = ed(22);
+    AccountStateMachine st;
+    st.credit_genesis(crypto::address_of(view(s1.public_key)), 1000);
+    st.credit_genesis(crypto::address_of(view(s2.public_key)), 1000);
+    st.credit_genesis(crypto::address_of(view(s3.public_key)), 1000);
+    Mempool mp2;
+    mp2.add(transfer_tip(s1, bob_addr, 0, 1, /*tip=*/5, kChain), kChain);
+    mp2.add(transfer_tip(s2, bob_addr, 0, 1, /*tip=*/10, kChain), kChain);
+    mp2.add(transfer_tip(s3, bob_addr, 0, 1, /*tip=*/1, kChain), kChain);
+    auto sel = mp2.select(st, 10);
+    CHECK(sel.size() == 3);
+    CHECK(sel[0].declared_fee() == 10);  // highest tip first
+    CHECK(sel[1].declared_fee() == 5);
+    CHECK(sel[2].declared_fee() == 1);
   }
 
   std::printf("== remove ==\n");

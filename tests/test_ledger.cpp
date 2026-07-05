@@ -28,6 +28,20 @@ Transaction make_transfer(const crypto::KeyPair& from, const Hash& to,
   return tx;
 }
 
+// A version-2 transfer carrying an explicit priority-fee tip.
+Transaction make_transfer_tip(const crypto::KeyPair& from, const Hash& to,
+                              std::uint64_t nonce, codec::u128 amount,
+                              codec::u128 tip, std::uint64_t chain_id) {
+  Transaction tx;
+  tx.version = 2;
+  tx.chain_id = chain_id;
+  tx.sig_algo = static_cast<std::uint8_t>(SigAlgo::kEd25519);
+  tx.fee = tip;
+  tx.body = AccountStateMachine::encode_transfer({nonce, to, amount});
+  sign_transaction(tx, from);
+  return tx;
+}
+
 const AccountStateMachine& as_account(const Ledger& l) {
   return dynamic_cast<const AccountStateMachine&>(l.state());
 }
@@ -179,6 +193,36 @@ int main() {
     Block ok = fl.build_block({make_transfer(alice, bob_addr, 1, 880, kChain)}, 2);
     CHECK_MSG(fl.process_block(ok).ok, "spend-to-the-fee-limit accepted");
     CHECK(as_account(fl).account(alice_addr).balance == 0);
+  }
+
+  std::printf("== variable per-tx fee: base flat fee + declared tip, both burned ==\n");
+  {
+    constexpr codec::u128 kBase = 10;  // chain base fee
+    auto g = std::make_unique<AccountStateMachine>(kBase);
+    g->credit_genesis(alice_addr, 1000);
+    ChainSpec spec{kChain, StateModel::kAccount};
+    spec.flat_fee = kBase;
+    Ledger l(spec, std::move(g));
+
+    // A v2 tx tipping 5: sender pays amount(100) + base(10) + tip(5) = 115.
+    Block b = l.build_block({make_transfer_tip(alice, bob_addr, 0, 100, 5, kChain)}, 1);
+    CHECK_MSG(l.process_block(b).ok, "tipped tx accepted");
+    CHECK(as_account(l).account(alice_addr).balance == 1000 - 100 - 10 - 5);  // 885
+    CHECK(as_account(l).account(bob_addr).balance == 100);                    // tip not credited
+
+    // A bigger tip changes the state root (the fee is committed), and a tip the
+    // sender cannot afford is rejected.
+    CHECK_THROWS(l.build_block({make_transfer_tip(alice, bob_addr, 1, 880, 100, kChain)}, 2));
+  }
+
+  std::printf("== a declared tip on a feeless chain is still charged + burned ==\n");
+  {
+    auto g = std::make_unique<AccountStateMachine>(0);
+    g->credit_genesis(alice_addr, 1000);
+    Ledger l(ChainSpec{kChain, StateModel::kAccount}, std::move(g));
+    Block b = l.build_block({make_transfer_tip(alice, bob_addr, 0, 100, 7, kChain)}, 1);
+    CHECK_MSG(l.process_block(b).ok, "tip on feeless chain accepted");
+    CHECK(as_account(l).account(alice_addr).balance == 1000 - 100 - 7);  // 893
   }
 
   std::printf("== consensus block limits reject oversized blocks (produced + received) ==\n");
