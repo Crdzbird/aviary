@@ -100,9 +100,15 @@ public final class Node {
         return Account(secret: secret, publicKey: publicKey, address: address)
     }
 
+    /// Credit an address at genesis. Valid until the first block is produced
+    /// (reads do NOT seal genesis); throws afterwards — never a silent no-op.
     public func credit(address: Data, amount: UInt64) throws {
         let rc = address.withC { p, _ in blockchainer_node_credit(h, p, amount) }
-        if rc != 0 { throw BlockchainerError(message: "credit failed") }
+        if rc == 2 {
+            throw BlockchainerError(
+                message: "genesis is sealed (a block was produced); fund accounts with transfers")
+        }
+        if rc != 0 { throw BlockchainerError(message: "credit failed (status \(rc))") }
     }
 
     @discardableResult

@@ -66,5 +66,43 @@ int main() {
   CHECK(node.produce_block(2) == 2);
   CHECK(node.balance(bob_addr) == 150);
 
+  std::printf("== S1 regression: reads do NOT seal genesis ==\n");
+  {
+    DemoNode fresh(43);
+    auto carol = fresh.new_account();
+    const Hash carol_addr = addr_of(carol);
+    // Read state BEFORE the first credit — under the old semantics this sealed
+    // the (empty) genesis and the credit below was silently dropped.
+    CHECK(fresh.height() == 0);
+    CHECK(fresh.balance(carol_addr) == 0);
+    (void)fresh.state_root();
+    (void)fresh.metrics_text();
+    fresh.credit(carol_addr, 777);  // must still land
+    CHECK(fresh.balance(carol_addr) == 777);
+    // Pre-start proofs verify against the pre-start root.
+    StateProof p0 = fresh.prove_account(carol_addr);
+    CHECK(verify_state_proof(fresh.state_root(), p0));
+    // ...and the credit survives the first block.
+    CHECK(fresh.produce_block(1) == 1);
+    CHECK(fresh.balance(carol_addr) == 777);
+  }
+
+  std::printf("== S1 regression: credit after sealing throws (never a no-op) ==\n");
+  {
+    DemoNode sealed_node(44);
+    auto dave = sealed_node.new_account();
+    const Hash dave_addr = addr_of(dave);
+    sealed_node.credit(dave_addr, 10);
+    CHECK(sealed_node.produce_block(1) == 1);
+    bool threw = false;
+    try {
+      sealed_node.credit(dave_addr, 1);
+    } catch (const node::GenesisSealedError&) {
+      threw = true;
+    }
+    CHECK(threw);
+    CHECK(sealed_node.balance(dave_addr) == 10);  // unchanged
+  }
+
   return bctest::summary();
 }

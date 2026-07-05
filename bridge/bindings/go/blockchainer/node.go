@@ -45,8 +45,22 @@ func AccountAddress(public []byte) []byte {
 	return b
 }
 
-func (n *Node) Credit(address []byte, amount uint64) {
-	C.blockchainer_node_credit(n.h, bp(address), C.uint64_t(amount))
+// ErrGenesisSealed is returned by Credit once a block has been produced —
+// genesis credits are no longer valid; fund accounts with transfers instead.
+var ErrGenesisSealed = errors.New("blockchainer: genesis is sealed (a block was produced); fund accounts with transfers")
+
+// Credit credits an address at genesis. Valid until the first block is produced
+// (reads do NOT seal genesis). Returns ErrGenesisSealed afterwards — never a
+// silent no-op.
+func (n *Node) Credit(address []byte, amount uint64) error {
+	switch C.blockchainer_node_credit(n.h, bp(address), C.uint64_t(amount)) {
+	case C.BLOCKCHAINER_OK:
+		return nil
+	case C.BLOCKCHAINER_ERR_GENESIS_SEALED:
+		return ErrGenesisSealed
+	default:
+		return errors.New("blockchainer: credit failed")
+	}
 }
 
 func (n *Node) SubmitTransfer(secret, to []byte, amount, nonce uint64) ([]byte, error) {

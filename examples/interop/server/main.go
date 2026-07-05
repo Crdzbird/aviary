@@ -54,7 +54,9 @@ func applyScenario(node *bc.Node, in *pb.ChainScenario) (*pb.ChainResult, error)
 	aAddr := bc.AccountAddress(aSec[32:64])
 	bAddr := bc.AccountAddress(bSec[32:64])
 
-	node.Credit(aAddr, in.GetAliceCredit())
+	if err := node.Credit(aAddr, in.GetAliceCredit()); err != nil {
+		return nil, err
+	}
 	if _, err := node.SubmitTransfer(aSec, bAddr, in.GetTransferAmount(), node.Nonce(aAddr)); err != nil {
 		return nil, err
 	}

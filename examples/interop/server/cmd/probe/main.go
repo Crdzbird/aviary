@@ -50,7 +50,9 @@ func main() {
 	local := bc.NewNode(7)
 	aAddr := bc.AccountAddress(aSec[32:64])
 	bAddr := bc.AccountAddress(bSec[32:64])
-	local.Credit(aAddr, 1_000_000)
+	if err := local.Credit(aAddr, 1_000_000); err != nil {
+		log.Fatal(err)
+	}
 	local.SubmitTransfer(aSec, bAddr, 250_000, local.Nonce(aAddr))
 	local.ProduceBlock(1)
 	fmt.Printf("local  stateRoot %s\n", hex.EncodeToString(local.StateRoot())[:16]+"…")

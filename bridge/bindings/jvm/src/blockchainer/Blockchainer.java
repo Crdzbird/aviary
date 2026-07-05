@@ -90,8 +90,15 @@ public final class Blockchainer implements AutoCloseable {
             try { return consume((MemorySegment) addr.invoke(arena.allocate(RES), seg(pub), (long) pub.length)); }
             catch (Throwable t) { throw new RuntimeException(t); }
         }
+        // Valid until the first block is produced (reads do NOT seal genesis);
+        // throws afterwards — never a silent no-op.
         public void credit(byte[] address, long amount) {
-            try { credit.invoke(node, seg(address), amount); } catch (Throwable t) { throw new RuntimeException(t); }
+            int rc;
+            try { rc = (int) credit.invoke(node, seg(address), amount); }
+            catch (Throwable t) { throw new RuntimeException(t); }
+            if (rc == 2) throw new IllegalStateException(
+                "genesis is sealed (a block was produced); fund accounts with transfers");
+            if (rc != 0) throw new RuntimeException("credit failed (status " + rc + ")");
         }
         public byte[] submitTransfer(byte[] secret, byte[] to, long amount, long n) {
             try { return consume((MemorySegment) submit.invoke(arena.allocate(RES), node, seg(secret), (long) secret.length, seg(to), amount, n)); }

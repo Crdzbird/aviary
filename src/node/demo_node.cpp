@@ -59,14 +59,15 @@ void DemoNode::ensure_started() {
   });
 }
 
-AccountStateMachine& DemoNode::account_state() {
-  ensure_started();
-  return const_cast<AccountStateMachine&>(
-      dynamic_cast<const AccountStateMachine&>(engine_->ledger().state()));
+const AccountStateMachine& DemoNode::read_state() const {
+  if (engine_) {
+    return dynamic_cast<const AccountStateMachine&>(engine_->ledger().state());
+  }
+  return *genesis_;  // pre-start: read the (still-mutable) genesis state
 }
 
 void DemoNode::credit(const Hash& address, codec::u128 amount) {
-  if (engine_) throw std::runtime_error("demo_node: cannot credit after start");
+  if (engine_) throw GenesisSealedError();
   genesis_->credit_genesis(address, amount);
 }
 
@@ -108,15 +109,15 @@ std::uint64_t DemoNode::produce_block(std::uint64_t timestamp) {
   return engine_->height();
 }
 
-std::uint64_t DemoNode::height() { ensure_started(); return engine_->height(); }
+std::uint64_t DemoNode::height() const { return engine_ ? engine_->height() : 0; }
 
-codec::u128 DemoNode::balance(const Hash& address) {
-  return account_state().account(address).balance;
+codec::u128 DemoNode::balance(const Hash& address) const {
+  return read_state().account(address).balance;
 }
-std::uint64_t DemoNode::nonce(const Hash& address) {
-  return account_state().account(address).nonce;
+std::uint64_t DemoNode::nonce(const Hash& address) const {
+  return read_state().account(address).nonce;
 }
-Hash DemoNode::state_root() { return account_state().state_root(); }
+Hash DemoNode::state_root() const { return read_state().state_root(); }
 
 std::string DemoNode::drain_events_json() {
   std::string out = "[";
@@ -130,14 +131,15 @@ std::string DemoNode::drain_events_json() {
 }
 
 std::string DemoNode::metrics_text() {
-  ensure_started();
+  // Non-sealing: a metrics scrape must never start the engine. Engine counters
+  // appear once the engine registers them (on first transact/produce).
   metrics_.gauge("blockchainer_mempool_size", "pending transactions")
       .set(static_cast<std::int64_t>(mempool_.size()));
   return metrics_.prometheus_text();
 }
 
-StateProof DemoNode::prove_account(const Hash& address) {
-  return account_state().prove_account(address);
+StateProof DemoNode::prove_account(const Hash& address) const {
+  return read_state().prove_account(address);
 }
 
 }  // namespace blockchainer::node

@@ -480,10 +480,19 @@ class Node {
     }
   }
 
+  /// Credit an address at genesis. Valid until the first block is produced
+  /// (reads do NOT seal genesis). Throws [BlockchainerException] afterwards —
+  /// never a silent no-op.
   void credit(Uint8List address, int amount) {
     final p = _bc._alloc(address);
     try {
-      _lib.lookupFunction<_CreditC, _CreditD>('blockchainer_node_credit')(_h, p, amount);
+      final rc =
+          _lib.lookupFunction<_CreditC, _CreditD>('blockchainer_node_credit')(_h, p, amount);
+      if (rc == 2) {
+        throw BlockchainerException(
+            'genesis is sealed (a block was produced); fund accounts with transfers');
+      }
+      if (rc != 0) throw BlockchainerException('credit failed (status $rc)');
     } finally {
       calloc.free(p);
     }

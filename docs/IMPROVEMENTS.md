@@ -275,3 +275,7 @@ selectors — validated against real-world vectors). Deferred:
 - StreamData seals on a fixed 1.5s ticker; make the cadence/threshold configurable and add backpressure if a device streams faster than blocks seal.
 - Credential is currently bound into the fingerprint only; no proof-of-possession challenge. Add a signed nonce challenge at ProvisionDevice for real device attestation.
 - Media bytes are sent whole over gRPC to be hashed server-side; for large video, hash client-side in chunks (Merkle of chunks) and stream only roots.
+
+## Security hardening — Phase 1 (S1/S2) — DONE (2026)
+- **[x] Genesis-seal-on-read (fund-loss bug) FIXED.** Reads (height/balance/state_root/metrics/prove) on a fresh `DemoNode` no longer start the engine or finalize the lazy genesis — only `produce_block()` seals. Credit after sealing throws `GenesisSealedError` (never a silent no-op). Regression tests in `test_demo_node.cpp` + the Go binding.
+- **[x] C ABI error taxonomy (start).** `BlockchainerStatus` enum (`BLOCKCHAINER_OK`, `BLOCKCHAINER_ERR`, `BLOCKCHAINER_ERR_GENESIS_SEALED`, `BLOCKCHAINER_ERR_BAD_INPUT`). `blockchainer_node_credit` returns codes; all six bindings surface them (Go `Credit() error` + `ErrGenesisSealed`, Dart/Node/Swift/JVM throw, C++ typed exception). Extend to submit/produce next.

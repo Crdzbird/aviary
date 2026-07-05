@@ -118,7 +118,9 @@ func (s *server) CreateChain(_ context.Context, r *pb.CreateChainRequest) (*pb.C
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	c.treasury = t
-	node.Credit(t.address, genesisSupply)
+	if err := node.Credit(t.address, genesisSupply); err != nil {
+		return nil, status.Errorf(codes.Internal, "genesis credit: %v", err)
+	}
 	s.chains[r.ChainId] = c
 	go c.eventLoop()
 	return c.chainPB(), nil

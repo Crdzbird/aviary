@@ -225,9 +225,11 @@ BlockchainerBufferResult blockchainer_account_address(const uint8_t* public_key,
 int blockchainer_node_credit(BlockchainerNode node, const uint8_t* address, uint64_t amount) {
   try {
     as_node(node)->credit(to_hash32(address), static_cast<blockchainer::codec::u128>(amount));
-    return 0;
+    return BLOCKCHAINER_OK;
+  } catch (const blockchainer::node::GenesisSealedError&) {
+    return BLOCKCHAINER_ERR_GENESIS_SEALED;
   } catch (...) {
-    return 1;
+    return BLOCKCHAINER_ERR;
   }
 }
 

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -18,12 +19,24 @@
 /// thus the Flutter demo) drives. Not for production: one validator, in-memory.
 namespace blockchainer::node {
 
+/// Thrown by credit() once genesis is sealed (the first block was produced).
+/// A typed exception so the C ABI can surface a stable error code instead of a
+/// generic failure — silent loss of a genesis credit is a fund-loss bug.
+class GenesisSealedError : public std::runtime_error {
+ public:
+  GenesisSealedError()
+      : std::runtime_error(
+            "demo_node: genesis is sealed (a block was produced); fund accounts with transfers") {}
+};
+
 class DemoNode {
  public:
   explicit DemoNode(std::uint64_t chain_id);
 
   // ── Creation ───────────────────────────────────────────────────────────────
-  /// Credit an address at genesis (only meaningful before the first block).
+  /// Credit an address at genesis. Valid until the first block is produced;
+  /// afterwards throws GenesisSealedError (never a silent no-op). Reads do NOT
+  /// seal genesis — only produce_block() does.
   void credit(const Hash& address, codec::u128 amount);
   /// Generate a fresh Ed25519 account keypair.
   crypto::KeyPair new_account();
@@ -39,11 +52,11 @@ class DemoNode {
   /// Returns the new height, or throws on failure.
   std::uint64_t produce_block(std::uint64_t timestamp);
 
-  // ── Queries (start the engine lazily, so credit() can run first) ─────────────
-  std::uint64_t height();
-  codec::u128 balance(const Hash& address);
-  std::uint64_t nonce(const Hash& address);
-  Hash state_root();
+  // ── Queries (non-sealing: reading never starts the engine or seals genesis) ──
+  std::uint64_t height() const;
+  codec::u128 balance(const Hash& address) const;
+  std::uint64_t nonce(const Hash& address) const;
+  Hash state_root() const;
   std::size_t mempool_size() const { return mempool_.size(); }
 
   // ── Observability / streaming ────────────────────────────────────────────────
@@ -54,11 +67,13 @@ class DemoNode {
 
   // ── Verification (light client) ──────────────────────────────────────────────
   /// State-inclusion proof for [address], verifiable against state_root().
-  StateProof prove_account(const Hash& address);
+  StateProof prove_account(const Hash& address) const;
 
  private:
   void ensure_started();
-  AccountStateMachine& account_state();
+  /// The current account state for READS: the engine's once started, otherwise
+  /// the (still-mutable) genesis state. Never starts the engine.
+  const AccountStateMachine& read_state() const;
 
   std::uint64_t chain_id_;
   crypto::KeyPair validator_;  // BLS — the sole validator

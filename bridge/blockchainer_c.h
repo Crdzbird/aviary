@@ -35,6 +35,20 @@ extern "C" {
 #  define BLOCKCHAINER_API __attribute__((visibility("default")))
 #endif
 
+/** Stable status codes returned by int-returning functions. Values are ABI —
+ *  never renumber. Bindings surface these as typed errors so failures are
+ *  distinguishable (a silently-swallowed credit is a fund-loss bug). */
+typedef enum {
+  BLOCKCHAINER_OK = 0,
+  /** Generic failure (exception with no more specific mapping). */
+  BLOCKCHAINER_ERR = 1,
+  /** Genesis is sealed (a block was produced) — credit is no longer valid;
+   *  fund accounts with transfers instead. */
+  BLOCKCHAINER_ERR_GENESIS_SEALED = 2,
+  /** Malformed input (wrong length, null where required, bad encoding). */
+  BLOCKCHAINER_ERR_BAD_INPUT = 3
+} BlockchainerStatus;
+
 /** Heap-allocated byte buffer. data is NULL on error. */
 typedef struct {
   uint8_t* data;
@@ -114,7 +128,9 @@ BLOCKCHAINER_API BlockchainerBufferResult blockchainer_node_new_account(Blockcha
 BLOCKCHAINER_API BlockchainerBufferResult blockchainer_account_address(
     const uint8_t* public_key, size_t pk_len);
 
-/** Credit [address] (32 bytes) at genesis. Only valid before the first block. */
+/** Credit [address] (32 bytes) at genesis. Valid until the first block is
+ *  produced; reads do NOT seal genesis. Returns a BlockchainerStatus:
+ *  BLOCKCHAINER_OK, or BLOCKCHAINER_ERR_GENESIS_SEALED after the first block. */
 BLOCKCHAINER_API int blockchainer_node_credit(BlockchainerNode node,
                                               const uint8_t* address, uint64_t amount);
 /** Build, sign, and submit a transfer. [secret] is the 64-byte Ed25519 key.

@@ -157,8 +157,12 @@ class Node {
     return consume(ensureLoaded().accountAddress(u8(publicKey), u8(publicKey).length), 'account_address');
   }
 
+  // Valid until the first block is produced (reads do NOT seal genesis);
+  // afterwards throws — never a silent no-op.
   credit(address, amount) {
-    if (fn.credit(this._h, u8(address), BigInt(amount)) !== 0) throw new Error('credit failed');
+    const rc = fn.credit(this._h, u8(address), BigInt(amount));
+    if (rc === 2) throw new Error('genesis is sealed (a block was produced); fund accounts with transfers');
+    if (rc !== 0) throw new Error(`credit failed (status ${rc})`);
   }
   submitTransfer(secret, toAddress, amount, nonce) {
     return consume(fn.submit(this._h, u8(secret), u8(secret).length, u8(toAddress), BigInt(amount), BigInt(nonce)), 'submit_transfer');

@@ -80,7 +80,10 @@ func (s *server) ProvisionDevice(_ context.Context, in *pb.DeviceInfo) (*pb.Prov
 		s.mu.Unlock()
 		return nil, status.Errorf(codes.Internal, "account: %v", err)
 	}
-	node.Credit(address, anchorCredit)
+	if err := node.Credit(address, anchorCredit); err != nil {
+		s.mu.Unlock()
+		return nil, status.Errorf(codes.Internal, "genesis credit: %v", err)
+	}
 	d := &device{
 		node: node, chainID: chainID, fingerprint: fp, address: address,
 		secret: secret, label: in.GetLabel(), kindCounts: map[string]uint64{},

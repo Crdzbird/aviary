@@ -33,7 +33,9 @@ func main() {
 	defer node.Free()
 	aSec, _, aAddr, _ := node.NewAccount()
 	_, _, bAddr, _ := node.NewAccount()
-	node.Credit(aAddr, 1_000_000)
+	if err := node.Credit(aAddr, 1_000_000); err != nil {
+		panic(err)
+	}
 	node.SubmitTransfer(aSec, bAddr, 250_000, node.Nonce(aAddr))
 	fmt.Printf("\nmempool before block: %d\n", node.MempoolSize())
 	height, _ := node.ProduceBlock(1)

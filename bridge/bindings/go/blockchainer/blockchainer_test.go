@@ -3,6 +3,7 @@ package blockchainer_test
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"testing"
 
 	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
@@ -97,6 +98,37 @@ func TestInterop(t *testing.T) {
 	raw, err := bc.EthSignLegacy(0, 1, 21000, make([]byte, 20), 0, calldata, 1, secp)
 	if err != nil || len(raw) == 0 {
 		t.Fatalf("eth sign legacy: raw=%d err=%v", len(raw), err)
+	}
+}
+
+// S1 regression: reads must not seal genesis, and credit after a block errors.
+func TestGenesisOrdering(t *testing.T) {
+	node := bc.NewNode(4242)
+	defer node.Free()
+	_, _, addr, _ := node.NewAccount()
+
+	// Read state BEFORE crediting — must not silently drop the credit.
+	_ = node.Height()
+	_ = node.Balance(addr)
+	_ = node.StateRoot()
+	if err := node.Credit(addr, 500); err != nil {
+		t.Fatalf("Credit after reads: %v", err)
+	}
+	if node.Balance(addr) != 500 {
+		t.Fatalf("credit dropped: balance = %d, want 500", node.Balance(addr))
+	}
+	if _, err := node.ProduceBlock(1); err != nil {
+		t.Fatalf("ProduceBlock: %v", err)
+	}
+	if node.Balance(addr) != 500 {
+		t.Fatalf("credit lost across block: %d", node.Balance(addr))
+	}
+	// Credit after sealing must return ErrGenesisSealed (never a no-op).
+	if err := node.Credit(addr, 1); !errors.Is(err, bc.ErrGenesisSealed) {
+		t.Fatalf("credit after block: got %v, want ErrGenesisSealed", err)
+	}
+	if node.Balance(addr) != 500 {
+		t.Fatalf("balance changed after rejected credit: %d", node.Balance(addr))
 	}
 }
 
