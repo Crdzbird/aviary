@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
 #include "blockchainer/networked_node.hpp"
+#include "blockchainer/secure_session.hpp"
 
 /// Real-socket transport for a [NetworkedNode] — the last mile that turns the
 /// pure in/out validator into one that runs over the network.
@@ -30,10 +32,27 @@ struct PeerAddr {
   std::uint16_t port;
 };
 
+/// Opt-in encryption + authentication for the transport. When supplied, every
+/// connection runs the [SecureSession] handshake (dialer = initiator, accepter =
+/// responder) before any consensus byte flows, and every frame is then encrypted
+/// and integrity-protected. The dialer encapsulates to the peer's known KEM key
+/// and pins the peer's authenticated signing key; the accepter maps the
+/// authenticated signing key back to a validator id (an allow-list — an unknown
+/// identity is dropped). So consensus runs over a confidential, mutually-
+/// authenticated, post-quantum-hybrid channel with no plaintext on the wire.
+struct SecureConfig {
+  SecureSession::Identity identity;              ///< this node's long-term identity
+  std::map<std::uint32_t, Bytes> peer_kem_pk;   ///< peer id → KEM public key (to dial)
+  std::map<std::uint32_t, Bytes> peer_sig_pk;   ///< peer id → signing public key (to pin / allow-list)
+};
+
 /// Drive [node] over TCP: listen on [listen_port], connect the topology implied
 /// by [peers], then run the reactor until the node commits or [deadline_ms]
-/// elapses. Blocking — run one per thread. Returns true iff the node committed.
+/// elapses. If [secure] is non-null, the channel is encrypted + mutually
+/// authenticated (see [SecureConfig]); otherwise it is plaintext. Blocking — run
+/// one per thread. Returns true iff the node committed.
 bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
-                      const std::vector<PeerAddr>& peers, int deadline_ms = 8000);
+                      const std::vector<PeerAddr>& peers, int deadline_ms = 8000,
+                      const SecureConfig* secure = nullptr);
 
 }  // namespace blockchainer::p2p

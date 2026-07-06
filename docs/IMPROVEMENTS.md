@@ -276,9 +276,17 @@ test. Still to do:
   validators, one thread each, own ledgers, commit the SAME block over a
   fully-connected loopback mesh — ASan/UBSan **and** TSan clean, ~0.36s, 10/10
   stable. **Remaining:** wrap each frame in the mutually-authenticated secure
-  session (encrypt/authenticate — handshake already built, composes cleanly),
-  connection lifecycle/reconnect, non-blocking sends with backpressure, and a
-  QUIC option.
+  session — DONE. Pass a `SecureConfig` (this node's `SecureSession::Identity`
+  + peer KEM/signing public keys) and every connection runs the SIGMA-style
+  handshake (dialer = initiator, accepter = responder) before any consensus
+  byte, then encrypts + integrity-protects every frame. The dialer pins the
+  peer's authenticated signing key; the accepter maps the authenticated key to a
+  validator id via an allow-list — an unknown/mis-pinned identity is dropped.
+  `test_tcp_transport.cpp` runs BFT over the encrypted channel AND shows a
+  mis-pinned validator excluded while the honest quorum still finalizes (needed
+  a connection *grace deadline* so an absent peer can't stall a quorate net).
+  ASan/UBSan + TSan clean. **Remaining:** connection lifecycle/reconnect,
+  non-blocking sends with backpressure, and a QUIC option.
 - **[~] Multi-validator vote gossip — DONE (in-memory).** `p2p::NetworkedNode` (`networked_node.hpp`) assembles {Ledger, RoundDriver, GossipOverlay} into a runnable validator: consensus broadcasts become gossip originations (+ self-delivery, since the round driver counts its own votes on delivery), gossip deliveries are deduped, fed to the driver, and relayed onward; timeouts arm/fire. `test_networked_node.cpp` runs BFT over partial-mesh topologies and shows **relay tolerance** (line/ring/star — a validator reaches quorum via hops it isn't directly connected to, all commit the same block) and **partition tolerance** (a connected 3-of-4 majority finalizes; an isolated validator stalls at height 0). ASan-clean. Now also driven over **real TCP** by `run_tcp_bft_node` (see the socket-transport item above). **Remaining:** a Byzantine-gossip adversary (equivocation propagation / spam).
 - **[~] Gossip overlay manager — CORE DONE.** `p2p::GossipOverlay` (`gossip.hpp`) is the mesh on top of the wire/secure-session transport: it dedups messages by content hash (BLAKE3) and floods a new one to peers except the sender, so a message reaches every connected node exactly once over any (partial) topology, loop-free. Transport-agnostic (returns relays to send). `test_gossip.cpp`: ring, partial mesh, and clique all propagate to every node with the redundant paths deduped. **Remaining:** peer scoring / ban list, message TTL + expiry of the seen-set, and topic-scoped subscriptions.
 - **[M] Peer discovery & address book.** No discovery, handshake/`Hello`

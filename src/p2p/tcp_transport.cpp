@@ -12,6 +12,7 @@
 #include <csignal>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -28,6 +29,12 @@ using Clock = std::chrono::steady_clock;
 // proposer is slow or missing, so a modest value keeps a real network live
 // without making the test slow.
 constexpr int kTimeoutMs = 200;
+
+// A node can't wait forever for a peer that will never connect (excluded by the
+// allow-list, partitioned, or simply down). Once every expected peer is up we
+// start immediately; otherwise we start anyway after this grace period and run
+// consensus with whoever connected — which still finalizes if that is a quorum.
+constexpr int kConnectGraceMs = 1500;
 
 std::int64_t now_ms(Clock::time_point start) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
@@ -49,7 +56,9 @@ bool write_all(int fd, const std::uint8_t* p, std::size_t n) {
   return true;
 }
 
-// A 4-byte big-endian length prefix followed by the payload.
+// A 4-byte big-endian length prefix followed by the payload. Every message on
+// the wire — the id hello, the handshake, and every (encrypted) consensus frame
+// — is one of these, so reassembly of partial reads is uniform.
 bool send_frame(int fd, const Bytes& payload) {
   std::uint8_t hdr[4];
   const std::uint32_t len = static_cast<std::uint32_t>(payload.size());
@@ -59,6 +68,15 @@ bool send_frame(int fd, const Bytes& payload) {
   hdr[3] = static_cast<std::uint8_t>(len);
   if (!write_all(fd, hdr, 4)) return false;
   return payload.empty() || write_all(fd, payload.data(), payload.size());
+}
+
+Bytes id_frame(std::uint32_t id) {
+  return Bytes{static_cast<std::uint8_t>(id >> 24), static_cast<std::uint8_t>(id >> 16),
+               static_cast<std::uint8_t>(id >> 8), static_cast<std::uint8_t>(id)};
+}
+std::uint32_t decode_id(const Bytes& b) {
+  return (static_cast<std::uint32_t>(b[0]) << 24) | (static_cast<std::uint32_t>(b[1]) << 16) |
+         (static_cast<std::uint32_t>(b[2]) << 8) | static_cast<std::uint32_t>(b[3]);
 }
 
 int make_listener(std::uint16_t port) {
@@ -99,26 +117,41 @@ int dial_once(const std::string& host, std::uint16_t port) {
   return fd;
 }
 
-// Per-connection receive state.
+// Per-connection state. `ready` means the link is usable for consensus: for a
+// plaintext dialer that is immediate; for an accepter it waits for the id hello;
+// under [SecureConfig] it waits for the handshake to complete.
 struct Conn {
+  bool dialer = false;
   std::uint32_t peer_id = 0;
-  bool have_id = false;  // dialer fds know the peer up front; accepted fds learn it from the hello
-  Bytes buf;             // accumulated unframed bytes
+  bool ready = false;
+  Bytes buf;
+  std::unique_ptr<SecureSession> sess;  // secure mode only
 };
 
 }  // namespace
 
 bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
-                      const std::vector<PeerAddr>& peers, int deadline_ms) {
+                      const std::vector<PeerAddr>& peers, int deadline_ms, const SecureConfig* secure) {
   ::signal(SIGPIPE, SIG_IGN);  // never die because a peer vanished mid-send
   const Clock::time_point start = Clock::now();
+
+  // Reverse allow-list: authenticated signing key → validator id.
+  std::map<Bytes, std::uint32_t> id_by_sig;
+  if (secure)
+    for (const auto& [id, pk] : secure->peer_sig_pk) id_by_sig[pk] = id;
 
   int listener = make_listener(listen_port);
   if (listener < 0) return false;
 
-  std::map<std::uint32_t, int> fd_by_peer;  // validator id → socket
+  std::map<std::uint32_t, int> fd_by_peer;  // ready validator id → socket
   std::unordered_map<int, Conn> conns;      // socket → receive state
   const std::size_t expected = peers.size();
+
+  auto drop = [&](int fd, Conn& c) {
+    if (c.ready) fd_by_peer.erase(c.peer_id);
+    ::close(fd);
+    conns.erase(fd);
+  };
 
   // Dial every higher-id peer (retry until it is listening or we run out of time).
   for (const auto& p : peers) {
@@ -132,14 +165,20 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
       struct timespec ts{0, 10 * 1000 * 1000};  // 10ms backoff
       ::nanosleep(&ts, nullptr);
     }
-    Bytes hello = {static_cast<std::uint8_t>(node.id() >> 24), static_cast<std::uint8_t>(node.id() >> 16),
-                   static_cast<std::uint8_t>(node.id() >> 8), static_cast<std::uint8_t>(node.id())};
-    write_all(fd, hello.data(), hello.size());
     Conn c;
+    c.dialer = true;
     c.peer_id = p.id;
-    c.have_id = true;
+    if (secure) {
+      // Initiator: encapsulate to the peer's KEM key, sign the transcript.
+      auto [s, msg1] = SecureSession::begin_initiator(secure->peer_kem_pk.at(p.id), secure->identity.sig);
+      c.sess = std::make_unique<SecureSession>(std::move(s));
+      send_frame(fd, msg1);  // ready only after we consume the peer's msg2
+    } else {
+      send_frame(fd, id_frame(node.id()));  // announce who we are
+      c.ready = true;
+      fd_by_peer[p.id] = fd;
+    }
     conns.emplace(fd, std::move(c));
-    fd_by_peer[p.id] = fd;
   }
 
   struct Timer {
@@ -154,13 +193,19 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   auto dispatch = [&](const NetworkedNode::Outbound& out) {
     for (const auto& r : out.relays) {
       auto it = fd_by_peer.find(r.to);
-      if (it != fd_by_peer.end()) send_frame(it->second, r.message);
+      if (it == fd_by_peer.end()) continue;
+      const int fd = it->second;
+      if (secure) {
+        auto cit = conns.find(fd);
+        if (cit != conns.end() && cit->second.sess) send_frame(fd, cit->second.sess->encrypt(r.message));
+      } else {
+        send_frame(fd, r.message);
+      }
     }
     for (const auto& t : out.timeouts) timers.push_back({now_ms(start) + kTimeoutMs, t.step, t.round});
   };
 
   while (now_ms(start) <= deadline_ms) {
-    // Build the poll set: the listener + every live connection.
     std::vector<pollfd> pfds;
     pfds.push_back({listener, POLLIN, 0});
     std::vector<int> order;
@@ -169,8 +214,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
       order.push_back(fd);
     }
 
-    int tick = 20;  // ms — bounds how long until we recheck timers / the deadline
-    int rc = ::poll(pfds.data(), pfds.size(), tick);
+    int rc = ::poll(pfds.data(), pfds.size(), /*tick=*/20);
     if (rc < 0 && errno != EINTR) break;
 
     // Accept new inbound connections (from lower-id peers).
@@ -179,7 +223,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
       while ((cfd = ::accept(listener, nullptr, nullptr)) >= 0) {
         int one = 1;
         ::setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-        conns.emplace(cfd, Conn{});  // peer id learned from the hello
+        conns.emplace(cfd, Conn{});  // peer id + readiness learned from hello/handshake
       }
     }
 
@@ -196,37 +240,80 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
       if (r > 0) {
         c.buf.insert(c.buf.end(), tmp, tmp + r);
       } else if (r == 0 || (r < 0 && errno != EAGAIN && errno != EINTR)) {
-        // Peer closed — forget the socket.
-        if (c.have_id) fd_by_peer.erase(c.peer_id);
-        ::close(fd);
-        conns.erase(cit);
+        drop(fd, c);
         continue;
       }
 
-      // First 4 bytes of an accepted connection are the dialer's id hello.
-      if (!c.have_id) {
-        if (c.buf.size() < 4) continue;
-        c.peer_id = (static_cast<std::uint32_t>(c.buf[0]) << 24) | (static_cast<std::uint32_t>(c.buf[1]) << 16) |
-                    (static_cast<std::uint32_t>(c.buf[2]) << 8) | static_cast<std::uint32_t>(c.buf[3]);
-        c.buf.erase(c.buf.begin(), c.buf.begin() + 4);
-        c.have_id = true;
-        fd_by_peer[c.peer_id] = fd;
-      }
-
-      // Extract length-prefixed frames.
-      while (c.buf.size() >= 4) {
+      bool dropped = false;
+      while (!dropped && c.buf.size() >= 4) {
         const std::uint32_t len = (static_cast<std::uint32_t>(c.buf[0]) << 24) |
                                   (static_cast<std::uint32_t>(c.buf[1]) << 16) |
                                   (static_cast<std::uint32_t>(c.buf[2]) << 8) | static_cast<std::uint32_t>(c.buf[3]);
         if (c.buf.size() < 4u + len) break;
-        Bytes payload(c.buf.begin() + 4, c.buf.begin() + 4 + len);
+        Bytes frame(c.buf.begin() + 4, c.buf.begin() + 4 + len);
         c.buf.erase(c.buf.begin(), c.buf.begin() + 4 + len);
-        pending.emplace_back(c.peer_id, std::move(payload));  // held until started
+
+        if (c.ready) {
+          // A live consensus frame.
+          if (secure) {
+            try {
+              pending.emplace_back(c.peer_id, c.sess->decrypt(frame));
+            } catch (...) {
+              drop(fd, c);  // tamper / desync — cut the peer off
+              dropped = true;
+            }
+          } else {
+            pending.emplace_back(c.peer_id, std::move(frame));
+          }
+        } else if (secure && c.dialer) {
+          // Initiator consuming msg2: complete + pin the peer's identity.
+          try {
+            c.sess->complete_initiator(frame);
+          } catch (...) {
+            drop(fd, c);
+            dropped = true;
+            continue;
+          }
+          if (c.sess->peer_identity() != secure->peer_sig_pk.at(c.peer_id)) {
+            drop(fd, c);  // authenticated key isn't the validator we dialed
+            dropped = true;
+            continue;
+          }
+          c.ready = true;
+          fd_by_peer[c.peer_id] = fd;
+        } else if (secure) {
+          // Responder consuming msg1: reply msg2, map identity → validator id.
+          try {
+            auto [s, msg2] = SecureSession::accept_responder(secure->identity, frame);
+            c.sess = std::make_unique<SecureSession>(std::move(s));
+            send_frame(fd, msg2);
+          } catch (...) {
+            drop(fd, c);
+            dropped = true;
+            continue;
+          }
+          auto found = id_by_sig.find(c.sess->peer_identity());
+          if (found == id_by_sig.end()) {
+            drop(fd, c);  // unknown identity — not on the allow-list
+            dropped = true;
+            continue;
+          }
+          c.peer_id = found->second;
+          c.ready = true;
+          fd_by_peer[c.peer_id] = fd;
+        } else {
+          // Plaintext accepter: first frame is the dialer's id hello.
+          c.peer_id = decode_id(frame);
+          c.ready = true;
+          fd_by_peer[c.peer_id] = fd;
+        }
       }
     }
 
-    // Once every peer link is up, begin consensus exactly once.
-    if (!started && fd_by_peer.size() >= expected) {
+    // Begin consensus exactly once: as soon as every peer link is up, or after
+    // the grace period with whoever connected (so an excluded/absent peer can't
+    // stall an otherwise-quorate network).
+    if (!started && (fd_by_peer.size() >= expected || now_ms(start) >= kConnectGraceMs)) {
       started = true;
       dispatch(node.start());
     }
@@ -241,11 +328,10 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     const std::int64_t t = now_ms(start);
     std::vector<Timer> keep;
     for (const auto& tm : timers) {
-      if (tm.due <= t) {
+      if (tm.due <= t)
         dispatch(node.on_timeout(tm.step, tm.round));
-      } else {
+      else
         keep.push_back(tm);
-      }
     }
     timers.swap(keep);
 
