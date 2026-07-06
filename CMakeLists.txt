@@ -222,6 +222,7 @@ blockchainer_add_test(test_gossip tests/test_gossip.cpp)
 blockchainer_add_test(test_kvstore tests/test_kvstore.cpp)
 blockchainer_add_test(test_networked_node tests/test_networked_node.cpp)
 blockchainer_add_test(test_tcp_transport tests/test_tcp_transport.cpp)
+blockchainer_add_test(test_byzantine tests/test_byzantine.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
