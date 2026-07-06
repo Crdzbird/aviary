@@ -62,6 +62,9 @@ class NetworkedNode {
   std::uint64_t height() const { return driver_.height(); }
   const Ledger& ledger() const { return *ledger_; }
 
+  /// Whether a peer has been banned for misbehavior (e.g. repeated garbage).
+  bool peer_banned(std::uint32_t peer) const { return gossip_.banned(peer); }
+
  private:
   Outbound emit(const consensus::RoundDriver::Output& out);  // driver output → gossip + timeouts
 

@@ -116,5 +116,49 @@ int main() {
     for (std::uint32_t i = 0; i < 5; ++i) CHECK(net.nodes[i].seen(msg("clique")));
   }
 
+  std::printf("== bounded seen-set: the window evicts oldest, capping memory ==\n");
+  {
+    GossipOverlay g(0, GossipOverlay::Config{/*seen_capacity=*/4, /*ban_threshold=*/50});
+    g.add_peer(1);
+    for (int i = 0; i < 100; ++i) {
+      Bytes m = msg("m");
+      m.push_back(static_cast<std::uint8_t>(i));
+      g.originate(m);
+    }
+    CHECK_MSG(g.seen_count() == 4, "seen-set never exceeds capacity");
+    // The most-recent ids are still remembered; long-evicted ones are forgotten.
+    Bytes recent = msg("m");
+    recent.push_back(99);
+    CHECK(g.seen(recent));
+    Bytes old = msg("m");
+    old.push_back(0);
+    CHECK(!g.seen(old));  // aged out of the window
+  }
+
+  std::printf("== peer scoring + ban: a penalized peer is cut off ==\n");
+  {
+    GossipOverlay g(0, GossipOverlay::Config{/*seen_capacity=*/1024, /*ban_threshold=*/3});
+    g.add_peer(1);
+    g.add_peer(2);
+    g.add_peer(3);
+    CHECK(!g.banned(1));
+    CHECK(!g.penalize(1));  // score 1
+    CHECK(!g.penalize(1));  // score 2
+    CHECK_MSG(g.penalize(1), "crossing the threshold bans the peer");
+    CHECK(g.banned(1));
+    CHECK(g.score(1) == 3);
+
+    // A banned peer is no longer relayed to, and its messages are ignored.
+    auto relays = g.originate(msg("after-ban"));
+    CHECK_MSG(relays.size() == 2, "originate skips the banned peer");  // to 2 and 3, not 1
+    for (const auto& r : relays) CHECK(r.to != 1);
+    CHECK_MSG(g.on_receive(1, msg("from-banned")).empty(), "messages from a banned peer are dropped");
+    CHECK(!g.seen(msg("from-banned")));  // never even entered the seen-set
+    // An honest peer is unaffected: its message relays onward (to 3, not back to 2).
+    CHECK(!g.banned(2));
+    auto fwd = g.on_receive(2, msg("from-honest"));
+    CHECK_MSG(fwd.size() == 1 && fwd[0].to == 3, "an honest peer's message still floods onward");
+  }
+
   return bctest::summary();
 }

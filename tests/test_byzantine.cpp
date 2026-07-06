@@ -171,5 +171,25 @@ int main() {
     for (std::uint32_t i = 1; i < n; ++i) CHECK(net.nodes[i]->ledger().tip().hash() == tip);
   }
 
+  std::printf("== persistent garbage floods get the spammer banned, then silenced ==\n");
+  {
+    auto node = std::make_unique<NetworkedNode>(kChain, vset, 1, bls(0x61), genesis_ledger(alice), 100);
+    for (std::uint32_t j = 0; j < n; ++j)
+      if (j != 1) node->add_peer(j);
+    CHECK(!node->peer_banned(0));
+
+    bool relayed = false;
+    for (int i = 0; i < 80 && !node->peer_banned(0); ++i) {
+      Bytes gb(30, 0xEE);  // distinct each time so it isn't just deduped
+      gb.push_back(static_cast<std::uint8_t>(i));
+      gb.push_back(static_cast<std::uint8_t>(i >> 8));
+      if (!node->on_gossip(0, gb).relays.empty()) relayed = true;
+    }
+    CHECK_MSG(node->peer_banned(0), "a peer that floods garbage past the threshold is banned");
+    CHECK_MSG(relayed, "garbage did flood (bounded) before the ban kicked in");
+    // Once banned, the spammer's traffic is dropped outright — no relay.
+    CHECK_MSG(node->on_gossip(0, Bytes(30, 0xDD)).relays.empty(), "a banned peer's traffic is silenced");
+  }
+
   return bctest::summary();
 }

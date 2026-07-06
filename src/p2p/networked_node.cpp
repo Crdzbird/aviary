@@ -39,6 +39,8 @@ NetworkedNode::Outbound NetworkedNode::emit(const consensus::RoundDriver::Output
 NetworkedNode::Outbound NetworkedNode::start() { return emit(driver_.start()); }
 
 NetworkedNode::Outbound NetworkedNode::on_gossip(std::uint32_t from, const Bytes& payload) {
+  if (gossip_.banned(from)) return {};  // a banned peer is silenced entirely
+
   // Dedup at the overlay: a message that already flooded through here is dropped
   // (this is what bounds traffic and stops loops), so the driver sees each unique
   // message exactly once.
@@ -56,7 +58,9 @@ NetworkedNode::Outbound NetworkedNode::on_gossip(std::uint32_t from, const Bytes
       o.timeouts = std::move(produced.timeouts);
     }
   } catch (...) {
-    // Malformed gossip payload — already deduped; just don't feed the driver.
+    // Undecodable payload = misbehavior. It already deduped (won't re-flood), and
+    // a peer that keeps sending garbage crosses the ban threshold and is cut off.
+    gossip_.penalize(from);
   }
   return o;
 }
