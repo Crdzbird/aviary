@@ -15,6 +15,7 @@
 #include "blockchainer/interop/encoding.hpp"
 #include "blockchainer/interop/json.hpp"
 #include "blockchainer/interop/rlp.hpp"
+#include "blockchainer/peer_book.hpp"
 #include "blockchainer/pos_engine.hpp"
 #include "blockchainer/pow_engine.hpp"
 #include "blockchainer/types.hpp"
@@ -87,6 +88,7 @@ int main() {
     totality_ok &= total([&] { (void)consensus::PowData::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::PosData::decode_all(v); });
     totality_ok &= total([&] { (void)GenesisSpec::decode_all(v); });
+    totality_ok &= total([&] { (void)p2p::AddressBook::decode(v); });
     totality_ok &= total([&] { (void)wire::Message::decode_all(v); });
     // Typed wire payload decoders on arbitrary payloads.
     totality_ok &= total([&] { (void)wire::as_tx(wire::Message{wire::MessageType::kTx, b}); });

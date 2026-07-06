@@ -289,8 +289,20 @@ test. Still to do:
   non-blocking sends with backpressure, and a QUIC option.
 - **[~] Multi-validator vote gossip — DONE (in-memory).** `p2p::NetworkedNode` (`networked_node.hpp`) assembles {Ledger, RoundDriver, GossipOverlay} into a runnable validator: consensus broadcasts become gossip originations (+ self-delivery, since the round driver counts its own votes on delivery), gossip deliveries are deduped, fed to the driver, and relayed onward; timeouts arm/fire. `test_networked_node.cpp` runs BFT over partial-mesh topologies and shows **relay tolerance** (line/ring/star — a validator reaches quorum via hops it isn't directly connected to, all commit the same block) and **partition tolerance** (a connected 3-of-4 majority finalizes; an isolated validator stalls at height 0). ASan-clean. Now also driven over **real TCP** by `run_tcp_bft_node` (see the socket-transport item above), and adversarially tested by `test_byzantine.cpp`: an **equivocating** round-0 proposer (two validly-signed conflicting blocks to different peers, then silent) — the honest quorum still agrees on ONE block (safety) and finalizes it (liveness); and a **gossip-spam** flood of undecodable garbage — honest nodes drop it, the seen-set dedups the re-flood, and consensus finishes unaffected. **Remaining:** none material for the mesh itself.
 - **[~] Gossip overlay manager — CORE + HARDENING DONE.** `p2p::GossipOverlay` (`gossip.hpp`) is the mesh on top of the wire/secure-session transport: it dedups messages by content hash (BLAKE3) and floods a new one to peers except the sender, so a message reaches every connected node exactly once over any (partial) topology, loop-free. **Hardened** so an adversary can't exhaust memory or dominate the mesh: the seen-set is a **bounded FIFO window** (capacity-limited, deterministic/clock-free eviction — the core forbids wall-clock; the window must exceed in-flight message count), and peers are **scored** — the caller reports misbehavior via `penalize` (the `NetworkedNode` does so on an undecodable payload) and a peer past the ban threshold is dropped: no longer relayed to, its messages ignored. `test_gossip.cpp`: ring/mesh/clique propagation, bounded-window eviction, and peer scoring→ban→silence. `test_byzantine.cpp` shows a `NetworkedNode` banning a persistent garbage-flooder end to end. Transport-agnostic (returns relays to send). **Remaining:** message TTL + topic-scoped subscriptions, positive scoring / gradual decay.
-- **[M] Peer discovery & address book.** No discovery, handshake/`Hello`
-  negotiation beyond the struct, peer scoring, or ban list.
+- **[~] Peer discovery & address book — DONE (PEX).** `p2p::AddressBook` of
+  `PeerRecord{id, host, port, kem_pk, sig_pk}` (`peer_book.hpp`) is the directory
+  the transport reads: where to dial each validator and which keys authenticate
+  it. A joining node need not hard-code the set — it starts from a seed and
+  learns the rest by exchanging books (pull-based PEX). `merge` is **first-
+  writer-wins**, so an attacker can't rebind a known identity via gossip, only
+  introduce genuinely-new ids. Canonically serialized (ascending id; strict
+  decode rejects reorder/dupes/trailing bytes — in the fuzz totality sweep).
+  `test_peer_book.cpp`: codec round-trip + canonicality, first-writer-wins,
+  PEX convergence over a sparse line (every node learns all peers in ≤ n rounds,
+  byte-identical books), and building the transport `SecureConfig` from a
+  converged book. **Remaining:** a signed/authenticated record (so PEX doesn't
+  rely on first-writer-wins), liveness/expiry, and eclipse-resistant peer
+  selection.
 - **[x] Mutual identity authentication on the secure session — DONE.** The
   channel now binds to long-term identities via a SIGMA-style signed handshake
   transcript: each side signs (KEM ciphertext ‖ both stream headers ‖ both
