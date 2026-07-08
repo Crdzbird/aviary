@@ -35,9 +35,11 @@ ValidatorSet make_vset(std::uint32_t n) {
   return ValidatorSet(std::move(vs));
 }
 
-// Build n whole validators (each its own ledger from the same genesis).
+// Build n whole validators (each its own ledger from the same genesis). With
+// full_mesh, every node gossip-peers with every other; otherwise the caller
+// wires the topology itself.
 std::vector<std::unique_ptr<NetworkedNode>> build_nodes(std::uint32_t n, const Hash& alice_addr,
-                                                        const ValidatorSet& vset) {
+                                                        const ValidatorSet& vset, bool full_mesh = true) {
   std::vector<std::unique_ptr<NetworkedNode>> nodes;
   for (std::uint32_t i = 0; i < n; ++i) {
     auto g = std::make_unique<AccountStateMachine>();
@@ -45,8 +47,9 @@ std::vector<std::unique_ptr<NetworkedNode>> build_nodes(std::uint32_t n, const H
     auto ledger = std::make_unique<Ledger>(ChainSpec{kChain, StateModel::kAccount}, std::move(g));
     nodes.push_back(std::make_unique<NetworkedNode>(kChain, vset, i, bls(static_cast<std::uint8_t>(0x60 + i)),
                                                     std::move(ledger), /*timestamp=*/1));
-    for (std::uint32_t j = 0; j < n; ++j)
-      if (j != i) nodes[i]->add_peer(j);
+    if (full_mesh)
+      for (std::uint32_t j = 0; j < n; ++j)
+        if (j != i) nodes[i]->add_peer(j);
   }
   return nodes;
 }
@@ -120,6 +123,47 @@ int main() {
     const Hash tip = nodes[0]->ledger().tip().hash();
     for (std::uint32_t i = 1; i < n; ++i)
       CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "encrypted validators agree on the block hash");
+  }
+
+  std::printf("== reconnect: a severed link heals by redial; consensus recovers via round change ==\n");
+  {
+    // A LINE 0-1-2-3 so the 1-2 link is a genuine cut vertex: severing it
+    // partitions {0,1} from {2,3} — neither side is a quorum, so consensus can
+    // ONLY finish if the dialer-side redial heals the link (messages lost on the
+    // dead socket are not replayed; the round machinery recovers).
+    const std::vector<std::pair<std::uint32_t, std::uint32_t>> edges = {{0, 1}, {1, 2}, {2, 3}};
+    auto nodes = build_nodes(n, alice_addr, vset, /*full_mesh=*/false);
+    for (auto [a, b] : edges) {
+      nodes[a]->add_peer(b);
+      nodes[b]->add_peer(a);
+    }
+    // Node 1 severs its link to node 2 after the first frame it receives from it.
+    // Node 1 is the dialer of 2 (lower id dials higher), so redial is its job.
+    const p2p::ChaosConfig chaos{/*peer=*/2, /*after_frames=*/1};
+
+    std::vector<char> committed(n, 0);
+    std::vector<std::thread> threads;
+    for (std::uint32_t i = 0; i < n; ++i) {
+      std::vector<PeerAddr> peers;
+      for (auto [a, b] : edges) {
+        if (a == i) peers.push_back(PeerAddr{b, "127.0.0.1", static_cast<std::uint16_t>(47670 + b)});
+        if (b == i) peers.push_back(PeerAddr{a, "127.0.0.1", static_cast<std::uint16_t>(47670 + a)});
+      }
+      const p2p::ChaosConfig* ch = (i == 1) ? &chaos : nullptr;
+      threads.emplace_back([&, i, peers, ch] {
+        committed[i] = p2p::run_tcp_bft_node(*nodes[i], static_cast<std::uint16_t>(47670 + i), peers,
+                                             /*deadline_ms=*/8000, /*secure=*/nullptr, ch)
+                           ? 1
+                           : 0;
+      });
+    }
+    for (auto& t : threads) t.join();
+
+    for (std::uint32_t i = 0; i < n; ++i)
+      CHECK_MSG(committed[i] == 1, "every validator committed despite the mid-consensus link drop");
+    const Hash tip = nodes[0]->ledger().tip().hash();
+    for (std::uint32_t i = 1; i < n; ++i)
+      CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "all agree on the block after the link healed");
   }
 
   std::printf("== allow-list rejection: a mis-pinned identity is excluded; the honest quorum still commits ==\n");

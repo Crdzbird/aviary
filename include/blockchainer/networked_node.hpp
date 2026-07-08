@@ -65,12 +65,22 @@ class NetworkedNode {
   /// Whether a peer has been banned for misbehavior (e.g. repeated garbage).
   bool peer_banned(std::uint32_t peer) const { return gossip_.banned(peer); }
 
+  /// Every unique consensus payload this node has originated or accepted for the
+  /// current height, in arrival order. A transport replays this to a peer whose
+  /// link (re)establishes after consensus started — reconnect catch-up. Votes
+  /// lost on a dead socket are never re-flooded by gossip (dedup), so without
+  /// this a healed partition stays stalled: neither side can reach quorum, and
+  /// Tendermint can't even change rounds without 2f+1 crossing the cut. The
+  /// receiver's dedup makes replay idempotent. Bounded: one height's messages.
+  const std::vector<Bytes>& replay_log() const { return replay_; }
+
  private:
   Outbound emit(const consensus::RoundDriver::Output& out);  // driver output → gossip + timeouts
 
   std::unique_ptr<Ledger> ledger_;
   consensus::RoundDriver driver_;
   GossipOverlay gossip_;
+  std::vector<Bytes> replay_;  // unique consensus payloads this height (catch-up)
 };
 
 }  // namespace blockchainer::p2p

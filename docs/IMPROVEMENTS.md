@@ -285,8 +285,22 @@ test. Still to do:
   `test_tcp_transport.cpp` runs BFT over the encrypted channel AND shows a
   mis-pinned validator excluded while the honest quorum still finalizes (needed
   a connection *grace deadline* so an absent peer can't stall a quorate net).
-  ASan/UBSan + TSan clean. **Remaining:** connection lifecycle/reconnect,
-  non-blocking sends with backpressure, and a QUIC option.
+  ASan/UBSan + TSan clean. **Lifecycle DONE:** sockets are
+  non-blocking; sends go through bounded per-connection outbound queues (4 MiB
+  cap) flushed on POLLOUT — a peer that stops reading past the cap is dropped,
+  not allowed to wedge the reactor. A dropped dialer-side link **re-dials with
+  backoff** (initial dial and reconnect share one path), rerunning the id hello
+  / secure handshake on the fresh socket. Because gossip never re-floods what it
+  already relayed, a healed link gets a **replay of the node's per-height
+  consensus log** (`NetworkedNode::replay_log`) — without it a healed partition
+  stays stalled (neither side can quorum, and Tendermint can't change rounds
+  without 2f+1 crossing the cut); receiver dedup makes replay idempotent, and a
+  late joiner catches up the same way. Fault injection via `ChaosConfig` (sever
+  a link after N frames): `test_tcp_transport.cpp` severs the 1-2 cut vertex of
+  a line topology mid-consensus and all four validators still commit the same
+  block after redial + replay. 10/10 stable; ASan/UBSan + TSan clean.
+  **Remaining:** a QUIC option (deliberately deferred — needs an external
+  protocol library, against the zero-dependency design).
 - **[~] Multi-validator vote gossip — DONE (in-memory).** `p2p::NetworkedNode` (`networked_node.hpp`) assembles {Ledger, RoundDriver, GossipOverlay} into a runnable validator: consensus broadcasts become gossip originations (+ self-delivery, since the round driver counts its own votes on delivery), gossip deliveries are deduped, fed to the driver, and relayed onward; timeouts arm/fire. `test_networked_node.cpp` runs BFT over partial-mesh topologies and shows **relay tolerance** (line/ring/star — a validator reaches quorum via hops it isn't directly connected to, all commit the same block) and **partition tolerance** (a connected 3-of-4 majority finalizes; an isolated validator stalls at height 0). ASan-clean. Now also driven over **real TCP** by `run_tcp_bft_node` (see the socket-transport item above), and adversarially tested by `test_byzantine.cpp`: an **equivocating** round-0 proposer (two validly-signed conflicting blocks to different peers, then silent) — the honest quorum still agrees on ONE block (safety) and finalizes it (liveness); and a **gossip-spam** flood of undecodable garbage — honest nodes drop it, the seen-set dedups the re-flood, and consensus finishes unaffected. **Remaining:** none material for the mesh itself.
 - **[~] Gossip overlay manager — CORE + HARDENING DONE.** `p2p::GossipOverlay` (`gossip.hpp`) is the mesh on top of the wire/secure-session transport: it dedups messages by content hash (BLAKE3) and floods a new one to peers except the sender, so a message reaches every connected node exactly once over any (partial) topology, loop-free. **Hardened** so an adversary can't exhaust memory or dominate the mesh: the seen-set is a **bounded FIFO window** (capacity-limited, deterministic/clock-free eviction — the core forbids wall-clock; the window must exceed in-flight message count), and peers are **scored** — the caller reports misbehavior via `penalize` (the `NetworkedNode` does so on an undecodable payload) and a peer past the ban threshold is dropped: no longer relayed to, its messages ignored. `test_gossip.cpp`: ring/mesh/clique propagation, bounded-window eviction, and peer scoring→ban→silence. `test_byzantine.cpp` shows a `NetworkedNode` banning a persistent garbage-flooder end to end. Transport-agnostic (returns relays to send). **Remaining:** message TTL + topic-scoped subscriptions, positive scoring / gradual decay.
 - **[~] Peer discovery & address book — DONE (PEX).** `p2p::AddressBook` of

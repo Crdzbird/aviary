@@ -46,13 +46,29 @@ struct SecureConfig {
   std::map<std::uint32_t, Bytes> peer_sig_pk;   ///< peer id → signing public key (to pin / allow-list)
 };
 
+/// Fault injection for tests: after [after_frames] complete frames have arrived
+/// from [peer], the node closes that connection once — simulating a mid-consensus
+/// link drop. The lifecycle machinery (dialer-side redial with backoff) must then
+/// heal the link for consensus to finish.
+struct ChaosConfig {
+  std::uint32_t peer = 0;
+  int after_frames = 1;
+};
+
 /// Drive [node] over TCP: listen on [listen_port], connect the topology implied
 /// by [peers], then run the reactor until the node commits or [deadline_ms]
 /// elapses. If [secure] is non-null, the channel is encrypted + mutually
 /// authenticated (see [SecureConfig]); otherwise it is plaintext. Blocking — run
 /// one per thread. Returns true iff the node committed.
+///
+/// Lifecycle: sockets are non-blocking; sends go through bounded per-connection
+/// outbound queues flushed on POLLOUT (a peer that stops reading past the cap is
+/// disconnected, not allowed to wedge the reactor). A dropped connection to a
+/// peer this node dials is automatically re-dialed with backoff — the handshake
+/// (id hello / secure session) reruns on the fresh socket. Messages lost on the
+/// dead link are NOT replayed; consensus recovers via its own round changes.
 bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
                       const std::vector<PeerAddr>& peers, int deadline_ms = 8000,
-                      const SecureConfig* secure = nullptr);
+                      const SecureConfig* secure = nullptr, const ChaosConfig* chaos = nullptr);
 
 }  // namespace blockchainer::p2p

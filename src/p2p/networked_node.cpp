@@ -28,6 +28,7 @@ NetworkedNode::Outbound NetworkedNode::emit(const consensus::RoundDriver::Output
 
     auto relays = gossip_.originate(payload);  // marks seen → peers' echoes dedup
     o.relays.insert(o.relays.end(), relays.begin(), relays.end());
+    replay_.push_back(payload);  // catch-up log for links that (re)connect later
 
     consensus::RoundDriver::Output more = driver_.deliver(wire::as_consensus(m));
     for (auto& mm : more.broadcasts) pending.push_back(std::move(mm));
@@ -53,6 +54,7 @@ NetworkedNode::Outbound NetworkedNode::on_gossip(std::uint32_t from, const Bytes
   try {
     wire::Message m = wire::Message::decode_all(view(payload));
     if (m.type == wire::MessageType::kConsensus) {
+      replay_.push_back(payload);  // valid consensus payload → part of the catch-up log
       Outbound produced = emit(driver_.deliver(wire::as_consensus(m)));
       o.relays.insert(o.relays.end(), produced.relays.begin(), produced.relays.end());
       o.timeouts = std::move(produced.timeouts);
