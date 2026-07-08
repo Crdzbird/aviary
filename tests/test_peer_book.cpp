@@ -1,8 +1,10 @@
 // Peer discovery + address book: a canonical, mergeable directory of validators
-// that a joining node fills in by exchanging books with peers (PEX). Tests the
-// codec, first-writer-wins merge (an attacker can't rebind a known identity),
-// convergence of PEX over a sparse topology, and that a converged book feeds the
-// transport's SecureConfig.
+// that a joining node fills in by exchanging books with peers (PEX). Records are
+// SELF-SIGNED (hybrid sig over the domain-tagged canonical bytes): merge — the
+// PEX trust boundary — verifies every incoming record, so an attacker can't
+// invent or alter a record for a key it doesn't hold; first-writer-wins protects
+// already-known ids on top. Tests the codec, the signature, hostile merges,
+// convergence over a sparse topology, and composition with the transport config.
 #include <string>
 #include <vector>
 
@@ -18,24 +20,32 @@ using p2p::SecureConfig;
 using p2p::SecureSession;
 
 namespace {
-PeerRecord rec(std::uint32_t id, Bytes kem, Bytes sig) {
-  return PeerRecord{id, "127.0.0.1", static_cast<std::uint16_t>(47000 + id), std::move(kem), std::move(sig)};
+PeerRecord make_record(std::uint32_t id, const SecureSession::Identity& owner) {
+  PeerRecord r{id, "127.0.0.1", static_cast<std::uint16_t>(47000 + id),
+               owner.kem.public_key, owner.sig.public_key, /*signature=*/{}};
+  r.sign(owner.sig.secret_key);
+  return r;
 }
 }  // namespace
 
 int main() {
   init();
 
+  // Long-term identities for six validators (used across all sections).
+  const std::uint32_t n = 6;
+  std::vector<SecureSession::Identity> ids;
+  for (std::uint32_t i = 0; i < n; ++i) ids.push_back(SecureSession::generate_identity());
+
   std::printf("== canonical codec: round-trips, re-encodes identically, rejects junk ==\n");
   {
     AddressBook b;
-    b.add(rec(2, {1, 2, 3}, {4, 5}));
-    b.add(rec(0, {9}, {8, 7}));
-    b.add(rec(5, {}, {1}));
+    b.add(make_record(2, ids[2]));
+    b.add(make_record(0, ids[0]));
+    b.add(make_record(5, ids[5]));
     const Bytes enc = b.encode();
     AddressBook d = AddressBook::decode(codec::ByteView(enc.data(), enc.size()));
     CHECK(d.size() == 3);
-    CHECK_MSG(d.all() == b.all(), "decode is the exact inverse of encode");
+    CHECK_MSG(d.all() == b.all(), "decode is the exact inverse of encode (incl. signatures)");
     CHECK_MSG(d.encode() == enc, "one book has exactly one encoding (canonical)");
 
     Bytes trailing = enc;
@@ -49,29 +59,66 @@ int main() {
     CHECK_MSG(threw, "trailing bytes are rejected (non-canonical)");
   }
 
-  std::printf("== first-writer-wins merge: a known identity can't be rebound ==\n");
+  std::printf("== self-signature: verifies, and any field tamper breaks it ==\n");
+  {
+    PeerRecord r = make_record(1, ids[1]);
+    CHECK_MSG(r.verify(), "an owner-signed record verifies");
+
+    PeerRecord moved = r;
+    moved.port = 9999;  // rebind the address...
+    CHECK_MSG(!moved.verify(), "...and the signature no longer verifies");
+
+    PeerRecord swapped = r;
+    swapped.kem_pk = ids[2].kem.public_key;  // swap in a different KEM key
+    CHECK(!swapped.verify());
+
+    PeerRecord unsigned_rec = r;
+    unsigned_rec.signature.clear();
+    CHECK(!unsigned_rec.verify());
+
+    // A signature by the WRONG key (attacker's) over an honest-looking record.
+    PeerRecord forged = r;
+    forged.sign(ids[3].sig.secret_key);  // attacker signs with its own key
+    CHECK_MSG(!forged.verify(), "a signature by a key other than sig_pk is rejected");
+  }
+
+  std::printf("== hostile merge: forgeries rejected; known ids never overwritten ==\n");
   {
     AddressBook mine;
-    mine.add(rec(1, {0x01}, {0x01}));  // the true record for validator 1
+    mine.add(make_record(1, ids[1]));  // the true record for validator 1
 
+    // A hostile book: a tampered copy of id 1, an unsigned id 2, a wrong-key id 3,
+    // and one genuinely valid new record (id 4).
     AddressBook hostile;
-    hostile.add(rec(1, {0x99, 0x99}, {0x99, 0x99}));  // tries to rebind id 1 ...
-    hostile.add(rec(2, {0x02}, {0x02}));              // ... and introduces id 2
+    PeerRecord tampered = make_record(1, ids[1]);
+    tampered.host = "6.6.6.6";  // signature now stale
+    hostile.add(tampered);
+    PeerRecord unsigned_rec{2, "127.0.0.1", 47002, ids[2].kem.public_key, ids[2].sig.public_key, {}};
+    hostile.add(unsigned_rec);
+    PeerRecord wrong_key = make_record(3, ids[3]);
+    wrong_key.sign(ids[0].sig.secret_key);  // not the owner's key
+    hostile.add(wrong_key);
+    hostile.add(make_record(4, ids[4]));
 
     const std::size_t added = mine.merge(hostile);
-    CHECK_MSG(added == 1, "only the genuinely-new record (id 2) is learned");
-    CHECK_MSG(mine.get(1)->kem_pk == (Bytes{0x01}), "the known identity is NOT overwritten");
-    CHECK(mine.contains(2));
+    CHECK_MSG(added == 1, "only the genuinely valid new record survives the merge");
+    CHECK(mine.contains(4) && !mine.contains(2) && !mine.contains(3));
+    CHECK_MSG(mine.get(1)->host == "127.0.0.1", "the known identity is NOT overwritten");
+
+    // Even a *validly signed* record can't rebind a known id (first-writer-wins):
+    AddressBook rebind;
+    PeerRecord moved = make_record(1, ids[1]);
+    moved.port = 50000;
+    moved.sign(ids[1].sig.secret_key);  // owner-valid, but we already know id 1
+    rebind.add(moved);
+    CHECK(mine.merge(rebind) == 0);
+    CHECK_MSG(mine.get(1)->port == 47001, "a validly-signed newer record still can't rebind mid-session");
   }
 
   std::printf("== PEX convergence: sparse seeds → every node learns the whole set ==\n");
-  const std::uint32_t n = 6;
-  std::vector<SecureSession::Identity> ids;
   std::vector<AddressBook> books(n);
-  for (std::uint32_t i = 0; i < n; ++i) {
-    ids.push_back(SecureSession::generate_identity());
-    books[i].add(rec(i, ids[i].kem.public_key, ids[i].sig.public_key));  // each starts knowing only itself
-  }
+  for (std::uint32_t i = 0; i < n; ++i)
+    books[i].add(make_record(i, ids[i]));  // each starts knowing only itself
   {
     // Exchange topology: a line 0-1-2-3-4-5. Knowledge must hop end to end.
     std::vector<std::pair<std::uint32_t, std::uint32_t>> edges;
@@ -81,7 +128,7 @@ int main() {
     int rounds = 0;
     for (; changed && rounds < 100; ++rounds) {
       changed = false;
-      for (auto [a, b] : edges) {  // pull in both directions
+      for (auto [a, b] : edges) {  // pull in both directions (verified merges)
         if (books[b].merge(books[a]) > 0) changed = true;
         if (books[a].merge(books[b]) > 0) changed = true;
       }

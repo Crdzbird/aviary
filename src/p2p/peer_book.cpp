@@ -3,12 +3,21 @@
 namespace blockchainer::p2p {
 
 namespace {
-void encode_record(codec::CodecWriter& w, const PeerRecord& r) {
+codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
+
+// The unsigned fields, canonically encoded — the byte string the owner signs
+// (via the domain-tagged hash) and the prefix of the wire form.
+void encode_unsigned(codec::CodecWriter& w, const PeerRecord& r) {
   w.write_u32(r.id);
   w.write_bytes(codec::ByteView(reinterpret_cast<const std::uint8_t*>(r.host.data()), r.host.size()));
   w.write_u16(r.port);
-  w.write_bytes(codec::ByteView(r.kem_pk.data(), r.kem_pk.size()));
-  w.write_bytes(codec::ByteView(r.sig_pk.data(), r.sig_pk.size()));
+  w.write_bytes(view(r.kem_pk));
+  w.write_bytes(view(r.sig_pk));
+}
+
+void encode_record(codec::CodecWriter& w, const PeerRecord& r) {
+  encode_unsigned(w, r);
+  w.write_bytes(view(r.signature));
 }
 
 PeerRecord decode_record(codec::CodecReader& rd) {
@@ -19,9 +28,27 @@ PeerRecord decode_record(codec::CodecReader& rd) {
   r.port = rd.read_u16();
   r.kem_pk = rd.read_bytes();
   r.sig_pk = rd.read_bytes();
+  r.signature = rd.read_bytes();
   return r;
 }
 }  // namespace
+
+Hash PeerRecord::signing_hash() const {
+  codec::CodecWriter w;
+  encode_unsigned(w, *this);
+  return crypto::hash_tagged(crypto::Domain::kPeerRecord, w.bytes());
+}
+
+void PeerRecord::sign(const Bytes& sig_secret_key) {
+  const Hash h = signing_hash();
+  signature = crypto::hybrid_sig_sign(codec::ByteView(h.data(), h.size()), view(sig_secret_key));
+}
+
+bool PeerRecord::verify() const {
+  if (signature.empty() || sig_pk.empty()) return false;
+  const Hash h = signing_hash();
+  return crypto::hybrid_sig_verify(codec::ByteView(h.data(), h.size()), view(signature), view(sig_pk));
+}
 
 const PeerRecord* AddressBook::get(std::uint32_t id) const {
   auto it = peers_.find(id);
@@ -37,15 +64,23 @@ std::vector<PeerRecord> AddressBook::all() const {
 
 std::size_t AddressBook::merge(const AddressBook& other) {
   std::size_t added = 0;
-  for (const auto& [id, r] : other.peers_)
-    if (peers_.emplace(id, r).second) ++added;  // first-writer-wins: emplace won't overwrite
+  for (const auto& [id, r] : other.peers_) {
+    if (peers_.count(id)) continue;   // first-writer-wins: never overwrite
+    if (!r.verify()) continue;        // PEX boundary: only owner-signed records
+    peers_.emplace(id, r);
+    ++added;
+  }
   return added;
 }
 
 std::size_t AddressBook::merge(const std::vector<PeerRecord>& records) {
   std::size_t added = 0;
-  for (const auto& r : records)
-    if (peers_.emplace(r.id, r).second) ++added;
+  for (const auto& r : records) {
+    if (peers_.count(r.id)) continue;
+    if (!r.verify()) continue;
+    peers_.emplace(r.id, r);
+    ++added;
+  }
   return added;
 }
 

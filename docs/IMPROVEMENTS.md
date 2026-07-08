@@ -300,9 +300,17 @@ test. Still to do:
   `test_peer_book.cpp`: codec round-trip + canonicality, first-writer-wins,
   PEX convergence over a sparse line (every node learns all peers in ≤ n rounds,
   byte-identical books), and building the transport `SecureConfig` from a
-  converged book. **Remaining:** a signed/authenticated record (so PEX doesn't
-  rely on first-writer-wins), liveness/expiry, and eclipse-resistant peer
-  selection.
+  converged book. **Signed records DONE:** every `PeerRecord` is now
+  self-signed — the owner signs the domain-tagged (`kPeerRecord` = 0x07) hash of
+  the canonical unsigned fields with the same hybrid signature key the secure
+  session authenticates with. `merge` (the PEX trust boundary) verifies each
+  incoming record and rejects forgeries outright: a tampered field, a missing
+  signature, or a wrong-key signature all fail; first-writer-wins still protects
+  known ids against even *validly signed* rebinds. `add` stays the trusted local
+  path (self/seeds, unverified). Note the honest limit: a signature binds a
+  record to *a* key, not an id to a key — id squatting for never-seen ids is
+  only prevented by seeding from genesis/validator-set data. **Remaining:**
+  liveness/expiry and eclipse-resistant peer selection.
 - **[x] Mutual identity authentication on the secure session — DONE.** The
   channel now binds to long-term identities via a SIGMA-style signed handshake
   transcript: each side signs (KEM ciphertext ‖ both stream headers ‖ both
