@@ -28,8 +28,12 @@ build_slice() {  # <slice> <IOS_PLATFORM> <cryptolib-slice>
   # Merge core + bridge + cryptolib's slice into ONE self-contained archive, so
   # the xcframework needs no companion pod (avoids cross-plugin OTHER_LDFLAGS
   # conflicts). cryptolib's merged.a already bundles its own deps.
-  local crypto_a="$CRYPTOLIB_ROOT/CryptoLib.xcframework/$cryptoslice/libcryptolib_c_merged.a"
-  [[ -f "$crypto_a" ]] || { echo "missing $crypto_a — rebuild cryptolib's xcframework"; exit 1; }
+  # cryptolib >= 3.x keeps the per-slice merged archive in build/ios/<slice>/
+  # (its xcframework now wraps slices as static *frameworks* — no bare .a
+  # inside). Fall back to the pre-3.x in-xcframework location.
+  local crypto_a="$CRYPTOLIB_ROOT/build/ios/$slice/libcryptolib_c_merged.a"
+  [[ -f "$crypto_a" ]] || crypto_a="$CRYPTOLIB_ROOT/CryptoLib.xcframework/$cryptoslice/libcryptolib_c_merged.a"
+  [[ -f "$crypto_a" ]] || { echo "missing $crypto_a — run cryptolib's scripts/ios/build_all.sh"; exit 1; }
   libtool -static -o "$BUILD/$slice/libblockchainer_c_merged.a" \
     "$BUILD/$slice/libblockchainer_core.a" "$BUILD/$slice/libblockchainer_c.a" "$crypto_a"
   echo "   $(du -h "$BUILD/$slice/libblockchainer_c_merged.a" | awk '{print $1}')  libblockchainer_c_merged.a (incl. cryptolib)"
