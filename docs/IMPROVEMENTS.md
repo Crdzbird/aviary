@@ -251,10 +251,20 @@
   **Remaining:** zeroize master/secret buffers on drop; an optional `DemoNode`
   convenience that signs by address; expose export/import through the C ABI +
   bindings.
-- **[H] PQ / hybrid signatures in the tx path.** Only Ed25519 is wired for
-  transactions. The hybrid Ed25519+ML-DSA option (cryptolib has it) and
-  `ChainSpec`-driven suite selection are designed but not implemented — no PQC
-  posture yet despite harvest-now-decrypt-later being in the threat model.
+- **[x] PQ / hybrid signatures in the tx path — DONE (three families).** The v2
+  envelope's committed `sig_algo` byte + `ChainSpec.accepted_sig_algos` gating
+  now carry THREE schemes: classical Ed25519 (`kEd25519`), the lattice hybrid
+  Ed25519+ML-DSA-65 (`kHybridEd25519MlDsa`, Q1), and **SLH-DSA-SHA2-128s
+  (`kSlhDsa` = 4, FIPS 205)** — stateless hash-based signatures whose security
+  rests on SHA-2 alone, the crypto-agility fallback if lattice assumptions fall.
+  The 128"s" profile minimises the on-chain signature (7856 B, pk 32 B) at the
+  cost of signing time — the right trade for transactions, signed once and
+  stored forever. No format change: `kSlhDsa` rides the existing v2 envelope,
+  anti-downgrade via the committed algo byte as before. `test_hybrid_sig.cpp`:
+  round-trip, encode/decode, tamper/wrong-key/algo-flip/truncation all fail,
+  ChainSpec gating (a hash-only chain rejects both other schemes), and an
+  SLH-DSA-signed transfer committing through the Ledger. **Remaining:** expose
+  SLH-DSA account creation in the language bindings (hybrid already is).
 - **[M] Crypto seam as interfaces.** `Hasher`/`Signer`/`Verifier`/`Aggregator`
   are free functions, not the injectable interfaces of `ARCHITECTURE.md` §3.2.
   Make them interfaces if we need suite-by-name selection or fake hashers in tests.

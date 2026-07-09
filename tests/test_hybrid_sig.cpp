@@ -106,5 +106,70 @@ int main() {
     CHECK(any.accepts(SigAlgo::kHybridEd25519MlDsa));
   }
 
+  std::printf("== SLH-DSA (FIPS 205): hash-based tx round-trips ==\n");
+  crypto::KeyPair sk = crypto::slh_dsa_keygen();
+  CHECK(sk.public_key.size() == 32);  // SLH-DSA-SHA2-128s public key
+  Transaction stx = make_transfer(sk, SigAlgo::kSlhDsa, 0);
+  CHECK(stx.version == 2);
+  CHECK(stx.algo() == SigAlgo::kSlhDsa);
+  CHECK_MSG(stx.signature.size() == 7856, "SLH-DSA-128s signature is 7856 bytes");
+  CHECK(verify_transaction_signature(stx));
+
+  std::printf("== SLH-DSA envelope survives encode/decode ==\n");
+  {
+    Transaction rt2 = Transaction::decode_all(view(stx.encode()));
+    CHECK(rt2.version == 2 && rt2.algo() == SigAlgo::kSlhDsa);
+    CHECK(rt2.txid() == stx.txid());
+    CHECK(verify_transaction_signature(rt2));
+  }
+
+  std::printf("== SLH-DSA: tamper, wrong key, and algo flip all fail ==\n");
+  {
+    Transaction bad = stx;
+    bad.signature[100] ^= 0x01;
+    CHECK(!verify_transaction_signature(bad));
+
+    crypto::KeyPair other = crypto::slh_dsa_keygen();
+    Transaction wrong = stx;
+    wrong.author = other.public_key;
+    CHECK(!verify_transaction_signature(wrong));
+
+    // The algo byte is committed in signing_bytes: claiming another scheme fails
+    // (kEd25519 also fails the 64-byte size check; the commitment is the point).
+    Transaction flip = stx;
+    flip.sig_algo = static_cast<std::uint8_t>(SigAlgo::kHybridEd25519MlDsa);
+    CHECK(!verify_transaction_signature(flip));
+
+    Transaction trunc = stx;
+    trunc.signature.resize(64);
+    CHECK(!verify_transaction_signature(trunc));
+  }
+
+  std::printf("== SLH-DSA is gated by chain params like any scheme ==\n");
+  {
+    ChainSpec hash_only{7, StateModel::kAccount, {static_cast<std::uint8_t>(SigAlgo::kSlhDsa)}};
+    CHECK(hash_only.accepts(SigAlgo::kSlhDsa));
+    CHECK(!hash_only.accepts(SigAlgo::kEd25519));
+    CHECK(!hash_only.accepts(SigAlgo::kHybridEd25519MlDsa));
+
+    ChainSpec classic{7, StateModel::kAccount, {static_cast<std::uint8_t>(SigAlgo::kEd25519)}};
+    CHECK(!classic.accepts(SigAlgo::kSlhDsa));
+
+    ChainSpec any{7, StateModel::kAccount, {}};
+    CHECK(any.accepts(SigAlgo::kSlhDsa));
+  }
+
+  std::printf("== an SLH-DSA transfer applies to the ledger ==\n");
+  {
+    auto genesis = std::make_unique<AccountStateMachine>();
+    const Hash sender = crypto::address_of(view(sk.public_key));
+    genesis->credit_genesis(sender, 1000);
+    Ledger ledger(ChainSpec{7, StateModel::kAccount}, std::move(genesis));
+
+    Block b = ledger.build_block({stx}, /*timestamp=*/1);
+    CHECK(ledger.process_block(b).ok);
+    CHECK_MSG(ledger.tip().height == 1, "a hash-based-signed transfer commits");
+  }
+
   return bctest::summary();
 }

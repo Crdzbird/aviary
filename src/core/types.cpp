@@ -183,6 +183,8 @@ void sign_transaction(Transaction& tx, const crypto::KeyPair& kp) {
   Bytes msg = tx.signing_bytes();
   if (tx.algo() == SigAlgo::kHybridEd25519MlDsa) {
     tx.signature = crypto::hybrid_sig_sign(view(msg), view(kp.secret_key));
+  } else if (tx.algo() == SigAlgo::kSlhDsa) {
+    tx.signature = crypto::slh_dsa_sign(view(msg), view(kp.secret_key));
   } else {
     tx.signature = crypto::ed25519_sign(view(msg), view(kp.secret_key));
   }
@@ -205,6 +207,11 @@ bool verify_transaction_signature(const Transaction& tx) {
       // (empty author), so it is only ever honoured on a UTXO chain. Envelope
       // verification is therefore a pass-through here.
       return true;
+    case SigAlgo::kSlhDsa:
+      // Fixed SLH-DSA-SHA2-128s shapes: pk 32 B, signature 7856 B. Reject
+      // malformed sizes before touching the backend.
+      if (tx.author.size() != 32 || tx.signature.size() != 7856) return false;
+      return crypto::slh_dsa_verify(view(msg), view(tx.signature), view(tx.author));
     default:
       return false;  // unknown scheme — never accept
   }

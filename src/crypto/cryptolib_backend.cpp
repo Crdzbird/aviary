@@ -120,6 +120,36 @@ bool hybrid_sig_verify(ByteView msg, ByteView sig, ByteView public_key) {
                                      public_key.data(), public_key.size()) == 1;
 }
 
+// ── SLH-DSA (FIPS 205) — fixed SLH-DSA-SHA2-128s profile ────────────────────
+
+namespace {
+constexpr int kSlhLevel = 0;       // 128s: smallest signature, slowest signing
+constexpr int kSlhHashFamily = 0;  // SHA-2
+}  // namespace
+
+KeyPair slh_dsa_keygen() {
+  CryptoKeyPair kp = cryptolib_slh_dsa_keygen(kSlhLevel, kSlhHashFamily);
+  KeyPair out{take_buffer(kp.public_key), take_buffer(kp.secret_key)};
+  return out;
+}
+
+Bytes slh_dsa_sign(ByteView msg, ByteView secret_key) {
+  CryptoBufferResult r = cryptolib_slh_dsa_sign(msg.data(), msg.size(), secret_key.data(),
+                                                secret_key.size(), kSlhLevel, kSlhHashFamily);
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "slh_dsa_sign failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+bool slh_dsa_verify(ByteView msg, ByteView sig, ByteView public_key) {
+  return cryptolib_slh_dsa_verify(msg.data(), msg.size(), sig.data(), sig.size(),
+                                  public_key.data(), public_key.size(), kSlhLevel,
+                                  kSlhHashFamily) == 1;
+}
+
 // ── BLS12-381 ────────────────────────────────────────────────────────────────
 
 KeyPair bls_keygen_from_ikm(ByteView ikm) {

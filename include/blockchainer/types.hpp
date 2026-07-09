@@ -28,6 +28,10 @@ enum class SigAlgo : std::uint8_t {
   kUtxoWitness = 3,         ///< multi-signer UTXO: author empty, per-input witnesses
                             ///< in [signature]; verification is done by the UTXO
                             ///< state machine (one signer per input).
+  kSlhDsa = 4,              ///< SLH-DSA-SHA2-128s (FIPS 205, stateless hash-based).
+                            ///< Security rests on SHA-2 alone — no lattice
+                            ///< assumption — so it survives even if ML-DSA falls.
+                            ///< author 32 B, signature 7856 B.
 };
 
 struct Transaction {

@@ -85,6 +85,20 @@ Bytes hybrid_sig_sign(ByteView msg, ByteView secret_key);
 /// Verifies a hybrid signature (both parts must pass). Never throws.
 bool hybrid_sig_verify(ByteView msg, ByteView sig, ByteView public_key);
 
+// ── SLH-DSA (FIPS 205, stateless hash-based) ─────────────────────────────────
+// The most conservative PQ family: security reduces to the hash function alone
+// (no lattice assumption), so it survives even if ML-DSA's assumptions fall.
+// Fixed profile: SLH-DSA-SHA2-128s — the "s"mall variant minimises the on-chain
+// signature (7856 B; pk 32 B) at the cost of slower signing, the right trade
+// for transactions, which are signed once and stored forever.
+
+/// Fresh SLH-DSA-SHA2-128s keypair (pk 32 B).
+KeyPair slh_dsa_keygen();
+/// SLH-DSA signature (7856 B) over [msg]. Throws on backend failure.
+Bytes slh_dsa_sign(ByteView msg, ByteView secret_key);
+/// Verifies an SLH-DSA signature. Never throws — false on any failure.
+bool slh_dsa_verify(ByteView msg, ByteView sig, ByteView public_key);
+
 // ── BLS12-381 (consensus votes; ARCHITECTURE §7) ─────────────────────────────
 
 /// Deterministic BLS keypair from input key material (>= 32 bytes).
