@@ -118,6 +118,20 @@ Bytes Vault::open(const SealedBlob& blob, std::string_view aad) const {
               "vault open");
 }
 
+SealedBlob Vault::seal_max(ByteView plaintext, std::string_view aad) const {
+  const auto* aadp = reinterpret_cast<const std::uint8_t*>(aad.data());
+  return take(cryptolib_molecular_seal_with_key(plaintext.data(), plaintext.size(), master_.data(),
+                                                master_.size(), aadp, aad.size()),
+              "vault seal (molecular)");
+}
+
+Bytes Vault::open_max(const SealedBlob& blob, std::string_view aad) const {
+  const auto* aadp = reinterpret_cast<const std::uint8_t*>(aad.data());
+  return take(cryptolib_molecular_open_with_key(blob.data(), blob.size(), master_.data(),
+                                                master_.size(), aadp, aad.size()),
+              "vault open (molecular)");
+}
+
 // ── KeyStore ────────────────────────────────────────────────────────────────
 
 KeyStore KeyStore::create_with_passphrase(std::string_view passphrase, bool sensitive) {
@@ -136,7 +150,8 @@ Hash KeyStore::add_account(ByteView public_key, ByteView secret) {
   const Hash address = crypto::address_of(public_key);
   Entry e;
   e.public_key.assign(public_key.begin(), public_key.end());
-  e.sealed = vault_->seal(secret, aad_for(address));
+  e.sealed = vault_->seal_max(secret, aad_for(address));  // new entries: cascade
+  e.seal_version = SealVersion::kMolecular;
   entries_[address] = std::move(e);
   return address;
 }
@@ -157,7 +172,49 @@ Bytes KeyStore::reveal_secret(const Hash& address) const {
   if (!vault_) throw std::runtime_error("custody: key store is locked");
   auto it = entries_.find(address);
   if (it == entries_.end()) throw std::runtime_error("custody: unknown address");
-  return vault_->open(it->second.sealed, aad_for(address));
+  const Entry& e = it->second;
+  return e.seal_version == SealVersion::kMolecular ? vault_->open_max(e.sealed, aad_for(address))
+                                                   : vault_->open(e.sealed, aad_for(address));
+}
+
+// Portable export/import: the plaintext payload is {public_key, secret} in the
+// canonical codec, sealed by MolecularVault's passphrase mode (Argon2id → the
+// cascade). The AAD is a fixed domain string so an envelope can't be replayed
+// into a different context; the address is recomputed from the public key.
+namespace {
+constexpr const char* kExportAad = "blockchainer.account.export.v1";
+}
+
+Bytes KeyStore::export_account(const Hash& address, std::string_view passphrase,
+                               std::uint64_t ops, std::size_t mem) const {
+  auto it = entries_.find(address);
+  if (it == entries_.end()) throw std::runtime_error("custody: unknown address");
+  const Bytes secret = reveal_secret(address);  // also checks unlocked
+
+  codec::CodecWriter w;
+  w.write_bytes(view(it->second.public_key));
+  w.write_bytes(view(secret));
+  const Bytes payload = w.take();
+
+  const std::string p(passphrase);
+  const auto* aadp = reinterpret_cast<const std::uint8_t*>(kExportAad);
+  return take(cryptolib_molecular_seal(payload.data(), payload.size(), p.c_str(), aadp,
+                                       std::char_traits<char>::length(kExportAad), ops, mem),
+              "account export");
+}
+
+Hash KeyStore::import_account(ByteView envelope, std::string_view passphrase) {
+  if (!vault_) throw std::runtime_error("custody: key store is locked");
+  const std::string p(passphrase);
+  const auto* aadp = reinterpret_cast<const std::uint8_t*>(kExportAad);
+  const Bytes payload = take(cryptolib_molecular_open(envelope.data(), envelope.size(), p.c_str(),
+                                                      aadp, std::char_traits<char>::length(kExportAad)),
+                             "account import");
+  codec::CodecReader r(view(payload));
+  const Bytes public_key = r.read_bytes();
+  const Bytes secret = r.read_bytes();
+  r.assert_fully_consumed();
+  return add_account(view(public_key), view(secret));  // reseals under THIS master
 }
 
 void KeyStore::unlock_with_passphrase(std::string_view passphrase) {
@@ -173,20 +230,24 @@ void KeyStore::unlock_with_device(ByteView factor_key) {
 Bytes KeyStore::serialise() const {
   const Bytes keyring_blob = keyring_.serialise();
   codec::CodecWriter w;
-  w.write_u8(1);  // format version
+  w.write_u8(2);  // format v2: per-entry seal version
   w.write_bytes(view(keyring_blob));
   w.write_u32(static_cast<std::uint32_t>(entries_.size()));
   for (const auto& [addr, e] : entries_) {  // map → deterministic, address-sorted
     w.write_fixed_bytes(codec::ByteView(addr.data(), addr.size()), 32);
     w.write_bytes(view(e.public_key));
     w.write_bytes(view(e.sealed));
+    w.write_u8(static_cast<std::uint8_t>(e.seal_version));
   }
   return w.take();
 }
 
 KeyStore KeyStore::load(ByteView blob) {
   codec::CodecReader r(codec::ByteView(blob.data(), blob.size()));
-  if (r.read_u8() != 1) throw std::runtime_error("custody: unsupported key-store version");
+  const std::uint8_t version = r.read_u8();
+  if (version != 1 && version != 2) {
+    throw std::runtime_error("custody: unsupported key-store version");
+  }
   const Bytes keyring_blob = r.read_bytes();
   KeyStore ks(Keyring::deserialise(view(keyring_blob)));
   const std::uint32_t n = r.read_u32();
@@ -197,6 +258,13 @@ KeyStore KeyStore::load(ByteView blob) {
     Entry e;
     e.public_key = r.read_bytes();
     e.sealed = r.read_bytes();
+    if (version >= 2) {
+      const std::uint8_t sv = r.read_u8();
+      if (sv != 1 && sv != 2) throw std::runtime_error("custody: unknown entry seal version");
+      e.seal_version = static_cast<SealVersion>(sv);
+    } else {
+      e.seal_version = SealVersion::kCommitting;  // v1 stores sealed with the committing AEAD
+    }
     ks.entries_[address] = std::move(e);
   }
   r.assert_fully_consumed();

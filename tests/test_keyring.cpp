@@ -122,5 +122,131 @@ int main() {
     CHECK(crypto::ed25519_verify(view(msg), view(sig), view(alice.public_key)));
   }
 
+  std::printf("== vault: molecular (cascade) seal — round-trip, tamper + wrong-aad rejected ==\n");
+  {
+    Bytes master(32, 0x42);
+    Vault v(view(master));
+    const Bytes secret = bytes("cascade-sealed signing secret");
+    const custody::SealedBlob blob = v.seal_max(view(secret), "acct");
+    CHECK(v.open_max(blob, "acct") == secret);
+
+    custody::SealedBlob tampered = blob;
+    tampered[tampered.size() / 2] ^= 0x01;
+    bool threw = false;
+    try {
+      (void)v.open_max(tampered, "acct");
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    CHECK_MSG(threw, "a tampered molecular envelope fails closed");
+
+    threw = false;
+    try {
+      (void)v.open_max(blob, "other-acct");
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    CHECK_MSG(threw, "the cascade commits to the AAD — relocation rejected");
+
+    Bytes other_master(32, 0x43);
+    Vault w(view(other_master));
+    threw = false;
+    try {
+      (void)w.open_max(blob, "acct");
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    CHECK_MSG(threw, "wrong master key rejected");
+  }
+
+  std::printf("== key store v2 round-trip: molecular entries survive persist + reload ==\n");
+  {
+    auto kp = crypto::ed25519_keygen();
+    KeyStore ks = KeyStore::create_with_passphrase("hunter2");
+    const crypto::Hash addr = ks.add_account(view(kp.public_key), view(kp.secret_key));
+    const Bytes blob = ks.serialise();
+    CHECK_MSG(blob[0] == 2, "stores now serialise as format v2");
+
+    KeyStore re = KeyStore::load(view(blob));
+    CHECK(!re.unlocked());
+    re.unlock_with_passphrase("hunter2");
+    CHECK_MSG(re.reveal_secret(addr) == kp.secret_key, "a molecular-sealed entry reopens after reload");
+  }
+
+  std::printf("== backward compat: a legacy v1 store (committing-AEAD entries) still opens ==\n");
+  {
+    // Hand-assemble a v1 blob through public API only: a Keyring whose master we
+    // recover, a Vault that seals the old way, and the v1 wire layout.
+    auto kp = crypto::ed25519_keygen();
+    const crypto::Hash addr = crypto::address_of(view(kp.public_key));
+    Keyring kr = Keyring::create();
+    CHECK(kr.add_passphrase_slot("legacy-pass"));
+    const Bytes master = kr.unlock_with_passphrase("legacy-pass");
+    Vault v(view(master));
+    // v1 sealed the secret with the committing AEAD, AAD = hex(address).
+    static const char* kHex = "0123456789abcdef";
+    std::string aad;
+    for (std::uint8_t b : addr) {
+      aad.push_back(kHex[b >> 4]);
+      aad.push_back(kHex[b & 0x0F]);
+    }
+    const custody::SealedBlob sealed = v.seal(view(kp.secret_key), aad);
+
+    codec::CodecWriter w;
+    w.write_u8(1);  // legacy format version
+    const Bytes kr_blob = kr.serialise();
+    w.write_bytes(codec::ByteView(kr_blob.data(), kr_blob.size()));
+    w.write_u32(1);
+    w.write_fixed_bytes(codec::ByteView(addr.data(), addr.size()), 32);
+    w.write_bytes(codec::ByteView(kp.public_key.data(), kp.public_key.size()));
+    w.write_bytes(codec::ByteView(sealed.data(), sealed.size()));
+    const Bytes v1_blob = w.take();
+
+    KeyStore ks = KeyStore::load(view(v1_blob));
+    ks.unlock_with_passphrase("legacy-pass");
+    CHECK_MSG(ks.reveal_secret(addr) == kp.secret_key, "a v1 entry opens via the committing path");
+    // And once re-serialised it carries the v2 format with the entry's true seal version.
+    const Bytes re = ks.serialise();
+    CHECK(re[0] == 2);
+    KeyStore ks2 = KeyStore::load(view(re));
+    ks2.unlock_with_passphrase("legacy-pass");
+    CHECK_MSG(ks2.reveal_secret(addr) == kp.secret_key, "v1→v2 migration preserves the entry");
+  }
+
+  std::printf("== portable export/import: an account moves between stores under a passphrase ==\n");
+  {
+    auto kp = crypto::ed25519_keygen();
+    KeyStore src = KeyStore::create_with_passphrase("store-A");
+    const crypto::Hash addr = src.add_account(view(kp.public_key), view(kp.secret_key));
+
+    // Light Argon2id work factors for the test; 0,0 (SENSITIVE) is the API default.
+    const Bytes envelope = src.export_account(addr, "backup-phrase", /*ops=*/3, /*mem=*/1u << 16);
+    CHECK(!envelope.empty());
+
+    KeyStore dst = KeyStore::create_with_passphrase("store-B");  // different keyring/master
+    const crypto::Hash imported = dst.import_account(view(envelope), "backup-phrase");
+    CHECK_MSG(imported == addr, "the imported account keeps its address");
+    CHECK(dst.public_key(addr) == kp.public_key);
+    CHECK_MSG(dst.reveal_secret(addr) == kp.secret_key, "the secret survives the round-trip resealed");
+
+    bool threw = false;
+    try {
+      (void)dst.import_account(view(envelope), "wrong-phrase");
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    CHECK_MSG(threw, "a wrong passphrase fails closed");
+
+    Bytes tampered = envelope;
+    tampered[tampered.size() / 2] ^= 0x01;
+    threw = false;
+    try {
+      (void)dst.import_account(view(tampered), "backup-phrase");
+    } catch (const std::exception&) {
+      threw = true;
+    }
+    CHECK_MSG(threw, "a tampered envelope fails closed");
+  }
+
   return bctest::summary();
 }

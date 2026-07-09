@@ -236,8 +236,21 @@
   binding (Go/Dart/npm/Swift/JVM) as a `KeyStore` class — custodial signing is
   `reveal(address) → submitTransfer(secret, …)`, verified end-to-end on all four
   runtime bindings (`alice 750 / bob 250`, wrong-passphrase rejected) + a durable
-  Go test (`TestKeyStoreCustodialSigning`). **Remaining:** zeroize master/secret
-  buffers on drop; an optional `DemoNode` convenience that signs by address.
+  Go test (`TestKeyStoreCustodialSigning`). **MolecularVault upgrade (cryptolib
+  3.x):** new entries are sealed by `Vault::seal_max` — cryptolib's MolecularVault
+  cascade (XChaCha20-Poly1305 ∘ AES-256-GCM-SIV) under a key-committing outer
+  layer, so BOTH ciphers must break before a signing secret at rest leaks. The
+  store format is v2 with a per-entry seal version: legacy v1 stores (committing
+  AEAD) still load and open, and re-serialising migrates the container while
+  preserving each entry's true seal version. New portable backup:
+  `KeyStore::export_account(addr, passphrase[, ops, mem])` seals {pubkey, secret}
+  via MolecularVault's Argon2id passphrase mode (0,0 = SENSITIVE preset) with a
+  fixed domain AAD, and `import_account` reseals it under the destination store's
+  master — an account moves between stores with only a passphrase. Tamper /
+  wrong-passphrase / wrong-AAD all fail closed; v1-compat + migration tested.
+  **Remaining:** zeroize master/secret buffers on drop; an optional `DemoNode`
+  convenience that signs by address; expose export/import through the C ABI +
+  bindings.
 - **[H] PQ / hybrid signatures in the tx path.** Only Ed25519 is wired for
   transactions. The hybrid Ed25519+ML-DSA option (cryptolib has it) and
   `ChainSpec`-driven suite selection are designed but not implemented — no PQC

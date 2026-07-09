@@ -80,6 +80,15 @@ class Vault {
   /// wrong key / wrong aad.
   Bytes open(const SealedBlob& blob, std::string_view aad = "") const;
 
+  /// Max-assurance seal via cryptolib's MolecularVault: a cascade of
+  /// XChaCha20-Poly1305 ∘ AES-256-GCM-SIV under a key-committing outer layer
+  /// (self-describing versioned envelope). Both cascade layers must break
+  /// before the plaintext leaks — defense in depth for long-lived signing
+  /// secrets at rest. Throws on failure.
+  SealedBlob seal_max(ByteView plaintext, std::string_view aad = "") const;
+  /// Open a [seal_max] envelope; fails closed on tamper / wrong key / wrong aad.
+  Bytes open_max(const SealedBlob& blob, std::string_view aad = "") const;
+
  private:
   Bytes master_;
 };
@@ -122,19 +131,37 @@ class KeyStore {
   bool add_device_slot(ByteView factor_key) { return keyring_.add_device_slot(factor_key); }
   std::size_t slot_count() const { return keyring_.slot_count(); }
 
+  /// Export one account as a PORTABLE encrypted envelope under a standalone
+  /// [passphrase] (independent of this store's keyring): MolecularVault cascade
+  /// keyed by Argon2id(passphrase). [ops]/[mem] are the Argon2id work factors —
+  /// 0,0 selects cryptolib's SENSITIVE preset (slow on purpose; a backup is
+  /// unlocked rarely and brute-forced forever). The store must be unlocked.
+  Bytes export_account(const Hash& address, std::string_view passphrase,
+                       std::uint64_t ops = 0, std::size_t mem = 0) const;
+  /// Import an [export_account] envelope into this store (which must be
+  /// unlocked; the secret is resealed under THIS store's master). Returns the
+  /// account's address. Throws on wrong passphrase / tamper.
+  Hash import_account(ByteView envelope, std::string_view passphrase);
+
   /// Serialise the whole store: the keyring envelope + every sealed entry. No
   /// plaintext secret is present.
   Bytes serialise() const;
   /// Load a serialised store. It comes back LOCKED — call unlock_* before
-  /// revealing secrets. Throws on a malformed blob.
+  /// revealing secrets. Throws on a malformed blob. Reads both the current v2
+  /// format (per-entry seal version) and legacy v1 (committing-AEAD entries).
   static KeyStore load(ByteView blob);
 
  private:
   explicit KeyStore(Keyring keyring) : keyring_(std::move(keyring)) {}
 
+  // How an entry's secret is sealed. New entries use the MolecularVault cascade;
+  // entries loaded from a v1 store keep opening via the committing AEAD.
+  enum class SealVersion : std::uint8_t { kCommitting = 1, kMolecular = 2 };
+
   struct Entry {
     Bytes public_key;
     SealedBlob sealed;
+    SealVersion seal_version = SealVersion::kMolecular;
   };
 
   Keyring keyring_;
