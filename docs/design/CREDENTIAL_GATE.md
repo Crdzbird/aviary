@@ -405,11 +405,15 @@ recorded inline.**
    `nym` deny-lists are coarse; a proper revocation accumulator (non-membership
    proof) is the standard answer but is a large addition. Deferred unless a
    deployment requires sub-epoch persistent revocation.
-4. **AssuranceProfile coupling (§7).** Should credential gating be a *dimension*
-   of the existing profiles, or an orthogonal `MembershipPolicy` committed
-   alongside? Leaning orthogonal (a chain can be `fortress` *and* permissionless,
-   or `standard` *and* permissioned) — but this changes the genesis schema. →
-   *Action: decide before touching `GenesisSpec`.*
+4. **AssuranceProfile coupling (§7). — RESOLVED: orthogonal.** Credential gating
+   is committed as an independent `GenesisSpec::membership_policy` (the canonical
+   `CredentialPolicy` bytes; empty = permissionless), NOT a dimension of
+   `AssuranceProfile`. The crypto posture and the permissioned/permissionless axis
+   are genuinely independent — a chain can be `fortress` *and* permissionless, or
+   `standard` *and* permissioned — so folding them would force false combinations.
+   `CredentialPolicy::commit_to(GenesisSpec&)` / `from_genesis(...)` mirror
+   `AssuranceProfile::apply_to` / `from_genesis`; both fields ride the genesis
+   hash side by side (`test_genesis.cpp`).
 5. **Epoch source.** `epoch = f(height)` is the obvious deterministic source, but
    couples pseudonym rotation to block production; an explicit governance epoch is
    cleaner but needs the (absent) validator-set-change machinery. → *v1: derive

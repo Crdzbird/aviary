@@ -198,9 +198,19 @@
   over a socketpair (verifier + prover threads): honest member admitted,
   unlinkable re-admit on a fresh connection, forged credential refused, garbage
   responder refused, silent peer times out to a refusal. ASan + **TSan**-clean.
-  **Remaining:** Option B per-epoch pseudonym (blocked on the filed cryptolib
-  primitive); wire the policy into `GenesisSpec` (deferred pending the §10.4
-  orthogonal-vs-dimension decision).
+  **Policy committed into the genesis hash DONE (§10.4 resolved: orthogonal).**
+  `GenesisSpec::membership_policy` (canonical `CredentialPolicy` bytes; empty =
+  permissionless) rides the genesis hash beside `assurance_profile` — the two
+  axes are independent (a chain may be any posture × permissioned/permissionless).
+  `CredentialPolicy::commit_to(GenesisSpec&)` / `from_genesis(...)` mirror
+  `AssuranceProfile::apply_to`/`from_genesis`; core stays decoupled (stores bytes,
+  the consensus layer derives the type). `test_genesis.cpp`: committing changes
+  chain identity, round-trips hash-stable, reconstructs the exact policy, builds a
+  working gate from genesis, and proves orthogonality (fortress+permissionless,
+  standard+permissioned). Go + Dart golden vectors still replay (genesis encoding
+  changed; tx/block/proof vectors unaffected); ASan-clean. **All unblocked
+  CredentialGate work is now DONE** — only Option B (per-epoch pseudonym) remains,
+  blocked on the filed cryptolib BBS-pseudonym primitive.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

@@ -1,12 +1,17 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string_view>
 #include <vector>
 
 #include "blockchainer/crypto.hpp"
 #include "blockchainer/types.hpp"
+
+namespace blockchainer {
+struct GenesisSpec;
+}  // namespace blockchainer
 
 /// Anonymous membership admission for a permissioned chain (design:
 /// docs/design/CREDENTIAL_GATE.md). An issuer signs a member's attribute vector
@@ -63,6 +68,15 @@ struct CredentialPolicy {
   static CredentialPolicy decode_all(crypto::ByteView bytes);
   /// Domain-separated commitment: hash_tagged(kCredentialPolicy, encode()).
   crypto::Hash hash() const;
+
+  /// Stamp this policy into [g] so it becomes part of the chain's identity (its
+  /// genesis hash) — the permissioned analog of AssuranceProfile::apply_to.
+  /// Orthogonal to the assurance posture (§10.4).
+  void commit_to(GenesisSpec& g) const;
+
+  /// The membership policy a genesis commits to, or std::nullopt if the chain is
+  /// permissionless (no policy). Throws if the committed bytes are malformed.
+  static std::optional<CredentialPolicy> from_genesis(const GenesisSpec& g);
 
   bool operator==(const CredentialPolicy&) const = default;
 };

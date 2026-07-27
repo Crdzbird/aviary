@@ -4,6 +4,7 @@
 #include <string>
 
 #include "blockchainer/codec.hpp"
+#include "blockchainer/genesis.hpp"
 
 namespace blockchainer::consensus {
 
@@ -75,6 +76,13 @@ CredentialPolicy CredentialPolicy::decode_all(crypto::ByteView bytes) {
 
 crypto::Hash CredentialPolicy::hash() const {
   return crypto::hash_tagged(crypto::Domain::kCredentialPolicy, encode());
+}
+
+void CredentialPolicy::commit_to(GenesisSpec& g) const { g.membership_policy = encode(); }
+
+std::optional<CredentialPolicy> CredentialPolicy::from_genesis(const GenesisSpec& g) {
+  if (g.membership_policy.empty()) return std::nullopt;  // permissionless
+  return decode_all(view(g.membership_policy));
 }
 
 // ── Issuance (trusted-issuer model; §5/§10.2) ────────────────────────────────

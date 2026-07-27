@@ -48,6 +48,16 @@ struct GenesisSpec {
   // on the tier at every seam — see assurance.hpp.
   std::uint16_t assurance_profile = 0;
 
+  // An optional anonymous-membership policy (docs/design/CREDENTIAL_GATE.md).
+  // Empty = permissionless (no admission gate). When set, these are the canonical
+  // `consensus::CredentialPolicy` bytes — the issuer key, attribute schema, and
+  // tier threshold — committed into the genesis hash so every node provably
+  // agrees on who may join. ORTHOGONAL to `assurance_profile` (§10.4): the crypto
+  // posture and the permissioned/permissionless axis are independent, so a chain
+  // may be any posture × either membership mode. Reconstruct the policy with
+  // `consensus::CredentialPolicy::from_genesis`.
+  Bytes membership_policy{};
+
   // Initial state. Use `accounts` for the account model, `utxos` for the UTXO
   // model (the other stays empty).
   std::vector<GenesisAccount> accounts;

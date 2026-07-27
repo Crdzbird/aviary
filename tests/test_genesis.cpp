@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "blockchainer/account_state.hpp"
+#include "blockchainer/assurance.hpp"
+#include "blockchainer/credential_gate.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/utxo_state.hpp"
 #include "blockchainer/version.hpp"
@@ -140,6 +142,53 @@ int main() {
     GenesisSpec g2 = g;
     std::swap(g2.utxos[0], g2.utxos[1]);
     CHECK(g2.hash() != g.hash());
+  }
+
+  // ── Membership policy committed into the genesis hash (§10.4, orthogonal) ────
+  {
+    GenesisSpec open = sample();  // permissionless: no membership policy
+    CHECK(open.membership_policy.empty());
+    CHECK(!consensus::CredentialPolicy::from_genesis(open).has_value());
+
+    // Build a policy and commit it into a copy of the same genesis.
+    auto issuer = crypto::bbs_keygen(view(Bytes(32, 0x5A)));
+    consensus::CredentialPolicy policy;
+    policy.chain_id = open.chain_id;
+    policy.issuer_public_key = issuer.public_key;
+    policy.header = Bytes{'m', 'e', 'm', 'b', 'e', 'r'};
+    policy.min_tier = 2;
+
+    GenesisSpec gated = sample();
+    policy.commit_to(gated);
+
+    // Committing membership changes chain identity (permissioned ≠ permissionless).
+    CHECK(!gated.membership_policy.empty());
+    CHECK(gated.hash() != open.hash());
+    // It round-trips through the genesis codec, hash-stable.
+    CHECK(GenesisSpec::decode_all(view(gated.encode())).hash() == gated.hash());
+    // And reconstructs to exactly the committed policy.
+    auto back = consensus::CredentialPolicy::from_genesis(gated);
+    CHECK(back.has_value());
+    CHECK(*back == policy);
+    // A node can build a working gate straight from genesis.
+    consensus::CredentialGate gate(*back);
+    CHECK(gate.policy().hash() == policy.hash());
+
+    // Orthogonal to the assurance posture (§10.4): the two axes are independent.
+    // A fortress chain can be permissionless; a standard chain can be permissioned.
+    GenesisSpec fortress_open = sample();
+    AssuranceProfile::fortress().apply_to(fortress_open);
+    CHECK(fortress_open.assurance_profile == 3);
+    CHECK(fortress_open.membership_policy.empty());  // fortress + permissionless
+
+    GenesisSpec standard_gated = sample();
+    policy.commit_to(standard_gated);  // standard posture + permissioned
+    CHECK(standard_gated.assurance_profile == 0);
+    CHECK(!standard_gated.membership_policy.empty());
+    // Committing membership leaves the assurance field untouched, and vice versa.
+    AssuranceProfile::fortress().apply_to(standard_gated);
+    CHECK(standard_gated.assurance_profile == 3 && !standard_gated.membership_policy.empty());
+    CHECK(consensus::CredentialPolicy::from_genesis(standard_gated).has_value());
   }
 
   return bctest::summary();
