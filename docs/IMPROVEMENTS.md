@@ -390,6 +390,26 @@ test. Still to do:
   mutual-auth, forged-initiator/responder rejection, wrong-KEM-key abort, and
   impostor-key visibility. **Remaining:** identity negotiation in the `Hello`/
   peer-discovery layer (who to expect) and bridging the session to the C ABI.
+- **[x] Armored channel (PQ ratchet, hardened transport tier) — DONE.**
+  `p2p::ArmoredChannel` (`armored.hpp`) composes cryptolib's hybrid-KEM **Double
+  Ratchet** (`crypto::Ratchet`) with a hybrid-signature identity handshake to
+  give a channel that is confidential, mutually authenticated, post-quantum,
+  forward-secret, **and** post-compromise-secure — a leaked message key exposes
+  neither past nor future traffic, and a full state leak on a long-lived
+  validator link heals as the ratchet turns. The raw ratchet authenticates only
+  the responder (prekey ownership); the channel adds initiator authentication —
+  the initiator signs a transcript binding the ratchet handshake, the
+  responder's prekey, and both identity keys, so the responder learns *who*
+  dialed it and pins that identity. The responder's prekey is sourced
+  authentically from its **signed PEX record** — `PeerRecord` gained a `prekey`
+  field covered by the record signature, so an attacker can't substitute a
+  prekey to MITM (swapping it invalidates the signature). `test_armored.cpp`:
+  many-turn bidirectional messaging, replay rejection, mutual-auth handshake,
+  impostor-identity rejection, responder-auth-by-prekey (an impostor lacking the
+  prekey secret can't open), tampered-frame rejection, and end-to-end
+  composition straight from a verified `PeerRecord`. ASan/UBSan-clean.
+  **Remaining:** wire `kRatcheted`/`kFortress` tiers into `run_tcp_bft_node`
+  (the transport still uses the SIGMA `SecureSession`), and rekey-on-reconnect.
 - **[M] Streaming state-snapshot fast sync.** Sync is block-by-block. Large-state
   fast sync (stream a state snapshot over SecretStream, then tail blocks) is not
   built — the SecretStream wrappers are ready for it.

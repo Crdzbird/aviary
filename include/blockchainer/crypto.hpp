@@ -104,6 +104,48 @@ Bytes ecvrf_proof_to_hash(ByteView pi);
 /// invalid proof. Never throws.
 std::optional<Bytes> ecvrf_verify(ByteView pk, ByteView alpha, ByteView pi);
 
+// ── PQ forward-secret ratchet (hybrid-KEM Double Ratchet) ────────────────────
+// A live channel with forward secrecy AND post-compromise security, all
+// post-quantum: a leaked message key exposes neither past nor future messages,
+// and a full state leak self-heals as the ratchet turns. Stateful (owns an
+// opaque handle). The handshake is prekey-bootstrapped — the responder
+// publishes a hybrid-KEM prekey, the initiator encapsulates to it — which
+// authenticates the RESPONDER (only the prekey holder can open the channel);
+// mutual authentication is layered on top by [p2p::ArmoredChannel].
+class Ratchet {
+ public:
+  /// A responder's prekey: a hybrid-KEM keypair. Publish the public half
+  /// (authenticated, e.g. in a signed peer record); keep the secret to accept.
+  static KeyPair generate_prekey();
+
+  /// Initiator: begin a session to [responder_prekey_pub]. Returns the open
+  /// session and the handshake message to hand the responder. Throws on failure.
+  static std::pair<Ratchet, Bytes> initiate(ByteView responder_prekey_pub);
+
+  /// Responder: accept a [handshake] with your prekey (public + secret). Throws
+  /// on a malformed handshake.
+  static Ratchet accept(ByteView handshake, ByteView prekey_pub, ByteView prekey_sec);
+
+  /// Encrypt the next outgoing message (advances the sending ratchet). [aad] is
+  /// bound in and must match on decrypt. Throws on failure.
+  Bytes encrypt(ByteView plaintext, ByteView aad = {});
+  /// Decrypt an incoming message (handles ratchet turns + out-of-order).
+  /// Throws on tamper / wrong key / wrong aad / replay.
+  Bytes decrypt(ByteView frame, ByteView aad = {});
+
+  bool open() const { return h_ != nullptr; }
+
+  Ratchet(Ratchet&&) noexcept;
+  Ratchet& operator=(Ratchet&&) noexcept;
+  Ratchet(const Ratchet&) = delete;
+  Ratchet& operator=(const Ratchet&) = delete;
+  ~Ratchet();
+
+ private:
+  explicit Ratchet(void* h) : h_(h) {}
+  void* h_ = nullptr;  // CryptoSession
+};
+
 // ── SLH-DSA (FIPS 205, stateless hash-based) ─────────────────────────────────
 // The most conservative PQ family: security reduces to the hash function alone
 // (no lattice assumption), so it survives even if ML-DSA's assumptions fall.

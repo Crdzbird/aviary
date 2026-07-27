@@ -35,6 +35,7 @@ struct PeerRecord {
   std::uint16_t port = 0;
   Bytes kem_pk;      ///< hybrid KEM public key (to open a secure session to it)
   Bytes sig_pk;      ///< hybrid signing public key (identity / allow-list)
+  Bytes prekey;      ///< ratchet prekey public key ([ArmoredChannel]); may be empty
   Bytes signature;   ///< owner's hybrid signature over signing_hash()
 
   bool operator==(const PeerRecord&) const = default;

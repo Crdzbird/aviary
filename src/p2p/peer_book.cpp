@@ -13,6 +13,7 @@ void encode_unsigned(codec::CodecWriter& w, const PeerRecord& r) {
   w.write_u16(r.port);
   w.write_bytes(view(r.kem_pk));
   w.write_bytes(view(r.sig_pk));
+  w.write_bytes(view(r.prekey));  // ratchet prekey (may be empty) — signed like the rest
 }
 
 void encode_record(codec::CodecWriter& w, const PeerRecord& r) {
@@ -28,6 +29,7 @@ PeerRecord decode_record(codec::CodecReader& rd) {
   r.port = rd.read_u16();
   r.kem_pk = rd.read_bytes();
   r.sig_pk = rd.read_bytes();
+  r.prekey = rd.read_bytes();
   r.signature = rd.read_bytes();
   return r;
 }

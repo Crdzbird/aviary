@@ -107,6 +107,7 @@ add_library(blockchainer_core STATIC
   src/p2p/mempool.cpp
   src/p2p/gossip.cpp
   src/p2p/peer_book.cpp
+  src/p2p/armored.cpp
   src/p2p/networked_node.cpp
   src/p2p/tcp_transport.cpp
   src/p2p/secure_session.cpp
@@ -229,6 +230,7 @@ blockchainer_add_test(test_byzantine tests/test_byzantine.cpp)
 blockchainer_add_test(test_peer_book tests/test_peer_book.cpp)
 blockchainer_add_test(test_threshold tests/test_threshold.cpp)
 blockchainer_add_test(test_vrf_pos tests/test_vrf_pos.cpp)
+blockchainer_add_test(test_armored tests/test_armored.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

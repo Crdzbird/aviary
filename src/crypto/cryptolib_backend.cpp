@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "cryptolib_c.h"
 
@@ -166,6 +167,80 @@ std::optional<Bytes> ecvrf_verify(ByteView pk, ByteView alpha, ByteView pi) {
     return std::nullopt;  // invalid proof — never throws
   }
   return take_buffer(r.buf);
+}
+
+// ── PQ forward-secret ratchet (cryptolib Session) ────────────────────────────
+
+KeyPair Ratchet::generate_prekey() {
+  CryptoKeyPair kp = cryptolib_session_generate_prekey();
+  return KeyPair{take_buffer(kp.public_key), take_buffer(kp.secret_key)};
+}
+
+std::pair<Ratchet, Bytes> Ratchet::initiate(ByteView responder_prekey_pub) {
+  char* err = nullptr;
+  CryptoSession h = cryptolib_session_initiate(responder_prekey_pub.data(),
+                                               responder_prekey_pub.size(), &err);
+  if (h == nullptr) {
+    std::string m = err ? err : "session_initiate failed";
+    if (err) cryptolib_str_free(err);
+    throw std::runtime_error(m);
+  }
+  CryptoBufferResult r = cryptolib_session_handshake(h);
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "session_handshake failed";
+    if (r.error) cryptolib_str_free(r.error);
+    cryptolib_session_free(h);
+    throw std::runtime_error(m);
+  }
+  return {Ratchet(h), take_buffer(r.buf)};
+}
+
+Ratchet Ratchet::accept(ByteView handshake, ByteView prekey_pub, ByteView prekey_sec) {
+  char* err = nullptr;
+  CryptoSession h = cryptolib_session_accept(handshake.data(), handshake.size(), prekey_pub.data(),
+                                             prekey_pub.size(), prekey_sec.data(), prekey_sec.size(),
+                                             &err);
+  if (h == nullptr) {
+    std::string m = err ? err : "session_accept failed";
+    if (err) cryptolib_str_free(err);
+    throw std::runtime_error(m);
+  }
+  return Ratchet(h);
+}
+
+Bytes Ratchet::encrypt(ByteView plaintext, ByteView aad) {
+  CryptoBufferResult r = cryptolib_session_encrypt(h_, plaintext.data(), plaintext.size(), aad.data(),
+                                                   aad.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "session_encrypt failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+Bytes Ratchet::decrypt(ByteView frame, ByteView aad) {
+  CryptoBufferResult r = cryptolib_session_decrypt(h_, frame.data(), frame.size(), aad.data(),
+                                                   aad.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "session_decrypt failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+Ratchet::Ratchet(Ratchet&& o) noexcept : h_(o.h_) { o.h_ = nullptr; }
+Ratchet& Ratchet::operator=(Ratchet&& o) noexcept {
+  if (this != &o) {
+    if (h_) cryptolib_session_free(h_);
+    h_ = o.h_;
+    o.h_ = nullptr;
+  }
+  return *this;
+}
+Ratchet::~Ratchet() {
+  if (h_) cryptolib_session_free(h_);
 }
 
 // ── SLH-DSA (FIPS 205) — fixed SLH-DSA-SHA2-128s profile ────────────────────
