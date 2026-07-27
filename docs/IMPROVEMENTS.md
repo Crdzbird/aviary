@@ -139,8 +139,11 @@
   (Sybil-weak but safe), and (2) the per-epoch pseudonym for real Sybil
   resistance, **blocked on an upstream cryptolib BBS-pseudonym primitive** — not
   a home-grown ZK construction (the project never reimplements crypto). Validator
-  anonymity deferred behind slashing/epoch machinery. **Next action:** cryptolib
-  feature request for BBS pseudonyms; then implement the wrappers + Option A.
+  anonymity deferred behind slashing/epoch machinery. **BBS-pseudonym request
+  FILED:** `docs/CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md` (§1 per-verifier
+  linkability/pseudonyms = the Option-B blocker, §2 blind issuance = the
+  malicious-issuer fix). **Next action:** implement the bare-BBS wrappers +
+  Option A now (unblocked); Option B follows the cryptolib primitive.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

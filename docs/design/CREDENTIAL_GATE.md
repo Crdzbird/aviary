@@ -469,5 +469,7 @@ headline feature (Sybil-resistant anonymous membership) is **correctly blocked o
 an upstream cryptolib primitive** rather than on a home-grown ZK protocol. This
 keeps blockchainer a consumer of vetted crypto and avoids the single most
 dangerous way this feature could go wrong. Next action is a **cryptolib feature
-request for BBS pseudonyms**, after which §9 implements in the order of this
-section.
+request for BBS pseudonyms** — **filed** as
+[`docs/CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md`](../CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md)
+(§1 pseudonyms = the Option-B blocker, §2 blind issuance = the §10.2
+malicious-issuer fix) — after which §9 implements in the order of this section.
