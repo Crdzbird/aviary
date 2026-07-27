@@ -307,6 +307,70 @@ public enum Blockchainer {
         return SealedMempool(capacity: capacity)
     }
 
+    // ── CredentialGate (anonymous membership admission, Option A) ───────────────
+
+    /// A BBS issuer keypair (public 96 B, secret 32 B) — the chain's issuer identity.
+    public static func newBBSIssuer(keyMaterial: Data) throws -> PortableAccount {
+        ensureReady()
+        return splitAccountBlob(try consume(keyMaterial.withC { p, l in
+            blockchainer_bbs_keygen(p, l) }, "bbs_keygen"))
+    }
+
+    /// A membership policy. Its canonical `encoded` bytes drive the gate; its
+    /// `hash()` is meant to be committed into genesis (like an AssuranceProfile).
+    public struct CredentialPolicy {
+        public let encoded: Data
+        public init(chainID: UInt64, issuerPublic: Data, header: Data,
+                    attributeCount: UInt32 = 4, minTier: UInt8 = 0) throws {
+            Blockchainer.ensureReady()
+            encoded = try consume(issuerPublic.withC { ip, il in header.withC { hp, hl in
+                blockchainer_credential_policy_encode(chainID, ip, il, hp, hl, attributeCount, minTier) } },
+                "credential_policy_encode")
+        }
+        /// The 32-byte commitment to commit into genesis.
+        public func hash() throws -> Data {
+            try consume(encoded.withC { p, l in blockchainer_credential_policy_hash(p, l) },
+                        "credential_policy_hash")
+        }
+        /// Issuer side: assemble + BBS-sign a credential (holder-secret blob).
+        public func issue(issuerSecret: Data, memberSecret: Data, tier: UInt8,
+                          notAfter: UInt64, issuerEpoch: UInt32) throws -> Data {
+            try consume(encoded.withC { pp, pl in issuerSecret.withC { sp, sl in memberSecret.withC { mp, ml in
+                blockchainer_credential_issue(pp, pl, sp, sl, mp, ml, tier, notAfter, issuerEpoch) } } },
+                "credential_issue")
+        }
+        /// Holder side: an unlinkable presentation for (epoch, scope, challenge).
+        public func present(credential: Data, epoch: UInt32, scope: String, challenge: Data) throws -> Data {
+            try consume(encoded.withC { pp, pl in credential.withC { cp, cl in challenge.withC { chp, chl in
+                blockchainer_credential_present(pp, pl, cp, cl, epoch, scope, chp, chl) } } },
+                "credential_present")
+        }
+    }
+
+    /// A verifier's admission gate (holds the issuer-epoch deny-list).
+    public final class CredentialGate {
+        private let h: OpaquePointer
+        init(policy: CredentialPolicy) {
+            let raw = policy.encoded.withC { p, l in blockchainer_credential_gate_new(p, l) }!
+            h = OpaquePointer(raw)
+        }
+        deinit { blockchainer_credential_gate_free(UnsafeMutableRawPointer(h)) }
+
+        /// Bulk revocation: refuse every credential issued in this epoch.
+        public func revokeIssuerEpoch(_ epoch: UInt32) {
+            blockchainer_credential_gate_revoke_epoch(UnsafeMutableRawPointer(h), epoch)
+        }
+        /// Admit? Runs the full checklist. Total — a malformed presentation is a quiet false.
+        public func admit(epoch: UInt32, scope: String, challenge: Data, presentation: Data, now: UInt64) -> Bool {
+            challenge.withC { chp, chl in presentation.withC { pp, pl in
+                blockchainer_credential_gate_admit(UnsafeMutableRawPointer(h), epoch, scope, chp, chl, pp, pl, now) == 1 } }
+        }
+    }
+    public static func makeCredentialGate(policy: CredentialPolicy) -> CredentialGate {
+        ensureReady()
+        return CredentialGate(policy: policy)
+    }
+
     /// Create a new in-memory single-validator chain.
     public static func makeNode(chainID: UInt64) throws -> Node {
         ensureReady()

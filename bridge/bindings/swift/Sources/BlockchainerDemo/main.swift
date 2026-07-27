@@ -95,5 +95,34 @@ let strangerReveal = try pool.reveal(proposerKemSecret: strangerKem.secret, max:
 precondition(strangerReveal.isEmpty, "a non-proposer opens nothing")
 print("assurance + sealed-mempool OK")
 
+// CredentialGate (anonymous membership admission, Option A — unlinkable).
+let issuer = try Blockchainer.newBBSIssuer(keyMaterial: Data(repeating: 0x11, count: 32))
+precondition(issuer.publicKey.count == 96 && issuer.secret.count == 32, "BBS issuer key sizes")
+let credPolicy = try Blockchainer.CredentialPolicy(chainID: 7, issuerPublic: issuer.publicKey,
+                                                   header: Data("blockchainer.credential.v1".utf8), minTier: 2)
+let credPolicyHash = try credPolicy.hash()
+precondition(credPolicyHash.count == 32, "policy hash is 32 bytes")
+let memberSecret = Data(repeating: 0xAB, count: 32)
+let credNow: UInt64 = 1_700_000_000
+let cred = try credPolicy.issue(issuerSecret: issuer.secret, memberSecret: memberSecret,
+                                tier: 3, notAfter: 4_102_444_800, issuerEpoch: 1)
+let credGate = Blockchainer.makeCredentialGate(policy: credPolicy)
+let credChallenge = Data(repeating: 0x01, count: 32)
+let pres = try credPolicy.present(credential: cred, epoch: 5, scope: "submit", challenge: credChallenge)
+precondition(credGate.admit(epoch: 5, scope: "submit", challenge: credChallenge, presentation: pres, now: credNow),
+             "valid presentation admitted")
+let pres2 = try credPolicy.present(credential: cred, epoch: 5, scope: "submit", challenge: credChallenge)
+precondition(pres != pres2, "two presentations of one credential are unlinkable")
+precondition(!credGate.admit(epoch: 6, scope: "submit", challenge: credChallenge, presentation: pres, now: credNow),
+             "wrong epoch rejected")
+let lowCred = try credPolicy.issue(issuerSecret: issuer.secret, memberSecret: memberSecret,
+                                   tier: 1, notAfter: 4_102_444_800, issuerEpoch: 1)
+let lowPres = try credPolicy.present(credential: lowCred, epoch: 5, scope: "submit", challenge: credChallenge)
+precondition(!credGate.admit(epoch: 5, scope: "submit", challenge: credChallenge, presentation: lowPres, now: credNow),
+             "below-min-tier rejected")
+precondition(!credGate.admit(epoch: 5, scope: "submit", challenge: credChallenge,
+                             presentation: Data("garbage".utf8), now: credNow), "malformed rejected")
+print("credential-gate OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

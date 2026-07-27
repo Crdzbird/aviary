@@ -154,11 +154,21 @@
   bulk issuer-epoch revocation. `test_credential_gate.cpp` (18 checks incl.
   unlinkability, context-binding, expiry, tier boundary, revocation,
   wrong-issuer, malformed-is-quiet-false); `CredentialPolicy::decode_all` in the
-  fuzz totality sweep; ASan/UBSan clean; 58 C++ suites. **Remaining:** Option B
+  fuzz totality sweep; ASan/UBSan clean; 58 C++ suites. **Surfaced through the C
+  ABI + ALL FIVE bindings:** `blockchainer_bbs_keygen` (issuer key) +
+  `_credential_policy_encode`/`_policy_hash` + `_credential_issue` +
+  `_credential_present` + opaque `BlockchainerCredentialGate`
+  (`_new`/`_revoke_epoch`/`_admit`/`_free`); credential blob
+  `[sig_len:4][sig]([attr_count:4]([attr_len:4][attr])×)`. Go (`credential_gate.go`
+  + `TestCredentialGate`), npm (`CredentialPolicy`/`CredentialGate` classes +
+  `credential_gate.test.js`), JVM (Panama inner classes + Main check), Swift
+  (`CredentialPolicy` struct + `CredentialGate` class + demo), Dart
+  (`makeCredentialPolicy`/`makeCredentialGate` + classes + smoke) — each drives
+  issue→present→admit + the full reject set and asserts unlinkability (two
+  presentations of one credential differ yet both admit). **Remaining:** Option B
   per-epoch pseudonym (blocked on the filed cryptolib primitive); wire the policy
   into `GenesisSpec` (deferred pending the §10.4 orthogonal-vs-dimension
-  decision); gate `Mempool::add` / gossip admission on a presentation; surface
-  through the C ABI + bindings.
+  decision); gate `Mempool::add` / gossip admission on a presentation.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

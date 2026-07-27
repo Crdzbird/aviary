@@ -27,7 +27,9 @@ public final class Blockchainer implements AutoCloseable {
             ksNew, ksAdd, ksReveal, ksSerialise, ksLoad, ksUnlock, ksUnlocked, ksFree,
             kemKeygen, pSealPass, pOpenPass, pSealTo, pOpenTo, pSealSigned, pOpenSigned,
             thCreate, thInfo, thSeal, thUnseal, thCommit, thCerNew, thCerFree, thSign, thVerify, thAgg,
-            asDescribe, txEncode, smSeal, smNew, smAdd, smSize, smReveal, smFree;
+            asDescribe, txEncode, smSeal, smNew, smAdd, smSize, smReveal, smFree,
+            bbsKeygen, credPolicyEncode, credPolicyHash, credIssue, credPresent,
+            credGateNew, credGateRevoke, credGateAdmit, credGateFree;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -91,6 +93,15 @@ public final class Blockchainer implements AutoCloseable {
         smSize     = h("blockchainer_sealed_mempool_size", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
         smReveal   = h("blockchainer_sealed_mempool_reveal", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, JAVA_LONG));
         smFree     = h("blockchainer_sealed_mempool_free", FunctionDescriptor.ofVoid(ADDRESS));
+        bbsKeygen  = h("blockchainer_bbs_keygen", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        credPolicyEncode = h("blockchainer_credential_policy_encode", FunctionDescriptor.of(RES, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_INT, JAVA_BYTE));
+        credPolicyHash = h("blockchainer_credential_policy_hash", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        credIssue  = h("blockchainer_credential_issue", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_BYTE, JAVA_LONG, JAVA_INT));
+        credPresent = h("blockchainer_credential_present", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        credGateNew = h("blockchainer_credential_gate_new", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG));
+        credGateRevoke = h("blockchainer_credential_gate_revoke_epoch", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT));
+        credGateAdmit = h("blockchainer_credential_gate_admit", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
+        credGateFree = h("blockchainer_credential_gate_free", FunctionDescriptor.ofVoid(ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -300,6 +311,65 @@ public final class Blockchainer implements AutoCloseable {
         @Override public void close() { try { smFree.invoke(h); } catch (Throwable ignored) {} }
     }
     public SealedMempool newSealedMempool(long capacity) { return new SealedMempool(capacity); }
+
+    // ── CredentialGate (anonymous membership admission, Option A) ───────────────
+
+    /** A BBS issuer keypair (public 96 B, secret 32 B) — the chain's issuer identity. */
+    public PortableAccount newBBSIssuer(byte[] keyMaterial) {
+        try { return splitBlob(consume((MemorySegment) bbsKeygen.invoke(arena.allocate(RES), seg(keyMaterial), (long) keyMaterial.length))); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** A membership policy. Its canonical {@code encoded} bytes drive the gate; its
+     *  {@code hash()} is meant to be committed into genesis (like an AssuranceProfile). */
+    public final class CredentialPolicy {
+        final byte[] encoded;
+        public CredentialPolicy(long chainId, byte[] issuerPublic, byte[] header, int attributeCount, int minTier) {
+            try { encoded = consume((MemorySegment) credPolicyEncode.invoke(arena.allocate(RES), chainId,
+                    seg(issuerPublic), (long) issuerPublic.length, seg(header), (long) header.length, attributeCount, (byte) minTier)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        public byte[] encoded() { return encoded; }
+        /** The 32-byte commitment to commit into genesis. */
+        public byte[] hash() {
+            try { return consume((MemorySegment) credPolicyHash.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Issuer side: assemble + BBS-sign a credential (holder-secret blob). */
+        public byte[] issue(byte[] issuerSecret, byte[] memberSecret, int tier, long notAfter, int issuerEpoch) {
+            try { return consume((MemorySegment) credIssue.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length,
+                    seg(issuerSecret), (long) issuerSecret.length, seg(memberSecret), (long) memberSecret.length,
+                    (byte) tier, notAfter, issuerEpoch)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Holder side: an unlinkable presentation for (epoch, scope, challenge). */
+        public byte[] present(byte[] credential, int epoch, String scope, byte[] challenge) {
+            try { return consume((MemorySegment) credPresent.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length,
+                    seg(credential), (long) credential.length, epoch, arena.allocateFrom(scope), seg(challenge), (long) challenge.length)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+    }
+
+    /** A verifier's admission gate (holds the issuer-epoch deny-list). */
+    public final class CredentialGate implements AutoCloseable {
+        private final MemorySegment h;
+        CredentialGate(CredentialPolicy policy) {
+            try { h = (MemorySegment) credGateNew.invoke(seg(policy.encoded), (long) policy.encoded.length); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Bulk revocation: refuse every credential issued in this epoch. */
+        public void revokeIssuerEpoch(int epoch) {
+            try { credGateRevoke.invoke(h, epoch); } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Admit? Runs the full checklist. Total — a malformed presentation is a quiet false. */
+        public boolean admit(int epoch, String scope, byte[] challenge, byte[] presentation, long now) {
+            try { return (int) credGateAdmit.invoke(h, epoch, arena.allocateFrom(scope), seg(challenge), (long) challenge.length,
+                    seg(presentation), (long) presentation.length, now) == 1; }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        @Override public void close() { try { credGateFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    public CredentialGate newCredentialGate(CredentialPolicy policy) { return new CredentialGate(policy); }
 
     public boolean verifyStateProof(byte[] root, byte[] proof) {
         try { return (int) verifyProof.invoke(seg(root), seg(proof), (long) proof.length) == 1; }

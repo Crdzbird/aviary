@@ -100,6 +100,16 @@ function ensureLoaded() {
     smSize: f('size_t blockchainer_sealed_mempool_size(void*)'),
     smReveal: f('BlockchainerBufferResult blockchainer_sealed_mempool_reveal(void*, uint8_t*, size_t, size_t)'),
     smFree: f('void blockchainer_sealed_mempool_free(void*)'),
+    // CredentialGate (anonymous membership admission, Option A)
+    bbsKeygen: f('BlockchainerBufferResult blockchainer_bbs_keygen(uint8_t*, size_t)'),
+    credPolicyEncode: f('BlockchainerBufferResult blockchainer_credential_policy_encode(uint64_t, uint8_t*, size_t, uint8_t*, size_t, uint32_t, uint8_t)'),
+    credPolicyHash: f('BlockchainerBufferResult blockchainer_credential_policy_hash(uint8_t*, size_t)'),
+    credIssue: f('BlockchainerBufferResult blockchainer_credential_issue(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t, uint64_t, uint32_t)'),
+    credPresent: f('BlockchainerBufferResult blockchainer_credential_present(uint8_t*, size_t, uint8_t*, size_t, uint32_t, const char*, uint8_t*, size_t)'),
+    credGateNew: f('void *blockchainer_credential_gate_new(uint8_t*, size_t)'),
+    credGateRevoke: f('void blockchainer_credential_gate_revoke_epoch(void*, uint32_t)'),
+    credGateAdmit: f('int blockchainer_credential_gate_admit(void*, uint32_t, const char*, uint8_t*, size_t, uint8_t*, size_t, uint64_t)'),
+    credGateFree: f('void blockchainer_credential_gate_free(void*)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -310,6 +320,39 @@ class Ceremony {
   free() { fn.thCeremonyFree(this._h); }
 }
 
+// CredentialGate (anonymous membership admission, Option A — unlinkable). An
+// issuer signs a member's attributes as a BBS credential; a holder admits itself
+// to a role by proving in zero knowledge it holds an issuer-signed credential
+// whose tier clears the policy and whose expiry has not passed.
+class CredentialPolicy {
+  constructor(chainId, issuerPublic, header, attributeCount = 4, minTier = 0) {
+    this.encoded = consume(fn.credPolicyEncode(BigInt(chainId), u8(issuerPublic), u8(issuerPublic).length,
+      u8(header), u8(header).length, attributeCount, minTier), 'credential_policy_encode');
+  }
+  // 32-byte commitment to commit into genesis.
+  hash() { return consume(fn.credPolicyHash(this.encoded, this.encoded.length), 'credential_policy_hash'); }
+  // Issuer side: assemble + BBS-sign a credential (holder-secret blob).
+  issue(issuerSecret, memberSecret, tier, notAfter, issuerEpoch) {
+    return consume(fn.credIssue(this.encoded, this.encoded.length, u8(issuerSecret), u8(issuerSecret).length,
+      u8(memberSecret), u8(memberSecret).length, tier, BigInt(notAfter), issuerEpoch), 'credential_issue');
+  }
+  // Holder side: an unlinkable presentation for (epoch, scope, challenge).
+  present(credential, epoch, scope, challenge) {
+    return consume(fn.credPresent(this.encoded, this.encoded.length, u8(credential), u8(credential).length,
+      epoch, scope, u8(challenge), u8(challenge).length), 'credential_present');
+  }
+}
+class CredentialGate {
+  constructor(policy) { this._h = fn.credGateNew(policy.encoded, policy.encoded.length); }
+  revokeIssuerEpoch(epoch) { fn.credGateRevoke(this._h, epoch); }
+  // Verifier side: admit? Total 1/0 — a malformed presentation is a quiet false.
+  admit(epoch, scope, challenge, presentation, now) {
+    return fn.credGateAdmit(this._h, epoch, scope, u8(challenge), u8(challenge).length,
+      u8(presentation), u8(presentation).length, BigInt(now)) === 1;
+  }
+  free() { fn.credGateFree(this._h); }
+}
+
 // Parse a share card's identity blob [id u16 BE][group_pk 32][public 32].
 function shareInfo(card) {
   const b = consume(fn.thShareInfo(u8(card), u8(card).length), 'threshold_share_info');
@@ -370,6 +413,12 @@ module.exports = {
   sealTx: (txEncoded, proposerKemPublic) =>
     consume(fn.smSeal(u8(txEncoded), u8(txEncoded).length, u8(proposerKemPublic), u8(proposerKemPublic).length), 'sealed_tx_seal'),
   SealedMempool,
+
+  // CredentialGate (anonymous membership admission, Option A). A BBS issuer key,
+  // a canonical policy, and the holder/verifier present/admit flow.
+  newBBSIssuer: (keyMaterial) => splitBlob(consume(fn.bbsKeygen(u8(keyMaterial), u8(keyMaterial).length), 'bbs_keygen')),
+  CredentialPolicy,
+  CredentialGate,
 
   commit(card) {
     const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');

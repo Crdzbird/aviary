@@ -165,6 +165,34 @@ typedef _SmRevealD = _BufResult Function(Pointer<Void>, Pointer<Uint8>, int, int
 typedef _SmFreeC = Void Function(Pointer<Void>);
 typedef _SmFreeD = void Function(Pointer<Void>);
 
+// CredentialGate (anonymous membership admission, Option A).
+typedef _BbsKeygenC = _BufResult Function(Pointer<Uint8>, Size);
+typedef _BbsKeygenD = _BufResult Function(Pointer<Uint8>, int);
+typedef _CredPolicyEncodeC = _BufResult Function(
+    Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Uint8);
+typedef _CredPolicyEncodeD = _BufResult Function(
+    int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int);
+typedef _CredPolicyHashC = _BufResult Function(Pointer<Uint8>, Size);
+typedef _CredPolicyHashD = _BufResult Function(Pointer<Uint8>, int);
+typedef _CredIssueC = _BufResult Function(
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint8, Uint64, Uint32);
+typedef _CredIssueD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int);
+typedef _CredPresentC = _BufResult Function(
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Pointer<Utf8>, Pointer<Uint8>, Size);
+typedef _CredPresentD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Uint8>, int);
+typedef _CredGateNewC = Pointer<Void> Function(Pointer<Uint8>, Size);
+typedef _CredGateNewD = Pointer<Void> Function(Pointer<Uint8>, int);
+typedef _CredGateRevokeC = Void Function(Pointer<Void>, Uint32);
+typedef _CredGateRevokeD = void Function(Pointer<Void>, int);
+typedef _CredGateAdmitC = Int32 Function(
+    Pointer<Void>, Uint32, Pointer<Utf8>, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint64);
+typedef _CredGateAdmitD = int Function(
+    Pointer<Void>, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int);
+typedef _CredGateFreeC = Void Function(Pointer<Void>);
+typedef _CredGateFreeD = void Function(Pointer<Void>);
+
 class BlockchainerException implements Exception {
   BlockchainerException(this.message);
   final String message;
@@ -807,6 +835,58 @@ class Blockchainer {
     return SealedMempool._(this, h);
   }
 
+  // ── CredentialGate (anonymous membership admission, Option A) ────────────────
+
+  /// A BBS issuer keypair from [keyMaterial] (>= 32 bytes) — the chain's issuer
+  /// identity. Returns (public 96 B, secret 32 B).
+  ({Uint8List public, Uint8List secret}) newBBSIssuer(Uint8List keyMaterial) {
+    final p = _alloc(keyMaterial);
+    try {
+      final blob = _take(
+          lib.lookupFunction<_BbsKeygenC, _BbsKeygenD>('blockchainer_bbs_keygen')(p, keyMaterial.length),
+          'bbs_keygen');
+      final pl = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+      return (public: Uint8List.sublistView(blob, 4, 4 + pl), secret: Uint8List.sublistView(blob, 4 + pl));
+    } finally {
+      calloc.free(p);
+    }
+  }
+
+  /// Canonically encode a membership [CredentialPolicy] (attributeCount must be
+  /// 4). Its [CredentialPolicy.hash] can be committed into genesis.
+  CredentialPolicy makeCredentialPolicy(
+      {required int chainId,
+      required Uint8List issuerPublic,
+      required Uint8List header,
+      int attributeCount = 4,
+      int minTier = 0}) {
+    final ip = _alloc(issuerPublic), hp = _alloc(header);
+    try {
+      final enc = _take(
+          lib.lookupFunction<_CredPolicyEncodeC, _CredPolicyEncodeD>(
+              'blockchainer_credential_policy_encode')(
+              chainId, ip, issuerPublic.length, hp, header.length, attributeCount, minTier),
+          'credential_policy_encode');
+      return CredentialPolicy._(this, enc);
+    } finally {
+      calloc.free(ip);
+      calloc.free(hp);
+    }
+  }
+
+  /// Open a verifier's admission [CredentialGate] enforcing [policy].
+  CredentialGate makeCredentialGate(CredentialPolicy policy) {
+    final pp = _alloc(policy.encoded);
+    try {
+      final h = lib.lookupFunction<_CredGateNewC, _CredGateNewD>('blockchainer_credential_gate_new')(
+          pp, policy.encoded.length);
+      if (h == nullptr) throw BlockchainerException('credential gate creation failed');
+      return CredentialGate._(this, h);
+    } finally {
+      calloc.free(pp);
+    }
+  }
+
   /// Create a custodial [KeyStore] protected by [passphrase] (returned unlocked).
   KeyStore createKeyStore(String passphrase) {
     final cp = passphrase.toNativeUtf8();
@@ -1228,4 +1308,102 @@ class SealedMempool {
 
   void free() => _bc.lib
       .lookupFunction<_SmFreeC, _SmFreeD>('blockchainer_sealed_mempool_free')(_h);
+}
+
+/// A membership policy: the issuer key, attribute schema, and tier threshold a
+/// chain enforces. Its [hash] is canonical and meant to be committed into the
+/// genesis (like an AssuranceProfile). Build one with
+/// [Blockchainer.makeCredentialPolicy].
+class CredentialPolicy {
+  CredentialPolicy._(this._bc, this.encoded);
+  final Blockchainer _bc;
+
+  /// The policy's canonical bytes (the form the gate consumes).
+  final Uint8List encoded;
+
+  /// The 32-byte commitment to commit into genesis.
+  Uint8List hash() {
+    final p = _bc._alloc(encoded);
+    try {
+      return _bc._take(
+          _bc.lib.lookupFunction<_CredPolicyHashC, _CredPolicyHashD>(
+              'blockchainer_credential_policy_hash')(p, encoded.length),
+          'credential_policy_hash');
+    } finally {
+      calloc.free(p);
+    }
+  }
+
+  /// Issuer side (trusted-issuer model): assemble + BBS-sign a credential. The
+  /// 32-byte [memberSecret] is generated by the member. The returned blob is
+  /// HOLDER-SECRET — store it sealed.
+  Uint8List issue(Uint8List issuerSecret, Uint8List memberSecret, int tier, int notAfter,
+      int issuerEpoch) {
+    final ep = _bc._alloc(encoded), sp = _bc._alloc(issuerSecret), mp = _bc._alloc(memberSecret);
+    try {
+      return _bc._take(
+          _bc.lib.lookupFunction<_CredIssueC, _CredIssueD>('blockchainer_credential_issue')(
+              ep, encoded.length, sp, issuerSecret.length, mp, memberSecret.length, tier, notAfter,
+              issuerEpoch),
+          'credential_issue');
+    } finally {
+      calloc.free(ep);
+      calloc.free(sp);
+      calloc.free(mp);
+    }
+  }
+
+  /// Holder side: an unlinkable presentation for ([epoch], [scope], [challenge]).
+  /// Discloses {tier, not_after, issuer_epoch}; proves the rest in zero knowledge.
+  Uint8List present(Uint8List credential, int epoch, String scope, Uint8List challenge) {
+    final ep = _bc._alloc(encoded), cp = _bc._alloc(credential), chp = _bc._alloc(challenge);
+    final scopeP = scope.toNativeUtf8();
+    try {
+      return _bc._take(
+          _bc.lib.lookupFunction<_CredPresentC, _CredPresentD>('blockchainer_credential_present')(
+              ep, encoded.length, cp, credential.length, epoch, scopeP, chp, challenge.length),
+          'credential_present');
+    } finally {
+      calloc.free(ep);
+      calloc.free(cp);
+      calloc.free(chp);
+      calloc.free(scopeP);
+    }
+  }
+}
+
+/// A verifier's anonymous-membership admission gate (Option A — unlinkable). It
+/// admits a holder to a role by a zero-knowledge proof that it holds an
+/// issuer-signed credential clearing the policy, revealing nothing else. Holds
+/// the issuer-epoch deny-list. Call [free] when done.
+class CredentialGate {
+  CredentialGate._(this._bc, this._h);
+  final Blockchainer _bc;
+  final Pointer<Void> _h;
+
+  /// Bulk revocation: refuse every credential issued in [epoch].
+  void revokeIssuerEpoch(int epoch) => _bc.lib
+      .lookupFunction<_CredGateRevokeC, _CredGateRevokeD>('blockchainer_credential_gate_revoke_epoch')(
+          _h, epoch);
+
+  /// Admit? Runs the full checklist (proof + expiry + revocation + tier), binding
+  /// ([epoch], [scope], [challenge], [now]). A malformed presentation is a quiet
+  /// false — this never throws.
+  bool admit(int epoch, String scope, Uint8List challenge, Uint8List presentation, int now) {
+    final chp = _bc._alloc(challenge), pp = _bc._alloc(presentation);
+    final scopeP = scope.toNativeUtf8();
+    try {
+      return _bc.lib.lookupFunction<_CredGateAdmitC, _CredGateAdmitD>(
+              'blockchainer_credential_gate_admit')(
+              _h, epoch, scopeP, chp, challenge.length, pp, presentation.length, now) ==
+          1;
+    } finally {
+      calloc.free(chp);
+      calloc.free(pp);
+      calloc.free(scopeP);
+    }
+  }
+
+  void free() =>
+      _bc.lib.lookupFunction<_CredGateFreeC, _CredGateFreeD>('blockchainer_credential_gate_free')(_h);
 }

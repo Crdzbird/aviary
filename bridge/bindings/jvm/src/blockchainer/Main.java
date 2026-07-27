@@ -113,6 +113,39 @@ public final class Main {
             }
             System.out.println("assurance + sealed-mempool OK");
 
+            // CredentialGate (anonymous membership admission, Option A — unlinkable).
+            var issuer = bc.newBBSIssuer(new byte[32]);
+            if (issuer.publicKey().length != 96 || issuer.secret().length != 32)
+                throw new IllegalStateException("bad BBS issuer key sizes");
+            var credPolicy = bc.new CredentialPolicy(7, issuer.publicKey(),
+                    "blockchainer.credential.v1".getBytes(java.nio.charset.StandardCharsets.UTF_8), 4, 2);
+            if (credPolicy.hash().length != 32) throw new IllegalStateException("policy hash size");
+            byte[] memberSecret = new byte[32];
+            java.util.Arrays.fill(memberSecret, (byte) 0xAB);
+            long credNow = 1_700_000_000L;
+            byte[] cred = credPolicy.issue(issuer.secret(), memberSecret, 3, 4_102_444_800L, 1);
+            byte[] chal = new byte[32];
+            java.util.Arrays.fill(chal, (byte) 0x01);
+            try (var credGate = bc.newCredentialGate(credPolicy)) {
+                byte[] pres = credPolicy.present(cred, 5, "submit", chal);
+                if (!credGate.admit(5, "submit", chal, pres, credNow))
+                    throw new IllegalStateException("valid presentation rejected");
+                byte[] pres2 = credPolicy.present(cred, 5, "submit", chal);
+                if (java.util.Arrays.equals(pres, pres2))
+                    throw new IllegalStateException("presentations not unlinkable");
+                if (credGate.admit(6, "submit", chal, pres, credNow))
+                    throw new IllegalStateException("wrong epoch admitted");
+                byte[] low = credPolicy.present(credPolicy.issue(issuer.secret(), memberSecret, 1, 4_102_444_800L, 1), 5, "submit", chal);
+                if (credGate.admit(5, "submit", chal, low, credNow))
+                    throw new IllegalStateException("below-min-tier admitted");
+                credGate.revokeIssuerEpoch(1);
+                if (credGate.admit(5, "submit", chal, pres, credNow))
+                    throw new IllegalStateException("revoked epoch admitted");
+                if (credGate.admit(5, "submit", chal, "garbage".getBytes(), credNow))
+                    throw new IllegalStateException("malformed presentation admitted");
+            }
+            System.out.println("credential-gate OK");
+
             System.out.println("\nALL GOOD");
         }
     }
