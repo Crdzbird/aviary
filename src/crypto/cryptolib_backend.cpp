@@ -376,6 +376,51 @@ Bytes hybrid_kem_decapsulate(ByteView ciphertext, ByteView secret_key) {
   return take_buffer(r.buf);
 }
 
+// ── Recipient-bound PQ seals (cryptolib Suite) ───────────────────────────────
+
+namespace {
+Bytes take_or_throw(CryptoBufferResult r, const char* op) {
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : std::string(op) + " failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+}  // namespace
+
+Bytes pq_seal_to(ByteView plaintext, ByteView recipient_kem_public, ByteView aad) {
+  return take_or_throw(cryptolib_suite_seal_pq(plaintext.data(), plaintext.size(),
+                                               recipient_kem_public.data(),
+                                               recipient_kem_public.size(), aad.data(), aad.size()),
+                       "pq_seal_to");
+}
+
+Bytes pq_open(ByteView envelope, ByteView recipient_kem_secret, ByteView aad) {
+  return take_or_throw(cryptolib_suite_open_pq(envelope.data(), envelope.size(),
+                                               recipient_kem_secret.data(),
+                                               recipient_kem_secret.size(), aad.data(), aad.size()),
+                       "pq_open");
+}
+
+Bytes pq_seal_signed_to(ByteView plaintext, ByteView recipient_kem_public, ByteView signer_sig_secret,
+                        ByteView aad) {
+  return take_or_throw(
+      cryptolib_suite_seal_signed_pq(plaintext.data(), plaintext.size(), recipient_kem_public.data(),
+                                     recipient_kem_public.size(), signer_sig_secret.data(),
+                                     signer_sig_secret.size(), aad.data(), aad.size()),
+      "pq_seal_signed_to");
+}
+
+Bytes pq_open_signed(ByteView envelope, ByteView recipient_kem_secret, ByteView signer_sig_public,
+                     ByteView aad) {
+  return take_or_throw(
+      cryptolib_suite_open_signed_pq(envelope.data(), envelope.size(), recipient_kem_secret.data(),
+                                     recipient_kem_secret.size(), signer_sig_public.data(),
+                                     signer_sig_public.size(), aad.data(), aad.size()),
+      "pq_open_signed");
+}
+
 // ── Interop primitives ───────────────────────────────────────────────────────
 
 namespace {

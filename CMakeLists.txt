@@ -231,6 +231,7 @@ blockchainer_add_test(test_peer_book tests/test_peer_book.cpp)
 blockchainer_add_test(test_threshold tests/test_threshold.cpp)
 blockchainer_add_test(test_vrf_pos tests/test_vrf_pos.cpp)
 blockchainer_add_test(test_armored tests/test_armored.cpp)
+blockchainer_add_test(test_portable tests/test_portable.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

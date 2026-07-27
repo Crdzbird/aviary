@@ -201,6 +201,28 @@ KemEncaps hybrid_kem_encapsulate(ByteView public_key);
 /// Decapsulate [ciphertext] with [secret_key]: returns the 32-byte shared secret.
 Bytes hybrid_kem_decapsulate(ByteView ciphertext, ByteView secret_key);
 
+// ── Recipient-bound PQ seals (one-call; self-describing envelope) ────────────
+// Encapsulate to a recipient's hybrid-KEM public key, then MolecularVault-seal
+// under the shared secret. Only the holder of the KEM secret can open — no
+// shared passphrase to phish. The signed variant also authenticates the sender.
+
+/// Seal [plaintext] to [recipient_kem_public] (with optional [aad]). Throws on
+/// failure.
+Bytes pq_seal_to(ByteView plaintext, ByteView recipient_kem_public, ByteView aad = {});
+/// Open a [pq_seal_to] envelope with [recipient_kem_secret]. Throws on tamper /
+/// wrong key / wrong aad.
+Bytes pq_open(ByteView envelope, ByteView recipient_kem_secret, ByteView aad = {});
+
+/// Seal [plaintext] to [recipient_kem_public] AND sign it with
+/// [signer_sig_secret] (hybrid signature). Throws on failure.
+Bytes pq_seal_signed_to(ByteView plaintext, ByteView recipient_kem_public,
+                        ByteView signer_sig_secret, ByteView aad = {});
+/// Open a [pq_seal_signed_to] envelope: returns the plaintext ONLY if it
+/// decrypts under [recipient_kem_secret] AND the signature verifies under
+/// [signer_sig_public]. Throws otherwise.
+Bytes pq_open_signed(ByteView envelope, ByteView recipient_kem_secret, ByteView signer_sig_public,
+                     ByteView aad = {});
+
 /// Forward-secure stream encryptor (libsodium SecretStream). RAII over the
 /// native handle; movable, non-copyable.
 class StreamEncryptor {

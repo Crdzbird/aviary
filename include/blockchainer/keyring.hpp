@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "blockchainer/codec.hpp"
 #include "blockchainer/crypto.hpp"
 
 /// Custodial key management (ARCHITECTURE §: Wallet / key custody). Thin, RAII
@@ -29,6 +30,37 @@ using Bytes = crypto::Bytes;
 /// A secret sealed by a [Vault] → a flat, persistable blob (nonce ‖ ciphertext ‖
 /// MAC ‖ Ed25519 signature ‖ KDF salt).
 using SealedBlob = Bytes;
+
+/// One account's exportable material — its public key and signing secret — with
+/// tiered, self-describing seals for moving it off the node (backup, device
+/// migration). Each tier is a different trust model; all fail closed:
+///
+///   - **passphrase** — MolecularVault + Argon2id. Anyone who knows the phrase.
+///   - **recipient** — encapsulate to a device's hybrid-KEM public key (PQ).
+///     Only that device can open; no shared secret to phish.
+///   - **signed-recipient** (Fortress-grade) — recipient-bound AND authenticated:
+///     the receiver both decrypts with its KEM secret and verifies the sender's
+///     hybrid signature, so a forged or substituted backup is rejected.
+struct PortableAccount {
+  Bytes public_key;
+  Bytes secret;
+
+  /// Canonical {public_key, secret} payload — what every tier seals.
+  Bytes encode() const;
+  static PortableAccount decode(codec::ByteView bytes);
+
+  // A fixed domain AAD binds every envelope to "an exported account", so one
+  // tier's ciphertext can't be reinterpreted as another context.
+  Bytes seal_passphrase(std::string_view passphrase, std::uint64_t ops = 0, std::size_t mem = 0) const;
+  static PortableAccount open_passphrase(codec::ByteView envelope, std::string_view passphrase);
+
+  Bytes seal_to(ByteView recipient_kem_public) const;
+  static PortableAccount open_to(codec::ByteView envelope, ByteView recipient_kem_secret);
+
+  Bytes seal_signed_to(ByteView recipient_kem_public, ByteView sender_sig_secret) const;
+  static PortableAccount open_signed_from(codec::ByteView envelope, ByteView recipient_kem_secret,
+                                          ByteView sender_sig_public);
+};
 
 /// Envelope-encryption master-key custody: one random master key wrapped by one
 /// or more unlock slots. Move-only; the native handle is freed on destruction.
@@ -142,6 +174,13 @@ class KeyStore {
   /// unlocked; the secret is resealed under THIS store's master). Returns the
   /// account's address. Throws on wrong passphrase / tamper.
   Hash import_account(ByteView envelope, std::string_view passphrase);
+
+  /// Reveal an account as a [PortableAccount] for tiered export (recipient-bound
+  /// / signed). The store must be unlocked.
+  PortableAccount extract(const Hash& address) const;
+  /// Seal a [PortableAccount] into this store under its master. Returns the
+  /// address. The store must be unlocked.
+  Hash absorb(const PortableAccount& account);
 
   /// Serialise the whole store: the keyring envelope + every sealed entry. No
   /// plaintext secret is present.

@@ -132,6 +132,76 @@ Bytes Vault::open_max(const SealedBlob& blob, std::string_view aad) const {
               "vault open (molecular)");
 }
 
+// ── PortableAccount (tiered account export) ─────────────────────────────────
+
+namespace {
+// Fixed domain AAD — every tier binds it, so an envelope can't be reinterpreted
+// as a different context.
+constexpr const char* kPortableAad = "blockchainer.portable-account.v1";
+codec::ByteView portable_aad() {
+  return codec::ByteView(reinterpret_cast<const std::uint8_t*>(kPortableAad),
+                         std::char_traits<char>::length(kPortableAad));
+}
+}  // namespace
+
+Bytes PortableAccount::encode() const {
+  codec::CodecWriter w;
+  w.write_u8(1);  // payload version
+  w.write_bytes(view(public_key));
+  w.write_bytes(view(secret));
+  return w.take();
+}
+
+PortableAccount PortableAccount::decode(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  if (r.read_u8() != 1) throw codec::CodecError("unsupported PortableAccount version");
+  PortableAccount a;
+  a.public_key = r.read_bytes();
+  a.secret = r.read_bytes();
+  r.assert_fully_consumed();
+  return a;
+}
+
+Bytes PortableAccount::seal_passphrase(std::string_view passphrase, std::uint64_t ops,
+                                       std::size_t mem) const {
+  const Bytes payload = encode();
+  const std::string p(passphrase);
+  const auto aad = portable_aad();
+  return take(cryptolib_molecular_seal(payload.data(), payload.size(), p.c_str(), aad.data(),
+                                       aad.size(), ops, mem),
+              "portable seal (passphrase)");
+}
+
+PortableAccount PortableAccount::open_passphrase(codec::ByteView envelope,
+                                                 std::string_view passphrase) {
+  const std::string p(passphrase);
+  const auto aad = portable_aad();
+  const Bytes payload = take(cryptolib_molecular_open(envelope.data(), envelope.size(), p.c_str(),
+                                                      aad.data(), aad.size()),
+                             "portable open (passphrase)");
+  return decode(view(payload));
+}
+
+Bytes PortableAccount::seal_to(ByteView recipient_kem_public) const {
+  return crypto::pq_seal_to(view(encode()), recipient_kem_public, portable_aad());
+}
+
+PortableAccount PortableAccount::open_to(codec::ByteView envelope, ByteView recipient_kem_secret) {
+  return decode(view(crypto::pq_open(envelope, recipient_kem_secret, portable_aad())));
+}
+
+Bytes PortableAccount::seal_signed_to(ByteView recipient_kem_public, ByteView sender_sig_secret) const {
+  return crypto::pq_seal_signed_to(view(encode()), recipient_kem_public, sender_sig_secret,
+                                   portable_aad());
+}
+
+PortableAccount PortableAccount::open_signed_from(codec::ByteView envelope,
+                                                  ByteView recipient_kem_secret,
+                                                  ByteView sender_sig_public) {
+  return decode(
+      view(crypto::pq_open_signed(envelope, recipient_kem_secret, sender_sig_public, portable_aad())));
+}
+
 // ── KeyStore ────────────────────────────────────────────────────────────────
 
 KeyStore KeyStore::create_with_passphrase(std::string_view passphrase, bool sensitive) {
@@ -201,6 +271,16 @@ Bytes KeyStore::export_account(const Hash& address, std::string_view passphrase,
   return take(cryptolib_molecular_seal(payload.data(), payload.size(), p.c_str(), aadp,
                                        std::char_traits<char>::length(kExportAad), ops, mem),
               "account export");
+}
+
+PortableAccount KeyStore::extract(const Hash& address) const {
+  auto it = entries_.find(address);
+  if (it == entries_.end()) throw std::runtime_error("custody: unknown address");
+  return PortableAccount{it->second.public_key, reveal_secret(address)};  // reveal checks unlocked
+}
+
+Hash KeyStore::absorb(const PortableAccount& account) {
+  return add_account(view(account.public_key), view(account.secret));  // reseals under our master
 }
 
 Hash KeyStore::import_account(ByteView envelope, std::string_view passphrase) {
