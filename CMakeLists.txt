@@ -129,6 +129,7 @@ add_library(blockchainer_core STATIC
   src/interop/bitcoin.cpp
   src/interop/bridge.cpp
   src/node/profiled_validator.cpp
+  src/node/remote_guard.cpp
   src/node/demo_node.cpp)
 target_include_directories(blockchainer_core
   PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -238,6 +239,7 @@ blockchainer_add_test(test_portable tests/test_portable.cpp)
 blockchainer_add_test(test_assurance tests/test_assurance.cpp)
 blockchainer_add_test(test_sealed_mempool tests/test_sealed_mempool.cpp)
 blockchainer_add_test(test_profiled_validator tests/test_profiled_validator.cpp)
+blockchainer_add_test(test_remote_guard tests/test_remote_guard.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

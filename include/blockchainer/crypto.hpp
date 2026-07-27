@@ -160,6 +160,67 @@ Bytes slh_dsa_sign(ByteView msg, ByteView secret_key);
 /// Verifies an SLH-DSA signature. Never throws — false on any failure.
 bool slh_dsa_verify(ByteView msg, ByteView sig, ByteView public_key);
 
+// ── OPAQUE aPAKE (draft-irtf-cfrg-opaque, OPAQUE-3DH, ristretto255-SHA-512) ───
+// A password-authenticated key exchange where the password NEVER leaves the
+// client and the server stores no password-equivalent. Two phases: a one-time
+// registration, then a 3DH login that yields a shared session key iff the
+// password is correct. The client-derived `export_key` is stable across logins
+// for the same password — a client can encrypt secrets under it that the server
+// stores but cannot read.
+
+/// Derive a ristretto255 keypair from a seed (the server's long-term OPAQUE key,
+/// and the OPRF keypair OPAQUE builds on).
+KeyPair oprf_derive_keypair(ByteView seed, ByteView info = {});
+
+/// Client registration step 1: blind the password. Keep [blind], send [request].
+struct OpaqueRegRequest {
+  Bytes blind;    ///< secret; feed to opaque_finalize_request
+  Bytes request;  ///< send to the server
+};
+OpaqueRegRequest opaque_registration_request(ByteView password);
+
+/// Server registration step: the 64-byte response for the client to finalize.
+Bytes opaque_registration_response(ByteView request, ByteView server_public_key,
+                                   ByteView credential_id, ByteView oprf_seed);
+
+/// Client registration step 2: the record (store server-side) + export_key.
+struct OpaqueRecord {
+  Bytes record;      ///< 192 B — upload to the server
+  Bytes export_key;  ///< 64 B — client-side, stable per password
+};
+OpaqueRecord opaque_finalize_request(ByteView password, ByteView blind, ByteView response,
+                                     ByteView server_identity = {}, ByteView client_identity = {});
+
+/// Client login step 1: KE1 (send) + client_state (keep).
+struct OpaqueKe1 {
+  Bytes ke1;
+  Bytes client_state;
+};
+OpaqueKe1 opaque_client_init(ByteView password);
+
+/// Server login step 1: KE2 (send) + server_state (keep).
+struct OpaqueKe2 {
+  Bytes ke2;
+  Bytes server_state;
+};
+OpaqueKe2 opaque_server_respond(ByteView context, ByteView server_private_key,
+                                ByteView server_public_key, ByteView record, ByteView credential_id,
+                                ByteView oprf_seed, ByteView ke1, ByteView server_identity = {},
+                                ByteView client_identity = {});
+
+/// Client login step 2: authenticate the server + agree the session key. Throws
+/// on a wrong password or server-auth failure.
+struct OpaqueLogin {
+  Bytes ke3;          ///< send to the server
+  Bytes session_key;  ///< 64 B — shared
+  Bytes export_key;   ///< 64 B — same as at registration
+};
+OpaqueLogin opaque_client_finish(ByteView client_state, ByteView ke2, ByteView context,
+                                 ByteView server_identity = {}, ByteView client_identity = {});
+
+/// Server login step 2: verify KE3 → the shared session key. Throws on failure.
+Bytes opaque_server_finish(ByteView server_state, ByteView ke3);
+
 // ── BLS12-381 (consensus votes; ARCHITECTURE §7) ─────────────────────────────
 
 /// Deterministic BLS keypair from input key material (>= 32 bytes).

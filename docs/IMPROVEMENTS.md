@@ -107,6 +107,24 @@
   straight from hardened-profile peer records; ASan/UBSan + TSan clean, 8/8
   stable. **Remaining:** wire the sealed mempool into the boot path (blocked on
   the epoch-proposer-key design), and epoch/validator-set changes.
+- **[x] RemoteGuard (OPAQUE admin gate) — DONE.** `node::RemoteGuard`
+  (`remote_guard.hpp`) gates a node's privileged operations (remote key-store
+  unlock, config) with OPAQUE (draft-irtf-cfrg-opaque, OPAQUE-3DH): the operator
+  password NEVER leaves the client and the node stores NO password-equivalent —
+  only an OPAQUE `record` useless to a stolen-disk attacker. A correct login
+  mutually authenticates and agrees a session key; a wrong password fails without
+  the node learning it. Capability pattern: at enrolment the admin seals a secret
+  (a key-store pass, an admin token) under the OPAQUE **export_key** — a key the
+  password derives client-side that the node can't compute — and the node stores
+  that opaque blob, releasing it only on a successful login for the client to
+  open. So the node holds an admin capability it cannot itself read, unlockable
+  only by the right password. Adds `crypto::` OPAQUE wrappers (registration +
+  3DH login) + `oprf_derive_keypair`. `test_remote_guard.cpp`: enrol → correct
+  login retrieves the capability + matching session keys; wrong password can't
+  finish; a tampered KE3 releases nothing; the stored record contains no password
+  bytes; the node can't open the capability without the derived key; unknown
+  credential rejected. ASan-clean. **Remaining:** run the OPAQUE messages over an
+  `ArmoredChannel` and expose it through the C ABI + bindings.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

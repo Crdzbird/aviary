@@ -273,6 +273,108 @@ bool slh_dsa_verify(ByteView msg, ByteView sig, ByteView public_key) {
                                   kSlhHashFamily) == 1;
 }
 
+// ── OPAQUE aPAKE ─────────────────────────────────────────────────────────────
+
+namespace {
+// Consume a CryptoBuffer field, throwing with [op] context if it's null.
+Bytes field_or_throw(CryptoBuffer& b, char** err, const char* op) {
+  if (b.data == nullptr) {
+    std::string m = err && *err ? *err : std::string(op) + " failed";
+    if (err && *err) cryptolib_str_free(*err);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(b);
+}
+}  // namespace
+
+KeyPair oprf_derive_keypair(ByteView seed, ByteView info) {
+  CryptoKeyPair kp = cryptolib_oprf_derive_keypair(seed.data(), seed.size(), info.data(), info.size());
+  return KeyPair{take_buffer(kp.public_key), take_buffer(kp.secret_key)};
+}
+
+OpaqueRegRequest opaque_registration_request(ByteView password) {
+  CryptoOprfBlind b = cryptolib_opaque_registration_request(password.data(), password.size());
+  if (b.blind.data == nullptr) {
+    std::string m = b.error ? b.error : "opaque_registration_request failed";
+    if (b.error) cryptolib_str_free(b.error);
+    throw std::runtime_error(m);
+  }
+  OpaqueRegRequest out{take_buffer(b.blind), take_buffer(b.blinded_element)};
+  return out;
+}
+
+Bytes opaque_registration_response(ByteView request, ByteView server_public_key,
+                                   ByteView credential_id, ByteView oprf_seed) {
+  CryptoBufferResult r = cryptolib_opaque_registration_response(
+      request.data(), request.size(), server_public_key.data(), server_public_key.size(),
+      credential_id.data(), credential_id.size(), oprf_seed.data(), oprf_seed.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "opaque_registration_response failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+OpaqueRecord opaque_finalize_request(ByteView password, ByteView blind, ByteView response,
+                                     ByteView server_identity, ByteView client_identity) {
+  CryptoOpaqueRecord r = cryptolib_opaque_finalize_request(
+      password.data(), password.size(), blind.data(), blind.size(), response.data(), response.size(),
+      server_identity.data(), server_identity.size(), client_identity.data(), client_identity.size());
+  OpaqueRecord out;
+  out.record = field_or_throw(r.record, &r.error, "opaque_finalize_request");
+  out.export_key = take_buffer(r.export_key);
+  return out;
+}
+
+OpaqueKe1 opaque_client_init(ByteView password) {
+  CryptoOpaqueKe1 k = cryptolib_opaque_client_init(password.data(), password.size());
+  OpaqueKe1 out;
+  out.ke1 = field_or_throw(k.ke1, &k.error, "opaque_client_init");
+  out.client_state = take_buffer(k.client_state);
+  return out;
+}
+
+OpaqueKe2 opaque_server_respond(ByteView context, ByteView server_private_key,
+                                ByteView server_public_key, ByteView record, ByteView credential_id,
+                                ByteView oprf_seed, ByteView ke1, ByteView server_identity,
+                                ByteView client_identity) {
+  CryptoOpaqueKe2 k = cryptolib_opaque_server_respond(
+      context.data(), context.size(), server_private_key.data(), server_private_key.size(),
+      server_public_key.data(), server_public_key.size(), record.data(), record.size(),
+      credential_id.data(), credential_id.size(), oprf_seed.data(), oprf_seed.size(), ke1.data(),
+      ke1.size(), server_identity.data(), server_identity.size(), client_identity.data(),
+      client_identity.size());
+  OpaqueKe2 out;
+  out.ke2 = field_or_throw(k.ke2, &k.error, "opaque_server_respond");
+  out.server_state = take_buffer(k.server_state);
+  return out;
+}
+
+OpaqueLogin opaque_client_finish(ByteView client_state, ByteView ke2, ByteView context,
+                                 ByteView server_identity, ByteView client_identity) {
+  CryptoOpaqueKe3 k = cryptolib_opaque_client_finish(
+      client_state.data(), client_state.size(), ke2.data(), ke2.size(), context.data(),
+      context.size(), server_identity.data(), server_identity.size(), client_identity.data(),
+      client_identity.size());
+  OpaqueLogin out;
+  out.ke3 = field_or_throw(k.ke3, &k.error, "opaque_client_finish (wrong password?)");
+  out.session_key = take_buffer(k.session_key);
+  out.export_key = take_buffer(k.export_key);
+  return out;
+}
+
+Bytes opaque_server_finish(ByteView server_state, ByteView ke3) {
+  CryptoBufferResult r =
+      cryptolib_opaque_server_finish(server_state.data(), server_state.size(), ke3.data(), ke3.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "opaque_server_finish (client auth failed)";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
 // ── BLS12-381 ────────────────────────────────────────────────────────────────
 
 KeyPair bls_keygen_from_ikm(ByteView ikm) {
