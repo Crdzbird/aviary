@@ -37,6 +37,30 @@ public final class Main {
             System.out.println("  SOL: " + bc.solAddress(alice.secret()));
 
             node.close();
+            // Portable account export — the three tiers, all fail-closed.
+            var hy = node.newAccountHybrid();
+            byte[] env1 = bc.sealAccountPassphrase(hy.publicKey(), hy.secret(), "backup", 3, 1 << 16);
+            if (!java.util.Arrays.equals(bc.openAccountPassphrase(env1, "backup").secret(), hy.secret()))
+                throw new IllegalStateException("passphrase round-trip");
+            boolean wrongPass = false;
+            try { bc.openAccountPassphrase(env1, "nope"); } catch (RuntimeException e) { wrongPass = true; }
+            if (!wrongPass) throw new IllegalStateException("wrong passphrase must fail");
+
+            var dev = bc.hybridKemKeypair();
+            byte[] env2 = bc.sealAccountTo(hy.publicKey(), hy.secret(), dev.publicKey());
+            if (!java.util.Arrays.equals(bc.openAccountTo(env2, dev.secret()).secret(), hy.secret()))
+                throw new IllegalStateException("recipient round-trip");
+
+            byte[] env3 = bc.sealAccountSignedTo(hy.publicKey(), hy.secret(), dev.publicKey(), hy.secret());
+            if (!java.util.Arrays.equals(bc.openAccountSignedFrom(env3, dev.secret(), hy.publicKey()).secret(), hy.secret()))
+                throw new IllegalStateException("signed round-trip");
+            var stranger = bc.hybridKemKeypair();
+            boolean wrongSigner = false;
+            try { bc.openAccountSignedFrom(env3, dev.secret(), stranger.publicKey()); }
+            catch (RuntimeException e) { wrongSigner = true; }
+            if (!wrongSigner) throw new IllegalStateException("wrong signer must fail");
+            System.out.println("portable tiers OK (passphrase + recipient + signed, all fail-closed)");
+
             System.out.println("\nALL GOOD");
         }
     }

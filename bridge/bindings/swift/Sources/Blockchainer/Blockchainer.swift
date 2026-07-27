@@ -73,6 +73,77 @@ public enum Blockchainer {
         return try consumeString(edSecret64.withC { p, _ in blockchainer_sol_address(p) }, "sol_address")
     }
 
+    // ── Portable account export (tiered encrypted backup) ──────────────────────
+
+    /// A hybrid-KEM device keypair for the recipient-bound export tiers.
+    public static func hybridKemKeypair() throws -> PortableAccount {
+        ensureReady()
+        return splitAccountBlob(try consume(blockchainer_hybrid_kem_keygen(), "hybrid_kem_keygen"))
+    }
+
+    /// Tier 1 — seal an account under a passphrase (MolecularVault + Argon2id;
+    /// ops=mem=0 → SENSITIVE preset).
+    public static func sealAccountPassphrase(publicKey: Data, secret: Data, passphrase: String,
+                                             ops: UInt64 = 0, mem: Int = 0) throws -> Data {
+        ensureReady()
+        return try consume(publicKey.withC { pp, pl in
+            secret.withC { sp, sl in
+                blockchainer_portable_seal_passphrase(pp, pl, sp, sl, passphrase, ops, mem)
+            }
+        }, "portable_seal_passphrase")
+    }
+    public static func openAccountPassphrase(envelope: Data, passphrase: String) throws -> PortableAccount {
+        ensureReady()
+        return splitAccountBlob(try consume(envelope.withC { ep, el in
+            blockchainer_portable_open_passphrase(ep, el, passphrase)
+        }, "portable_open_passphrase"))
+    }
+
+    /// Tier 2 — recipient-bound (PQ): only the device's KEM secret opens it.
+    public static func sealAccountTo(publicKey: Data, secret: Data, recipientKemPublic: Data) throws -> Data {
+        ensureReady()
+        return try consume(publicKey.withC { pp, pl in
+            secret.withC { sp, sl in
+                recipientKemPublic.withC { rp, rl in
+                    blockchainer_portable_seal_to(pp, pl, sp, sl, rp, rl)
+                }
+            }
+        }, "portable_seal_to")
+    }
+    public static func openAccountTo(envelope: Data, recipientKemSecret: Data) throws -> PortableAccount {
+        ensureReady()
+        return splitAccountBlob(try consume(envelope.withC { ep, el in
+            recipientKemSecret.withC { rp, rl in blockchainer_portable_open_to(ep, el, rp, rl) }
+        }, "portable_open_to"))
+    }
+
+    /// Tier 3 — signed-recipient (Fortress-grade): recipient-bound AND the
+    /// receiver verifies the owner's hybrid signature.
+    public static func sealAccountSignedTo(publicKey: Data, secret: Data,
+                                           recipientKemPublic: Data, senderSigSecret: Data) throws -> Data {
+        ensureReady()
+        return try consume(publicKey.withC { pp, pl in
+            secret.withC { sp, sl in
+                recipientKemPublic.withC { rp, rl in
+                    senderSigSecret.withC { ssp, ssl in
+                        blockchainer_portable_seal_signed_to(pp, pl, sp, sl, rp, rl, ssp, ssl)
+                    }
+                }
+            }
+        }, "portable_seal_signed_to")
+    }
+    public static func openAccountSignedFrom(envelope: Data, recipientKemSecret: Data,
+                                             senderSigPublic: Data) throws -> PortableAccount {
+        ensureReady()
+        return splitAccountBlob(try consume(envelope.withC { ep, el in
+            recipientKemSecret.withC { rp, rl in
+                senderSigPublic.withC { spp, spl in
+                    blockchainer_portable_open_signed_from(ep, el, rp, rl, spp, spl)
+                }
+            }
+        }, "portable_open_signed_from"))
+    }
+
     /// Create a new in-memory single-validator chain.
     public static func makeNode(chainID: UInt64) throws -> Node {
         ensureReady()
@@ -234,6 +305,20 @@ public final class Node {
     public func proveAccount(address: Data) throws -> Data {
         try consume(address.withC { p, _ in blockchainer_node_prove_account(h, p) }, "prove_account")
     }
+}
+
+/// A signing account's material — public key and secret — as returned by the
+/// portable-account "open" calls (and the device key from `hybridKemKeypair`).
+public struct PortableAccount {
+    public let publicKey: Data
+    public let secret: Data
+}
+
+// Unpack the C ABI account blob [pub_len:4 BE][public][secret].
+private func splitAccountBlob(_ blob: Data) -> PortableAccount {
+    let pl = Int(blob[0]) << 24 | Int(blob[1]) << 16 | Int(blob[2]) << 8 | Int(blob[3])
+    return PortableAccount(publicKey: blob.subdata(in: 4..<(4 + pl)),
+                           secret: blob.subdata(in: (4 + pl)..<blob.count))
 }
 
 // ── Buffer marshalling helpers ─────────────────────────────────────────────────

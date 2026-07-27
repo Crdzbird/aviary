@@ -29,5 +29,31 @@ print("state proof verified:", ok)
 let secp = Data(repeating: 0x11, count: 32)
 print("eth:", try Blockchainer.ethAddress(secret32: secp))
 
+// Portable account export — the three tiers, all fail-closed.
+let hy = try node.newAccountHybrid()
+let env1 = try Blockchainer.sealAccountPassphrase(publicKey: hy.publicKey, secret: hy.secret,
+                                                  passphrase: "backup", ops: 3, mem: 1 << 16)
+let back1 = try Blockchainer.openAccountPassphrase(envelope: env1, passphrase: "backup")
+precondition(back1.secret == hy.secret, "passphrase round-trip")
+var wrongPass = false
+do { _ = try Blockchainer.openAccountPassphrase(envelope: env1, passphrase: "nope") } catch { wrongPass = true }
+precondition(wrongPass, "wrong passphrase must fail")
+
+let dev = try Blockchainer.hybridKemKeypair()
+let env2 = try Blockchainer.sealAccountTo(publicKey: hy.publicKey, secret: hy.secret, recipientKemPublic: dev.publicKey)
+let back2 = try Blockchainer.openAccountTo(envelope: env2, recipientKemSecret: dev.secret)
+precondition(back2.secret == hy.secret, "recipient round-trip")
+
+let env3 = try Blockchainer.sealAccountSignedTo(publicKey: hy.publicKey, secret: hy.secret,
+                                                recipientKemPublic: dev.publicKey, senderSigSecret: hy.secret)
+let back3 = try Blockchainer.openAccountSignedFrom(envelope: env3, recipientKemSecret: dev.secret,
+                                                   senderSigPublic: hy.publicKey)
+precondition(back3.secret == hy.secret, "signed round-trip")
+let stranger = try Blockchainer.hybridKemKeypair()
+var wrongSigner = false
+do { _ = try Blockchainer.openAccountSignedFrom(envelope: env3, recipientKemSecret: dev.secret, senderSigPublic: stranger.publicKey) } catch { wrongSigner = true }
+precondition(wrongSigner, "wrong expected signer must fail")
+print("portable tiers OK (passphrase + recipient + signed, all fail-closed)")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

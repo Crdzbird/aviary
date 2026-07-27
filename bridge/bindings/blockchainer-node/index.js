@@ -75,6 +75,13 @@ function ensureLoaded() {
     ksUnlock: f('int blockchainer_keystore_unlock(void*, const char*)'),
     ksUnlocked: f('int blockchainer_keystore_unlocked(void*)'),
     ksFree: f('void blockchainer_keystore_free(void*)'),
+    kemKeygen: f('BlockchainerBufferResult blockchainer_hybrid_kem_keygen()'),
+    pSealPass: f('BlockchainerBufferResult blockchainer_portable_seal_passphrase(uint8_t*, size_t, uint8_t*, size_t, const char*, uint64_t, size_t)'),
+    pOpenPass: f('BlockchainerBufferResult blockchainer_portable_open_passphrase(uint8_t*, size_t, const char*)'),
+    pSealTo: f('BlockchainerBufferResult blockchainer_portable_seal_to(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    pOpenTo: f('BlockchainerBufferResult blockchainer_portable_open_to(uint8_t*, size_t, uint8_t*, size_t)'),
+    pSealSigned: f('BlockchainerBufferResult blockchainer_portable_seal_signed_to(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    pOpenSigned: f('BlockchainerBufferResult blockchainer_portable_open_signed_from(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -103,11 +110,19 @@ const fn = new Proxy({}, { get: (_t, p) => ensureLoaded()[p] });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const u8 = (x) => Buffer.isBuffer(x) ? x : Buffer.from(x);
+// Unpack the C ABI account blob [pub_len:4 BE][public][secret].
+const splitBlob = (blob) => {
+  const pl = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+  return { public: blob.subarray(4, 4 + pl), secret: blob.subarray(4 + pl) };
+};
 const bytes = (cb) => (!cb.data || Number(cb.len) === 0)
   ? Buffer.alloc(0) : Buffer.from(koffi.decode(cb.data, 'uint8_t', Number(cb.len)));
 function consume(r, op) {
   if ((!r.buf.data || Number(r.buf.len) === 0) && r.error) {
-    const m = koffi.decode(r.error, 'char *'); fn.strFree(r.error); throw new Error(m);
+    // Read the NUL-terminated C string the error pointer holds (koffi: length -1
+    // decodes to the terminator). Decoding it as 'char *' instead reads a pointer
+    // AT the address — a double-indirection that segfaults on the error path.
+    const m = koffi.decode(r.error, 'char', -1); fn.strFree(r.error); throw new Error(m);
   }
   if (!r.buf.data) throw new Error(`${op || 'call'} failed`);
   const out = bytes(r.buf); fn.bufFree(r.buf); return out;
@@ -256,6 +271,29 @@ module.exports = {
   newKeyStore: (passphrase) => new KeyStore(passphrase),
   loadKeyStore: (blob) => KeyStore.load(blob),
   KeyStore,
+
+  // Portable account export (tiered encrypted backup). Returns/takes accounts as
+  // { public, secret } Buffers; envelopes are Buffers.
+  hybridKemKeypair: () => splitBlob(consume(fn.kemKeygen(), 'hybrid_kem_keygen')),
+  sealAccountPassphrase: (publicKey, secret, passphrase, ops = 0, mem = 0) =>
+    consume(fn.pSealPass(u8(publicKey), u8(publicKey).length, u8(secret), u8(secret).length,
+      passphrase, BigInt(ops), mem), 'portable_seal_passphrase'),
+  openAccountPassphrase: (envelope, passphrase) =>
+    splitBlob(consume(fn.pOpenPass(u8(envelope), u8(envelope).length, passphrase), 'portable_open_passphrase')),
+  sealAccountTo: (publicKey, secret, recipientKemPublic) =>
+    consume(fn.pSealTo(u8(publicKey), u8(publicKey).length, u8(secret), u8(secret).length,
+      u8(recipientKemPublic), u8(recipientKemPublic).length), 'portable_seal_to'),
+  openAccountTo: (envelope, recipientKemSecret) =>
+    splitBlob(consume(fn.pOpenTo(u8(envelope), u8(envelope).length,
+      u8(recipientKemSecret), u8(recipientKemSecret).length), 'portable_open_to')),
+  sealAccountSignedTo: (publicKey, secret, recipientKemPublic, senderSigSecret) =>
+    consume(fn.pSealSigned(u8(publicKey), u8(publicKey).length, u8(secret), u8(secret).length,
+      u8(recipientKemPublic), u8(recipientKemPublic).length,
+      u8(senderSigSecret), u8(senderSigSecret).length), 'portable_seal_signed_to'),
+  openAccountSignedFrom: (envelope, recipientKemSecret, senderSigPublic) =>
+    splitBlob(consume(fn.pOpenSigned(u8(envelope), u8(envelope).length,
+      u8(recipientKemSecret), u8(recipientKemSecret).length,
+      u8(senderSigPublic), u8(senderSigPublic).length), 'portable_open_signed_from')),
 
   ethAddress: (secret32) => consume(fn.ethAddr(u8(secret32)), 'eth_address').toString('utf8'),
   btcAddress: (secret32) => consume(fn.btcAddr(u8(secret32)), 'btc_address').toString('utf8'),

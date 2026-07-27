@@ -24,7 +24,8 @@ public final class Blockchainer implements AutoCloseable {
             submit, submitFee, produce, height, balance, nonce, mempool, stateRoot, drain, metrics, prove,
             verifyProof, ethAddr, btcAddr, solAddr, bufFree, strFree,
             newAccountHybrid, submitHybrid,
-            ksNew, ksAdd, ksReveal, ksSerialise, ksLoad, ksUnlock, ksUnlocked, ksFree;
+            ksNew, ksAdd, ksReveal, ksSerialise, ksLoad, ksUnlock, ksUnlocked, ksFree,
+            kemKeygen, pSealPass, pOpenPass, pSealTo, pOpenTo, pSealSigned, pOpenSigned;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -63,6 +64,13 @@ public final class Blockchainer implements AutoCloseable {
         ksUnlock   = h("blockchainer_keystore_unlock", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
         ksUnlocked = h("blockchainer_keystore_unlocked", FunctionDescriptor.of(JAVA_INT, ADDRESS));
         ksFree     = h("blockchainer_keystore_free", FunctionDescriptor.ofVoid(ADDRESS));
+        kemKeygen  = h("blockchainer_hybrid_kem_keygen", FunctionDescriptor.of(RES));
+        pSealPass  = h("blockchainer_portable_seal_passphrase", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
+        pOpenPass  = h("blockchainer_portable_open_passphrase", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS));
+        pSealTo    = h("blockchainer_portable_seal_to", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        pOpenTo    = h("blockchainer_portable_open_to", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        pSealSigned= h("blockchainer_portable_seal_signed_to", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        pOpenSigned= h("blockchainer_portable_open_signed_from", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -75,6 +83,61 @@ public final class Blockchainer implements AutoCloseable {
     public String ethAddress(byte[] secret32) { return new String(call1(ethAddr, secret32), StandardCharsets.UTF_8); }
     public String btcAddress(byte[] secret32) { return new String(call1(btcAddr, secret32), StandardCharsets.UTF_8); }
     public String solAddress(byte[] edSecret) { return new String(call1(solAddr, edSecret), StandardCharsets.UTF_8); }
+
+    // ── Portable account export (tiered encrypted backup) ──────────────────────
+
+    /** A signing account's material (or a KEM device key), returned by the open calls. */
+    public record PortableAccount(byte[] publicKey, byte[] secret) {}
+
+    private PortableAccount splitBlob(byte[] blob) {
+        int pl = ((blob[0] & 0xFF) << 24) | ((blob[1] & 0xFF) << 16) | ((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF);
+        return new PortableAccount(java.util.Arrays.copyOfRange(blob, 4, 4 + pl),
+                                   java.util.Arrays.copyOfRange(blob, 4 + pl, blob.length));
+    }
+
+    /** A hybrid-KEM device keypair for the recipient-bound export tiers. */
+    public PortableAccount hybridKemKeypair() {
+        try { return splitBlob(consume((MemorySegment) kemKeygen.invoke(arena.allocate(RES)))); }
+        catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    /** Tier 1 — seal an account under a passphrase (ops=mem=0 → SENSITIVE preset). */
+    public byte[] sealAccountPassphrase(byte[] pub, byte[] secret, String passphrase, long ops, long mem) {
+        try { return consume((MemorySegment) pSealPass.invoke(arena.allocate(RES), seg(pub), (long) pub.length,
+                seg(secret), (long) secret.length, arena.allocateFrom(passphrase), ops, mem)); }
+        catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    public PortableAccount openAccountPassphrase(byte[] envelope, String passphrase) {
+        try { return splitBlob(consume((MemorySegment) pOpenPass.invoke(arena.allocate(RES),
+                seg(envelope), (long) envelope.length, arena.allocateFrom(passphrase)))); }
+        catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    /** Tier 2 — recipient-bound (PQ): only the device's KEM secret opens it. */
+    public byte[] sealAccountTo(byte[] pub, byte[] secret, byte[] recipientKemPublic) {
+        try { return consume((MemorySegment) pSealTo.invoke(arena.allocate(RES), seg(pub), (long) pub.length,
+                seg(secret), (long) secret.length, seg(recipientKemPublic), (long) recipientKemPublic.length)); }
+        catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    public PortableAccount openAccountTo(byte[] envelope, byte[] recipientKemSecret) {
+        try { return splitBlob(consume((MemorySegment) pOpenTo.invoke(arena.allocate(RES),
+                seg(envelope), (long) envelope.length, seg(recipientKemSecret), (long) recipientKemSecret.length))); }
+        catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    /** Tier 3 — signed-recipient (Fortress-grade): recipient-bound + the receiver verifies the owner. */
+    public byte[] sealAccountSignedTo(byte[] pub, byte[] secret, byte[] recipientKemPublic, byte[] senderSigSecret) {
+        try { return consume((MemorySegment) pSealSigned.invoke(arena.allocate(RES), seg(pub), (long) pub.length,
+                seg(secret), (long) secret.length, seg(recipientKemPublic), (long) recipientKemPublic.length,
+                seg(senderSigSecret), (long) senderSigSecret.length)); }
+        catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    public PortableAccount openAccountSignedFrom(byte[] envelope, byte[] recipientKemSecret, byte[] senderSigPublic) {
+        try { return splitBlob(consume((MemorySegment) pOpenSigned.invoke(arena.allocate(RES),
+                seg(envelope), (long) envelope.length, seg(recipientKemSecret), (long) recipientKemSecret.length,
+                seg(senderSigPublic), (long) senderSigPublic.length))); }
+        catch (Throwable t) { throw new RuntimeException(t); }
+    }
 
     public boolean verifyStateProof(byte[] root, byte[] proof) {
         try { return (int) verifyProof.invoke(seg(root), seg(proof), (long) proof.length) == 1; }
