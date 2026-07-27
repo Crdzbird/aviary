@@ -65,6 +65,16 @@ Bytes take_buffer(CryptoBuffer& b) {
 }
 }  // namespace
 
+Bytes random_bytes(std::size_t n) {
+  CryptoBufferResult r = cryptolib_random_bytes(n);
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "random_bytes failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
 KeyPair ed25519_keygen() {
   CryptoKeyPair kp = cryptolib_ed25519_keygen();
   KeyPair out{take_buffer(kp.public_key), take_buffer(kp.secret_key)};

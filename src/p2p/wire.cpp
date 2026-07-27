@@ -7,7 +7,7 @@ codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()
 
 bool valid_type(std::uint8_t t) {
   return t >= static_cast<std::uint8_t>(MessageType::kHello) &&
-         t <= static_cast<std::uint8_t>(MessageType::kConsensus);
+         t <= static_cast<std::uint8_t>(MessageType::kAdmissionPresentation);
 }
 
 void expect(const Message& m, MessageType t) {
@@ -155,6 +155,40 @@ ConsensusMsg as_consensus(const Message& m) {
   c.block = r.read_bytes();
   r.assert_fully_consumed();
   return c;
+}
+
+// ── Admission (anonymous membership; docs/design/CREDENTIAL_GATE.md §6) ───────
+
+Message make(const AdmissionChallenge& a) {
+  codec::CodecWriter w;
+  w.write_u32(a.epoch);
+  w.write_bytes(view(a.challenge));
+  return Message{MessageType::kAdmissionChallenge, w.take()};
+}
+
+AdmissionChallenge as_admission_challenge(const Message& m) {
+  expect(m, MessageType::kAdmissionChallenge);
+  codec::CodecReader r(view(m.payload));
+  AdmissionChallenge a;
+  a.epoch = r.read_u32();
+  a.challenge = r.read_bytes();
+  r.assert_fully_consumed();
+  return a;
+}
+
+Message make(const AdmissionPresentation& a) {
+  codec::CodecWriter w;
+  w.write_bytes(view(a.presentation));
+  return Message{MessageType::kAdmissionPresentation, w.take()};
+}
+
+AdmissionPresentation as_admission_presentation(const Message& m) {
+  expect(m, MessageType::kAdmissionPresentation);
+  codec::CodecReader r(view(m.payload));
+  AdmissionPresentation a;
+  a.presentation = r.read_bytes();
+  r.assert_fully_consumed();
+  return a;
 }
 
 }  // namespace blockchainer::wire

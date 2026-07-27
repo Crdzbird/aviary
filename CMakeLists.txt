@@ -107,6 +107,7 @@ add_library(blockchainer_core STATIC
   src/consensus/vrf_pos.cpp
   src/consensus/credential_gate.cpp
   src/p2p/mempool.cpp
+  src/p2p/admission.cpp
   src/p2p/sealed_mempool.cpp
   src/p2p/gossip.cpp
   src/p2p/peer_book.cpp
@@ -243,6 +244,7 @@ blockchainer_add_test(test_profiled_validator tests/test_profiled_validator.cpp)
 blockchainer_add_test(test_remote_guard tests/test_remote_guard.cpp)
 blockchainer_add_test(test_bbs tests/test_bbs.cpp)
 blockchainer_add_test(test_credential_gate tests/test_credential_gate.cpp)
+blockchainer_add_test(test_admission tests/test_admission.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

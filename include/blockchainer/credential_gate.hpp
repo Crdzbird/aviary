@@ -37,6 +37,14 @@ inline constexpr std::uint64_t kIssuerEpoch = 3;   ///< u32, always disclosed (i
 inline constexpr std::uint32_t kBaseCount = 4;     ///< the four well-known attributes
 }  // namespace credential_attr
 
+/// The membership/pseudonym epoch a given block height falls in (§10.5).
+/// [epoch_length] is heights-per-epoch; 0 disables rotation (a single epoch 0).
+/// Deterministic — every node derives the same epoch from the same height, so a
+/// presentation's epoch binding is unambiguous.
+inline std::uint32_t membership_epoch(std::uint64_t height, std::uint32_t epoch_length) {
+  return epoch_length == 0 ? 0u : static_cast<std::uint32_t>(height / epoch_length);
+}
+
 /// The membership policy a chain enforces. Its [hash] is designed to be committed
 /// into the genesis (like [AssuranceProfile]) so every node provably agrees on
 /// the issuer, schema, and threshold — see CREDENTIAL_GATE.md §7. (Wiring it into

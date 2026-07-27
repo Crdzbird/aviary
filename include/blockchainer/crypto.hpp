@@ -53,6 +53,11 @@ Hash zero_hash();
 using Bytes = std::vector<std::uint8_t>;
 using ByteView = std::span<const std::uint8_t>;
 
+/// [n] cryptographically secure random bytes. For transport-layer nonces
+/// (challenges, session salts) — NEVER for consensus-critical logic, which must
+/// stay deterministic. Throws std::runtime_error on backend failure.
+Bytes random_bytes(std::size_t n);
+
 struct KeyPair {
   Bytes public_key;  ///< 32 bytes
   Bytes secret_key;  ///< 64 bytes
