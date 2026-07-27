@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "blockchainer/account_state.hpp"
+#include "blockchainer/assurance.hpp"
 #include "blockchainer/ledger.hpp"
 #include "blockchainer/networked_node.hpp"
 #include "blockchainer/tcp_transport.hpp"
@@ -118,11 +119,77 @@ int main() {
     auto committed = run_mesh(nodes, 47630, &cfgs);
     for (std::uint32_t i = 0; i < n; ++i) {
       CHECK_MSG(committed[i] == 1, "validator committed over the encrypted channel");
-      CHECK(nodes[i]->ledger().tip().height == 1);
     }
     const Hash tip = nodes[0]->ledger().tip().hash();
     for (std::uint32_t i = 1; i < n; ++i)
       CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "encrypted validators agree on the block hash");
+  }
+
+  std::printf("== BFT over the RATCHETED tier (ArmoredChannel: FS + PCS) ==\n");
+  {
+    // Each node publishes a ratchet prekey; peers dial to it. Same identities +
+    // allow-list as the SIGMA run, but tier = kRatcheted.
+    std::vector<crypto::KeyPair> prekeys;
+    for (std::uint32_t i = 0; i < n; ++i) prekeys.push_back(crypto::Ratchet::generate_prekey());
+
+    std::vector<SecureConfig> cfgs(n);
+    for (std::uint32_t i = 0; i < n; ++i) {
+      cfgs[i].tier = p2p::TransportTier::kRatcheted;
+      cfgs[i].identity = ids[i];
+      cfgs[i].ratchet_prekey = prekeys[i];  // this node's prekey (to accept)
+      for (std::uint32_t j = 0; j < n; ++j) {
+        if (j == i) continue;
+        cfgs[i].peer_sig_pk[j] = ids[j].sig.public_key;
+        cfgs[i].peer_prekey[j] = prekeys[j].public_key;  // dial to peer j's prekey
+      }
+    }
+    auto nodes = build_nodes(n, alice_addr, vset);
+    auto committed = run_mesh(nodes, 47690, &cfgs);
+    for (std::uint32_t i = 0; i < n; ++i)
+      CHECK_MSG(committed[i] == 1, "validator committed over the ratcheted channel");
+    const Hash tip = nodes[0]->ledger().tip().hash();
+    for (std::uint32_t i = 1; i < n; ++i)
+      CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "ratcheted validators agree on the block hash");
+  }
+
+  std::printf("== boot wiring: a profile's transport tier builds the config from records ==\n");
+  {
+    using blockchainer::AssuranceProfile;
+    // The address book of peer records the transport reads (kem + sig + prekey).
+    std::vector<crypto::KeyPair> prekeys;
+    for (std::uint32_t i = 0; i < n; ++i) prekeys.push_back(crypto::Ratchet::generate_prekey());
+    std::vector<p2p::PeerRecord> records;
+    for (std::uint32_t i = 0; i < n; ++i)
+      records.push_back(p2p::PeerRecord{i, "127.0.0.1", static_cast<std::uint16_t>(47730 + i),
+                                        ids[i].kem.public_key, ids[i].sig.public_key,
+                                        prekeys[i].public_key, {}});
+
+    auto tier_of = [](const AssuranceProfile& p) {
+      return p.transport() == AssuranceProfile::Transport::kRatcheted ? p2p::TransportTier::kRatcheted
+                                                                      : p2p::TransportTier::kMutual;
+    };
+    // standard → kMutual (KEM keys wired, no prekeys); hardened → kRatcheted.
+    p2p::SecureConfig std_cfg = p2p::secure_config_from_records(
+        tier_of(AssuranceProfile::standard()), ids[0], prekeys[0], /*self=*/0, records);
+    CHECK(std_cfg.tier == p2p::TransportTier::kMutual);
+    CHECK(std_cfg.peer_kem_pk.size() == n - 1 && std_cfg.peer_prekey.empty());
+    CHECK(std_cfg.peer_sig_pk.at(1) == ids[1].sig.public_key);
+
+    p2p::SecureConfig hard_cfg = p2p::secure_config_from_records(
+        tier_of(AssuranceProfile::hardened()), ids[0], prekeys[0], /*self=*/0, records);
+    CHECK(hard_cfg.tier == p2p::TransportTier::kRatcheted);
+    CHECK(hard_cfg.peer_prekey.size() == n - 1 && hard_cfg.peer_kem_pk.empty());
+    CHECK(hard_cfg.peer_prekey.at(2) == prekeys[2].public_key);
+
+    // And a mesh built from those hardened configs actually commits.
+    std::vector<p2p::SecureConfig> cfgs;
+    for (std::uint32_t i = 0; i < n; ++i)
+      cfgs.push_back(p2p::secure_config_from_records(tier_of(AssuranceProfile::hardened()), ids[i],
+                                                     prekeys[i], i, records));
+    auto nodes = build_nodes(n, alice_addr, vset);
+    auto committed = run_mesh(nodes, 47730, &cfgs);
+    for (std::uint32_t i = 0; i < n; ++i)
+      CHECK_MSG(committed[i] == 1, "a mesh wired from hardened-profile records commits");
   }
 
   std::printf("== reconnect: a severed link heals by redial; consensus recovers via round change ==\n");

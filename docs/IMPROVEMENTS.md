@@ -93,9 +93,20 @@
   posture and drives them to commit (standard→PoS one height, hardened→VRF three
   heights, all agreeing on the tip), asserts the signature gate reaches the state
   layer, and rejects inconsistent / unknown / VRF-without-keys genesises.
-  Deterministic (fixed-seed VRF keys), ASan-clean. **Remaining:** auto-wire the
-  transport tier (mutual vs ratcheted) and the sealed mempool into the same boot
-  path, and epoch/validator-set changes.
+  Deterministic (fixed-seed VRF keys), ASan-clean.
+  **Transport-tier wiring DONE:** `run_tcp_bft_node`'s `SecureConfig` now carries
+  a `TransportTier` — `kMutual` (the SIGMA `SecureSession`) or `kRatcheted` (the
+  `ArmoredChannel` PQ Double Ratchet, per-message FS + post-compromise healing).
+  The reactor grew the ratchet path (Conn holds `chan` XOR `sess`; a per-frame
+  1-byte control tag carries a keepalive so the initiator can prime the
+  responder's sending chain — a ratchet responder can't speak until it decrypts
+  once, which would otherwise deadlock a proposer that dialed in). `secure_config_
+  from_records(tier, identity, prekey, self, records)` is the boot bridge: a node
+  maps `profile.transport()` → tier and hands its address book. `test_tcp_
+  transport.cpp` runs BFT over the ratcheted tier AND builds a committing mesh
+  straight from hardened-profile peer records; ASan/UBSan + TSan clean, 8/8
+  stable. **Remaining:** wire the sealed mempool into the boot path (blocked on
+  the epoch-proposer-key design), and epoch/validator-set changes.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

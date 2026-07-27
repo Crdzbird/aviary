@@ -1,5 +1,7 @@
 #include "blockchainer/tcp_transport.hpp"
 
+#include "blockchainer/armored.hpp"
+
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -107,18 +109,78 @@ int dial_once(const std::string& host, std::uint16_t port) {
 }
 
 // Per-connection state. `ready` means the link is usable for consensus: for a
-// plaintext dialer that is immediate; for an accepter it waits for the id hello;
-// under [SecureConfig] it waits for the handshake to complete.
+// plaintext (or ratcheted) dialer that is immediate; for an accepter it waits
+// for the hello; under the SIGMA tier the dialer also waits for msg2. Exactly
+// one of sess/chan is set in secure mode (per the config tier).
 struct Conn {
   bool dialer = false;
   std::uint32_t peer_id = 0;
   bool ready = false;
+  // A Double-Ratchet responder cannot encrypt until it has decrypted its first
+  // message ("no sending chain yet"). So a ratcheted accepter starts unable to
+  // send; its outbound consensus is buffered here until the initiator's priming
+  // frame arrives and opens its sending chain. Everyone else can send at once.
+  bool can_send = true;
+  std::vector<Bytes> send_backlog;
   Bytes in;                             // inbound bytes awaiting frame reassembly
   Bytes out;                            // outbound framed bytes awaiting POLLOUT flush
-  std::unique_ptr<SecureSession> sess;  // secure mode only
+  std::unique_ptr<SecureSession> sess;  // kMutual tier
+  std::unique_ptr<ArmoredChannel> chan; // kRatcheted tier
 };
 
+crypto::ByteView cv(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
+
+// The ratcheted tier wraps each plaintext in a 1-byte control tag: 0x01 = a data
+// frame (consensus), 0x00 = a keepalive/priming frame (no payload). The tag lets
+// the initiator prime the responder's sending chain without injecting a bogus
+// consensus message — and cryptolib's AEAD rejects an empty plaintext, so the
+// keepalive must carry at least this byte.
+constexpr std::uint8_t kFrameData = 0x01;
+constexpr std::uint8_t kFrameKeepalive = 0x00;
+
+// Frame crypto that dispatches on the connection's tier (plaintext if neither).
+Bytes conn_encrypt(Conn& c, const Bytes& pt) {
+  if (c.chan) {
+    Bytes framed;
+    framed.reserve(pt.size() + 1);
+    framed.push_back(kFrameData);
+    framed.insert(framed.end(), pt.begin(), pt.end());
+    return c.chan->encrypt(framed);
+  }
+  if (c.sess) return c.sess->encrypt(pt);
+  return pt;
+}
+// Returns the consensus payload, or empty for a ratcheted keepalive (which the
+// caller treats as "received, not a message"). Throws on tamper.
+Bytes conn_decrypt(Conn& c, const Bytes& frame) {
+  if (c.chan) {
+    Bytes plain = c.chan->decrypt(frame);
+    if (plain.empty() || plain.front() == kFrameKeepalive) return {};
+    return Bytes(plain.begin() + 1, plain.end());
+  }
+  return c.sess->decrypt(frame);  // secure mode guarantees exactly one is set
+}
+
 }  // namespace
+
+SecureConfig secure_config_from_records(TransportTier tier, SecureSession::Identity identity,
+                                        crypto::KeyPair prekey, std::uint32_t self_id,
+                                        const std::vector<PeerRecord>& records) {
+  SecureConfig cfg;
+  cfg.tier = tier;
+  cfg.identity = std::move(identity);
+  cfg.ratchet_prekey = std::move(prekey);
+  for (const PeerRecord& r : records) {
+    if (r.id == self_id) continue;
+    cfg.peer_sig_pk[r.id] = r.sig_pk;                     // both tiers: allow-list / pin
+    if (tier == TransportTier::kMutual) {
+      cfg.peer_kem_pk[r.id] = r.kem_pk;                   // SIGMA dials to the KEM key
+    } else if (!r.prekey.empty()) {
+      cfg.peer_prekey[r.id] = r.prekey;                   // ratchet dials to the prekey
+    }
+  }
+  return cfg;
+}
 
 bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
                       const std::vector<PeerAddr>& peers, int deadline_ms, const SecureConfig* secure,
@@ -130,6 +192,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   std::map<Bytes, std::uint32_t> id_by_sig;
   if (secure)
     for (const auto& [id, pk] : secure->peer_sig_pk) id_by_sig[pk] = id;
+  const bool ratcheted = secure && secure->tier == TransportTier::kRatcheted;
 
   int listener = make_listener(listen_port);
   if (listener < 0) return false;
@@ -203,6 +266,20 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     if (!flush(fd, c)) drop(fd);
   };
 
+  // Send a consensus payload on [fd], encrypting per the connection's tier. A
+  // ratcheted responder that can't send yet (no sending chain) buffers it until
+  // the initiator's priming frame opens the chain.
+  auto send_payload = [&](int fd, const Bytes& plaintext) {
+    auto it = conns.find(fd);
+    if (it == conns.end()) return;
+    Conn& c = it->second;
+    if (!c.can_send) {
+      c.send_backlog.push_back(plaintext);
+      return;
+    }
+    queue_frame(fd, secure ? conn_encrypt(c, plaintext) : plaintext);
+  };
+
   bool started = false;
 
   // A link just became usable for consensus. If consensus already started, the
@@ -214,9 +291,8 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     fd_by_peer[c.peer_id] = fd;
     if (!started) return true;
     for (const Bytes& payload : node.replay_log()) {
-      auto cit = conns.find(fd);
-      if (cit == conns.end()) return false;  // dropped (overflow) — caller must stop
-      queue_frame(fd, secure ? cit->second.sess->encrypt(payload) : payload);
+      if (conns.find(fd) == conns.end()) return false;  // dropped (overflow) — caller must stop
+      send_payload(fd, payload);
     }
     return conns.count(fd) != 0;
   };
@@ -235,7 +311,26 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     Conn c;
     c.dialer = true;
     c.peer_id = p.id;
-    if (secure) {
+    if (ratcheted) {
+      // Ratchet initiator: encapsulate to the peer's published prekey, pin its
+      // identity. The channel opens immediately (no msg2 round), so — like the
+      // plaintext dialer — it is ready at once; the armored hello goes out ahead
+      // of any encrypted consensus frame.
+      auto [chan, hello] = ArmoredChannel::initiate(cv(secure->peer_prekey.at(p.id)),
+                                                    cv(secure->peer_sig_pk.at(p.id)),
+                                                    secure->identity.sig);
+      c.chan = std::make_unique<ArmoredChannel>(std::move(chan));
+      c.ready = true;
+      conns.emplace(fd, std::move(c));
+      queue_frame(fd, hello);
+      auto cit = conns.find(fd);
+      if (cit != conns.end()) {
+        // Prime the responder: a keepalive frame it can decrypt opens its
+        // sending chain (a ratchet responder can't speak until it receives).
+        queue_frame(fd, cit->second.chan->encrypt(Bytes{kFrameKeepalive}));
+        on_link_ready(fd, cit->second);
+      }
+    } else if (secure) {
       auto [s, msg1] = SecureSession::begin_initiator(secure->peer_kem_pk.at(p.id), secure->identity.sig);
       c.sess = std::make_unique<SecureSession>(std::move(s));
       conns.emplace(fd, std::move(c));
@@ -265,12 +360,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
       auto it = fd_by_peer.find(r.to);
       if (it == fd_by_peer.end()) continue;  // link down — gossip is best-effort
       const int fd = it->second;
-      if (secure) {
-        auto cit = conns.find(fd);
-        if (cit != conns.end() && cit->second.sess) queue_frame(fd, cit->second.sess->encrypt(r.message));
-      } else {
-        queue_frame(fd, r.message);
-      }
+      send_payload(fd, r.message);
     }
     for (const auto& t : out.timeouts) timers.push_back({now_ms(start) + kTimeoutMs, t.step, t.round});
   };
@@ -366,13 +456,48 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
           // A live consensus frame.
           if (secure) {
             try {
-              pending.emplace_back(c.peer_id, c.sess->decrypt(frame));
+              Bytes pt = conn_decrypt(c, frame);
+              // Receiving anything opens a ratcheted responder's sending chain;
+              // flush whatever it buffered while it couldn't speak.
+              if (!c.can_send) {
+                c.can_send = true;
+                for (const Bytes& b : c.send_backlog) queue_frame(fd, conn_encrypt(c, b));
+                c.send_backlog.clear();
+              }
+              // An empty plaintext is a transport priming/keepalive, not a
+              // consensus message — a real wire message is never zero-length.
+              if (!pt.empty()) pending.emplace_back(c.peer_id, std::move(pt));
             } catch (...) {
               drop(fd);  // tamper / desync — cut the peer off (redial → fresh keys)
               dropped = true;
             }
           } else {
             pending.emplace_back(c.peer_id, std::move(frame));
+          }
+        } else if (ratcheted) {
+          // Ratchet responder consuming the armored hello: accept, map the
+          // authenticated initiator identity → validator id. No reply frame; the
+          // channel is open and the next frames are encrypted consensus.
+          try {
+            c.chan = std::make_unique<ArmoredChannel>(
+                ArmoredChannel::accept(frame, secure->ratchet_prekey, secure->identity.sig));
+          } catch (...) {
+            drop(fd);  // bad handshake / failed initiator auth
+            dropped = true;
+            continue;
+          }
+          auto found = id_by_sig.find(c.chan->peer_identity());
+          if (found == id_by_sig.end()) {
+            drop(fd);  // unknown identity — not on the allow-list
+            dropped = true;
+            continue;
+          }
+          c.peer_id = found->second;
+          c.ready = true;
+          c.can_send = false;  // responder can't encrypt until it decrypts once
+          if (!on_link_ready(fd, c)) {
+            dropped = true;
+            continue;
           }
         } else if (secure && c.dialer) {
           // Initiator consuming msg2: complete + pin the peer's identity.

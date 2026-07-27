@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "blockchainer/networked_node.hpp"
+#include "blockchainer/peer_book.hpp"
 #include "blockchainer/secure_session.hpp"
 
 /// Real-socket transport for a [NetworkedNode] — the last mile that turns the
@@ -32,19 +33,48 @@ struct PeerAddr {
   std::uint16_t port;
 };
 
-/// Opt-in encryption + authentication for the transport. When supplied, every
-/// connection runs the [SecureSession] handshake (dialer = initiator, accepter =
-/// responder) before any consensus byte flows, and every frame is then encrypted
-/// and integrity-protected. The dialer encapsulates to the peer's known KEM key
-/// and pins the peer's authenticated signing key; the accepter maps the
-/// authenticated signing key back to a validator id (an allow-list — an unknown
-/// identity is dropped). So consensus runs over a confidential, mutually-
-/// authenticated, post-quantum-hybrid channel with no plaintext on the wire.
+/// Opt-in encryption + authentication for the transport. Every connection runs
+/// a mutually-authenticated handshake (dialer = initiator, accepter = responder)
+/// before any consensus byte flows, and every frame is then encrypted; an
+/// unknown identity is dropped (an allow-list). The [tier] picks which channel:
+///
+///   - `kMutual` — the SIGMA [SecureSession]: one-shot hybrid-KEM + signed
+///     transcript. Confidential, mutually authenticated, PQ.
+///   - `kRatcheted` — the [ArmoredChannel] hybrid-KEM Double Ratchet: adds
+///     per-message forward secrecy + post-compromise healing on long-lived
+///     links. The dialer encapsulates to the peer's published ratchet prekey.
+///
+/// The tier is what an `AssuranceProfile` selects; `secure_config_for` builds
+/// the matching config from a node's identity + its peers' records.
+enum class TransportTier { kMutual, kRatcheted };
+
 struct SecureConfig {
-  SecureSession::Identity identity;              ///< this node's long-term identity
-  std::map<std::uint32_t, Bytes> peer_kem_pk;   ///< peer id → KEM public key (to dial)
-  std::map<std::uint32_t, Bytes> peer_sig_pk;   ///< peer id → signing public key (to pin / allow-list)
+  TransportTier tier = TransportTier::kMutual;
+  SecureSession::Identity identity;              ///< this node's long-term identity (its .sig authenticates)
+  std::map<std::uint32_t, Bytes> peer_sig_pk;   ///< peer id → signing public key (pin / allow-list; both tiers)
+
+  // kMutual: the SIGMA KEM keys.
+  std::map<std::uint32_t, Bytes> peer_kem_pk;   ///< peer id → hybrid-KEM public key (to dial)
+
+  // kRatcheted: the ratchet prekeys.
+  crypto::KeyPair ratchet_prekey;               ///< this node's ratchet prekey (to accept)
+  std::map<std::uint32_t, Bytes> peer_prekey;   ///< peer id → ratchet prekey public key (to dial)
 };
+
+/// Assemble the transport [SecureConfig] for validator [self_id] at [tier] from
+/// its long-term [identity], its ratchet [prekey], and the authenticated peer
+/// [records] (each supplying the peer's KEM key, signing key, and ratchet
+/// prekey). This is the boot-time bridge from an `AssuranceProfile` — a node
+/// maps `profile.transport()` to a [TransportTier] and passes its address book:
+///
+///   AssuranceProfile::Transport::kMutual    → TransportTier::kMutual
+///   AssuranceProfile::Transport::kRatcheted → TransportTier::kRatcheted
+///
+/// Peers with `id == self_id` are skipped; a record missing the material the
+/// tier needs simply contributes nothing for that peer.
+SecureConfig secure_config_from_records(TransportTier tier, SecureSession::Identity identity,
+                                        crypto::KeyPair prekey, std::uint32_t self_id,
+                                        const std::vector<PeerRecord>& records);
 
 /// Fault injection for tests: after [after_frames] complete frames have arrived
 /// from [peer], the node closes that connection once — simulating a mid-consensus
