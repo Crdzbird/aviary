@@ -295,3 +295,82 @@ func TestKeyStoreCustodialSigning(t *testing.T) {
 		t.Fatal("wrong passphrase unlocked the keystore")
 	}
 }
+
+// TestPortableAccountTiers exercises the three encrypted-export tiers over the
+// C ABI: a passphrase backup, a recipient-bound (PQ) backup to a device key, and
+// a signed-recipient (Fortress-grade) backup that also authenticates the owner.
+// Every wrong-key / wrong-passphrase / wrong-signer path must fail closed.
+func TestPortableAccountTiers(t *testing.T) {
+	// The account to back up: a hybrid account gives us a real (public, secret).
+	n := bc.NewNode(7)
+	defer n.Free()
+	secret, public, _, err := n.NewAccountHybrid()
+	if err != nil {
+		t.Fatal(err)
+	}
+	acct := bc.PortableAccount{Public: public, Secret: secret}
+
+	// Tier 1 — passphrase. Light Argon2id factors keep the test fast.
+	env, err := acct.SealPassphrase("backup-phrase", 3, 1<<16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := bc.OpenPassphrase(env, "backup-phrase")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(back.Secret, secret) || !bytes.Equal(back.Public, public) {
+		t.Fatal("passphrase round-trip lost the account")
+	}
+	if _, err := bc.OpenPassphrase(env, "wrong"); err == nil {
+		t.Fatal("wrong passphrase opened the envelope")
+	}
+
+	// A device key for the recipient-bound tiers.
+	devPub, devSec, err := bc.HybridKEMKeypair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Tier 2 — recipient-bound.
+	env2, err := acct.SealTo(devPub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back2, err := bc.OpenTo(env2, devSec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(back2.Secret, secret) {
+		t.Fatal("recipient round-trip lost the secret")
+	}
+	strangerPub, strangerSec, _ := bc.HybridKEMKeypair()
+	_ = strangerPub
+	if _, err := bc.OpenTo(env2, strangerSec); err == nil {
+		t.Fatal("a different device opened a recipient-bound envelope")
+	}
+
+	// Tier 3 — signed-recipient. Sign with a hybrid sig secret; the receiver
+	// verifies it. Reuse the account's hybrid signing secret as the owner key.
+	env3, err := acct.SealSignedTo(devPub, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back3, err := bc.OpenSignedFrom(env3, devSec, public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(back3.Secret, secret) {
+		t.Fatal("signed-recipient round-trip lost the secret")
+	}
+	// Wrong expected signer → rejected (authenticity).
+	if _, err := bc.OpenSignedFrom(env3, devSec, strangerPub); err == nil {
+		t.Fatal("an envelope not signed by the expected owner opened")
+	}
+	// Tampered envelope → rejected.
+	tampered := append([]byte(nil), env3...)
+	tampered[len(tampered)/2] ^= 0x01
+	if _, err := bc.OpenSignedFrom(tampered, devSec, public); err == nil {
+		t.Fatal("a tampered signed envelope opened")
+	}
+}

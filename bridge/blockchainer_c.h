@@ -211,6 +211,46 @@ BLOCKCHAINER_API int blockchainer_keystore_unlocked(BlockchainerKeyStore ks);
 /** Destroy a key-store handle. */
 BLOCKCHAINER_API void blockchainer_keystore_free(BlockchainerKeyStore ks);
 
+/* ── Portable account export (tiered encrypted backup) ─────────────────────────
+ * Move one signing account off the node under a chosen trust tier, all fail-
+ * closed. An account is a (public_key, secret) pair; the "open" calls return it
+ * as a self-describing blob: [pub_len:4 BE][public_key][secret] (the same layout
+ * blockchainer_node_new_account_hybrid uses), so a binding unpacks it once and
+ * reuses that helper. */
+
+/** A hybrid KEM keypair (X25519 + ML-KEM-768) — a "device key" for the
+ *  recipient-bound tiers. Returns [pub_len:4 BE][public][secret], or an error. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_hybrid_kem_keygen(void);
+
+/** Tier 1 — passphrase (MolecularVault + Argon2id). ops/mem are Argon2id work
+ *  factors; pass 0,0 for the SENSITIVE preset. Returns the sealed envelope. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_portable_seal_passphrase(
+    const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
+    const char* passphrase, uint64_t ops, size_t mem);
+/** Open a passphrase envelope → [pub_len:4 BE][public][secret]. Error on wrong
+ *  passphrase / tamper. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_portable_open_passphrase(
+    const uint8_t* envelope, size_t env_len, const char* passphrase);
+
+/** Tier 2 — recipient-bound (PQ). Seal to a device's hybrid-KEM public key; only
+ *  its KEM secret opens it. No shared secret to phish. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_portable_seal_to(
+    const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
+    const uint8_t* recipient_kem_public, size_t rk_len);
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_portable_open_to(
+    const uint8_t* envelope, size_t env_len, const uint8_t* recipient_kem_secret, size_t rk_len);
+
+/** Tier 3 — signed-recipient (Fortress-grade): recipient-bound AND authenticated.
+ *  The receiver verifies the owner's hybrid signature on open. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_portable_seal_signed_to(
+    const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
+    const uint8_t* recipient_kem_public, size_t rk_len,
+    const uint8_t* sender_sig_secret, size_t ss_len);
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_portable_open_signed_from(
+    const uint8_t* envelope, size_t env_len,
+    const uint8_t* recipient_kem_secret, size_t rk_len,
+    const uint8_t* sender_sig_public, size_t sp_len);
+
 /* ── Interop address derivation (showcase) ─────────────────────────────────── */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */

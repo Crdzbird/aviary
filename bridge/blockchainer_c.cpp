@@ -61,6 +61,25 @@ blockchainer::custody::KeyStore* as_ks(BlockchainerKeyStore k) {
   return static_cast<blockchainer::custody::KeyStore*>(k);
 }
 
+// Pack a {public_key, secret} pair as the self-describing account blob
+// [pub_len:4 BE][public][secret] — the same layout new_account_hybrid emits.
+BlockchainerBufferResult account_blob(const blockchainer::crypto::Bytes& pub,
+                                      const blockchainer::crypto::Bytes& sec) {
+  std::vector<std::uint8_t> out;
+  const std::uint32_t pl = static_cast<std::uint32_t>(pub.size());
+  out.push_back(static_cast<std::uint8_t>((pl >> 24) & 0xFF));
+  out.push_back(static_cast<std::uint8_t>((pl >> 16) & 0xFF));
+  out.push_back(static_cast<std::uint8_t>((pl >> 8) & 0xFF));
+  out.push_back(static_cast<std::uint8_t>(pl & 0xFF));
+  out.insert(out.end(), pub.begin(), pub.end());
+  out.insert(out.end(), sec.begin(), sec.end());
+  return bytes_result(out);
+}
+
+blockchainer::crypto::ByteView cbv(const std::uint8_t* p, std::size_t n) {
+  return blockchainer::crypto::ByteView(p, n);
+}
+
 }  // namespace
 
 extern "C" {
@@ -405,6 +424,92 @@ int blockchainer_keystore_unlocked(BlockchainerKeyStore ks) {
 }
 
 void blockchainer_keystore_free(BlockchainerKeyStore ks) { delete as_ks(ks); }
+
+// ── Portable account export (tiered encrypted backup) ─────────────────────────
+
+BlockchainerBufferResult blockchainer_hybrid_kem_keygen(void) {
+  try {
+    auto kp = blockchainer::crypto::hybrid_kem_keygen();
+    return account_blob(kp.public_key, kp.secret_key);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_portable_seal_passphrase(
+    const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
+    const char* passphrase, uint64_t ops, size_t mem) {
+  try {
+    blockchainer::custody::PortableAccount acct{
+        blockchainer::crypto::Bytes(public_key, public_key + pk_len),
+        blockchainer::crypto::Bytes(secret, secret + sk_len)};
+    return bytes_result(acct.seal_passphrase(passphrase ? passphrase : "", ops, mem));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_portable_open_passphrase(
+    const uint8_t* envelope, size_t env_len, const char* passphrase) {
+  try {
+    auto a = blockchainer::custody::PortableAccount::open_passphrase(cbv(envelope, env_len),
+                                                                    passphrase ? passphrase : "");
+    return account_blob(a.public_key, a.secret);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_portable_seal_to(
+    const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
+    const uint8_t* recipient_kem_public, size_t rk_len) {
+  try {
+    blockchainer::custody::PortableAccount acct{
+        blockchainer::crypto::Bytes(public_key, public_key + pk_len),
+        blockchainer::crypto::Bytes(secret, secret + sk_len)};
+    return bytes_result(acct.seal_to(cbv(recipient_kem_public, rk_len)));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_portable_open_to(
+    const uint8_t* envelope, size_t env_len, const uint8_t* recipient_kem_secret, size_t rk_len) {
+  try {
+    auto a = blockchainer::custody::PortableAccount::open_to(cbv(envelope, env_len),
+                                                            cbv(recipient_kem_secret, rk_len));
+    return account_blob(a.public_key, a.secret);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_portable_seal_signed_to(
+    const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
+    const uint8_t* recipient_kem_public, size_t rk_len,
+    const uint8_t* sender_sig_secret, size_t ss_len) {
+  try {
+    blockchainer::custody::PortableAccount acct{
+        blockchainer::crypto::Bytes(public_key, public_key + pk_len),
+        blockchainer::crypto::Bytes(secret, secret + sk_len)};
+    return bytes_result(acct.seal_signed_to(cbv(recipient_kem_public, rk_len),
+                                            cbv(sender_sig_secret, ss_len)));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_portable_open_signed_from(
+    const uint8_t* envelope, size_t env_len, const uint8_t* recipient_kem_secret, size_t rk_len,
+    const uint8_t* sender_sig_public, size_t sp_len) {
+  try {
+    auto a = blockchainer::custody::PortableAccount::open_signed_from(
+        cbv(envelope, env_len), cbv(recipient_kem_secret, rk_len), cbv(sender_sig_public, sp_len));
+    return account_blob(a.public_key, a.secret);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
 
 // ── Interop addresses ─────────────────────────────────────────────────────────
 
