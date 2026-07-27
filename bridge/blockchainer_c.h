@@ -311,6 +311,52 @@ BLOCKCHAINER_API int blockchainer_threshold_verify_share(
 BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_aggregate(
     BlockchainerCeremony c, const uint16_t* ids, const uint8_t* sig_shares, size_t count);
 
+/* ── AssuranceProfile (one security posture, describing every tier) ────────────
+ * A named posture fixes a consistent tier at every seam. Levels: 1 = standard,
+ * 2 = hardened, 3 = fortress. `describe` returns a fixed blob:
+ *   [transport u8 (0=mutual, 1=ratcheted)]
+ *   [consensus u8 (0=stake-weighted, 1=vrf)]
+ *   [threshold_custody u8 (0/1)]
+ *   [sealed_mempool  u8 (0/1)]
+ *   [sig_algo_count  u8][mandated SigAlgo bytes ...]
+ * so a consumer can wire the classes the posture requires. Unknown level → error. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_assurance_describe(uint16_t level);
+
+/* ── Transaction encoding ──────────────────────────────────────────────────────
+ * Encode a transaction from its fields into the canonical wire form (e.g. to
+ * seal into the mempool below). [fee] is only carried when version >= 2. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_tx_encode(
+    uint8_t version, uint64_t chain_id, uint8_t sig_algo, uint64_t fee,
+    const uint8_t* body, size_t body_len, const uint8_t* author, size_t author_len,
+    const uint8_t* signature, size_t sig_len);
+
+/* ── SealedMempool (anti-MEV: transactions invisible until inclusion) ──────────
+ * A submitter seals an encoded transaction to the block proposer's hybrid-KEM
+ * key; the pool orders by a cleartext fee hint WITHOUT decrypting, and only the
+ * proposer opens the winners at build time. A front-runner sees only ciphertext.
+ * Submission-only: committed blocks carry ordinary plaintext transactions. */
+
+/** Opaque sealed-mempool handle. */
+typedef void* BlockchainerSealedMempool;
+
+/** Seal an encoded transaction to [proposer_kem_public] → a SealedTx blob (its
+ *  cleartext fee hint is the transaction's declared fee). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_sealed_tx_seal(
+    const uint8_t* tx_encoded, size_t tx_len, const uint8_t* proposer_kem_public, size_t pk_len);
+
+BLOCKCHAINER_API BlockchainerSealedMempool blockchainer_sealed_mempool_new(size_t capacity);
+/** Admit a SealedTx (no decryption). Returns 1 if admitted, 0 if full/rejected. */
+BLOCKCHAINER_API int blockchainer_sealed_mempool_add(
+    BlockchainerSealedMempool m, const uint8_t* sealed_tx, size_t len);
+BLOCKCHAINER_API size_t blockchainer_sealed_mempool_size(BlockchainerSealedMempool m);
+/** Proposer-only: open up to [max] highest-fee submissions with the KEM secret.
+ *  Returns a blob: [count u32] then count × ( [tx_len u32][encoded tx] ). Entries
+ *  that don't decrypt / decode, or whose real fee != the committed hint, are
+ *  silently skipped. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_sealed_mempool_reveal(
+    BlockchainerSealedMempool m, const uint8_t* proposer_kem_secret, size_t sk_len, size_t max);
+BLOCKCHAINER_API void blockchainer_sealed_mempool_free(BlockchainerSealedMempool m);
+
 /* ── Interop address derivation (showcase) ─────────────────────────────────── */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */

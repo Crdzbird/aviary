@@ -13,8 +13,10 @@
 #include "blockchainer/interop/evm.hpp"
 #include "blockchainer/interop/solana.hpp"
 #include "blockchainer/keyring.hpp"
+#include "blockchainer/assurance.hpp"
 #include "blockchainer/node/demo_node.hpp"
 #include "blockchainer/proofs.hpp"
+#include "blockchainer/sealed_mempool.hpp"
 #include "blockchainer/threshold.hpp"
 #include "blockchainer/types.hpp"
 #include "blockchainer/version.hpp"
@@ -674,6 +676,114 @@ BlockchainerBufferResult blockchainer_threshold_aggregate(BlockchainerCeremony c
     return error_result(e.what());
   }
 }
+
+// ── AssuranceProfile ──────────────────────────────────────────────────────────
+
+BlockchainerBufferResult blockchainer_assurance_describe(uint16_t level) {
+  try {
+    blockchainer::AssuranceProfile p = [level]() {
+      switch (level) {
+        case 1: return blockchainer::AssuranceProfile::standard();
+        case 2: return blockchainer::AssuranceProfile::hardened();
+        case 3: return blockchainer::AssuranceProfile::fortress();
+        default: throw std::runtime_error("assurance: unknown profile level");
+      }
+    }();
+    std::vector<std::uint8_t> out;
+    out.push_back(p.transport() == blockchainer::AssuranceProfile::Transport::kRatcheted ? 1 : 0);
+    out.push_back(p.consensus() == blockchainer::AssuranceProfile::Consensus::kVrf ? 1 : 0);
+    out.push_back(p.threshold_custody() ? 1 : 0);
+    out.push_back(p.sealed_mempool() ? 1 : 0);
+    const auto algos = p.required_sig_algos();
+    out.push_back(static_cast<std::uint8_t>(algos.size()));
+    out.insert(out.end(), algos.begin(), algos.end());
+    return bytes_result(out);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+// ── Transaction encoding ──────────────────────────────────────────────────────
+
+BlockchainerBufferResult blockchainer_tx_encode(uint8_t version, uint64_t chain_id, uint8_t sig_algo,
+                                                uint64_t fee, const uint8_t* body, size_t body_len,
+                                                const uint8_t* author, size_t author_len,
+                                                const uint8_t* signature, size_t sig_len) {
+  try {
+    blockchainer::Transaction tx;
+    tx.version = version;
+    tx.chain_id = chain_id;
+    tx.sig_algo = sig_algo;
+    tx.fee = static_cast<blockchainer::codec::u128>(fee);
+    tx.body.assign(body, body + body_len);
+    tx.author.assign(author, author + author_len);
+    tx.signature.assign(signature, signature + sig_len);
+    return bytes_result(tx.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+// ── SealedMempool ─────────────────────────────────────────────────────────────
+
+namespace {
+blockchainer::p2p::SealedMempool* as_pool(BlockchainerSealedMempool m) {
+  return static_cast<blockchainer::p2p::SealedMempool*>(m);
+}
+}  // namespace
+
+BlockchainerBufferResult blockchainer_sealed_tx_seal(const uint8_t* tx_encoded, size_t tx_len,
+                                                     const uint8_t* proposer_kem_public,
+                                                     size_t pk_len) {
+  try {
+    blockchainer::Transaction tx = blockchainer::Transaction::decode_all(cbv(tx_encoded, tx_len));
+    blockchainer::p2p::SealedTx sealed =
+        blockchainer::p2p::SealedTx::seal(tx, cbv(proposer_kem_public, pk_len));
+    return bytes_result(sealed.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerSealedMempool blockchainer_sealed_mempool_new(size_t capacity) {
+  try {
+    return new blockchainer::p2p::SealedMempool(capacity);
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+int blockchainer_sealed_mempool_add(BlockchainerSealedMempool m, const uint8_t* sealed_tx,
+                                    size_t len) {
+  try {
+    return as_pool(m)->add(blockchainer::p2p::SealedTx::decode(cbv(sealed_tx, len))) ? 1 : 0;
+  } catch (...) {
+    return 0;
+  }
+}
+
+size_t blockchainer_sealed_mempool_size(BlockchainerSealedMempool m) { return as_pool(m)->size(); }
+
+BlockchainerBufferResult blockchainer_sealed_mempool_reveal(BlockchainerSealedMempool m,
+                                                            const uint8_t* proposer_kem_secret,
+                                                            size_t sk_len, size_t max) {
+  try {
+    std::vector<blockchainer::Transaction> txs =
+        as_pool(m)->reveal(cbv(proposer_kem_secret, sk_len), max);
+    std::vector<std::uint8_t> out;
+    put_u32(out, static_cast<std::uint32_t>(txs.size()));
+    for (const auto& tx : txs) {
+      const blockchainer::crypto::Bytes enc = tx.encode();
+      put_u32(out, static_cast<std::uint32_t>(enc.size()));
+      out.insert(out.end(), enc.begin(), enc.end());
+    }
+    return bytes_result(out);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+void blockchainer_sealed_mempool_free(BlockchainerSealedMempool m) { delete as_pool(m); }
 
 // ── Interop addresses ─────────────────────────────────────────────────────────
 

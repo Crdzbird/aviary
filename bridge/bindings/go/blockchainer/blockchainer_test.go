@@ -474,3 +474,87 @@ func TestThresholdAccount(t *testing.T) {
 		t.Fatal("wrong passphrase unsealed the share")
 	}
 }
+
+// TestAssuranceProfile checks each posture maps to a consistent tier at every seam.
+func TestAssuranceProfile(t *testing.T) {
+	std, err := bc.Describe(bc.Standard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if std.Ratcheted || std.VRF || std.ThresholdCustody || std.SealedMempool {
+		t.Fatal("standard should use the baseline tier everywhere")
+	}
+	hard, _ := bc.Describe(bc.Hardened)
+	if !hard.Ratcheted || !hard.VRF || !hard.ThresholdCustody || hard.SealedMempool {
+		t.Fatal("hardened: ratcheted transport + VRF + threshold custody, no sealed mempool")
+	}
+	fort, _ := bc.Describe(bc.Fortress)
+	if !fort.Ratcheted || !fort.VRF || !fort.ThresholdCustody || !fort.SealedMempool {
+		t.Fatal("fortress: every tier on")
+	}
+	// Stronger levels never permit bare Ed25519 (SigAlgo 1).
+	if !containsByte(std.SigAlgos, 1) {
+		t.Fatal("standard should permit Ed25519")
+	}
+	if containsByte(hard.SigAlgos, 1) || containsByte(fort.SigAlgos, 1) {
+		t.Fatal("hardened/fortress must not permit bare Ed25519")
+	}
+	if _, err := bc.Describe(99); err == nil {
+		t.Fatal("an unknown level should error")
+	}
+}
+
+func containsByte(b []byte, x byte) bool {
+	for _, v := range b {
+		if v == x {
+			return true
+		}
+	}
+	return false
+}
+
+// TestSealedMempool: transactions stay sealed to the proposer, ordered by fee,
+// opened only by the proposer's key.
+func TestSealedMempool(t *testing.T) {
+	proposerPub, proposerSec, err := bc.HybridKEMKeypair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Encode three v2 (fee-carrying) transactions with distinct fees.
+	mk := func(fee uint64, tag byte) []byte {
+		tx, e := bc.EncodeTx(2, 7, 1, fee, []byte{tag}, make([]byte, 32), make([]byte, 64))
+		if e != nil {
+			t.Fatal(e)
+		}
+		return tx
+	}
+	pool := bc.NewSealedMempool(64)
+	defer pool.Free()
+	for _, f := range []uint64{50, 300, 120} {
+		sealed, e := bc.SealTx(mk(f, byte(f)), proposerPub)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if !pool.Add(sealed) {
+			t.Fatal("add rejected")
+		}
+	}
+	if pool.Size() != 3 {
+		t.Fatalf("pool size = %d", pool.Size())
+	}
+
+	opened, err := pool.Reveal(proposerSec, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(opened) != 3 {
+		t.Fatalf("revealed %d, want 3", len(opened))
+	}
+	// The pool never exposes plaintext; only the proposer's key opens it. A
+	// different (non-proposer) key reveals nothing. (Fee-priority ordering is a
+	// C++ property, verified in test_sealed_mempool.cpp.)
+	_, sec2, _ := bc.HybridKEMKeypair()
+	if other, _ := pool.Reveal(sec2, 10); len(other) != 0 {
+		t.Fatal("a non-proposer key opened the sealed pool")
+	}
+}

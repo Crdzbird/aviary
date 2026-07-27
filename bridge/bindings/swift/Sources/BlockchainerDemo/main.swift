@@ -78,5 +78,22 @@ let tBack = try Blockchainer.unsealShare(envelope: tEnv, passphrase: "share-pass
 precondition(tBack == shares[1].bytes, "sealed share round-trip")
 print("threshold OK (2-of-3 -> Ed25519, attribution, sealed)")
 
+// AssuranceProfile tiers + SealedMempool (anti-MEV).
+let hardProfile = try Blockchainer.describeAssurance(level: 2)
+precondition(hardProfile.ratcheted && hardProfile.vrf && hardProfile.thresholdCustody && !hardProfile.sealedMempool, "hardened tiers")
+let fortProfile = try Blockchainer.describeAssurance(level: 3)
+precondition(fortProfile.sealedMempool, "fortress seals the mempool")
+let proposerKem = try Blockchainer.hybridKemKeypair()
+let sealTx = try Blockchainer.encodeTx(chainID: 7, fee: 300, body: Data([1]), author: Data(count: 32), signature: Data(count: 64))
+let pool = Blockchainer.makeSealedMempool()
+let sealedBlob = try Blockchainer.sealTx(txEncoded: sealTx, proposerKemPublic: proposerKem.publicKey)
+precondition(pool.add(sealedBlob), "add")
+let revealed = try pool.reveal(proposerKemSecret: proposerKem.secret, max: 10)
+precondition(revealed.count == 1, "proposer reveals its sealed tx")
+let strangerKem = try Blockchainer.hybridKemKeypair()
+let strangerReveal = try pool.reveal(proposerKemSecret: strangerKem.secret, max: 10)
+precondition(strangerReveal.isEmpty, "a non-proposer opens nothing")
+print("assurance + sealed-mempool OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

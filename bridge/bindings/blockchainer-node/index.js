@@ -92,6 +92,14 @@ function ensureLoaded() {
     thSign: f('BlockchainerBufferResult blockchainer_threshold_sign(void*, uint8_t*, size_t, uint8_t*)'),
     thVerifyShare: f('int blockchainer_threshold_verify_share(void*, uint16_t, uint8_t*, uint8_t*)'),
     thAggregate: f('BlockchainerBufferResult blockchainer_threshold_aggregate(void*, uint16_t*, uint8_t*, size_t)'),
+    asDescribe: f('BlockchainerBufferResult blockchainer_assurance_describe(uint16_t)'),
+    txEncode: f('BlockchainerBufferResult blockchainer_tx_encode(uint8_t, uint64_t, uint8_t, uint64_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    smSeal: f('BlockchainerBufferResult blockchainer_sealed_tx_seal(uint8_t*, size_t, uint8_t*, size_t)'),
+    smNew: f('void *blockchainer_sealed_mempool_new(size_t)'),
+    smAdd: f('int blockchainer_sealed_mempool_add(void*, uint8_t*, size_t)'),
+    smSize: f('size_t blockchainer_sealed_mempool_size(void*)'),
+    smReveal: f('BlockchainerBufferResult blockchainer_sealed_mempool_reveal(void*, uint8_t*, size_t, size_t)'),
+    smFree: f('void blockchainer_sealed_mempool_free(void*)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -263,6 +271,27 @@ class KeyStore {
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
+// An encrypted mempool (opaque handle). Submissions stay sealed to the proposer.
+class SealedMempool {
+  constructor(capacity = 4096) { this._h = fn.smNew(capacity); }
+  add(sealedTx) { return fn.smAdd(this._h, u8(sealedTx), u8(sealedTx).length) === 1; }
+  get size() { return Number(fn.smSize(this._h)); }
+  reveal(proposerKemSecret, max) {
+    const blob = consume(fn.smReveal(this._h, u8(proposerKemSecret), u8(proposerKemSecret).length, max), 'sealed_mempool_reveal');
+    const count = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+    const txs = [];
+    let off = 4;
+    for (let i = 0; i < count; i++) {
+      const len = (blob[off] << 24) | (blob[off+1] << 16) | (blob[off+2] << 8) | blob[off+3];
+      off += 4;
+      txs.push(Buffer.from(blob.subarray(off, off + len)));
+      off += len;
+    }
+    return txs;
+  }
+  free() { fn.smFree(this._h); }
+}
+
 // A two-round FROST signing ceremony (opaque handle). Free() when done.
 class Ceremony {
   constructor(groupPK, message, commitments) {
@@ -321,6 +350,27 @@ module.exports = {
     return cards;
   },
   shareInfo,
+
+  // AssuranceProfile: what tier a posture (1=standard, 2=hardened, 3=fortress)
+  // mandates at every seam.
+  describeAssurance(level) {
+    const b = consume(fn.asDescribe(level), 'assurance_describe');
+    return {
+      ratcheted: b[0] === 1, vrf: b[1] === 1, thresholdCustody: b[2] === 1, sealedMempool: b[3] === 1,
+      sigAlgos: Array.from(b.subarray(5, 5 + b[4])),
+    };
+  },
+
+  // Encode a transaction from its fields (e.g. to seal into a SealedMempool).
+  encodeTx({ version = 2, chainId = 0, sigAlgo = 1, fee = 0, body, author, signature }) {
+    return consume(fn.txEncode(version, BigInt(chainId), sigAlgo, BigInt(fee),
+      u8(body), u8(body).length, u8(author), u8(author).length, u8(signature), u8(signature).length), 'tx_encode');
+  },
+  // Seal an encoded tx to the proposer's hybrid-KEM public key.
+  sealTx: (txEncoded, proposerKemPublic) =>
+    consume(fn.smSeal(u8(txEncoded), u8(txEncoded).length, u8(proposerKemPublic), u8(proposerKemPublic).length), 'sealed_tx_seal'),
+  SealedMempool,
+
   commit(card) {
     const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');
     return { nonces: b.subarray(0, 64), commitment: b.subarray(64, 130) };

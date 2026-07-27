@@ -26,7 +26,8 @@ public final class Blockchainer implements AutoCloseable {
             newAccountHybrid, submitHybrid,
             ksNew, ksAdd, ksReveal, ksSerialise, ksLoad, ksUnlock, ksUnlocked, ksFree,
             kemKeygen, pSealPass, pOpenPass, pSealTo, pOpenTo, pSealSigned, pOpenSigned,
-            thCreate, thInfo, thSeal, thUnseal, thCommit, thCerNew, thCerFree, thSign, thVerify, thAgg;
+            thCreate, thInfo, thSeal, thUnseal, thCommit, thCerNew, thCerFree, thSign, thVerify, thAgg,
+            asDescribe, txEncode, smSeal, smNew, smAdd, smSize, smReveal, smFree;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -82,6 +83,14 @@ public final class Blockchainer implements AutoCloseable {
         thSign     = h("blockchainer_threshold_sign", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS));
         thVerify   = h("blockchainer_threshold_verify_share", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_SHORT, ADDRESS, ADDRESS));
         thAgg      = h("blockchainer_threshold_aggregate", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG));
+        asDescribe = h("blockchainer_assurance_describe", FunctionDescriptor.of(RES, JAVA_SHORT));
+        txEncode   = h("blockchainer_tx_encode", FunctionDescriptor.of(RES, JAVA_BYTE, JAVA_LONG, JAVA_BYTE, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        smSeal     = h("blockchainer_sealed_tx_seal", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        smNew      = h("blockchainer_sealed_mempool_new", FunctionDescriptor.of(ADDRESS, JAVA_LONG));
+        smAdd      = h("blockchainer_sealed_mempool_add", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        smSize     = h("blockchainer_sealed_mempool_size", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        smReveal   = h("blockchainer_sealed_mempool_reveal", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, JAVA_LONG));
+        smFree     = h("blockchainer_sealed_mempool_free", FunctionDescriptor.ofVoid(ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -235,6 +244,62 @@ public final class Blockchainer implements AutoCloseable {
     private Object invokeResA(MethodHandle mh, byte[] a) {
         try { return mh.invoke(arena.allocate(RES), seg(a), (long) a.length); } catch (Throwable e) { throw new RuntimeException(e); }
     }
+
+    // ── AssuranceProfile + SealedMempool ───────────────────────────────────────
+
+    /** The tiers a security posture mandates at every seam. */
+    public record AssuranceProfile(boolean ratcheted, boolean vrf, boolean thresholdCustody,
+                                   boolean sealedMempool, byte[] sigAlgos) {}
+
+    /** Describe a posture: 1 = standard, 2 = hardened, 3 = fortress. */
+    public AssuranceProfile describeAssurance(int level) {
+        byte[] b;
+        try { b = consume((MemorySegment) asDescribe.invoke(arena.allocate(RES), (short) level)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+        int n = b[4] & 0xFF;
+        return new AssuranceProfile(b[0] == 1, b[1] == 1, b[2] == 1, b[3] == 1,
+                                    java.util.Arrays.copyOfRange(b, 5, 5 + n));
+    }
+
+    /** Encode a transaction from its fields (e.g. to seal into a SealedMempool). */
+    public byte[] encodeTx(int version, long chainId, int sigAlgo, long fee, byte[] body, byte[] author, byte[] signature) {
+        try { return consume((MemorySegment) txEncode.invoke(arena.allocate(RES), (byte) version, chainId, (byte) sigAlgo, fee,
+                seg(body), (long) body.length, seg(author), (long) author.length, seg(signature), (long) signature.length)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+    /** Seal an encoded transaction to the proposer's hybrid-KEM public key. */
+    public byte[] sealTx(byte[] txEncoded, byte[] proposerKemPublic) {
+        try { return consume((MemorySegment) smSeal.invoke(arena.allocate(RES), seg(txEncoded), (long) txEncoded.length,
+                seg(proposerKemPublic), (long) proposerKemPublic.length)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** An encrypted mempool: submissions stay sealed to the proposer until reveal. */
+    public final class SealedMempool implements AutoCloseable {
+        private final MemorySegment h;
+        SealedMempool(long capacity) {
+            try { h = (MemorySegment) smNew.invoke(capacity); } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        public boolean add(byte[] sealedTx) {
+            try { return (int) smAdd.invoke(h, seg(sealedTx), (long) sealedTx.length) == 1; }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        public long size() { try { return (long) smSize.invoke(h); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public byte[][] reveal(byte[] proposerKemSecret, long max) {
+            byte[] blob;
+            try { blob = consume((MemorySegment) smReveal.invoke(arena.allocate(RES), h, seg(proposerKemSecret), (long) proposerKemSecret.length, max)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+            int count = ((blob[0] & 0xFF) << 24) | ((blob[1] & 0xFF) << 16) | ((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF);
+            byte[][] txs = new byte[count][]; int off = 4;
+            for (int i = 0; i < count; i++) {
+                int len = ((blob[off] & 0xFF) << 24) | ((blob[off+1] & 0xFF) << 16) | ((blob[off+2] & 0xFF) << 8) | (blob[off+3] & 0xFF);
+                off += 4; txs[i] = java.util.Arrays.copyOfRange(blob, off, off + len); off += len;
+            }
+            return txs;
+        }
+        @Override public void close() { try { smFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    public SealedMempool newSealedMempool(long capacity) { return new SealedMempool(capacity); }
 
     public boolean verifyStateProof(byte[] root, byte[] proof) {
         try { return (int) verifyProof.invoke(seg(root), seg(proof), (long) proof.length) == 1; }

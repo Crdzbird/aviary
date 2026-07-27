@@ -721,3 +721,27 @@ selectors — validated against real-world vectors). Deferred:
   Go emits a hybrid scenario, Dart replays it from the shared keys and reaches a
   byte-identical state root — PQ ledger state is deterministic across bindings
   even though ML-DSA signatures differ per run.
+
+## Safety classes through the bindings — DONE (2026)
+- **[x] ThresholdAccount (FROST t-of-n) through the C ABI + all five bindings.**
+  Ten `blockchainer_threshold_*` functions (create → per-share info blob
+  `[id u16][gpk 32][pub 32]` → seal/unseal a share → round-1 `commit`
+  `[nonces 64][commitment 66]` → opaque `Ceremony` handle → `sign` → attributable
+  `verify_share` → `aggregate`). The group secret never exists on the ABI; the
+  aggregate is a **standard 64-byte Ed25519 signature**, and each binding proves
+  that with its *own* Ed25519 verifier under the group key — cryptolib (Go),
+  `node:crypto` SPKI-wrap (npm), `java.security` (JVM), CryptoKit
+  `Curve25519.Signing` (Swift), and the shared ABI attribution check (Dart).
+- **[x] AssuranceProfile + SealedMempool through the C ABI + all five bindings.**
+  `blockchainer_assurance_describe(level)` returns the posture descriptor blob
+  `[transport u8][consensus u8][threshold_custody u8][sealed_mempool u8][algo_count u8][algos…]`;
+  bindings expose it as an `AssuranceProfile` (ratcheted / vrf / thresholdCustody
+  / sealedMempool + admitted sig algos) and assert the tiers are monotonic
+  (standard → hardened → fortress only tighten) with unknown levels failing
+  closed. `blockchainer_tx_encode(...)` canonically encodes a fee-bearing tx so
+  a binding can seal one; `blockchainer_sealed_tx_seal` HPKE-seals it to a
+  proposer's KEM key; `blockchainer_sealed_mempool_{new,add,size,reveal,free}`
+  runs the anti-MEV pool. Every binding's smoke test seals txs to a proposer,
+  reveals them all with the proposer's KEM secret, and confirms a **non-proposer
+  key opens nothing** — the confidentiality guarantee. Go/npm/JVM/Swift/Dart all
+  green; 56/56 C++ suite still passes.

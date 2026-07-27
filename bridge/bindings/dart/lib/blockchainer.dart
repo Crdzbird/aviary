@@ -145,6 +145,26 @@ typedef _ThVerifyD = int Function(Pointer<Void>, int, Pointer<Uint8>, Pointer<Ui
 typedef _ThAggC = _BufResult Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint8>, Size);
 typedef _ThAggD = _BufResult Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint8>, int);
 
+// AssuranceProfile + SealedMempool.
+typedef _AsDescribeC = _BufResult Function(Uint16);
+typedef _AsDescribeD = _BufResult Function(int);
+typedef _TxEncodeC = _BufResult Function(Uint8, Uint64, Uint8, Uint64, Pointer<Uint8>, Size,
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _TxEncodeD = _BufResult Function(int, int, int, int, Pointer<Uint8>, int, Pointer<Uint8>,
+    int, Pointer<Uint8>, int);
+typedef _SmSealC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _SmSealD = _BufResult Function(Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _SmNewC = Pointer<Void> Function(Size);
+typedef _SmNewD = Pointer<Void> Function(int);
+typedef _SmAddC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size);
+typedef _SmAddD = int Function(Pointer<Void>, Pointer<Uint8>, int);
+typedef _SmSizeC = Size Function(Pointer<Void>);
+typedef _SmSizeD = int Function(Pointer<Void>);
+typedef _SmRevealC = _BufResult Function(Pointer<Void>, Pointer<Uint8>, Size, Size);
+typedef _SmRevealD = _BufResult Function(Pointer<Void>, Pointer<Uint8>, int, int);
+typedef _SmFreeC = Void Function(Pointer<Void>);
+typedef _SmFreeD = void Function(Pointer<Void>);
+
 class BlockchainerException implements Exception {
   BlockchainerException(this.message);
   final String message;
@@ -725,6 +745,68 @@ class Blockchainer {
     }
   }
 
+  // ── AssuranceProfile + SealedMempool ───────────────────────────────────────
+
+  /// Describe the security posture at [level] (1=standard, 2=hardened, 3=fortress).
+  AssuranceProfile describeAssurance(int level) {
+    final b = _take(
+        lib.lookupFunction<_AsDescribeC, _AsDescribeD>('blockchainer_assurance_describe')(level),
+        'assurance_describe');
+    // [transport u8][consensus u8][threshold_custody u8][sealed_mempool u8][algo_count u8][algos...]
+    return AssuranceProfile(
+      ratcheted: b[0] == 1,
+      vrf: b[1] == 1,
+      thresholdCustody: b[2] == 1,
+      sealedMempool: b[3] == 1,
+      sigAlgos: Uint8List.sublistView(b, 5, 5 + b[4]),
+    );
+  }
+
+  /// Canonically encode a [Transaction] from its fields (for sealing into a mempool).
+  Uint8List encodeTx({
+    int version = 2,
+    required int chainId,
+    int sigAlgo = 1,
+    int fee = 0,
+    required Uint8List body,
+    required Uint8List author,
+    required Uint8List signature,
+  }) {
+    final bP = _alloc(body), aP = _alloc(author), sP = _alloc(signature);
+    try {
+      return _take(
+          lib.lookupFunction<_TxEncodeC, _TxEncodeD>('blockchainer_tx_encode')(version, chainId,
+              sigAlgo, fee, bP, body.length, aP, author.length, sP, signature.length),
+          'tx_encode');
+    } finally {
+      calloc.free(bP);
+      calloc.free(aP);
+      calloc.free(sP);
+    }
+  }
+
+  /// HPKE-seal an encoded transaction to a proposer's KEM public key. The result
+  /// is opaque until that proposer reveals it — nobody else can read or reorder it.
+  Uint8List sealTx(Uint8List txEncoded, Uint8List proposerKemPublic) {
+    final tP = _alloc(txEncoded), pP = _alloc(proposerKemPublic);
+    try {
+      return _take(
+          lib.lookupFunction<_SmSealC, _SmSealD>('blockchainer_sealed_tx_seal')(
+              tP, txEncoded.length, pP, proposerKemPublic.length),
+          'sealed_tx_seal');
+    } finally {
+      calloc.free(tP);
+      calloc.free(pP);
+    }
+  }
+
+  /// Open an anti-MEV [SealedMempool] with room for [capacity] sealed transactions.
+  SealedMempool makeSealedMempool(int capacity) {
+    final h = lib.lookupFunction<_SmNewC, _SmNewD>('blockchainer_sealed_mempool_new')(capacity);
+    if (h == nullptr) throw BlockchainerException('sealed mempool creation failed');
+    return SealedMempool._(this, h);
+  }
+
   /// Create a custodial [KeyStore] protected by [passphrase] (returned unlocked).
   KeyStore createKeyStore(String passphrase) {
     final cp = passphrase.toNativeUtf8();
@@ -1007,6 +1089,34 @@ class ThresholdShare {
   final Uint8List publicShare;
 }
 
+/// The security posture a chain commits to at genesis, as described by
+/// [Blockchainer.describeAssurance]. Higher tiers only ever tighten the tier
+/// below them — the flags are monotonic.
+class AssuranceProfile {
+  AssuranceProfile({
+    required this.ratcheted,
+    required this.vrf,
+    required this.thresholdCustody,
+    required this.sealedMempool,
+    required this.sigAlgos,
+  });
+
+  /// Transport tier: false = mutually-authenticated, true = PQ-ratcheted.
+  final bool ratcheted;
+
+  /// Consensus tier: false = stake-weighted, true = VRF leader election.
+  final bool vrf;
+
+  /// Whether validator custody must be threshold (FROST t-of-n).
+  final bool thresholdCustody;
+
+  /// Whether the mempool is HPKE-sealed (anti-MEV).
+  final bool sealedMempool;
+
+  /// The signature algorithms this posture admits.
+  final Uint8List sigAlgos;
+}
+
 /// A two-round FROST signing ceremony over a fixed message and roster. Call
 /// [free] when done.
 class Ceremony {
@@ -1064,4 +1174,58 @@ class Ceremony {
 
   void free() =>
       _bc.lib.lookupFunction<_ThCerFreeC, _ThCerFreeD>('blockchainer_threshold_ceremony_free')(_h);
+}
+
+/// An anti-MEV mempool of HPKE-sealed transactions. Each sealed tx is opaque to
+/// everyone but the block's proposer, so it cannot be front-run or reordered on
+/// content before inclusion. Call [free] when done.
+class SealedMempool {
+  SealedMempool._(this._bc, this._h);
+  final Blockchainer _bc;
+  final Pointer<Void> _h;
+
+  /// Admit a sealed transaction (from [Blockchainer.sealTx]). Returns false if
+  /// the pool is at capacity.
+  bool add(Uint8List sealedTx) {
+    final p = _bc._alloc(sealedTx);
+    try {
+      return _bc.lib.lookupFunction<_SmAddC, _SmAddD>('blockchainer_sealed_mempool_add')(
+              _h, p, sealedTx.length) ==
+          1;
+    } finally {
+      calloc.free(p);
+    }
+  }
+
+  /// Sealed transactions currently held.
+  int get size => _bc.lib.lookupFunction<_SmSizeC, _SmSizeD>('blockchainer_sealed_mempool_size')(_h);
+
+  /// Reveal up to [max] transactions with the proposer's KEM secret. A non-proposer
+  /// key opens nothing (returns empty) — that is the confidentiality guarantee.
+  List<Uint8List> reveal(Uint8List proposerKemSecret, int max) {
+    final sP = _bc._alloc(proposerKemSecret);
+    try {
+      final blob = _bc._take(
+          _bc.lib.lookupFunction<_SmRevealC, _SmRevealD>('blockchainer_sealed_mempool_reveal')(
+              _h, sP, proposerKemSecret.length, max),
+          'sealed_mempool_reveal');
+      // [count u32]([tx_len u32][tx])×
+      final count = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+      final out = <Uint8List>[];
+      var off = 4;
+      for (var i = 0; i < count; i++) {
+        final len =
+            (blob[off] << 24) | (blob[off + 1] << 16) | (blob[off + 2] << 8) | blob[off + 3];
+        off += 4;
+        out.add(Uint8List.sublistView(blob, off, off + len));
+        off += len;
+      }
+      return out;
+    } finally {
+      calloc.free(sP);
+    }
+  }
+
+  void free() => _bc.lib
+      .lookupFunction<_SmFreeC, _SmFreeD>('blockchainer_sealed_mempool_free')(_h);
 }

@@ -239,6 +239,74 @@ public enum Blockchainer {
         return try Ceremony(groupPK: groupPK, message: message, commitments: commitments)
     }
 
+    // ── AssuranceProfile + SealedMempool ───────────────────────────────────────
+
+    /// The tiers a security posture mandates at every seam.
+    public struct AssuranceProfile {
+        public let ratcheted: Bool
+        public let vrf: Bool
+        public let thresholdCustody: Bool
+        public let sealedMempool: Bool
+        public let sigAlgos: [UInt8]
+    }
+
+    /// Describe a posture: 1 = standard, 2 = hardened, 3 = fortress.
+    public static func describeAssurance(level: UInt16) throws -> AssuranceProfile {
+        ensureReady()
+        let b = try consume(blockchainer_assurance_describe(level), "assurance_describe")
+        let n = Int(b[4])
+        return AssuranceProfile(ratcheted: b[0] == 1, vrf: b[1] == 1, thresholdCustody: b[2] == 1,
+                                sealedMempool: b[3] == 1, sigAlgos: [UInt8](b.subdata(in: 5..<(5 + n))))
+    }
+
+    /// Encode a transaction from its fields (e.g. to seal into a SealedMempool).
+    public static func encodeTx(version: UInt8 = 2, chainID: UInt64, sigAlgo: UInt8 = 1, fee: UInt64,
+                                body: Data, author: Data, signature: Data) throws -> Data {
+        ensureReady()
+        return try consume(body.withC { bp, bl in author.withC { ap, al in signature.withC { sp, sl in
+            blockchainer_tx_encode(version, chainID, sigAlgo, fee, bp, bl, ap, al, sp, sl) } } }, "tx_encode")
+    }
+    /// Seal an encoded tx to the proposer's hybrid-KEM public key.
+    public static func sealTx(txEncoded: Data, proposerKemPublic: Data) throws -> Data {
+        ensureReady()
+        return try consume(txEncoded.withC { tp, tl in proposerKemPublic.withC { pp, pl in
+            blockchainer_sealed_tx_seal(tp, tl, pp, pl) } }, "sealed_tx_seal")
+    }
+
+    /// An encrypted mempool: submissions stay sealed to the proposer until reveal.
+    public final class SealedMempool {
+        private let h: OpaquePointer
+        init(capacity: Int) {
+            let raw = blockchainer_sealed_mempool_new(capacity)!
+            h = OpaquePointer(raw)
+        }
+        deinit { blockchainer_sealed_mempool_free(UnsafeMutableRawPointer(h)) }
+
+        public func add(_ sealedTx: Data) -> Bool {
+            sealedTx.withC { sp, sl in
+                blockchainer_sealed_mempool_add(UnsafeMutableRawPointer(h), sp, sl) == 1 }
+        }
+        public var size: Int { blockchainer_sealed_mempool_size(UnsafeMutableRawPointer(h)) }
+        public func reveal(proposerKemSecret: Data, max: Int) throws -> [Data] {
+            let blob = try consume(proposerKemSecret.withC { sp, sl in
+                blockchainer_sealed_mempool_reveal(UnsafeMutableRawPointer(h), sp, sl, max) }, "sealed_mempool_reveal")
+            var out: [Data] = []
+            let count = Int(blob[0]) << 24 | Int(blob[1]) << 16 | Int(blob[2]) << 8 | Int(blob[3])
+            var off = 4
+            for _ in 0..<count {
+                let len = Int(blob[off]) << 24 | Int(blob[off+1]) << 16 | Int(blob[off+2]) << 8 | Int(blob[off+3])
+                off += 4
+                out.append(blob.subdata(in: off..<(off + len)))
+                off += len
+            }
+            return out
+        }
+    }
+    public static func makeSealedMempool(capacity: Int = 4096) -> SealedMempool {
+        ensureReady()
+        return SealedMempool(capacity: capacity)
+    }
+
     /// Create a new in-memory single-validator chain.
     public static func makeNode(chainID: UInt64) throws -> Node {
         ensureReady()

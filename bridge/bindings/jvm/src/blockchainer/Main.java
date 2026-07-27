@@ -97,6 +97,22 @@ public final class Main {
                 throw new IllegalStateException("sealed share round-trip");
             System.out.println("threshold OK (2-of-3 → Ed25519, attribution, sealed)");
 
+            // AssuranceProfile tiers + SealedMempool (anti-MEV).
+            var hardP = bc.describeAssurance(2);
+            if (!hardP.ratcheted() || !hardP.vrf() || !hardP.thresholdCustody() || hardP.sealedMempool())
+                throw new IllegalStateException("hardened tiers wrong");
+            var fortP = bc.describeAssurance(3);
+            if (!fortP.sealedMempool()) throw new IllegalStateException("fortress should seal the mempool");
+            var kem = bc.hybridKemKeypair();
+            byte[] tx = bc.encodeTx(2, 7, 1, 300, new byte[]{1}, new byte[32], new byte[64]);
+            try (var pool = bc.newSealedMempool(64)) {
+                if (!pool.add(bc.sealTx(tx, kem.publicKey()))) throw new IllegalStateException("add rejected");
+                if (pool.reveal(kem.secret(), 10).length != 1) throw new IllegalStateException("proposer reveal");
+                if (bc.newSealedMempool(64) != null && pool.reveal(bc.hybridKemKeypair().secret(), 10).length != 0)
+                    throw new IllegalStateException("a non-proposer opened the pool");
+            }
+            System.out.println("assurance + sealed-mempool OK");
+
             System.out.println("\nALL GOOD");
         }
     }
