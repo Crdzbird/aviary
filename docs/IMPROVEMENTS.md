@@ -281,6 +281,16 @@
   **Remaining:** zeroize master/secret buffers on drop; an optional `DemoNode`
   convenience that signs by address; expose export/import + threshold through
   the C ABI + bindings; distributed keygen (the dealer is trusted at creation).
+  **Portable account tiers DONE (cryptolib Suite/PQ):** `custody::PortableAccount`
+  is one export value {public_key, secret} with three fail-closed, domain-AAD-
+  bound tiers: **passphrase** (MolecularVault + Argon2id), **recipient-bound**
+  (`crypto::pq_seal_to` — encapsulate to a device's hybrid-KEM key; only that
+  device opens, no shared secret to phish), and **signed-recipient** /
+  Fortress-grade (`pq_seal_signed_to` — recipient-bound AND the receiver verifies
+  the owner's hybrid signature). `KeyStore::extract`/`absorb` move an account
+  between stores in any tier, resealed under the destination master.
+  `test_portable.cpp` covers all three round-trips + wrong-passphrase / wrong-
+  device / wrong-signer / tamper failing closed + a cross-store move.
 - **[x] PQ / hybrid signatures in the tx path — DONE (three families).** The v2
   envelope's committed `sig_algo` byte + `ChainSpec.accepted_sig_algos` gating
   now carry THREE schemes: classical Ed25519 (`kEd25519`), the lattice hybrid
