@@ -10,6 +10,7 @@
 #include "blockchainer/account_state.hpp"
 #include "blockchainer/block_store.hpp"
 #include "blockchainer/consensus.hpp"
+#include "blockchainer/credential_gate.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/interop/bridge.hpp"
 #include "blockchainer/interop/encoding.hpp"
@@ -95,6 +96,7 @@ int main() {
     totality_ok &= total([&] { (void)GenesisSpec::decode_all(v); });
     totality_ok &= total([&] { (void)p2p::AddressBook::decode(v); });
     totality_ok &= total([&] { (void)custody::ShareCard::decode(v); });
+    totality_ok &= total([&] { (void)consensus::CredentialPolicy::decode_all(v); });
     totality_ok &= total([&] { (void)wire::Message::decode_all(v); });
     // Typed wire payload decoders on arbitrary payloads.
     totality_ok &= total([&] { (void)wire::as_tx(wire::Message{wire::MessageType::kTx, b}); });

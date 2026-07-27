@@ -375,6 +375,90 @@ Bytes opaque_server_finish(ByteView server_state, ByteView ke3) {
   return take_buffer(r.buf);
 }
 
+// ── BBS signatures ───────────────────────────────────────────────────────────
+
+namespace {
+// The parallel (pointers[], lengths[]) arrays cryptolib_bbs_* expect, built from
+// a vector of messages. Empty vector → count 0 (nullptr data is fine).
+struct MsgArrays {
+  std::vector<const std::uint8_t*> ptrs;
+  std::vector<std::size_t> lens;
+};
+MsgArrays msg_arrays(const std::vector<Bytes>& msgs) {
+  MsgArrays a;
+  a.ptrs.reserve(msgs.size());
+  a.lens.reserve(msgs.size());
+  for (const auto& m : msgs) {
+    a.ptrs.push_back(m.data());
+    a.lens.push_back(m.size());
+  }
+  return a;
+}
+}  // namespace
+
+KeyPair bbs_keygen(ByteView key_material, ByteView key_info) {
+  CryptoKeyPair kp = cryptolib_bbs_keygen(key_material.data(), key_material.size(), key_info.data(),
+                                          key_info.size());
+  if (kp.public_key.data == nullptr) throw std::runtime_error("bbs_keygen failed");
+  return KeyPair{take_buffer(kp.public_key), take_buffer(kp.secret_key)};
+}
+
+Bytes bbs_sk_to_pk(ByteView sk) {
+  CryptoBufferResult r = cryptolib_bbs_sk_to_pk(sk.data(), sk.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "bbs_sk_to_pk failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+Bytes bbs_sign(ByteView sk, ByteView pk, ByteView header, const std::vector<Bytes>& msgs) {
+  MsgArrays a = msg_arrays(msgs);
+  CryptoBufferResult r =
+      cryptolib_bbs_sign(sk.data(), sk.size(), pk.data(), pk.size(), header.data(), header.size(),
+                         a.ptrs.data(), a.lens.data(), a.ptrs.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "bbs_sign failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+bool bbs_verify(ByteView pk, ByteView signature, ByteView header, const std::vector<Bytes>& msgs) {
+  MsgArrays a = msg_arrays(msgs);
+  return cryptolib_bbs_verify(pk.data(), pk.size(), signature.data(), signature.size(),
+                              header.data(), header.size(), a.ptrs.data(), a.lens.data(),
+                              a.ptrs.size()) == 1;
+}
+
+Bytes bbs_proof_gen(ByteView pk, ByteView signature, ByteView header, ByteView ph,
+                    const std::vector<Bytes>& msgs,
+                    const std::vector<std::uint64_t>& disclosed_indexes) {
+  MsgArrays a = msg_arrays(msgs);
+  CryptoBufferResult r = cryptolib_bbs_proof_gen(
+      pk.data(), pk.size(), signature.data(), signature.size(), header.data(), header.size(),
+      ph.data(), ph.size(), a.ptrs.data(), a.lens.data(), a.ptrs.size(), disclosed_indexes.data(),
+      disclosed_indexes.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "bbs_proof_gen failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+bool bbs_proof_verify(ByteView pk, ByteView proof, ByteView header, ByteView ph,
+                      const std::vector<Bytes>& disclosed_msgs,
+                      const std::vector<std::uint64_t>& disclosed_indexes) {
+  MsgArrays a = msg_arrays(disclosed_msgs);
+  return cryptolib_bbs_proof_verify(pk.data(), pk.size(), proof.data(), proof.size(), header.data(),
+                                    header.size(), ph.data(), ph.size(), a.ptrs.data(),
+                                    a.lens.data(), a.ptrs.size(), disclosed_indexes.data(),
+                                    disclosed_indexes.size()) == 1;
+}
+
 // ── BLS12-381 ────────────────────────────────────────────────────────────────
 
 KeyPair bls_keygen_from_ikm(ByteView ikm) {

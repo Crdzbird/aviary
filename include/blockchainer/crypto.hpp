@@ -28,6 +28,8 @@ enum class Domain : std::uint8_t {
   kGenesis = 0x05,       ///< commitment to a genesis spec
   kProposer = 0x06,      ///< stake-weighted proposer-selection ticket (PoS)
   kPeerRecord = 0x07,    ///< self-signed peer-discovery record (PEX)
+  kCredentialPolicy = 0x08,        ///< commitment to a membership-credential policy
+  kCredentialPresentation = 0x09,  ///< binds a credential presentation to its context
 };
 
 /// BLAKE3-256 over [data, data+len). The chain's primary hash primitive.
@@ -220,6 +222,37 @@ OpaqueLogin opaque_client_finish(ByteView client_state, ByteView ke2, ByteView c
 
 /// Server login step 2: verify KE3 → the shared session key. Throws on failure.
 Bytes opaque_server_finish(ByteView server_state, ByteView ke3);
+
+// ── BBS signatures (draft-irtf-cfrg-bbs-signatures, BLS12-381-SHA-256) ────────
+// Multi-message signatures with zero-knowledge SELECTIVE DISCLOSURE: an issuer
+// signs a vector of attributes; a holder later proves possession of the whole
+// credential while revealing only a chosen subset, in zero knowledge of the
+// rest. The privacy primitive behind anonymous credentials. Sizes: sk 32 B,
+// pk 96 B, signature 80 B. Two proofs from ONE credential are mutually
+// UNLINKABLE — a feature for pure privacy, a design constraint for a chain
+// (Sybil/revocation); see docs/design/CREDENTIAL_GATE.md.
+
+/// BBS keypair from key material (>= 32 B) + optional key info. pk 96 B, sk 32 B.
+KeyPair bbs_keygen(ByteView key_material, ByteView key_info = {});
+/// Derive the 96-byte public key from a 32-byte BBS secret key. Throws on failure.
+Bytes bbs_sk_to_pk(ByteView sk);
+/// Sign the [msgs] vector under [sk]/[pk] with a domain [header] → 80-byte
+/// signature. Throws on backend failure.
+Bytes bbs_sign(ByteView sk, ByteView pk, ByteView header, const std::vector<Bytes>& msgs);
+/// Verify a [signature] over the [msgs] vector. Never throws — false on any failure.
+bool bbs_verify(ByteView pk, ByteView signature, ByteView header,
+                const std::vector<Bytes>& msgs);
+/// Derive a selective-disclosure proof over the FULL [msgs] vector, revealing
+/// only [disclosed_indexes] (0-based, ascending). [ph] (presentation header)
+/// binds the proof to a challenge/context. Throws on failure.
+Bytes bbs_proof_gen(ByteView pk, ByteView signature, ByteView header, ByteView ph,
+                    const std::vector<Bytes>& msgs,
+                    const std::vector<std::uint64_t>& disclosed_indexes);
+/// Verify a selective-disclosure proof: [disclosed_msgs] aligned with
+/// [disclosed_indexes]. Never throws — false on any failure.
+bool bbs_proof_verify(ByteView pk, ByteView proof, ByteView header, ByteView ph,
+                      const std::vector<Bytes>& disclosed_msgs,
+                      const std::vector<std::uint64_t>& disclosed_indexes);
 
 // ── BLS12-381 (consensus votes; ARCHITECTURE §7) ─────────────────────────────
 

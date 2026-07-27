@@ -142,8 +142,23 @@
   anonymity deferred behind slashing/epoch machinery. **BBS-pseudonym request
   FILED:** `docs/CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md` (§1 per-verifier
   linkability/pseudonyms = the Option-B blocker, §2 blind issuance = the
-  malicious-issuer fix). **Next action:** implement the bare-BBS wrappers +
-  Option A now (unblocked); Option B follows the cryptolib primitive.
+  malicious-issuer fix). **DONE — bare-BBS wrappers + Option A:** `crypto::bbs_*`
+  seam (keygen/sk_to_pk/sign/verify/proof_gen/proof_verify over cryptolib BBS,
+  BLS12-381-SHA-256; `test_bbs.cpp`) + `consensus::CredentialGate` unlinkable
+  admission (`credential_gate.{hpp,cpp}`): `CredentialPolicy`
+  (issuer pk + schema + min_tier, canonical encode/decode_all/`hash()` ready to
+  commit in genesis), `issue_credential` (trusted-issuer model, §10.2),
+  `present`/`admit` — a holder proves in ZK it holds an issuer-signed credential
+  with `tier ≥ min_tier` and unexpired `not_after`, disclosing nothing else;
+  presentation bound to (chain_id, epoch, scope, challenge) for anti-replay;
+  bulk issuer-epoch revocation. `test_credential_gate.cpp` (18 checks incl.
+  unlinkability, context-binding, expiry, tier boundary, revocation,
+  wrong-issuer, malformed-is-quiet-false); `CredentialPolicy::decode_all` in the
+  fuzz totality sweep; ASan/UBSan clean; 58 C++ suites. **Remaining:** Option B
+  per-epoch pseudonym (blocked on the filed cryptolib primitive); wire the policy
+  into `GenesisSpec` (deferred pending the §10.4 orthogonal-vs-dimension
+  decision); gate `Mempool::add` / gossip admission on a presentation; surface
+  through the C ABI + bindings.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
