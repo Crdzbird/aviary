@@ -84,6 +84,7 @@ add_library(blockchainer_core STATIC
   src/version.cpp
   src/crypto/cryptolib_backend.cpp
   src/crypto/keyring.cpp
+  src/crypto/threshold.cpp
   src/codec/codec.cpp
   src/core/merkle.cpp
   src/core/types.cpp
@@ -225,6 +226,7 @@ blockchainer_add_test(test_networked_node tests/test_networked_node.cpp)
 blockchainer_add_test(test_tcp_transport tests/test_tcp_transport.cpp)
 blockchainer_add_test(test_byzantine tests/test_byzantine.cpp)
 blockchainer_add_test(test_peer_book tests/test_peer_book.cpp)
+blockchainer_add_test(test_threshold tests/test_threshold.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

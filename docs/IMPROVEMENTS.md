@@ -248,9 +248,20 @@
   fixed domain AAD, and `import_account` reseals it under the destination store's
   master — an account moves between stores with only a passphrase. Tamper /
   wrong-passphrase / wrong-AAD all fail closed; v1-compat + migration tested.
+  **Threshold custody DONE (cryptolib FROST):** `custody::ThresholdAccount` /
+  `SigningCeremony` (`threshold.hpp`) — t-of-n accounts via FROST(Ed25519,
+  RFC 9591) where the account secret **never exists**: dealt shares sign in a
+  two-round ceremony and the aggregate is a standard 64-byte Ed25519 signature,
+  so a threshold-signed tx verifies through the untouched `kEd25519` path (the
+  chain can't tell). A lying cosigner is *identified* (`verify_share`), not
+  just rejected; shares seal at rest via MolecularVault with the AAD binding
+  group + slot (`ShareCard::seal/unseal`, envelope prefix reproduces the AAD).
+  `test_threshold.cpp`: 2-of-3 signs a transfer the Ledger commits, t-1 fails,
+  corrupt cosigner named, cross-roster share never aggregates, sealed round-trip
+  + rebind rejection; ShareCard::decode in the fuzz totality sweep.
   **Remaining:** zeroize master/secret buffers on drop; an optional `DemoNode`
-  convenience that signs by address; expose export/import through the C ABI +
-  bindings.
+  convenience that signs by address; expose export/import + threshold through
+  the C ABI + bindings; distributed keygen (the dealer is trusted at creation).
 - **[x] PQ / hybrid signatures in the tx path — DONE (three families).** The v2
   envelope's committed `sig_algo` byte + `ChainSpec.accepted_sig_algos` gating
   now carry THREE schemes: classical Ed25519 (`kEd25519`), the lattice hybrid
