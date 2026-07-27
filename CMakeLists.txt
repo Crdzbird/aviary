@@ -93,6 +93,7 @@ add_library(blockchainer_core STATIC
   src/state/state_serialize.cpp
   src/core/ledger.cpp
   src/core/genesis.cpp
+  src/core/assurance.cpp
   src/core/block_store.cpp
   src/core/fork_choice.cpp
   src/storage/file_store.cpp
@@ -232,6 +233,7 @@ blockchainer_add_test(test_threshold tests/test_threshold.cpp)
 blockchainer_add_test(test_vrf_pos tests/test_vrf_pos.cpp)
 blockchainer_add_test(test_armored tests/test_armored.cpp)
 blockchainer_add_test(test_portable tests/test_portable.cpp)
+blockchainer_add_test(test_assurance tests/test_assurance.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)

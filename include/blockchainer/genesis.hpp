@@ -43,6 +43,11 @@ struct GenesisSpec {
   std::uint32_t max_block_txs = 0;
   std::uint64_t max_block_bytes = 0;
 
+  // The network-wide security posture (an AssuranceProfile::Level id; 0 =
+  // unspecified). Committed into the genesis hash, so every node provably agrees
+  // on the tier at every seam — see assurance.hpp.
+  std::uint16_t assurance_profile = 0;
+
   // Initial state. Use `accounts` for the account model, `utxos` for the UTXO
   // model (the other stays empty).
   std::vector<GenesisAccount> accounts;

@@ -43,6 +43,25 @@
   chaining three heights through a silent validator. **Remaining:** a real
   socket/timer transport, a proposer-rotation policy beyond round-robin, and
   equivocation handling within the round SM.
+- **[x] AssuranceProfile (one safety knob, committed in genesis) — DONE.**
+  `AssuranceProfile` (`assurance.hpp`) is the umbrella that makes this "a safe
+  library" rather than a parts bin: one named posture — `standard()` /
+  `hardened()` / `fortress()` — fixes a *consistent* tier at every seam
+  (signature algorithms, transport = mutual/ratcheted, consensus =
+  stake-weighted/VRF, threshold custody, sealed mempool), so a deployment can't
+  pair strong custody with a weak transport. `apply_to(GenesisSpec)` stamps the
+  profile id AND the mandated `accepted_sig_algos`, and the id is **committed
+  into the genesis hash** (new `GenesisSpec::assurance_profile` field) — so every
+  node provably runs the same posture, and one can't silently join with a weaker
+  config (the same suite-id-in-envelope discipline cryptolib uses).
+  `from_genesis` reconstructs the profile AND rejects an inconsistent spec (a
+  strong level whose accepted-signature set permits weak schemes) or an unknown
+  id. `test_assurance.cpp`: tier mapping per level, the posture changing the
+  genesis hash, encode/decode round-trip, and rejection of inconsistent /
+  unknown profiles. GenesisSpec codec + fuzz totality still hold; golden vectors
+  unaffected. **Remaining:** enforce the profile's transport/consensus/custody
+  tiers automatically when a node boots from genesis (today the accessors report
+  the tier; the node still wires the matching classes by hand).
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

@@ -29,6 +29,7 @@ Bytes GenesisSpec::encode() const {
   w.write_u128(flat_fee);
   w.write_u32(max_block_txs);
   w.write_u64(max_block_bytes);
+  w.write_u16(assurance_profile);
   // Accounts, sorted by address → canonical regardless of insertion order.
   std::vector<GenesisAccount> sorted_accounts = accounts;
   std::sort(sorted_accounts.begin(), sorted_accounts.end(),
@@ -61,6 +62,7 @@ GenesisSpec GenesisSpec::decode_all(codec::ByteView bytes) {
   g.flat_fee = r.read_u128();
   g.max_block_txs = r.read_u32();
   g.max_block_bytes = r.read_u64();
+  g.assurance_profile = r.read_u16();
   g.accounts = r.read_list<GenesisAccount>([](codec::CodecReader& r) {
     GenesisAccount a;
     a.address = to_hash(r.read_fixed_bytes(32));
