@@ -77,6 +77,25 @@
   tampered-envelope rejection, codec round-trip; `SealedTx::decode` in the fuzz
   sweep. ASan-clean. **Remaining:** per-height/epoch proposer key rotation and
   wiring `reveal` into `VrfPosEngine::propose` under the fortress profile.
+- **[x] ProfiledValidator (assurance profile → node boot) — DONE.**
+  `node::ProfiledValidator` (`profiled_validator.hpp`) is the integration seam
+  that turns the `AssuranceProfile` from a *descriptor* into an *enforced* posture:
+  `boot(genesis, me, bls_key, [vrf_secret, vrf_pubkeys])` reads the profile
+  committed in the genesis, validates the genesis against it (rejecting an
+  inconsistent or unknown posture), builds a ledger carrying the profile's
+  signature-scheme gate, and wires the consensus engine the posture mandates —
+  stake-weighted `PosEngine` for `standard`, grind-proof `VrfPosEngine` for
+  `hardened`/`fortress` (which additionally require the node's VRF material, or
+  boot throws). It hides *which* engine backs it: `propose`/`seal`/`submit` are
+  uniform (both PoS families share the seal + the `ConsensusEngine` seam), and it
+  reports the `threshold_custody`/`sealed_mempool` expectations. `test_profiled_
+  validator.cpp` boots real validator sets from ONE profiled genesis at each
+  posture and drives them to commit (standard→PoS one height, hardened→VRF three
+  heights, all agreeing on the tip), asserts the signature gate reaches the state
+  layer, and rejects inconsistent / unknown / VRF-without-keys genesises.
+  Deterministic (fixed-seed VRF keys), ASan-clean. **Remaining:** auto-wire the
+  transport tier (mutual vs ratcheted) and the sealed mempool into the same boot
+  path, and epoch/validator-set changes.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
