@@ -558,3 +558,102 @@ func TestSealedMempool(t *testing.T) {
 		t.Fatal("a non-proposer key opened the sealed pool")
 	}
 }
+
+// TestCredentialGate drives Option A anonymous membership admission end to end:
+// issue an issuer-signed credential, present it unlinkably, admit — then confirm
+// the gate rejects on context mismatch, expiry, tier, revocation, and forgery.
+func TestCredentialGate(t *testing.T) {
+	issuer, err := bc.NewBBSIssuer(bytes.Repeat([]byte{0x11}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issuer.Public) != 96 || len(issuer.Secret) != 32 {
+		t.Fatalf("bad issuer key sizes: pub=%d sec=%d", len(issuer.Public), len(issuer.Secret))
+	}
+
+	policy, err := bc.NewCredentialPolicy(7, issuer.Public, []byte("blockchainer.credential.v1"), 4, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := policy.Hash()
+	if err != nil || len(h) != 32 {
+		t.Fatalf("policy hash: %v len=%d", err, len(h))
+	}
+
+	memberSecret := bytes.Repeat([]byte{0xAB}, 32)
+	const notAfter = uint64(4102444800) // year 2100
+	const now = uint64(1700000000)
+	cred, err := policy.IssueCredential(issuer.Secret, memberSecret, 3, notAfter, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gate := bc.NewCredentialGate(policy)
+	defer gate.Free()
+	challenge := bytes.Repeat([]byte{0x01}, 32)
+
+	// Happy path.
+	pres, err := policy.Present(cred, 5, "submit", challenge)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !gate.Admit(5, "submit", challenge, pres, now) {
+		t.Fatal("valid presentation was rejected")
+	}
+
+	// Unlinkability: a fresh presentation of the same credential differs on the
+	// wire yet still admits.
+	pres2, _ := policy.Present(cred, 5, "submit", challenge)
+	if bytes.Equal(pres, pres2) {
+		t.Fatal("two presentations of one credential were byte-identical (not unlinkable)")
+	}
+	if !gate.Admit(5, "submit", challenge, pres2, now) {
+		t.Fatal("second presentation rejected")
+	}
+
+	// Context binding (anti-replay): wrong epoch / scope / challenge all reject.
+	if gate.Admit(6, "submit", challenge, pres, now) {
+		t.Fatal("admitted under the wrong epoch")
+	}
+	if gate.Admit(5, "gossip", challenge, pres, now) {
+		t.Fatal("admitted under the wrong scope")
+	}
+	if gate.Admit(5, "submit", bytes.Repeat([]byte{0x02}, 32), pres, now) {
+		t.Fatal("admitted under the wrong challenge")
+	}
+
+	// Expiry.
+	expired, _ := policy.IssueCredential(issuer.Secret, memberSecret, 3, 1000, 1)
+	ep, _ := policy.Present(expired, 5, "submit", challenge)
+	if gate.Admit(5, "submit", challenge, ep, now) {
+		t.Fatal("admitted an expired credential")
+	}
+
+	// Tier below the policy threshold.
+	low, _ := policy.IssueCredential(issuer.Secret, memberSecret, 1, notAfter, 1)
+	lp, _ := policy.Present(low, 5, "submit", challenge)
+	if gate.Admit(5, "submit", challenge, lp, now) {
+		t.Fatal("admitted a credential below min tier")
+	}
+
+	// Bulk revocation of issuer epoch 1.
+	revoking := bc.NewCredentialGate(policy)
+	defer revoking.Free()
+	revoking.RevokeIssuerEpoch(1)
+	if revoking.Admit(5, "submit", challenge, pres, now) {
+		t.Fatal("admitted a credential from a revoked issuer epoch")
+	}
+
+	// Forgery: a credential from another issuer is refused.
+	rogue, _ := bc.NewBBSIssuer(bytes.Repeat([]byte{0x77}, 32))
+	forged, _ := policy.IssueCredential(rogue.Secret, memberSecret, 3, notAfter, 1)
+	fp, _ := policy.Present(forged, 5, "submit", challenge)
+	if gate.Admit(5, "submit", challenge, fp, now) {
+		t.Fatal("admitted a forged (wrong-issuer) credential")
+	}
+
+	// Malformed presentation is a quiet reject.
+	if gate.Admit(5, "submit", challenge, []byte("garbage"), now) {
+		t.Fatal("admitted a malformed presentation")
+	}
+}

@@ -14,10 +14,12 @@
 #include "blockchainer/interop/solana.hpp"
 #include "blockchainer/keyring.hpp"
 #include "blockchainer/assurance.hpp"
+#include "blockchainer/credential_gate.hpp"
 #include "blockchainer/node/demo_node.hpp"
 #include "blockchainer/proofs.hpp"
 #include "blockchainer/sealed_mempool.hpp"
 #include "blockchainer/threshold.hpp"
+#include "blockchainer/codec.hpp"
 #include "blockchainer/types.hpp"
 #include "blockchainer/version.hpp"
 
@@ -81,6 +83,33 @@ BlockchainerBufferResult account_blob(const blockchainer::crypto::Bytes& pub,
 
 blockchainer::crypto::ByteView cbv(const std::uint8_t* p, std::size_t n) {
   return blockchainer::crypto::ByteView(p, n);
+}
+
+namespace cg = blockchainer::consensus;
+
+cg::CredentialGate* as_gate(BlockchainerCredentialGate g) {
+  return static_cast<cg::CredentialGate*>(g);
+}
+
+// Credential blob = [sig_len:4][sig]([attr_count:4]([attr_len:4][attr])×).
+// Holder-secret (carries member_secret + hidden attributes).
+std::vector<std::uint8_t> encode_credential(const cg::Credential& c) {
+  blockchainer::codec::CodecWriter w;
+  w.write_bytes(cbv(c.signature.data(), c.signature.size()));
+  w.write_list(c.attrs,
+               [](blockchainer::codec::CodecWriter& ww, const blockchainer::crypto::Bytes& a) {
+                 ww.write_bytes(cbv(a.data(), a.size()));
+               });
+  return w.take();
+}
+cg::Credential decode_credential(const std::uint8_t* p, std::size_t n) {
+  blockchainer::codec::CodecReader r(cbv(p, n));
+  cg::Credential c;
+  c.signature = r.read_bytes();
+  c.attrs = r.read_list<blockchainer::crypto::Bytes>(
+      [](blockchainer::codec::CodecReader& rr) { return rr.read_bytes(); });
+  r.assert_fully_consumed();
+  return c;
 }
 
 }  // namespace
@@ -784,6 +813,105 @@ BlockchainerBufferResult blockchainer_sealed_mempool_reveal(BlockchainerSealedMe
 }
 
 void blockchainer_sealed_mempool_free(BlockchainerSealedMempool m) { delete as_pool(m); }
+
+// ── CredentialGate (anonymous membership admission, Option A) ──────────────────
+
+BlockchainerBufferResult blockchainer_bbs_keygen(const uint8_t* key_material, size_t km_len) {
+  try {
+    blockchainer::crypto::KeyPair kp = blockchainer::crypto::bbs_keygen(cbv(key_material, km_len));
+    return account_blob(kp.public_key, kp.secret_key);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_credential_policy_encode(uint64_t chain_id,
+                                                               const uint8_t* issuer_pk,
+                                                               size_t pk_len, const uint8_t* header,
+                                                               size_t header_len,
+                                                               uint32_t attribute_count,
+                                                               uint8_t min_tier) {
+  try {
+    cg::CredentialPolicy p;
+    p.chain_id = chain_id;
+    p.issuer_public_key.assign(issuer_pk, issuer_pk + pk_len);
+    p.header.assign(header, header + header_len);
+    p.attribute_count = attribute_count;
+    p.min_tier = min_tier;
+    return bytes_result(p.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_credential_policy_hash(const uint8_t* policy,
+                                                             size_t policy_len) {
+  try {
+    cg::CredentialPolicy p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    blockchainer::crypto::Hash h = p.hash();
+    return bytes_result(h.data(), h.size());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_credential_issue(const uint8_t* policy, size_t policy_len,
+                                                       const uint8_t* issuer_sk, size_t sk_len,
+                                                       const uint8_t* member_secret, size_t ms_len,
+                                                       uint8_t tier, uint64_t not_after,
+                                                       uint32_t issuer_epoch) {
+  try {
+    cg::CredentialPolicy p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    cg::Credential c = cg::issue_credential(p, cbv(issuer_sk, sk_len), cbv(member_secret, ms_len),
+                                            tier, not_after, issuer_epoch);
+    return bytes_result(encode_credential(c));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_credential_present(const uint8_t* policy, size_t policy_len,
+                                                         const uint8_t* credential, size_t cred_len,
+                                                         uint32_t epoch, const char* scope,
+                                                         const uint8_t* challenge,
+                                                         size_t challenge_len) {
+  try {
+    cg::CredentialPolicy p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    cg::Credential c = decode_credential(credential, cred_len);
+    std::vector<std::uint8_t> pres = cg::CredentialGate::present(
+        p, c, epoch, scope ? scope : "", cbv(challenge, challenge_len));
+    return bytes_result(pres);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerCredentialGate blockchainer_credential_gate_new(const uint8_t* policy,
+                                                            size_t policy_len) {
+  try {
+    cg::CredentialPolicy p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    return new cg::CredentialGate(std::move(p));
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+void blockchainer_credential_gate_revoke_epoch(BlockchainerCredentialGate g, uint32_t epoch) {
+  if (g) as_gate(g)->revoke_issuer_epoch(epoch);
+}
+
+int blockchainer_credential_gate_admit(BlockchainerCredentialGate g, uint32_t epoch,
+                                       const char* scope, const uint8_t* challenge,
+                                       size_t challenge_len, const uint8_t* presentation,
+                                       size_t presentation_len, uint64_t now) {
+  if (g == nullptr) return 0;
+  return as_gate(g)->admit(epoch, scope ? scope : "", cbv(challenge, challenge_len),
+                           cbv(presentation, presentation_len), now)
+             ? 1
+             : 0;
+}
+
+void blockchainer_credential_gate_free(BlockchainerCredentialGate g) { delete as_gate(g); }
 
 // ── Interop addresses ─────────────────────────────────────────────────────────
 
