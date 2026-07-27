@@ -125,6 +125,22 @@
   bytes; the node can't open the capability without the derived key; unknown
   credential rejected. ASan-clean. **Remaining:** run the OPAQUE messages over an
   `ArmoredChannel` and expose it through the C ABI + bindings.
+- **[~] CredentialGate (BBS anonymous membership) — DESIGN DONE, impl staged.**
+  Design doc: [`design/CREDENTIAL_GATE.md`](design/CREDENTIAL_GATE.md). A
+  permissioned chain admits submitters / gossip peers by a zero-knowledge proof
+  of holding an issuer-signed membership credential (BBS selective disclosure),
+  disclosing only a required attribute (`tier ≥ k`) and the credential expiry.
+  Policy (issuer key + schema + thresholds) committed into the genesis hash like
+  `AssuranceProfile`. The doc resolves the core tension — BBS proofs are
+  *unlinkable*, which breaks Sybil resistance / revocation / slashing — via a
+  per-epoch verifiable pseudonym. **Audit finding (recorded in the doc):**
+  cryptolib exposes only *bare* BBS (no pseudonym / blind-commit), so this stages
+  into (1) shippable-now BBS wrappers + *unlinkable* Option-A admission
+  (Sybil-weak but safe), and (2) the per-epoch pseudonym for real Sybil
+  resistance, **blocked on an upstream cryptolib BBS-pseudonym primitive** — not
+  a home-grown ZK construction (the project never reimplements crypto). Validator
+  anonymity deferred behind slashing/epoch machinery. **Next action:** cryptolib
+  feature request for BBS pseudonyms; then implement the wrappers + Option A.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
