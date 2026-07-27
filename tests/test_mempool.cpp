@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "blockchainer/account_state.hpp"
+#include "blockchainer/credential_gate.hpp"
 #include "blockchainer/mempool.hpp"
 #include "blockchainer/utxo_state.hpp"
 #include "blockchainer/version.hpp"
@@ -203,6 +204,52 @@ int main() {
     CHECK(ump.add(spend(200), kChain) == AddResult::kAdded);  // conflicts: both spend op0
     auto sel = ump.select(ustate, 10);
     CHECK(sel.size() == 1);  // only one can spend op0
+  }
+
+  // ── Membership admission gate (CredentialGate, Option A) ─────────────────────
+  // A permissioned pool admits a tx only behind a valid "submit"-scope
+  // presentation. The plain add() is the trusted path and stays ungated.
+  {
+    auto issuer = crypto::bbs_keygen(view(Bytes(32, 0x5A)));
+    consensus::CredentialPolicy policy;
+    policy.chain_id = kChain;
+    policy.issuer_public_key = issuer.public_key;
+    policy.header = Bytes{'m', 'e', 'm', 'b', 'e', 'r'};
+    policy.min_tier = 1;
+    consensus::CredentialGate gate(policy);
+
+    Bytes member_secret(32, 0x11);
+    auto cred = consensus::issue_credential(policy, view(issuer.secret_key), view(member_secret),
+                                            /*tier=*/2, /*not_after=*/4102444800ULL,
+                                            /*issuer_epoch=*/1);
+    const std::uint64_t now = 1700000000ULL;
+    Bytes challenge(32, 0x42);
+
+    Mempool gated;
+    gated.set_credential_gate(&gate);
+    auto tx = transfer(alice, bob_addr, 0, 10, kChain);
+
+    // Without a valid presentation, the gated path refuses the tx.
+    CHECK(gated.add(tx, kChain, 3, view(challenge), view(Bytes{0, 1, 2}), now) ==
+          AddResult::kNotAdmitted);
+    CHECK(gated.size() == 0);
+
+    // A valid "submit" presentation for (epoch 3, this challenge) admits it.
+    Bytes pres = consensus::CredentialGate::present(policy, cred, 3, "submit", view(challenge));
+    CHECK(gated.add(tx, kChain, 3, view(challenge), view(pres), now) == AddResult::kAdded);
+    CHECK(gated.size() == 1);
+
+    // A presentation bound to a different epoch does not admit a fresh tx.
+    auto tx2 = transfer(alice, bob_addr, 1, 10, kChain);
+    CHECK(gated.add(tx2, kChain, 4, view(challenge), view(pres), now) == AddResult::kNotAdmitted);
+
+    // The plain add() is the trusted path — never gated, even with a gate set.
+    CHECK(gated.add(tx2, kChain) == AddResult::kAdded);
+
+    // An ungated pool ignores the presentation argument entirely (permissionless).
+    Mempool open;
+    CHECK(open.add(transfer(alice, bob_addr, 0, 10, kChain), kChain, 0, view(challenge),
+                   view(Bytes{}), now) == AddResult::kAdded);
   }
 
   return bctest::summary();

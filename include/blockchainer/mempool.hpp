@@ -12,6 +12,10 @@ namespace blockchainer::observe {
 class EventBus;
 }  // namespace blockchainer::observe
 
+namespace blockchainer::consensus {
+class CredentialGate;
+}  // namespace blockchainer::consensus
+
 /// Transaction mempool (ARCHITECTURE §9). Model-agnostic: it leans on the
 /// pluggable [StateMachine] to decide which pending txs form a valid, ordered
 /// sequence — so account nonce-ordering and UTXO conflict-detection fall out of
@@ -40,6 +44,7 @@ enum class AddResult {
   kTooLarge,
   kFull,
   kAccountLimit,  ///< sender already has max_per_account pending txs
+  kNotAdmitted,   ///< a membership gate is attached and the presentation did not admit
 };
 
 class Mempool {
@@ -48,8 +53,19 @@ class Mempool {
 
   /// Admit a transaction: checks size, chain id, signature, and dedup. Does NOT
   /// check state validity (a future-nonce tx is admitted and becomes selectable
-  /// once its predecessors land).
+  /// once its predecessors land). This is the TRUSTED path — it is not membership-
+  /// gated even when a gate is attached (use it for node-internal submissions).
   AddResult add(const Transaction& tx, std::uint64_t chain_id);
+
+  /// Submission from an (anonymous) member. When a credential gate is attached
+  /// (see [set_credential_gate]), the [presentation] must admit under scope
+  /// "submit" bound to ([epoch], [challenge], [now]) — otherwise kNotAdmitted and
+  /// the tx is not added. Then the normal [add] checks run. With no gate attached
+  /// this behaves exactly like `add(tx, chain_id)` (the presentation is ignored),
+  /// so an ungated (permissionless) chain is unaffected. The gate is a *local*
+  /// admission policy — [now] is caller-supplied, so the mempool stays clock-free.
+  AddResult add(const Transaction& tx, std::uint64_t chain_id, std::uint32_t epoch,
+                crypto::ByteView challenge, crypto::ByteView presentation, std::uint64_t now);
 
   bool contains(const Hash& txid) const { return pool_.count(txid) != 0; }
   std::size_t size() const { return pool_.size(); }
@@ -66,6 +82,12 @@ class Mempool {
   /// Attach an event bus (nullable). Publishes TxAdmitted/TxRemoved.
   void set_event_bus(observe::EventBus* bus) { bus_ = bus; }
 
+  /// Attach an anonymous-membership admission gate (nullable). When set, the
+  /// gated [add] overload requires a valid "submit"-scope presentation before a
+  /// tx is admitted (docs/design/CREDENTIAL_GATE.md, Option A). The gate is only
+  /// read (its admit() is const); ownership stays with the caller.
+  void set_credential_gate(const consensus::CredentialGate* gate) { gate_ = gate; }
+
  private:
   MempoolConfig cfg_;
   // Keyed by txid → deterministic iteration order for selection.
@@ -74,6 +96,7 @@ class Mempool {
   // cap. Only tracks txs with a non-empty author.
   std::map<Hash, std::size_t> per_account_;
   observe::EventBus* bus_ = nullptr;
+  const consensus::CredentialGate* gate_ = nullptr;
 };
 
 }  // namespace blockchainer

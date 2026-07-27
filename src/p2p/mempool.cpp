@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "blockchainer/credential_gate.hpp"
 #include "blockchainer/observability/event_bus.hpp"
 #include "blockchainer/observability/events.hpp"
 
@@ -19,6 +20,18 @@ std::optional<Hash> sender_bucket(const Transaction& tx) {
   return crypto::address_of(codec::ByteView(tx.author.data(), tx.author.size()));
 }
 }  // namespace
+
+AddResult Mempool::add(const Transaction& tx, std::uint64_t chain_id, std::uint32_t epoch,
+                       crypto::ByteView challenge, crypto::ByteView presentation,
+                       std::uint64_t now) {
+  // Membership admission first (a permissioned chain): prove holder of an issuer-
+  // signed credential clearing the policy, unlinkably, before spending any effort
+  // on the tx itself. An ungated pool skips straight to the normal add.
+  if (gate_ != nullptr && !gate_->admit(epoch, "submit", challenge, presentation, now)) {
+    return AddResult::kNotAdmitted;
+  }
+  return add(tx, chain_id);
+}
 
 AddResult Mempool::add(const Transaction& tx, std::uint64_t chain_id) {
   if (tx.chain_id != chain_id) return AddResult::kWrongChain;

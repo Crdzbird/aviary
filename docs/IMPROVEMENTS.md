@@ -165,10 +165,19 @@
   (`CredentialPolicy` struct + `CredentialGate` class + demo), Dart
   (`makeCredentialPolicy`/`makeCredentialGate` + classes + smoke) — each drives
   issue→present→admit + the full reject set and asserts unlinkability (two
-  presentations of one credential differ yet both admit). **Remaining:** Option B
-  per-epoch pseudonym (blocked on the filed cryptolib primitive); wire the policy
-  into `GenesisSpec` (deferred pending the §10.4 orthogonal-vs-dimension
-  decision); gate `Mempool::add` / gossip admission on a presentation.
+  presentations of one credential differ yet both admit). **Mempool submission gate
+  DONE:** `Mempool::set_credential_gate(const consensus::CredentialGate*)` +
+  gated `add(tx, chain_id, epoch, challenge, presentation, now)` overload →
+  `AddResult::kNotAdmitted` unless the presentation admits under scope "submit"
+  (docs/design/CREDENTIAL_GATE.md §6). The plain `add(tx, chain_id)` stays the
+  ungated TRUSTED path; an ungated pool ignores the presentation (permissionless
+  unaffected); the gate is a *local* policy so `now` is caller-supplied and the
+  mempool stays clock-free. `test_mempool.cpp` gated section (no presentation →
+  kNotAdmitted, valid submit presentation → kAdded, wrong-epoch presentation →
+  kNotAdmitted, trusted plain-add still works, ungated pool admits); ASan-clean.
+  **Remaining:** Option B per-epoch pseudonym (blocked on the filed cryptolib
+  primitive); wire the policy into `GenesisSpec` (deferred pending the §10.4
+  orthogonal-vs-dimension decision); gossip peer admission (scope "gossip").
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
