@@ -1,6 +1,20 @@
 #include "blockchainer/gossip.hpp"
 
+#include "blockchainer/credential_gate.hpp"
+
 namespace blockchainer::p2p {
+
+bool GossipOverlay::admit_peer(std::uint32_t peer, std::uint32_t epoch, crypto::ByteView challenge,
+                               crypto::ByteView presentation, std::uint64_t now) {
+  // Membership admission before a peer joins the mesh: prove holder of an issuer-
+  // signed credential clearing the policy, unlinkably, under the "gossip" scope.
+  // An ungated overlay admits everyone (permissionless).
+  if (gate_ != nullptr && !gate_->admit(epoch, "gossip", challenge, presentation, now)) {
+    return false;
+  }
+  add_peer(peer);
+  return true;
+}
 
 namespace {
 Hash message_id(const Bytes& message) {

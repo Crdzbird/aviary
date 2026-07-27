@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 
+#include "blockchainer/credential_gate.hpp"
 #include "blockchainer/gossip.hpp"
 #include "blockchainer/version.hpp"
 #include "check.hpp"
@@ -158,6 +159,53 @@ int main() {
     CHECK(!g.banned(2));
     auto fwd = g.on_receive(2, msg("from-honest"));
     CHECK_MSG(fwd.size() == 1 && fwd[0].to == 3, "an honest peer's message still floods onward");
+  }
+
+  // ── Membership admission gate (CredentialGate, Option A) ─────────────────────
+  // A permissioned mesh admits a peer only behind a valid "gossip"-scope
+  // presentation. The plain add_peer() is the trusted path and stays ungated.
+  {
+    auto viewb = [](const Bytes& b) { return codec::ByteView(b.data(), b.size()); };
+    auto issuer = crypto::bbs_keygen(viewb(Bytes(32, 0x5A)));
+    consensus::CredentialPolicy policy;
+    policy.chain_id = 9;
+    policy.issuer_public_key = issuer.public_key;
+    policy.header = msg("gossip-member");
+    policy.min_tier = 1;
+    consensus::CredentialGate gate(policy);
+
+    Bytes member_secret(32, 0x22);
+    auto cred = consensus::issue_credential(policy, viewb(issuer.secret_key), viewb(member_secret),
+                                            /*tier=*/2, /*not_after=*/4102444800ULL,
+                                            /*issuer_epoch=*/1);
+    const std::uint64_t now = 1700000000ULL;
+    Bytes challenge(32, 0x7E);
+
+    GossipOverlay g(0);
+    g.set_credential_gate(&gate);
+
+    // Without a valid presentation, the peer is not admitted to the mesh.
+    CHECK(!g.admit_peer(1, 3, viewb(challenge), viewb(Bytes{9, 9}), now));
+    CHECK(g.peers().count(1) == 0);
+
+    // A valid "gossip" presentation for (epoch 3, this challenge) admits it.
+    Bytes gp = consensus::CredentialGate::present(policy, cred, 3, "gossip", viewb(challenge));
+    CHECK(g.admit_peer(1, 3, viewb(challenge), viewb(gp), now));
+    CHECK(g.peers().count(1) == 1);
+
+    // A "submit"-scope proof does not admit a gossip peer (scope binding).
+    Bytes sp = consensus::CredentialGate::present(policy, cred, 3, "submit", viewb(challenge));
+    CHECK(!g.admit_peer(2, 3, viewb(challenge), viewb(sp), now));
+    CHECK(g.peers().count(2) == 0);
+
+    // The plain add_peer() is the trusted path — never gated, even with a gate set.
+    g.add_peer(2);
+    CHECK(g.peers().count(2) == 1);
+
+    // An ungated overlay admits any peer (permissionless).
+    GossipOverlay open(0);
+    CHECK(open.admit_peer(5, 0, viewb(challenge), viewb(Bytes{}), now));
+    CHECK(open.peers().count(5) == 1);
   }
 
   return bctest::summary();

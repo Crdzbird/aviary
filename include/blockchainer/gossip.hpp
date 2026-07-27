@@ -10,6 +10,10 @@
 #include "blockchainer/crypto.hpp"
 #include "blockchainer/types.hpp"
 
+namespace blockchainer::consensus {
+class CredentialGate;
+}  // namespace blockchainer::consensus
+
 /// Gossip overlay (ARCHITECTURE §9). The wire protocol and secure sessions carry
 /// messages between two peers; this is the mesh on top: each node dedups
 /// messages by content hash and floods a new one to its peers (except whoever
@@ -41,9 +45,28 @@ class GossipOverlay {
   explicit GossipOverlay(std::uint32_t self) : GossipOverlay(self, Config{}) {}
   GossipOverlay(std::uint32_t self, Config cfg) : self_(self), cfg_(cfg) {}
 
+  /// Add a peer to the mesh. This is the TRUSTED path — not membership-gated even
+  /// when a gate is attached (use it for genesis-known / already-authenticated
+  /// peers).
   void add_peer(std::uint32_t peer) {
     if (peer != self_ && !banned_.count(peer)) peers_.insert(peer);
   }
+
+  /// Attach an anonymous-membership admission gate (nullable). When set,
+  /// [admit_peer] requires a valid "gossip"-scope presentation before a peer
+  /// joins the mesh (docs/design/CREDENTIAL_GATE.md, Option A). The gate is only
+  /// read (admit() is const); ownership stays with the caller.
+  void set_credential_gate(const consensus::CredentialGate* gate) { gate_ = gate; }
+
+  /// Admit a peer behind a membership proof. When a gate is attached, the
+  /// [presentation] must admit under scope "gossip" bound to ([epoch],
+  /// [challenge], [now]) or the peer is NOT added and this returns false. With no
+  /// gate attached it is exactly [add_peer] and returns true (the presentation is
+  /// ignored), so an ungated (permissionless) mesh is unaffected. The gate is a
+  /// *local* admission policy — [now] is caller-supplied, keeping this clock-free.
+  bool admit_peer(std::uint32_t peer, std::uint32_t epoch, crypto::ByteView challenge,
+                  crypto::ByteView presentation, std::uint64_t now);
+
   std::uint32_t self() const { return self_; }
   const std::set<std::uint32_t>& peers() const { return peers_; }
 
@@ -84,6 +107,7 @@ class GossipOverlay {
   std::deque<Hash> seen_order_;  // insertion order for FIFO eviction
   std::map<std::uint32_t, int> misbehavior_;           // peer → accumulated penalty weight
   std::set<std::uint32_t> banned_;
+  const consensus::CredentialGate* gate_ = nullptr;
 };
 
 }  // namespace blockchainer::p2p

@@ -175,9 +175,16 @@
   mempool stays clock-free. `test_mempool.cpp` gated section (no presentation →
   kNotAdmitted, valid submit presentation → kAdded, wrong-epoch presentation →
   kNotAdmitted, trusted plain-add still works, ungated pool admits); ASan-clean.
-  **Remaining:** Option B per-epoch pseudonym (blocked on the filed cryptolib
-  primitive); wire the policy into `GenesisSpec` (deferred pending the §10.4
-  orthogonal-vs-dimension decision); gossip peer admission (scope "gossip").
+  **Gossip peer-admission gate DONE:** the analog on the mesh —
+  `GossipOverlay::set_credential_gate(const consensus::CredentialGate*)` +
+  `admit_peer(peer, epoch, challenge, presentation, now)` → adds the peer only if
+  the presentation admits under scope **"gossip"** (else the peer stays out and
+  it returns false); the plain `add_peer` stays the ungated trusted path
+  (genesis-known peers); ungated overlay admits everyone. `test_gossip.cpp`
+  section proves it, including that a **"submit"-scope proof does NOT admit a
+  gossip peer** (scope binding). ASan-clean. **Remaining:** Option B per-epoch
+  pseudonym (blocked on the filed cryptolib primitive); wire the policy into
+  `GenesisSpec` (deferred pending the §10.4 orthogonal-vs-dimension decision).
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
