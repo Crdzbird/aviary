@@ -79,6 +79,25 @@
   tampered sig / impostor index), a round-robin policy swap, and driving via a
   `ConsensusEngine&`; PosData fuzzed. Reference-grade (no fork choice / no
   finality gadget beyond the leader signature).
+  **[x] VRF-PoS (grind-proof election) — DONE.** `VrfPosEngine` (`vrf_pos.hpp`)
+  is the hardened tier composed on cryptolib's ECVRF (RFC 9381), closing the
+  reference engine's two structural gaps: its leader is a public function of the
+  height, so it is *predictable arbitrarily far ahead* (targeted DoS) and
+  grindable by anyone influencing the seed. Here eligibility is a VRF proof over
+  `alpha = tag ‖ chain_id ‖ height ‖ attempt ‖ parent_hash` — unpredictable
+  without the leader's secret, un-grindable (beta is a function, not a choice),
+  publicly verifiable from the proof carried in a versioned `VrfPosData`, and
+  pinned to the exact tip by `parent_hash` (no cross-branch replay). Threshold:
+  `ticket(beta) mod total_power < oversample × power`, so stake weighting and
+  zero-power exclusion carry over; bounded `attempt` retries preserve liveness
+  when nobody is eligible. `test_vrf_pos.cpp`: multi-height chain agreement,
+  deterministic re-query, stake weighting, and adversarial rejection of
+  tampered / impostor / out-of-range / bad-seal blocks **and of a genuine proof
+  that fails the threshold**. `VrfPosData` in the fuzz sweep; ASan-clean. NOTE:
+  VRF keys are engine config today (index-aligned with the validator set) —
+  committing them into `GenesisSpec` is the follow-up. **Remaining:** fork
+  choice for crowded attempts (linear ledger arbitrates today), VRF keys in
+  genesis, epoch key rotation.
 - **[~] PoW reference engine — DONE.** `PowEngine`
   (`pow_engine.hpp`) implements `ConsensusEngine` as a second consensus family: a
   block is justified by *work* — its header hash must be <= a difficulty target,

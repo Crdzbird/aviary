@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <optional>
 #include <vector>
 
 /// The crypto seam (ARCHITECTURE §3.2). Wraps cryptolib's C ABI in
@@ -84,6 +85,24 @@ Bytes hybrid_sig_sign(ByteView msg, ByteView secret_key);
 
 /// Verifies a hybrid signature (both parts must pass). Never throws.
 bool hybrid_sig_verify(ByteView msg, ByteView sig, ByteView public_key);
+
+// ── ECVRF (RFC 9381, ECVRF-EDWARDS25519-SHA512-TAI) ──────────────────────────
+// A verifiable random function: sk maps an input to a unique, unpredictable
+// 64-byte output plus an 80-byte proof anyone can verify with pk. The basis for
+// grind-proof leader election: the output is fixed the moment (sk, input) is —
+// nobody can search for a favourable one — yet unpredictable until revealed.
+
+/// Fresh VRF keypair (pk 32 B, sk = 32-byte seed).
+KeyPair ecvrf_keygen();
+/// Derive the public key from a 32-byte secret seed. Throws on failure.
+Bytes ecvrf_public_key(ByteView sk);
+/// The 80-byte proof pi for (sk, alpha). Throws on failure.
+Bytes ecvrf_prove(ByteView sk, ByteView alpha);
+/// The 64-byte VRF output beta for a proof. Throws on malformed proof.
+Bytes ecvrf_proof_to_hash(ByteView pi);
+/// Verify [pi] for (pk, alpha): the 64-byte beta on success, std::nullopt on an
+/// invalid proof. Never throws.
+std::optional<Bytes> ecvrf_verify(ByteView pk, ByteView alpha, ByteView pi);
 
 // ── SLH-DSA (FIPS 205, stateless hash-based) ─────────────────────────────────
 // The most conservative PQ family: security reduces to the hash function alone

@@ -18,6 +18,7 @@
 #include "blockchainer/peer_book.hpp"
 #include "blockchainer/threshold.hpp"
 #include "blockchainer/pos_engine.hpp"
+#include "blockchainer/vrf_pos.hpp"
 #include "blockchainer/pow_engine.hpp"
 #include "blockchainer/types.hpp"
 #include "blockchainer/utxo_state.hpp"
@@ -88,6 +89,7 @@ int main() {
     totality_ok &= total([&] { (void)consensus::Evidence::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::PowData::decode_all(v); });
     totality_ok &= total([&] { (void)consensus::PosData::decode_all(v); });
+    totality_ok &= total([&] { (void)consensus::VrfPosData::decode_all(v); });
     totality_ok &= total([&] { (void)GenesisSpec::decode_all(v); });
     totality_ok &= total([&] { (void)p2p::AddressBook::decode(v); });
     totality_ok &= total([&] { (void)custody::ShareCard::decode(v); });

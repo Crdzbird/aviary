@@ -120,6 +120,54 @@ bool hybrid_sig_verify(ByteView msg, ByteView sig, ByteView public_key) {
                                      public_key.data(), public_key.size()) == 1;
 }
 
+// ── ECVRF (RFC 9381) ─────────────────────────────────────────────────────────
+
+KeyPair ecvrf_keygen() {
+  CryptoKeyPair kp = cryptolib_ecvrf_keygen();
+  KeyPair out{take_buffer(kp.public_key), take_buffer(kp.secret_key)};
+  return out;
+}
+
+Bytes ecvrf_public_key(ByteView sk) {
+  CryptoBufferResult r = cryptolib_ecvrf_public_key(sk.data(), sk.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "ecvrf_public_key failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+Bytes ecvrf_prove(ByteView sk, ByteView alpha) {
+  CryptoBufferResult r = cryptolib_ecvrf_prove(sk.data(), sk.size(), alpha.data(), alpha.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "ecvrf_prove failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+Bytes ecvrf_proof_to_hash(ByteView pi) {
+  CryptoBufferResult r = cryptolib_ecvrf_proof_to_hash(pi.data(), pi.size());
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "ecvrf_proof_to_hash failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(m);
+  }
+  return take_buffer(r.buf);
+}
+
+std::optional<Bytes> ecvrf_verify(ByteView pk, ByteView alpha, ByteView pi) {
+  CryptoBufferResult r =
+      cryptolib_ecvrf_verify(pk.data(), pk.size(), alpha.data(), alpha.size(), pi.data(), pi.size());
+  if (r.buf.data == nullptr) {
+    if (r.error) cryptolib_str_free(r.error);
+    return std::nullopt;  // invalid proof — never throws
+  }
+  return take_buffer(r.buf);
+}
+
 // ── SLH-DSA (FIPS 205) — fixed SLH-DSA-SHA2-128s profile ────────────────────
 
 namespace {
