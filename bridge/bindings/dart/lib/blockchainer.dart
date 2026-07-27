@@ -99,6 +99,30 @@ typedef _BufFreeD = void Function(Pointer<_Buffer>);
 typedef _StrFreeC = Void Function(Pointer<Utf8>);
 typedef _StrFreeD = void Function(Pointer<Utf8>);
 
+// Portable account export.
+typedef _KemKeygenC = _BufResult Function();
+typedef _KemKeygenD = _BufResult Function();
+typedef _PSealPassC = _BufResult Function(
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Utf8>, Uint64, Size);
+typedef _PSealPassD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Utf8>, int, int);
+typedef _POpenPassC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Utf8>);
+typedef _POpenPassD = _BufResult Function(Pointer<Uint8>, int, Pointer<Utf8>);
+typedef _PSealToC = _BufResult Function(
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _PSealToD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _POpenToC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _POpenToD = _BufResult Function(Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _PSealSignedC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size,
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _PSealSignedD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _POpenSignedC = _BufResult Function(
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _POpenSignedD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int);
+
 class BlockchainerException implements Exception {
   BlockchainerException(this.message);
   final String message;
@@ -470,6 +494,120 @@ class Blockchainer {
   /// Alias for [createNode] (naming parity with the Go binding's NewNode).
   Node newNode(int chainId) => createNode(chainId);
 
+  // Unpack the C ABI account blob [pub_len:4 BE][public][secret].
+  PortableAccount _splitBlob(Uint8List blob) {
+    final pl = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+    return PortableAccount(
+        Uint8List.sublistView(blob, 4, 4 + pl), Uint8List.sublistView(blob, 4 + pl));
+  }
+
+  /// A hybrid-KEM device keypair (X25519 + ML-KEM-768) for the recipient-bound
+  /// portable-account tiers.
+  PortableAccount hybridKemKeypair() => _splitBlob(_take(
+      lib.lookupFunction<_KemKeygenC, _KemKeygenD>('blockchainer_hybrid_kem_keygen')(),
+      'hybrid_kem_keygen'));
+
+  /// Tier 1 — seal an account (public + secret) under [passphrase]
+  /// (MolecularVault + Argon2id; ops=mem=0 → SENSITIVE preset).
+  Uint8List sealAccountPassphrase(Uint8List public, Uint8List secret, String passphrase,
+      {int ops = 0, int mem = 0}) {
+    final pubP = _alloc(public), secP = _alloc(secret), cp = passphrase.toNativeUtf8();
+    try {
+      return _take(
+          lib.lookupFunction<_PSealPassC, _PSealPassD>('blockchainer_portable_seal_passphrase')(
+              pubP, public.length, secP, secret.length, cp, ops, mem),
+          'portable_seal_passphrase');
+    } finally {
+      calloc.free(pubP);
+      calloc.free(secP);
+      calloc.free(cp);
+    }
+  }
+
+  /// Open a passphrase envelope. Throws on wrong passphrase / tamper.
+  PortableAccount openAccountPassphrase(Uint8List envelope, String passphrase) {
+    final envP = _alloc(envelope), cp = passphrase.toNativeUtf8();
+    try {
+      return _splitBlob(_take(
+          lib.lookupFunction<_POpenPassC, _POpenPassD>('blockchainer_portable_open_passphrase')(
+              envP, envelope.length, cp),
+          'portable_open_passphrase'));
+    } finally {
+      calloc.free(envP);
+      calloc.free(cp);
+    }
+  }
+
+  /// Tier 2 — seal an account to a device's hybrid-KEM public key (recipient-
+  /// bound PQ). Only that device's KEM secret opens it.
+  Uint8List sealAccountTo(Uint8List public, Uint8List secret, Uint8List recipientKemPublic) {
+    final pubP = _alloc(public), secP = _alloc(secret), rkP = _alloc(recipientKemPublic);
+    try {
+      return _take(
+          lib.lookupFunction<_PSealToC, _PSealToD>('blockchainer_portable_seal_to')(
+              pubP, public.length, secP, secret.length, rkP, recipientKemPublic.length),
+          'portable_seal_to');
+    } finally {
+      calloc.free(pubP);
+      calloc.free(secP);
+      calloc.free(rkP);
+    }
+  }
+
+  /// Open a recipient-bound envelope with the device's KEM secret.
+  PortableAccount openAccountTo(Uint8List envelope, Uint8List recipientKemSecret) {
+    final envP = _alloc(envelope), rkP = _alloc(recipientKemSecret);
+    try {
+      return _splitBlob(_take(
+          lib.lookupFunction<_POpenToC, _POpenToD>('blockchainer_portable_open_to')(
+              envP, envelope.length, rkP, recipientKemSecret.length),
+          'portable_open_to'));
+    } finally {
+      calloc.free(envP);
+      calloc.free(rkP);
+    }
+  }
+
+  /// Tier 3 — seal to a device KEM key AND sign with the owner's hybrid signature
+  /// secret (Fortress-grade: recipient-bound + authenticated).
+  Uint8List sealAccountSignedTo(Uint8List public, Uint8List secret,
+      Uint8List recipientKemPublic, Uint8List senderSigSecret) {
+    final pubP = _alloc(public),
+        secP = _alloc(secret),
+        rkP = _alloc(recipientKemPublic),
+        ssP = _alloc(senderSigSecret);
+    try {
+      return _take(
+          lib.lookupFunction<_PSealSignedC, _PSealSignedD>(
+              'blockchainer_portable_seal_signed_to')(pubP, public.length, secP, secret.length,
+              rkP, recipientKemPublic.length, ssP, senderSigSecret.length),
+          'portable_seal_signed_to');
+    } finally {
+      calloc.free(pubP);
+      calloc.free(secP);
+      calloc.free(rkP);
+      calloc.free(ssP);
+    }
+  }
+
+  /// Open a signed-recipient envelope: decrypt with the device KEM secret AND
+  /// verify the owner's signature. Throws otherwise.
+  PortableAccount openAccountSignedFrom(
+      Uint8List envelope, Uint8List recipientKemSecret, Uint8List senderSigPublic) {
+    final envP = _alloc(envelope), rkP = _alloc(recipientKemSecret), spP = _alloc(senderSigPublic);
+    try {
+      return _splitBlob(_take(
+          lib.lookupFunction<_POpenSignedC, _POpenSignedD>(
+              'blockchainer_portable_open_signed_from')(
+              envP, envelope.length, rkP, recipientKemSecret.length, spP, senderSigPublic.length),
+          'portable_open_signed_from'));
+    } finally {
+      calloc.free(envP);
+      calloc.free(rkP);
+      calloc.free(spP);
+    }
+  }
+
   /// Create a custodial [KeyStore] protected by [passphrase] (returned unlocked).
   KeyStore createKeyStore(String passphrase) {
     final cp = passphrase.toNativeUtf8();
@@ -730,4 +868,14 @@ class KeyStore {
 
   void dispose() =>
       _lib.lookupFunction<_NodeFreeC, _NodeFreeD>('blockchainer_keystore_free')(_h);
+}
+
+/// A signing account's material — public key and secret — as returned by the
+/// portable-account "open" methods. For a KEM device key from
+/// [Blockchainer.hybridKemKeypair], [public] is the KEM public and [secret] the
+/// KEM secret.
+class PortableAccount {
+  PortableAccount(this.public, this.secret);
+  final Uint8List public;
+  final Uint8List secret;
 }
