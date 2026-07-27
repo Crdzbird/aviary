@@ -82,6 +82,16 @@ function ensureLoaded() {
     pOpenTo: f('BlockchainerBufferResult blockchainer_portable_open_to(uint8_t*, size_t, uint8_t*, size_t)'),
     pSealSigned: f('BlockchainerBufferResult blockchainer_portable_seal_signed_to(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
     pOpenSigned: f('BlockchainerBufferResult blockchainer_portable_open_signed_from(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    thCreate: f('BlockchainerBufferResult blockchainer_threshold_create(uint16_t, uint16_t)'),
+    thShareInfo: f('BlockchainerBufferResult blockchainer_threshold_share_info(uint8_t*, size_t)'),
+    thShareSeal: f('BlockchainerBufferResult blockchainer_threshold_share_seal(uint8_t*, size_t, const char*, uint64_t, size_t)'),
+    thShareUnseal: f('BlockchainerBufferResult blockchainer_threshold_share_unseal(uint8_t*, size_t, const char*)'),
+    thCommit: f('BlockchainerBufferResult blockchainer_threshold_commit(uint8_t*, size_t)'),
+    thCeremonyNew: f('void *blockchainer_threshold_ceremony_new(uint8_t*, uint8_t*, size_t, uint8_t*, size_t)'),
+    thCeremonyFree: f('void blockchainer_threshold_ceremony_free(void*)'),
+    thSign: f('BlockchainerBufferResult blockchainer_threshold_sign(void*, uint8_t*, size_t, uint8_t*)'),
+    thVerifyShare: f('int blockchainer_threshold_verify_share(void*, uint16_t, uint8_t*, uint8_t*)'),
+    thAggregate: f('BlockchainerBufferResult blockchainer_threshold_aggregate(void*, uint16_t*, uint8_t*, size_t)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -253,6 +263,30 @@ class KeyStore {
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
+// A two-round FROST signing ceremony (opaque handle). Free() when done.
+class Ceremony {
+  constructor(groupPK, message, commitments) {
+    const roster = Buffer.concat(commitments.map(u8));
+    this._h = fn.thCeremonyNew(u8(groupPK), u8(message), u8(message).length, roster, roster.length);
+    if (!this._h) throw new Error('threshold ceremony creation failed');
+  }
+  sign(card, nonces) { return consume(fn.thSign(this._h, u8(card), u8(card).length, u8(nonces)), 'threshold_sign'); }
+  verifyShare(id, publicShare, sigShare) {
+    return fn.thVerifyShare(this._h, id, u8(publicShare), u8(sigShare)) === 1;
+  }
+  aggregate(ids, sigShares) {
+    const flat = Buffer.concat(sigShares.map(u8));
+    return consume(fn.thAggregate(this._h, Uint16Array.from(ids), flat, ids.length), 'threshold_aggregate');
+  }
+  free() { fn.thCeremonyFree(this._h); }
+}
+
+// Parse a share card's identity blob [id u16 BE][group_pk 32][public 32].
+function shareInfo(card) {
+  const b = consume(fn.thShareInfo(u8(card), u8(card).length), 'threshold_share_info');
+  return { index: (b[0] << 8) | b[1], groupPublicKey: b.subarray(2, 34), publicShare: b.subarray(34, 66) };
+}
+
 module.exports = {
   preload,
   _warm,
@@ -271,6 +305,31 @@ module.exports = {
   newKeyStore: (passphrase) => new KeyStore(passphrase),
   loadKeyStore: (blob) => KeyStore.load(blob),
   KeyStore,
+
+  // Threshold (FROST t-of-n) accounts. Cards, commit, ceremony, aggregate.
+  createThresholdAccount(n, t) {
+    const blob = consume(fn.thCreate(n, t), 'threshold_create');
+    const count = (blob[0] << 8) | blob[1];
+    const cards = [];
+    let off = 2;
+    for (let i = 0; i < count; i++) {
+      const len = (blob[off] << 24) | (blob[off + 1] << 16) | (blob[off + 2] << 8) | blob[off + 3];
+      off += 4;
+      cards.push(Buffer.from(blob.subarray(off, off + len)));
+      off += len;
+    }
+    return cards;
+  },
+  shareInfo,
+  commit(card) {
+    const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');
+    return { nonces: b.subarray(0, 64), commitment: b.subarray(64, 130) };
+  },
+  sealShare: (card, passphrase, ops = 0, mem = 0) =>
+    consume(fn.thShareSeal(u8(card), u8(card).length, passphrase, BigInt(ops), mem), 'threshold_share_seal'),
+  unsealShare: (envelope, passphrase) =>
+    consume(fn.thShareUnseal(u8(envelope), u8(envelope).length, passphrase), 'threshold_share_unseal'),
+  Ceremony,
 
   // Portable account export (tiered encrypted backup). Returns/takes accounts as
   // { public, secret } Buffers; envelopes are Buffers.

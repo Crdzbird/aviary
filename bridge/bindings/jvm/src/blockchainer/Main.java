@@ -4,7 +4,7 @@ import java.util.HexFormat;
 
 /** Java demo: drives the full stack. Run with --enable-native-access=ALL-UNNAMED. */
 public final class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         try (Blockchainer bc = new Blockchainer()) {
             System.out.printf("blockchainer %s (crypto backend %s)%n%n", bc.version(), bc.cryptoBackend());
 
@@ -60,6 +60,42 @@ public final class Main {
             catch (RuntimeException e) { wrongSigner = true; }
             if (!wrongSigner) throw new IllegalStateException("wrong signer must fail");
             System.out.println("portable tiers OK (passphrase + recipient + signed, all fail-closed)");
+
+            // Threshold (FROST 2-of-3): the aggregate is a standard Ed25519 signature.
+            var cards = bc.createThresholdAccount(3, 2);
+            if (cards.length != 3) throw new IllegalStateException("expected 3 share cards");
+            byte[] groupPK = cards[0].groupPublicKey();
+            byte[] tmsg = "threshold-signed transfer".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] cm0 = bc.commit(cards[0].bytes()), cm2 = bc.commit(cards[2].bytes());
+            byte[] com0 = java.util.Arrays.copyOfRange(cm0, 64, 130);
+            byte[] com2 = java.util.Arrays.copyOfRange(cm2, 64, 130);
+            byte[] non0 = java.util.Arrays.copyOfRange(cm0, 0, 64);
+            byte[] non2 = java.util.Arrays.copyOfRange(cm2, 0, 64);
+            byte[] tsig;
+            try (var cer = bc.newCeremony(groupPK, tmsg, new byte[][]{com2, com0})) {
+                byte[] s0 = cer.sign(cards[0].bytes(), non0);
+                byte[] s2 = cer.sign(cards[2].bytes(), non2);
+                if (!cer.verifyShare(cards[0].index(), cards[0].publicShare(), s0))
+                    throw new IllegalStateException("honest share not attributed");
+                byte[] bad = s2.clone(); bad[5] ^= 1;
+                if (cer.verifyShare(cards[2].index(), cards[2].publicShare(), bad))
+                    throw new IllegalStateException("corrupt share not detected");
+                tsig = cer.aggregate(new int[]{cards[0].index(), cards[2].index()}, new byte[][]{s0, s2});
+            }
+            if (tsig.length != 64) throw new IllegalStateException("aggregate not 64 bytes");
+            byte[] spki = new byte[12 + 32];
+            System.arraycopy(new byte[]{0x30,0x2a,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x03,0x21,0x00}, 0, spki, 0, 12);
+            System.arraycopy(groupPK, 0, spki, 12, 32);
+            var pub = java.security.KeyFactory.getInstance("Ed25519")
+                .generatePublic(new java.security.spec.X509EncodedKeySpec(spki));
+            var ver = java.security.Signature.getInstance("Ed25519");
+            ver.initVerify(pub); ver.update(tmsg);
+            if (!ver.verify(tsig)) throw new IllegalStateException("threshold aggregate is not a valid Ed25519 signature");
+            // Sealed share round-trip.
+            byte[] tenv = bc.sealShare(cards[1].bytes(), "share-pass", 3, 1 << 16);
+            if (!java.util.Arrays.equals(bc.unsealShare(tenv, "share-pass"), cards[1].bytes()))
+                throw new IllegalStateException("sealed share round-trip");
+            System.out.println("threshold OK (2-of-3 → Ed25519, attribution, sealed)");
 
             System.out.println("\nALL GOOD");
         }

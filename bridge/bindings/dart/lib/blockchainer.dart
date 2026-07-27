@@ -123,6 +123,28 @@ typedef _POpenSignedC = _BufResult Function(
 typedef _POpenSignedD = _BufResult Function(
     Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int);
 
+// Threshold (FROST t-of-n).
+typedef _ThCreateC = _BufResult Function(Uint16, Uint16);
+typedef _ThCreateD = _BufResult Function(int, int);
+typedef _ThBufC = _BufResult Function(Pointer<Uint8>, Size); // info + commit
+typedef _ThBufD = _BufResult Function(Pointer<Uint8>, int);
+typedef _ThSealC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Utf8>, Uint64, Size);
+typedef _ThSealD = _BufResult Function(Pointer<Uint8>, int, Pointer<Utf8>, int, int);
+typedef _ThUnsealC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Utf8>);
+typedef _ThUnsealD = _BufResult Function(Pointer<Uint8>, int, Pointer<Utf8>);
+typedef _ThCerNewC = Pointer<Void> Function(
+    Pointer<Uint8>, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _ThCerNewD = Pointer<Void> Function(
+    Pointer<Uint8>, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _ThCerFreeC = Void Function(Pointer<Void>);
+typedef _ThCerFreeD = void Function(Pointer<Void>);
+typedef _ThSignC = _BufResult Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>);
+typedef _ThSignD = _BufResult Function(Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>);
+typedef _ThVerifyC = Int32 Function(Pointer<Void>, Uint16, Pointer<Uint8>, Pointer<Uint8>);
+typedef _ThVerifyD = int Function(Pointer<Void>, int, Pointer<Uint8>, Pointer<Uint8>);
+typedef _ThAggC = _BufResult Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint8>, Size);
+typedef _ThAggD = _BufResult Function(Pointer<Void>, Pointer<Uint16>, Pointer<Uint8>, int);
+
 class BlockchainerException implements Exception {
   BlockchainerException(this.message);
   final String message;
@@ -608,6 +630,101 @@ class Blockchainer {
     }
   }
 
+  // ── Threshold (FROST t-of-n) accounts ──────────────────────────────────────
+
+  /// Deal a t-of-n account: [n] share cards, any [t] of which can sign. The dealt
+  /// group secret is zeroised before returning.
+  List<ThresholdShare> createThresholdAccount(int n, int t) {
+    final blob = _take(
+        lib.lookupFunction<_ThCreateC, _ThCreateD>('blockchainer_threshold_create')(n, t),
+        'threshold_create');
+    final count = (blob[0] << 8) | blob[1];
+    final out = <ThresholdShare>[];
+    var off = 2;
+    for (var i = 0; i < count; i++) {
+      final len = (blob[off] << 24) | (blob[off + 1] << 16) | (blob[off + 2] << 8) | blob[off + 3];
+      off += 4;
+      final card = Uint8List.sublistView(blob, off, off + len);
+      off += len;
+      out.add(_shareInfo(card));
+    }
+    return out;
+  }
+
+  ThresholdShare _shareInfo(Uint8List card) {
+    final cP = _alloc(card);
+    try {
+      final info = _take(
+          lib.lookupFunction<_ThBufC, _ThBufD>('blockchainer_threshold_share_info')(cP, card.length),
+          'threshold_share_info');
+      return ThresholdShare(card, (info[0] << 8) | info[1],
+          Uint8List.sublistView(info, 2, 34), Uint8List.sublistView(info, 34, 66));
+    } finally {
+      calloc.free(cP);
+    }
+  }
+
+  /// Seal a share card for rest (ops=mem=0 → SENSITIVE preset).
+  Uint8List sealShare(Uint8List card, String passphrase, {int ops = 0, int mem = 0}) {
+    final cP = _alloc(card), pp = passphrase.toNativeUtf8();
+    try {
+      return _take(
+          lib.lookupFunction<_ThSealC, _ThSealD>('blockchainer_threshold_share_seal')(
+              cP, card.length, pp, ops, mem),
+          'threshold_share_seal');
+    } finally {
+      calloc.free(cP);
+      calloc.free(pp);
+    }
+  }
+
+  /// Open a sealed share card. Throws on wrong passphrase / tamper.
+  Uint8List unsealShare(Uint8List envelope, String passphrase) {
+    final eP = _alloc(envelope), pp = passphrase.toNativeUtf8();
+    try {
+      return _take(
+          lib.lookupFunction<_ThUnsealC, _ThUnsealD>('blockchainer_threshold_share_unseal')(
+              eP, envelope.length, pp),
+          'threshold_share_unseal');
+    } finally {
+      calloc.free(eP);
+      calloc.free(pp);
+    }
+  }
+
+  /// Round 1 for a card: 130 bytes = [nonces 64][commitment 66]. Keep the nonces
+  /// secret; broadcast the commitment to the coordinator.
+  ({Uint8List nonces, Uint8List commitment}) commit(Uint8List card) {
+    final cP = _alloc(card);
+    try {
+      final b = _take(
+          lib.lookupFunction<_ThBufC, _ThBufD>('blockchainer_threshold_commit')(cP, card.length),
+          'threshold_commit');
+      return (nonces: Uint8List.sublistView(b, 0, 64), commitment: Uint8List.sublistView(b, 64, 130));
+    } finally {
+      calloc.free(cP);
+    }
+  }
+
+  /// Open a two-round signing [Ceremony] over [message] and the participating
+  /// [commitments] (66 bytes each).
+  Ceremony makeCeremony(Uint8List groupPublicKey, Uint8List message, List<Uint8List> commitments) {
+    final roster = BytesBuilder();
+    for (final c in commitments) roster.add(c);
+    final rosterBytes = roster.toBytes();
+    final gP = _alloc(groupPublicKey), mP = _alloc(message), rP = _alloc(rosterBytes);
+    try {
+      final h = lib.lookupFunction<_ThCerNewC, _ThCerNewD>('blockchainer_threshold_ceremony_new')(
+          gP, mP, message.length, rP, rosterBytes.length);
+      if (h == nullptr) throw BlockchainerException('threshold ceremony creation failed');
+      return Ceremony._(this, h);
+    } finally {
+      calloc.free(gP);
+      calloc.free(mP);
+      calloc.free(rP);
+    }
+  }
+
   /// Create a custodial [KeyStore] protected by [passphrase] (returned unlocked).
   KeyStore createKeyStore(String passphrase) {
     final cp = passphrase.toNativeUtf8();
@@ -878,4 +995,73 @@ class PortableAccount {
   PortableAccount(this.public, this.secret);
   final Uint8List public;
   final Uint8List secret;
+}
+
+/// A participant's share of a threshold (FROST t-of-n) account. Persist [bytes]
+/// sealed (Blockchainer.sealShare); never store it plaintext.
+class ThresholdShare {
+  ThresholdShare(this.bytes, this.index, this.groupPublicKey, this.publicShare);
+  final Uint8List bytes;
+  final int index;
+  final Uint8List groupPublicKey; // the account's on-chain author key
+  final Uint8List publicShare;
+}
+
+/// A two-round FROST signing ceremony over a fixed message and roster. Call
+/// [free] when done.
+class Ceremony {
+  Ceremony._(this._bc, this._h);
+  final Blockchainer _bc;
+  final Pointer<Void> _h;
+
+  /// Round 2 for [card] using its round-1 [nonces]: a 32-byte signature share.
+  Uint8List sign(Uint8List card, Uint8List nonces) {
+    final cP = _bc._alloc(card), nP = _bc._alloc(nonces);
+    try {
+      return _bc._take(
+          _bc.lib.lookupFunction<_ThSignC, _ThSignD>('blockchainer_threshold_sign')(
+              _h, cP, card.length, nP),
+          'threshold_sign');
+    } finally {
+      calloc.free(cP);
+      calloc.free(nP);
+    }
+  }
+
+  /// Attribute a share to participant [id] (its public share): a lying cosigner
+  /// is named, not just rejected.
+  bool verifyShare(int id, Uint8List publicShare, Uint8List sigShare) {
+    final pP = _bc._alloc(publicShare), sP = _bc._alloc(sigShare);
+    try {
+      return _bc.lib.lookupFunction<_ThVerifyC, _ThVerifyD>('blockchainer_threshold_verify_share')(
+              _h, id, pP, sP) ==
+          1;
+    } finally {
+      calloc.free(pP);
+      calloc.free(sP);
+    }
+  }
+
+  /// Aggregate (id → 32-byte share) pairs into a standard 64-byte Ed25519
+  /// signature under the group key. Pairs may be in any order.
+  Uint8List aggregate(List<int> ids, List<Uint8List> sigShares) {
+    final flat = BytesBuilder();
+    for (final s in sigShares) flat.add(s);
+    final flatBytes = flat.toBytes();
+    final idP = calloc<Uint16>(ids.isEmpty ? 1 : ids.length);
+    final fP = _bc._alloc(flatBytes);
+    try {
+      for (var i = 0; i < ids.length; i++) idP[i] = ids[i];
+      return _bc._take(
+          _bc.lib.lookupFunction<_ThAggC, _ThAggD>('blockchainer_threshold_aggregate')(
+              _h, idP, fP, ids.length),
+          'threshold_aggregate');
+    } finally {
+      calloc.free(idP);
+      calloc.free(fP);
+    }
+  }
+
+  void free() =>
+      _bc.lib.lookupFunction<_ThCerFreeC, _ThCerFreeD>('blockchainer_threshold_ceremony_free')(_h);
 }

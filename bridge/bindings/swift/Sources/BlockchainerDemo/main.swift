@@ -2,6 +2,7 @@
 // Run on macOS: `swift run BlockchainerDemo`
 import Blockchainer
 import Foundation
+import CryptoKit
 
 // Optional: warm the native backend off the main thread. Fire-and-forget — the
 // synchronous API below never waits on it.
@@ -54,6 +55,28 @@ var wrongSigner = false
 do { _ = try Blockchainer.openAccountSignedFrom(envelope: env3, recipientKemSecret: dev.secret, senderSigPublic: stranger.publicKey) } catch { wrongSigner = true }
 precondition(wrongSigner, "wrong expected signer must fail")
 print("portable tiers OK (passphrase + recipient + signed, all fail-closed)")
+
+// Threshold (FROST 2-of-3): the aggregate is a standard Ed25519 signature.
+let shares = try Blockchainer.createThresholdAccount(n: 3, t: 2)
+precondition(shares.count == 3, "3 share cards")
+let tGroupPK = shares[0].groupPublicKey
+let tMsg = Data("threshold-signed transfer".utf8)
+let (n0, com0) = try Blockchainer.commit(card: shares[0].bytes)
+let (n2, com2) = try Blockchainer.commit(card: shares[2].bytes)
+let ceremony = try Blockchainer.makeCeremony(groupPK: tGroupPK, message: tMsg, commitments: [com2, com0])
+let sh0 = try ceremony.sign(card: shares[0].bytes, nonces: n0)
+let sh2 = try ceremony.sign(card: shares[2].bytes, nonces: n2)
+precondition(ceremony.verifyShare(id: shares[0].index, publicShare: shares[0].publicShare, sigShare: sh0), "honest share attributed")
+var badShare = sh2; badShare[badShare.startIndex + 5] ^= 1
+precondition(!ceremony.verifyShare(id: shares[2].index, publicShare: shares[2].publicShare, sigShare: badShare), "corrupt share detected")
+let tSig = try ceremony.aggregate(ids: [shares[0].index, shares[2].index], sigShares: [sh0, sh2])
+precondition(tSig.count == 64, "aggregate is a 64-byte Ed25519 signature")
+let edPub = try Curve25519.Signing.PublicKey(rawRepresentation: tGroupPK)
+precondition(edPub.isValidSignature(tSig, for: tMsg), "aggregate verifies as Ed25519 under the group key")
+let tEnv = try Blockchainer.sealShare(card: shares[1].bytes, passphrase: "share-pass", ops: 3, mem: 1 << 16)
+let tBack = try Blockchainer.unsealShare(envelope: tEnv, passphrase: "share-pass")
+precondition(tBack == shares[1].bytes, "sealed share round-trip")
+print("threshold OK (2-of-3 -> Ed25519, attribution, sealed)")
 
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

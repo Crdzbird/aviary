@@ -144,6 +144,101 @@ public enum Blockchainer {
         }, "portable_open_signed_from"))
     }
 
+    // ── Threshold (FROST t-of-n) accounts ──────────────────────────────────────
+
+    /// A participant's share of a threshold account (opaque bytes + identity fields).
+    public struct ThresholdShare {
+        public let bytes: Data
+        public let index: UInt16
+        public let groupPublicKey: Data
+        public let publicShare: Data
+    }
+
+    /// Deal a t-of-n account: n share cards, any t of which can sign. The dealt
+    /// group secret is zeroised before returning.
+    public static func createThresholdAccount(n: UInt16, t: UInt16) throws -> [ThresholdShare] {
+        ensureReady()
+        let blob = try consume(blockchainer_threshold_create(n, t), "threshold_create")
+        var out: [ThresholdShare] = []
+        let count = Int(blob[0]) << 8 | Int(blob[1])
+        var off = 2
+        for _ in 0..<count {
+            let len = Int(blob[off]) << 24 | Int(blob[off+1]) << 16 | Int(blob[off+2]) << 8 | Int(blob[off+3])
+            off += 4
+            let card = blob.subdata(in: off..<(off + len))
+            off += len
+            let info = try consume(card.withC { blockchainer_threshold_share_info($0, $1) }, "threshold_share_info")
+            out.append(ThresholdShare(bytes: card, index: UInt16(info[0]) << 8 | UInt16(info[1]),
+                                      groupPublicKey: info.subdata(in: 2..<34), publicShare: info.subdata(in: 34..<66)))
+        }
+        return out
+    }
+
+    /// Seal a share card for rest (ops=mem=0 → SENSITIVE preset).
+    public static func sealShare(card: Data, passphrase: String, ops: UInt64 = 0, mem: Int = 0) throws -> Data {
+        ensureReady()
+        return try consume(card.withC { cp, cl in
+            blockchainer_threshold_share_seal(cp, cl, passphrase, ops, mem)
+        }, "threshold_share_seal")
+    }
+    public static func unsealShare(envelope: Data, passphrase: String) throws -> Data {
+        ensureReady()
+        return try consume(envelope.withC { ep, el in
+            blockchainer_threshold_share_unseal(ep, el, passphrase)
+        }, "threshold_share_unseal")
+    }
+
+    /// Round 1 for a card: (secret nonces, public commitment).
+    public static func commit(card: Data) throws -> (nonces: Data, commitment: Data) {
+        ensureReady()
+        let b = try consume(card.withC { blockchainer_threshold_commit($0, $1) }, "threshold_commit")
+        return (b.subdata(in: 0..<64), b.subdata(in: 64..<130))
+    }
+
+    /// A two-round FROST signing ceremony over a fixed message + roster.
+    public final class Ceremony {
+        private let h: OpaquePointer
+        init(groupPK: Data, message: Data, commitments: [Data]) throws {
+            var roster = Data()
+            for c in commitments { roster.append(c) }
+            let raw: UnsafeMutableRawPointer? = groupPK.withC { gp, _ in
+                message.withC { mp, ml in
+                    roster.withC { rp, rl in
+                        blockchainer_threshold_ceremony_new(gp, mp, ml, rp, rl)
+                    }
+                }
+            }
+            guard let raw else { throw BlockchainerError(message: "threshold ceremony creation failed") }
+            h = OpaquePointer(raw)
+        }
+        deinit { blockchainer_threshold_ceremony_free(UnsafeMutableRawPointer(h)) }
+
+        /// Round 2 for a card using its round-1 nonces: a 32-byte share.
+        public func sign(card: Data, nonces: Data) throws -> Data {
+            try consume(card.withC { cp, cl in nonces.withC { np, _ in
+                blockchainer_threshold_sign(UnsafeMutableRawPointer(h), cp, cl, np) } }, "threshold_sign")
+        }
+        /// Attribute a share to participant [id] (public share 32 B).
+        public func verifyShare(id: UInt16, publicShare: Data, sigShare: Data) -> Bool {
+            publicShare.withC { pp, _ in sigShare.withC { sp, _ in
+                blockchainer_threshold_verify_share(UnsafeMutableRawPointer(h), id, pp, sp) == 1 } }
+        }
+        /// Aggregate (id → 32-byte share) pairs into a 64-byte Ed25519 signature.
+        public func aggregate(ids: [UInt16], sigShares: [Data]) throws -> Data {
+            var flat = Data(); for s in sigShares { flat.append(s) }
+            let res: BlockchainerBufferResult = ids.withUnsafeBufferPointer { idp in
+                flat.withC { fp, _ in
+                    blockchainer_threshold_aggregate(UnsafeMutableRawPointer(h), idp.baseAddress, fp, ids.count)
+                }
+            }
+            return try consume(res, "threshold_aggregate")
+        }
+    }
+    public static func makeCeremony(groupPK: Data, message: Data, commitments: [Data]) throws -> Ceremony {
+        ensureReady()
+        return try Ceremony(groupPK: groupPK, message: message, commitments: commitments)
+    }
+
     /// Create a new in-memory single-validator chain.
     public static func makeNode(chainID: UInt64) throws -> Node {
         ensureReady()

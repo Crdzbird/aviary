@@ -25,7 +25,8 @@ public final class Blockchainer implements AutoCloseable {
             verifyProof, ethAddr, btcAddr, solAddr, bufFree, strFree,
             newAccountHybrid, submitHybrid,
             ksNew, ksAdd, ksReveal, ksSerialise, ksLoad, ksUnlock, ksUnlocked, ksFree,
-            kemKeygen, pSealPass, pOpenPass, pSealTo, pOpenTo, pSealSigned, pOpenSigned;
+            kemKeygen, pSealPass, pOpenPass, pSealTo, pOpenTo, pSealSigned, pOpenSigned,
+            thCreate, thInfo, thSeal, thUnseal, thCommit, thCerNew, thCerFree, thSign, thVerify, thAgg;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -71,6 +72,16 @@ public final class Blockchainer implements AutoCloseable {
         pOpenTo    = h("blockchainer_portable_open_to", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         pSealSigned= h("blockchainer_portable_seal_signed_to", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         pOpenSigned= h("blockchainer_portable_open_signed_from", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        thCreate   = h("blockchainer_threshold_create", FunctionDescriptor.of(RES, JAVA_SHORT, JAVA_SHORT));
+        thInfo     = h("blockchainer_threshold_share_info", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        thSeal     = h("blockchainer_threshold_share_seal", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
+        thUnseal   = h("blockchainer_threshold_share_unseal", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS));
+        thCommit   = h("blockchainer_threshold_commit", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        thCerNew   = h("blockchainer_threshold_ceremony_new", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        thCerFree  = h("blockchainer_threshold_ceremony_free", FunctionDescriptor.ofVoid(ADDRESS));
+        thSign     = h("blockchainer_threshold_sign", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS));
+        thVerify   = h("blockchainer_threshold_verify_share", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_SHORT, ADDRESS, ADDRESS));
+        thAgg      = h("blockchainer_threshold_aggregate", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -137,6 +148,92 @@ public final class Blockchainer implements AutoCloseable {
                 seg(envelope), (long) envelope.length, seg(recipientKemSecret), (long) recipientKemSecret.length,
                 seg(senderSigPublic), (long) senderSigPublic.length))); }
         catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    // ── Threshold (FROST t-of-n) accounts ──────────────────────────────────────
+
+    /** A participant's share of a threshold account (opaque, self-describing). */
+    public record ShareCard(byte[] bytes, int index, byte[] groupPublicKey, byte[] publicShare) {}
+
+    /** Deal a t-of-n account: n share cards, any t of which can sign. */
+    public ShareCard[] createThresholdAccount(int n, int t) {
+        byte[] blob = consume((MemorySegment) invokeShort2(thCreate, (short) n, (short) t));
+        int count = ((blob[0] & 0xFF) << 8) | (blob[1] & 0xFF);
+        ShareCard[] cards = new ShareCard[count];
+        int off = 2;
+        for (int i = 0; i < count; i++) {
+            int len = ((blob[off] & 0xFF) << 24) | ((blob[off+1] & 0xFF) << 16) | ((blob[off+2] & 0xFF) << 8) | (blob[off+3] & 0xFF);
+            off += 4;
+            byte[] card = java.util.Arrays.copyOfRange(blob, off, off + len);
+            off += len;
+            byte[] info = consume((MemorySegment) invokeResA(thInfo, card));
+            int idx = ((info[0] & 0xFF) << 8) | (info[1] & 0xFF);
+            cards[i] = new ShareCard(card, idx, java.util.Arrays.copyOfRange(info, 2, 34),
+                                     java.util.Arrays.copyOfRange(info, 34, 66));
+        }
+        return cards;
+    }
+
+    /** Seal a share card for rest (ops=mem=0 → SENSITIVE preset). */
+    public byte[] sealShare(byte[] card, String passphrase, long ops, long mem) {
+        try { return consume((MemorySegment) thSeal.invoke(arena.allocate(RES), seg(card), (long) card.length,
+                arena.allocateFrom(passphrase), ops, mem)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+    public byte[] unsealShare(byte[] envelope, String passphrase) {
+        try { return consume((MemorySegment) thUnseal.invoke(arena.allocate(RES), seg(envelope), (long) envelope.length,
+                arena.allocateFrom(passphrase))); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** Round 1 for a card: [nonces 64][commitment 66]. Keep nonces; broadcast commitment. */
+    public byte[] commit(byte[] card) {
+        try { return consume((MemorySegment) thCommit.invoke(arena.allocate(RES), seg(card), (long) card.length)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** A two-round signing ceremony over a fixed message + roster. */
+    public final class Ceremony implements AutoCloseable {
+        private final MemorySegment h;
+        Ceremony(byte[] groupPK, byte[] message, byte[][] commitments) {
+            int total = 0; for (byte[] c : commitments) total += c.length;
+            byte[] roster = new byte[total]; int o = 0;
+            for (byte[] c : commitments) { System.arraycopy(c, 0, roster, o, c.length); o += c.length; }
+            try {
+                h = (MemorySegment) thCerNew.invoke(seg(groupPK), seg(message), (long) message.length, seg(roster), (long) roster.length);
+            } catch (Throwable e) { throw new RuntimeException(e); }
+            if (h.address() == 0) throw new IllegalStateException("threshold ceremony creation failed");
+        }
+        /** Round 2 for a card using its round-1 nonces: a 32-byte share. */
+        public byte[] sign(byte[] card, byte[] nonces) {
+            try { return consume((MemorySegment) thSign.invoke(arena.allocate(RES), h, seg(card), (long) card.length, seg(nonces))); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Attribute a share to participant [id] (public share 32 B). */
+        public boolean verifyShare(int id, byte[] publicShare, byte[] sigShare) {
+            try { return (int) thVerify.invoke(h, (short) id, seg(publicShare), seg(sigShare)) == 1; }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Aggregate (id → 32-byte share) pairs into a 64-byte Ed25519 signature. */
+        public byte[] aggregate(int[] ids, byte[][] sigShares) {
+            MemorySegment idSeg = arena.allocate(JAVA_SHORT, ids.length);
+            for (int i = 0; i < ids.length; i++) idSeg.setAtIndex(JAVA_SHORT, i, (short) ids[i]);
+            byte[] flat = new byte[sigShares.length * 32]; int o = 0;
+            for (byte[] s : sigShares) { System.arraycopy(s, 0, flat, o, 32); o += 32; }
+            try { return consume((MemorySegment) thAgg.invoke(arena.allocate(RES), h, idSeg, seg(flat), (long) ids.length)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        @Override public void close() { try { thCerFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    public Ceremony newCeremony(byte[] groupPK, byte[] message, byte[][] commitments) {
+        return new Ceremony(groupPK, message, commitments);
+    }
+
+    private Object invokeShort2(MethodHandle mh, short a, short b) {
+        try { return mh.invoke(arena.allocate(RES), a, b); } catch (Throwable e) { throw new RuntimeException(e); }
+    }
+    private Object invokeResA(MethodHandle mh, byte[] a) {
+        try { return mh.invoke(arena.allocate(RES), seg(a), (long) a.length); } catch (Throwable e) { throw new RuntimeException(e); }
     }
 
     public boolean verifyStateProof(byte[] root, byte[] proof) {

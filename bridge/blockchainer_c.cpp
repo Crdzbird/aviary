@@ -15,6 +15,7 @@
 #include "blockchainer/keyring.hpp"
 #include "blockchainer/node/demo_node.hpp"
 #include "blockchainer/proofs.hpp"
+#include "blockchainer/threshold.hpp"
 #include "blockchainer/types.hpp"
 #include "blockchainer/version.hpp"
 
@@ -506,6 +507,169 @@ BlockchainerBufferResult blockchainer_portable_open_signed_from(
     auto a = blockchainer::custody::PortableAccount::open_signed_from(
         cbv(envelope, env_len), cbv(recipient_kem_secret, rk_len), cbv(sender_sig_public, sp_len));
     return account_blob(a.public_key, a.secret);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+// ── Threshold accounts (FROST t-of-n) ─────────────────────────────────────────
+
+namespace {
+namespace th = blockchainer::custody;
+
+void put_u16(std::vector<std::uint8_t>& v, std::uint16_t x) {
+  v.push_back(static_cast<std::uint8_t>(x >> 8));
+  v.push_back(static_cast<std::uint8_t>(x & 0xFF));
+}
+void put_u32(std::vector<std::uint8_t>& v, std::uint32_t x) {
+  v.push_back(static_cast<std::uint8_t>((x >> 24) & 0xFF));
+  v.push_back(static_cast<std::uint8_t>((x >> 16) & 0xFF));
+  v.push_back(static_cast<std::uint8_t>((x >> 8) & 0xFF));
+  v.push_back(static_cast<std::uint8_t>(x & 0xFF));
+}
+std::uint16_t rd_u16(const std::uint8_t* p) {
+  return static_cast<std::uint16_t>((p[0] << 8) | p[1]);
+}
+
+th::SigningCeremony* as_ceremony(BlockchainerCeremony c) {
+  return static_cast<th::SigningCeremony*>(c);
+}
+}  // namespace
+
+BlockchainerBufferResult blockchainer_threshold_create(uint16_t n, uint16_t t) {
+  try {
+    std::vector<th::ShareCard> cards = th::ThresholdAccount::create(n, t);
+    std::vector<std::uint8_t> out;
+    put_u16(out, static_cast<std::uint16_t>(cards.size()));
+    for (const auto& card : cards) {
+      const blockchainer::crypto::Bytes enc = card.encode();
+      put_u32(out, static_cast<std::uint32_t>(enc.size()));
+      out.insert(out.end(), enc.begin(), enc.end());
+    }
+    return bytes_result(out);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_threshold_share_info(const uint8_t* card, size_t card_len) {
+  try {
+    th::ShareCard c = th::ShareCard::decode(cbv(card, card_len));
+    std::vector<std::uint8_t> out;
+    put_u16(out, c.index);
+    out.insert(out.end(), c.group_public_key.begin(), c.group_public_key.end());
+    out.insert(out.end(), c.public_share.begin(), c.public_share.end());
+    return bytes_result(out);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_threshold_share_seal(const uint8_t* card, size_t card_len,
+                                                           const char* passphrase, uint64_t ops,
+                                                           size_t mem) {
+  try {
+    th::ShareCard c = th::ShareCard::decode(cbv(card, card_len));
+    return bytes_result(c.seal(passphrase ? passphrase : "", ops, mem));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_threshold_share_unseal(const uint8_t* envelope, size_t env_len,
+                                                             const char* passphrase) {
+  try {
+    th::ShareCard c = th::ShareCard::unseal(cbv(envelope, env_len), passphrase ? passphrase : "");
+    return bytes_result(c.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_threshold_commit(const uint8_t* card, size_t card_len) {
+  try {
+    th::ShareCard c = th::ShareCard::decode(cbv(card, card_len));
+    auto [nonces, commitment] = th::SigningCeremony::commit(c);
+    std::vector<std::uint8_t> out;
+    out.insert(out.end(), nonces.hiding.begin(), nonces.hiding.end());   // [0..32)
+    out.insert(out.end(), nonces.binding.begin(), nonces.binding.end()); // [32..64)
+    put_u16(out, commitment.id);                                         // commitment: [64..66)
+    out.insert(out.end(), commitment.hiding.begin(), commitment.hiding.end());
+    out.insert(out.end(), commitment.binding.begin(), commitment.binding.end());
+    return bytes_result(out);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerCeremony blockchainer_threshold_ceremony_new(const uint8_t* group_pk32,
+                                                         const uint8_t* message, size_t msg_len,
+                                                         const uint8_t* commitments,
+                                                         size_t commits_len) {
+  try {
+    if (commits_len % 66 != 0) return nullptr;  // each commitment is id(2)+32+32
+    std::vector<th::SigningCeremony::Commitment> roster;
+    for (size_t off = 0; off + 66 <= commits_len; off += 66) {
+      th::SigningCeremony::Commitment cm;
+      cm.id = rd_u16(commitments + off);
+      cm.hiding.assign(commitments + off + 2, commitments + off + 34);
+      cm.binding.assign(commitments + off + 34, commitments + off + 66);
+      roster.push_back(std::move(cm));
+    }
+    return new th::SigningCeremony(blockchainer::crypto::Bytes(group_pk32, group_pk32 + 32),
+                                   blockchainer::crypto::Bytes(message, message + msg_len),
+                                   std::move(roster));
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+void blockchainer_threshold_ceremony_free(BlockchainerCeremony c) { delete as_ceremony(c); }
+
+BlockchainerBufferResult blockchainer_threshold_sign(BlockchainerCeremony c, const uint8_t* card,
+                                                     size_t card_len, const uint8_t* nonces64) {
+  try {
+    th::ShareCard share = th::ShareCard::decode(cbv(card, card_len));
+    th::SigningCeremony::Nonces nonces{blockchainer::crypto::Bytes(nonces64, nonces64 + 32),
+                                       blockchainer::crypto::Bytes(nonces64 + 32, nonces64 + 64)};
+    return bytes_result(as_ceremony(c)->sign(share, nonces));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+int blockchainer_threshold_verify_share(BlockchainerCeremony c, uint16_t id, const uint8_t* public32,
+                                        const uint8_t* sig_share32) {
+  try {
+    return as_ceremony(c)->verify_share(id, blockchainer::crypto::Bytes(public32, public32 + 32),
+                                        blockchainer::crypto::Bytes(sig_share32, sig_share32 + 32))
+               ? 1
+               : 0;
+  } catch (...) {
+    return 0;
+  }
+}
+
+BlockchainerBufferResult blockchainer_threshold_aggregate(BlockchainerCeremony c,
+                                                          const uint16_t* ids,
+                                                          const uint8_t* sig_shares, size_t count) {
+  try {
+    th::SigningCeremony* cer = as_ceremony(c);
+    // Reorder the caller's (id → share) pairs into the ceremony's roster order,
+    // which is what SigningCeremony::aggregate expects.
+    std::vector<blockchainer::crypto::Bytes> ordered;
+    for (const auto& cm : cer->roster()) {
+      bool found = false;
+      for (size_t i = 0; i < count; ++i) {
+        if (ids[i] == cm.id) {
+          ordered.emplace_back(sig_shares + i * 32, sig_shares + i * 32 + 32);
+          found = true;
+          break;
+        }
+      }
+      if (!found) return error_result("threshold: missing signature share for a roster participant");
+    }
+    return bytes_result(cer->aggregate(ordered));
   } catch (const std::exception& e) {
     return error_result(e.what());
   }

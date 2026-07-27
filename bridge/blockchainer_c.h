@@ -251,6 +251,66 @@ BLOCKCHAINER_API BlockchainerBufferResult blockchainer_portable_open_signed_from
     const uint8_t* recipient_kem_secret, size_t rk_len,
     const uint8_t* sender_sig_public, size_t sp_len);
 
+/* ── Threshold accounts (FROST t-of-n; the key never exists) ───────────────────
+ * A t-of-n account whose secret key is never assembled: dealt shares sign in a
+ * two-round ceremony, and the aggregate is a STANDARD 64-byte Ed25519 signature
+ * — so a threshold-signed transaction verifies through the ordinary Ed25519 path
+ * (the chain can't tell). Flow: create() deals n share cards; each participating
+ * card runs commit() (keep the nonces, broadcast the commitment); a coordinator
+ * opens a ceremony over the fixed roster of commitments; each card signs; the
+ * shares aggregate into the group signature.
+ *
+ * Blob layouts (bindings split these; all multi-byte ints big-endian):
+ *   create()   → [u16 count]  then count × ( [u32 len][share-card bytes] )
+ *   commit()   → [hiding_nonce 32][binding_nonce 32][commitment 66]
+ *                where commitment = [id 2][hiding_commit 32][binding_commit 32].
+ *                Keep bytes[0..64) (the secret nonces); broadcast bytes[64..130)
+ *                (the commitment) to the coordinator.
+ *   a roster   = the participating commitments (66 bytes each) concatenated. */
+
+/** Opaque signing-ceremony handle (fixed message + roster). */
+typedef void* BlockchainerCeremony;
+
+/** Deal a t-of-n account: returns the packed share cards (see layout above). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_create(uint16_t n, uint16_t t);
+
+/** A card's identity fields as a 66-byte blob: [id u16 BE][group_pk 32][public
+ *  share 32]. The group public key is the account's on-chain author key. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_share_info(
+    const uint8_t* card, size_t card_len);
+
+/** Seal a share card for rest (MolecularVault + Argon2id; ops=mem=0 → SENSITIVE).
+ *  The envelope binds the group key + slot, so it can't be relocated. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_share_seal(
+    const uint8_t* card, size_t card_len, const char* passphrase, uint64_t ops, size_t mem);
+/** Open a sealed share card → the card bytes. Fails closed on wrong passphrase. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_share_unseal(
+    const uint8_t* envelope, size_t env_len, const char* passphrase);
+
+/** Round 1: fresh nonces + commitment for a card (see commit() layout above). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_commit(
+    const uint8_t* card, size_t card_len);
+
+/** Open a ceremony over [message] and a [commitments] roster (66 bytes each,
+ *  concatenated). Returns a handle, or NULL on malformed input. */
+BLOCKCHAINER_API BlockchainerCeremony blockchainer_threshold_ceremony_new(
+    const uint8_t* group_pk32, const uint8_t* message, size_t msg_len,
+    const uint8_t* commitments, size_t commits_len);
+BLOCKCHAINER_API void blockchainer_threshold_ceremony_free(BlockchainerCeremony c);
+
+/** Round 2: this card's 32-byte signature share, using its round-1 [nonces64]. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_sign(
+    BlockchainerCeremony c, const uint8_t* card, size_t card_len, const uint8_t* nonces64);
+
+/** Attribute a share to participant [id] (public share 32 B): 1 valid, 0 invalid. */
+BLOCKCHAINER_API int blockchainer_threshold_verify_share(
+    BlockchainerCeremony c, uint16_t id, const uint8_t* public32, const uint8_t* sig_share32);
+
+/** Aggregate [count] (id, 32-byte share) pairs → a 64-byte Ed25519 signature.
+ *  The pairs may be in any order; the ceremony reorders them internally. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_threshold_aggregate(
+    BlockchainerCeremony c, const uint16_t* ids, const uint8_t* sig_shares, size_t count);
+
 /* ── Interop address derivation (showcase) ─────────────────────────────────── */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */

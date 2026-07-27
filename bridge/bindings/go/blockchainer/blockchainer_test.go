@@ -374,3 +374,103 @@ func TestPortableAccountTiers(t *testing.T) {
 		t.Fatal("a tampered signed envelope opened")
 	}
 }
+
+// TestThresholdAccount exercises FROST t-of-n signing over the C ABI: a 2-of-3
+// ceremony produces a STANDARD Ed25519 signature under the group key (so it
+// verifies through the ordinary path), a lone share cannot, a corrupt cosigner
+// is attributed, and a sealed share round-trips.
+func TestThresholdAccount(t *testing.T) {
+	cards, err := bc.CreateThresholdAccount(3, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cards) != 3 {
+		t.Fatalf("want 3 cards, got %d", len(cards))
+	}
+	groupPK := cards[0].GroupPublicKey()
+	if len(groupPK) != 32 {
+		t.Fatalf("group pk = %d bytes", len(groupPK))
+	}
+	for _, c := range cards[1:] {
+		if !bytes.Equal(c.GroupPublicKey(), groupPK) {
+			t.Fatal("cards disagree on the group key")
+		}
+	}
+
+	msg := []byte("threshold-signed transfer")
+
+	// Participants: cards 0 and 3 (indices 1 and 3). Round 1.
+	n0, c0, err := cards[0].Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n2, c2, err := cards[2].Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cer, err := bc.NewCeremony(groupPK, msg, []bc.Commitment{c2, c0}) // order-insensitive
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cer.Free()
+
+	s0, err := cer.Sign(cards[0], n0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := cer.Sign(cards[2], n2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sig, err := cer.Aggregate([]uint16{cards[0].Index(), cards[2].Index()}, [][]byte{s0, s2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sig) != 64 {
+		t.Fatalf("aggregate is %d bytes, want a 64-byte Ed25519 signature", len(sig))
+	}
+	if !cryptolib.Ed25519Verify(msg, sig, groupPK) {
+		t.Fatal("the aggregate is not a valid Ed25519 signature under the group key")
+	}
+
+	// A lying cosigner is identified, not just rejected.
+	if !cer.VerifyShare(cards[0].Index(), cards[0].PublicShare(), s0) {
+		t.Fatal("honest share attributed as invalid")
+	}
+	bad := append([]byte(nil), s2...)
+	bad[5] ^= 0x01
+	if cer.VerifyShare(cards[2].Index(), cards[2].PublicShare(), bad) {
+		t.Fatal("corrupt share was not detected")
+	}
+
+	// Below threshold: one participant alone cannot forge the group signature.
+	nSolo, cSolo, _ := cards[1].Commit()
+	solo, err := bc.NewCeremony(groupPK, msg, []bc.Commitment{cSolo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer solo.Free()
+	sSolo, _ := solo.Sign(cards[1], nSolo)
+	soloSig, err := solo.Aggregate([]uint16{cards[1].Index()}, [][]byte{sSolo})
+	if err == nil && cryptolib.Ed25519Verify(msg, soloSig, groupPK) {
+		t.Fatal("a single share produced a valid group signature")
+	}
+
+	// A sealed share round-trips; a wrong passphrase fails closed.
+	env, err := cards[1].Seal("share-pass", 3, 1<<16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := bc.UnsealShare(env, "share-pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(back, cards[1]) {
+		t.Fatal("sealed share did not round-trip")
+	}
+	if _, err := bc.UnsealShare(env, "wrong"); err == nil {
+		t.Fatal("wrong passphrase unsealed the share")
+	}
+}
