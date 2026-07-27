@@ -182,9 +182,25 @@
   it returns false); the plain `add_peer` stays the ungated trusted path
   (genesis-known peers); ungated overlay admits everyone. `test_gossip.cpp`
   section proves it, including that a **"submit"-scope proof does NOT admit a
-  gossip peer** (scope binding). ASan-clean. **Remaining:** Option B per-epoch
-  pseudonym (blocked on the filed cryptolib primitive); wire the policy into
-  `GenesisSpec` (deferred pending the §10.4 orthogonal-vs-dimension decision).
+  gossip peer** (scope binding). ASan-clean. **Admission handshake over the wire
+  DONE (2 increments):** (1) the pure protocol — `crypto::random_bytes` seam,
+  `wire::kAdmissionChallenge`/`kAdmissionPresentation` (+ fuzz), deterministic
+  `consensus::membership_epoch(height, epoch_length)` (§10.5), and
+  `p2p::{make_admission_challenge, answer_admission_challenge, admission_granted}`
+  (challenge→present→admit, transport-agnostic wire bytes); `test_admission.cpp`
+  (unlinkability, cross-connection replay refused, epoch binding, wrong-issuer,
+  garbage-is-quiet-false). (2) over a real socket —
+  `p2p::admit_peer_over_socket` (verifier) / `present_over_socket` (prover), a
+  blocking length-framed round, deliberately SEPARATE from the consensus reactor
+  (`run_tcp_bft_node` already mutually-authenticates *validators* by sig key;
+  anonymous *validators* are out of v1 scope per §3.4 — membership is for
+  non-validator gossip / submitter peers). `test_admission_socket.cpp` drives it
+  over a socketpair (verifier + prover threads): honest member admitted,
+  unlinkable re-admit on a fresh connection, forged credential refused, garbage
+  responder refused, silent peer times out to a refusal. ASan + **TSan**-clean.
+  **Remaining:** Option B per-epoch pseudonym (blocked on the filed cryptolib
+  primitive); wire the policy into `GenesisSpec` (deferred pending the §10.4
+  orthogonal-vs-dimension decision).
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
