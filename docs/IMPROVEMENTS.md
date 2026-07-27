@@ -62,6 +62,21 @@
   unaffected. **Remaining:** enforce the profile's transport/consensus/custody
   tiers automatically when a node boots from genesis (today the accessors report
   the tier; the node still wires the matching classes by hand).
+- **[x] SealedMempool (anti-MEV encrypted mempool) — DONE.** `p2p::SealedMempool`
+  (`sealed_mempool.hpp`) realises the `fortress` profile's sealed-mempool tier:
+  a submitter seals the encoded tx to the block proposer's hybrid-KEM key
+  (`crypto::pq_seal_to`) with a cleartext, AAD-bound `fee_hint`. The pool orders
+  by that hint **without decrypting**, so a front-runner watching the mempool
+  sees only ciphertext + a fee — never which contract or amounts — and cannot
+  sandwich or re-order. `reveal(proposer_kem_secret, max)` opens the top-k at
+  build time; entries that don't decrypt (not for us / tampered), don't decode,
+  or whose real fee ≠ the hint (buying priority with a lie) are silently
+  dropped. Submission-only: committed blocks carry ordinary plaintext txs, so
+  consensus/ledger/wire are untouched. `test_sealed_mempool.cpp`: ciphertext-only
+  pool, fee-priority reveal, a non-proposer opening nothing, lying-hint and
+  tampered-envelope rejection, codec round-trip; `SealedTx::decode` in the fuzz
+  sweep. ASan-clean. **Remaining:** per-height/epoch proposer key rotation and
+  wiring `reveal` into `VrfPosEngine::propose` under the fortress profile.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

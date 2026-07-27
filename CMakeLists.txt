@@ -106,6 +106,7 @@ add_library(blockchainer_core STATIC
   src/consensus/pos_engine.cpp
   src/consensus/vrf_pos.cpp
   src/p2p/mempool.cpp
+  src/p2p/sealed_mempool.cpp
   src/p2p/gossip.cpp
   src/p2p/peer_book.cpp
   src/p2p/armored.cpp
@@ -234,6 +235,7 @@ blockchainer_add_test(test_vrf_pos tests/test_vrf_pos.cpp)
 blockchainer_add_test(test_armored tests/test_armored.cpp)
 blockchainer_add_test(test_portable tests/test_portable.cpp)
 blockchainer_add_test(test_assurance tests/test_assurance.cpp)
+blockchainer_add_test(test_sealed_mempool tests/test_sealed_mempool.cpp)
 
 if(BLOCKCHAINER_BUILD_FUZZERS)
   add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
