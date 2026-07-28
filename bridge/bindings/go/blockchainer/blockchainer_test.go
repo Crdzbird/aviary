@@ -657,3 +657,139 @@ func TestCredentialGate(t *testing.T) {
 		t.Fatal("admitted a malformed presentation")
 	}
 }
+
+// TestCredentialGatePseudonymous drives Option B end to end: blind issuance
+// (commit -> blind-sign -> finalize), then per-(epoch, scope) pseudonyms — same
+// member+epoch+scope -> same nym (Sybil-linkable), different epoch -> unlinkable —
+// plus the Sybil cap, targeted nym revocation, and the reject set.
+func TestCredentialGatePseudonymous(t *testing.T) {
+	issuer, err := bc.NewBBSIssuer(bytes.Repeat([]byte{0x2a}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := bc.NewPseudonymousPolicy(7, issuer.Public, []byte("blockchainer.credential.v2"), 4, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Blind issuance: the issuer never sees the member's seed.
+	issueCred := func(memberSecret []byte, tier uint8, notAfter uint64, issuerEpoch uint32) []byte {
+		mc, err := policy.MembershipCommit(memberSecret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commit, err := bc.ExtractCommitment(mc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bi, err := policy.BlindIssue(issuer.Secret, commit, tier, notAfter, issuerEpoch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cred, err := bc.FinalizeMembership(mc, bi)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cred
+	}
+
+	memberSecret := bytes.Repeat([]byte{0x77}, 32)
+	const notAfter = uint64(4102444800)
+	const now = uint64(1700000000)
+	cred := issueCred(memberSecret, 3, notAfter, 1)
+
+	gate := bc.NewCredentialGate(policy)
+	defer gate.Free()
+
+	present := func(c []byte, epoch uint32, scope string, ch byte) []byte {
+		p, err := policy.PresentPseudonymous(c, epoch, scope, bytes.Repeat([]byte{ch}, 32))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	// Happy path: admit returns a 48-byte pseudonym.
+	nymA, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{1}, 32), present(cred, 5, "gossip", 1), now)
+	if !ok || len(nymA) != 48 {
+		t.Fatalf("admit: ok=%v len=%d", ok, len(nymA))
+	}
+
+	// Sybil-linkable: a fresh presentation of the same member in the same
+	// (epoch, scope) yields the SAME pseudonym.
+	nym2, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{2}, 32), present(cred, 5, "gossip", 2), now)
+	if !ok || !bytes.Equal(nym2, nymA) {
+		t.Fatal("same member+epoch+scope should yield the same nym")
+	}
+	if !gate.NoteAdmission(5, "gossip", nymA) {
+		t.Fatal("first admission should be fresh")
+	}
+	if gate.NoteAdmission(5, "gossip", nym2) {
+		t.Fatal("a second session on an admitted nym should be flagged (Sybil cap)")
+	}
+
+	// Unlinkable across epochs and scopes.
+	nymE, ok := gate.AdmitPseudonymous(6, "gossip", bytes.Repeat([]byte{1}, 32), present(cred, 6, "gossip", 1), now)
+	if !ok || bytes.Equal(nymE, nymA) {
+		t.Fatal("different epoch should yield a different nym")
+	}
+	nymS, ok := gate.AdmitPseudonymous(5, "submit", bytes.Repeat([]byte{1}, 32), present(cred, 5, "submit", 1), now)
+	if !ok || bytes.Equal(nymS, nymA) {
+		t.Fatal("different scope should yield a different nym")
+	}
+
+	// A different member → a different nym in the same context.
+	nymO, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{1}, 32),
+		present(issueCred(bytes.Repeat([]byte{0x88}, 32), 3, notAfter, 1), 5, "gossip", 1), now)
+	if !ok || bytes.Equal(nymO, nymA) {
+		t.Fatal("different member should yield a different nym")
+	}
+
+	// Context binding (anti-replay): wrong epoch / scope / challenge all reject.
+	presA := present(cred, 5, "gossip", 1)
+	if _, ok := gate.AdmitPseudonymous(6, "gossip", bytes.Repeat([]byte{1}, 32), presA, now); ok {
+		t.Fatal("wrong epoch admitted")
+	}
+	if _, ok := gate.AdmitPseudonymous(5, "submit", bytes.Repeat([]byte{1}, 32), presA, now); ok {
+		t.Fatal("wrong scope admitted")
+	}
+	if _, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{9}, 32), presA, now); ok {
+		t.Fatal("wrong challenge admitted")
+	}
+
+	// Expiry + tier.
+	if _, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{1}, 32),
+		present(issueCred(memberSecret, 3, 1000, 1), 5, "gossip", 1), now); ok {
+		t.Fatal("expired credential admitted")
+	}
+	if _, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{1}, 32),
+		present(issueCred(memberSecret, 1, notAfter, 1), 5, "gossip", 1), now); ok {
+		t.Fatal("below-min-tier admitted")
+	}
+
+	// Targeted nym revocation: banning nymA blocks epoch 5, not epoch 6.
+	{
+		revoking := bc.NewCredentialGate(policy)
+		defer revoking.Free()
+		revoking.RevokeNym(nymA)
+		if _, ok := revoking.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{3}, 32), present(cred, 5, "gossip", 3), now); ok {
+			t.Fatal("revoked nym admitted")
+		}
+		if _, ok := revoking.AdmitPseudonymous(6, "gossip", bytes.Repeat([]byte{3}, 32), present(cred, 6, "gossip", 3), now); !ok {
+			t.Fatal("a different epoch's nym should not be banned")
+		}
+	}
+
+	// Forged issuer + malformed both reject.
+	rogue, _ := bc.NewBBSIssuer(bytes.Repeat([]byte{0x99}, 32))
+	forgedCommit, _ := policy.MembershipCommit(memberSecret)
+	fc, _ := bc.ExtractCommitment(forgedCommit)
+	fbi, _ := policy.BlindIssue(rogue.Secret, fc, 3, notAfter, 1)
+	forged, _ := bc.FinalizeMembership(forgedCommit, fbi)
+	if _, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{1}, 32), present(forged, 5, "gossip", 1), now); ok {
+		t.Fatal("forged (wrong-issuer) credential admitted")
+	}
+	if _, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{1}, 32), []byte("garbage"), now); ok {
+		t.Fatal("malformed presentation admitted")
+	}
+}

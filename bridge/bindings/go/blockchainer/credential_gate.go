@@ -6,7 +6,11 @@ package blockchainer
 */
 import "C"
 
-import "unsafe"
+import (
+	"encoding/binary"
+	"errors"
+	"unsafe"
+)
 
 // CredentialGate is anonymous membership admission (docs/design/CREDENTIAL_GATE.md,
 // Option A). An issuer signs a member's attribute vector as a BBS credential; the
@@ -15,9 +19,8 @@ import "unsafe"
 // expiry has not passed — revealing nothing else.
 //
 // Option A is UNLINKABLE: two presentations of one credential cannot be
-// correlated (strong privacy, weak Sybil resistance). Real per-epoch Sybil
-// resistance is Option B, blocked on an upstream cryptolib BBS-pseudonym
-// primitive.
+// correlated (strong privacy, weak Sybil resistance). Option B (below) adds real
+// per-epoch Sybil resistance via per-(epoch, scope) pseudonyms.
 
 // BBSKeypair is a credential issuer's BBS key (public 96 B, secret 32 B).
 type BBSKeypair struct {
@@ -118,4 +121,104 @@ func (g *CredentialGate) Admit(epoch uint32, scope string, challenge, presentati
 	return C.blockchainer_credential_gate_admit(g.h, C.uint32_t(epoch), cscope,
 		bp(challenge), C.size_t(len(challenge)), bp(presentation), C.size_t(len(presentation)),
 		C.uint64_t(now)) == 1
+}
+
+// ── Option B — pseudonymous (per-epoch Sybil resistance) ─────────────────────
+
+// CredentialModePseudonymous marks a policy as Option B (per-(epoch, scope)
+// pseudonym). The default NewCredentialPolicy is Option A (unlinkable).
+const CredentialModePseudonymous uint8 = 1
+
+// NewPseudonymousPolicy canonically encodes an Option-B (pseudonymous) policy.
+func NewPseudonymousPolicy(chainID uint64, issuerPublic, header []byte, attributeCount uint32, minTier uint8) (*CredentialPolicy, error) {
+	ensure()
+	enc, err := takeBuf(C.blockchainer_credential_policy_encode_ex(C.uint64_t(chainID),
+		bp(issuerPublic), C.size_t(len(issuerPublic)), bp(header), C.size_t(len(header)),
+		C.uint32_t(attributeCount), C.uint8_t(minTier), C.uint8_t(CredentialModePseudonymous)))
+	if err != nil {
+		return nil, err
+	}
+	return &CredentialPolicy{
+		ChainID: chainID, IssuerPublic: issuerPublic, Header: header,
+		AttributeCount: attributeCount, MinTier: minTier, encoded: enc,
+	}, nil
+}
+
+// MembershipCommit (holder step 1) derives a nym seed from memberSecret and
+// blind-commits it. The returned blob is HOLDER-SECRET; its first length-prefixed
+// field is the commitment to send to the issuer (see ExtractCommitment).
+func (p *CredentialPolicy) MembershipCommit(memberSecret []byte) ([]byte, error) {
+	ensure()
+	return takeBuf(C.blockchainer_membership_commit(bp(p.encoded), C.size_t(len(p.encoded)),
+		bp(memberSecret), C.size_t(len(memberSecret))))
+}
+
+// ExtractCommitment extracts the commitment (the first length-prefixed field) from a
+// membership-commit blob — the only part sent to the issuer.
+func ExtractCommitment(membershipCommit []byte) ([]byte, error) {
+	if len(membershipCommit) < 4 {
+		return nil, errors.New("credential: short membership-commit blob")
+	}
+	n := int(binary.BigEndian.Uint32(membershipCommit[:4]))
+	if 4+n > len(membershipCommit) {
+		return nil, errors.New("credential: bad commitment length")
+	}
+	return membershipCommit[4 : 4+n], nil
+}
+
+// BlindIssue (issuer step 2) blind-signs the holder's commitment with the
+// issuer-set attributes. The issuer never sees the seed.
+func (p *CredentialPolicy) BlindIssue(issuerSecret, commitment []byte, tier uint8, notAfter uint64, issuerEpoch uint32) ([]byte, error) {
+	ensure()
+	return takeBuf(C.blockchainer_blind_issue(bp(p.encoded), C.size_t(len(p.encoded)),
+		bp(issuerSecret), C.size_t(len(issuerSecret)), bp(commitment), C.size_t(len(commitment)),
+		C.uint8_t(tier), C.uint64_t(notAfter), C.uint32_t(issuerEpoch)))
+}
+
+// FinalizeMembership (holder step 3) assembles the pseudonymous credential from
+// the membership-commit blob and the issuer's blind-issuance blob. HOLDER-SECRET.
+func FinalizeMembership(membershipCommit, blindIssuance []byte) ([]byte, error) {
+	ensure()
+	return takeBuf(C.blockchainer_finalize_membership(bp(membershipCommit), C.size_t(len(membershipCommit)),
+		bp(blindIssuance), C.size_t(len(blindIssuance))))
+}
+
+// PresentPseudonymous (holder) builds a pseudonymous presentation for (epoch,
+// scope, challenge). It carries a per-(chain, epoch, scope) pseudonym.
+func (p *CredentialPolicy) PresentPseudonymous(credential []byte, epoch uint32, scope string, challenge []byte) ([]byte, error) {
+	ensure()
+	cscope := C.CString(scope)
+	defer C.free(unsafe.Pointer(cscope))
+	return takeBuf(C.blockchainer_credential_present_pseudonymous(bp(p.encoded), C.size_t(len(p.encoded)),
+		bp(credential), C.size_t(len(credential)), C.uint32_t(epoch), cscope,
+		bp(challenge), C.size_t(len(challenge))))
+}
+
+// AdmitPseudonymous (verifier) runs the §6 checklist and, on success, returns the
+// 48-byte pseudonym (ok=true). A reject — malformed, failed proof, expiry, tier,
+// revoked nym/epoch — returns ok=false with a nil nym. Never errors.
+func (g *CredentialGate) AdmitPseudonymous(epoch uint32, scope string, challenge, presentation []byte, now uint64) (nym []byte, ok bool) {
+	cscope := C.CString(scope)
+	defer C.free(unsafe.Pointer(cscope))
+	out, err := takeBuf(C.blockchainer_credential_gate_admit_pseudonymous(g.h, C.uint32_t(epoch), cscope,
+		bp(challenge), C.size_t(len(challenge)), bp(presentation), C.size_t(len(presentation)),
+		C.uint64_t(now)))
+	if err != nil || len(out) == 0 {
+		return nil, false
+	}
+	return out, true
+}
+
+// RevokeNym (§6.2) refuses this exact pseudonym.
+func (g *CredentialGate) RevokeNym(nym []byte) {
+	C.blockchainer_credential_gate_revoke_nym(g.h, bp(nym), C.size_t(len(nym)))
+}
+
+// NoteAdmission (§6.3 Sybil cap) records an admitted nym for (epoch, scope) and
+// reports whether it is the first session on it (false = a duplicate).
+func (g *CredentialGate) NoteAdmission(epoch uint32, scope string, nym []byte) bool {
+	cscope := C.CString(scope)
+	defer C.free(unsafe.Pointer(cscope))
+	return C.blockchainer_credential_gate_note_admission(g.h, C.uint32_t(epoch), cscope,
+		bp(nym), C.size_t(len(nym))) == 1
 }

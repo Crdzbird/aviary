@@ -425,6 +425,68 @@ BLOCKCHAINER_API int blockchainer_credential_gate_admit(
 /** Free a gate handle. */
 BLOCKCHAINER_API void blockchainer_credential_gate_free(BlockchainerCredentialGate g);
 
+/* ── CredentialGate Option B — pseudonymous (per-epoch Sybil resistance) ───────
+ *  Real per-epoch Sybil resistance: each presentation carries a deterministic
+ *  per-(chain, epoch, scope) pseudonym derived from a holder seed the issuer
+ *  never sees (blind BBS issuance). Same member + same epoch + scope → the SAME
+ *  pseudonym; a different epoch → an unlinkable one. See CREDENTIAL_GATE.md §3.2.
+ *
+ *  Blob layouts (each field is a length-prefixed byte string unless noted):
+ *   - membership_commit blob:  [commitment][nym_seed 32][secret_prover_blind 32]
+ *     — HOLDER SECRET. Decode the FIRST field (commitment) to send to the issuer;
+ *     keep the whole blob for _finalize_membership.
+ *   - blind_issuance blob:     [sig][entropy 32][tier u8][not_after u64][issuer_epoch u32]
+ *     — opaque; the issuer returns it to the holder.
+ *   - pseudonymous credential: opaque holder-secret blob (feed to _present_pseudonymous).
+ *   - presentation:            opaque proof+nym blob from _present_pseudonymous.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** Encode a policy with an explicit admission mode (0 = unlinkable / Option A,
+ *  1 = pseudonymous / Option B). `blockchainer_credential_policy_encode` is the
+ *  mode-0 shorthand. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_credential_policy_encode_ex(
+    uint64_t chain_id, const uint8_t* issuer_pk, size_t pk_len, const uint8_t* header,
+    size_t header_len, uint32_t attribute_count, uint8_t min_tier, uint8_t mode);
+
+/** Holder step 1: derive a nym seed from [member_secret] and blind-commit it.
+ *  Returns the membership-commit blob (holder-secret). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_membership_commit(
+    const uint8_t* policy, size_t policy_len, const uint8_t* member_secret, size_t ms_len);
+
+/** Issuer step 2: blind-sign the holder's [commitment] (the first field of the
+ *  membership-commit blob) with the issuer-set attributes. The issuer never sees
+ *  the seed. Returns the blind-issuance blob. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_blind_issue(
+    const uint8_t* policy, size_t policy_len, const uint8_t* issuer_sk, size_t sk_len,
+    const uint8_t* commitment, size_t commitment_len, uint8_t tier, uint64_t not_after,
+    uint32_t issuer_epoch);
+
+/** Holder step 3: finalize into a pseudonymous credential (holder-secret). Takes
+ *  the whole membership-commit blob + the blind-issuance blob. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_finalize_membership(
+    const uint8_t* membership_commit, size_t mc_len, const uint8_t* blind_issuance, size_t bi_len);
+
+/** Holder: build a pseudonymous presentation for (epoch, scope, challenge). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_credential_present_pseudonymous(
+    const uint8_t* policy, size_t policy_len, const uint8_t* credential, size_t cred_len,
+    uint32_t epoch, const char* scope, const uint8_t* challenge, size_t challenge_len);
+
+/** Verifier: admit? On success returns the 48-byte pseudonym; on any reject
+ *  returns an EMPTY buffer (len 0, no error). Never fails as an error. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_credential_gate_admit_pseudonymous(
+    BlockchainerCredentialGate g, uint32_t epoch, const char* scope, const uint8_t* challenge,
+    size_t challenge_len, const uint8_t* presentation, size_t presentation_len, uint64_t now);
+
+/** Targeted revocation (§6.2): refuse this exact pseudonym. */
+BLOCKCHAINER_API void blockchainer_credential_gate_revoke_nym(
+    BlockchainerCredentialGate g, const uint8_t* nym, size_t nym_len);
+
+/** Sybil cap (§6.3): record an admitted nym for (epoch, scope). Returns 1 if this
+ *  is the first session on it, 0 if a duplicate (the caller rate-limits). */
+BLOCKCHAINER_API int blockchainer_credential_gate_note_admission(
+    BlockchainerCredentialGate g, uint32_t epoch, const char* scope, const uint8_t* nym,
+    size_t nym_len);
+
 /* ── Interop address derivation (showcase) ─────────────────────────────────── */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */

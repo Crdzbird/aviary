@@ -112,6 +112,76 @@ cg::Credential decode_credential(const std::uint8_t* p, std::size_t n) {
   return c;
 }
 
+// ── Option B blob (de)serialisers ──────────────────────────────────────────
+using CW = blockchainer::codec::CodecWriter;
+using CR = blockchainer::codec::CodecReader;
+
+// membership-commit = [commitment][nym_seed][secret_prover_blind]
+std::vector<std::uint8_t> encode_membership_commit(const cg::MembershipCommitment& m) {
+  CW w;
+  w.write_bytes(cbv(m.commitment.data(), m.commitment.size()));
+  w.write_bytes(cbv(m.nym_seed.data(), m.nym_seed.size()));
+  w.write_bytes(cbv(m.secret_prover_blind.data(), m.secret_prover_blind.size()));
+  return w.take();
+}
+cg::MembershipCommitment decode_membership_commit(const std::uint8_t* p, std::size_t n) {
+  CR r(cbv(p, n));
+  cg::MembershipCommitment m;
+  m.commitment = r.read_bytes();
+  m.nym_seed = r.read_bytes();
+  m.secret_prover_blind = r.read_bytes();
+  r.assert_fully_consumed();
+  return m;
+}
+
+// blind-issuance = [sig][entropy][tier u8][not_after u64][issuer_epoch u32]
+std::vector<std::uint8_t> encode_blind_issuance(const cg::BlindIssuance& b) {
+  CW w;
+  w.write_bytes(cbv(b.signature.data(), b.signature.size()));
+  w.write_bytes(cbv(b.entropy.data(), b.entropy.size()));
+  w.write_u8(b.tier);
+  w.write_u64(b.not_after);
+  w.write_u32(b.issuer_epoch);
+  return w.take();
+}
+cg::BlindIssuance decode_blind_issuance(const std::uint8_t* p, std::size_t n) {
+  CR r(cbv(p, n));
+  cg::BlindIssuance b;
+  b.signature = r.read_bytes();
+  b.entropy = r.read_bytes();
+  b.tier = r.read_u8();
+  b.not_after = r.read_u64();
+  b.issuer_epoch = r.read_u32();
+  r.assert_fully_consumed();
+  return b;
+}
+
+// pseudonymous credential = [sig][tier u8][not_after u64][issuer_epoch u32][nym_secrets…][spb]
+std::vector<std::uint8_t> encode_pseudonymous_credential(const cg::PseudonymousCredential& c) {
+  CW w;
+  w.write_bytes(cbv(c.signature.data(), c.signature.size()));
+  w.write_u8(c.tier);
+  w.write_u64(c.not_after);
+  w.write_u32(c.issuer_epoch);
+  w.write_list(c.nym_secrets, [](CW& ww, const blockchainer::crypto::Bytes& s) {
+    ww.write_bytes(cbv(s.data(), s.size()));
+  });
+  w.write_bytes(cbv(c.secret_prover_blind.data(), c.secret_prover_blind.size()));
+  return w.take();
+}
+cg::PseudonymousCredential decode_pseudonymous_credential(const std::uint8_t* p, std::size_t n) {
+  CR r(cbv(p, n));
+  cg::PseudonymousCredential c;
+  c.signature = r.read_bytes();
+  c.tier = r.read_u8();
+  c.not_after = r.read_u64();
+  c.issuer_epoch = r.read_u32();
+  c.nym_secrets = r.read_list<blockchainer::crypto::Bytes>([](CR& rr) { return rr.read_bytes(); });
+  c.secret_prover_blind = r.read_bytes();
+  r.assert_fully_consumed();
+  return c;
+}
+
 }  // namespace
 
 extern "C" {
@@ -912,6 +982,108 @@ int blockchainer_credential_gate_admit(BlockchainerCredentialGate g, uint32_t ep
 }
 
 void blockchainer_credential_gate_free(BlockchainerCredentialGate g) { delete as_gate(g); }
+
+// ── CredentialGate Option B — pseudonymous ────────────────────────────────────
+
+BlockchainerBufferResult blockchainer_credential_policy_encode_ex(uint64_t chain_id,
+                                                                  const uint8_t* issuer_pk,
+                                                                  size_t pk_len,
+                                                                  const uint8_t* header,
+                                                                  size_t header_len,
+                                                                  uint32_t attribute_count,
+                                                                  uint8_t min_tier, uint8_t mode) {
+  try {
+    cg::CredentialPolicy p;
+    p.chain_id = chain_id;
+    p.issuer_public_key.assign(issuer_pk, issuer_pk + pk_len);
+    p.header.assign(header, header + header_len);
+    p.attribute_count = attribute_count;
+    p.min_tier = min_tier;
+    p.mode = static_cast<cg::CredentialMode>(mode);
+    return bytes_result(p.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_membership_commit(const uint8_t* policy, size_t policy_len,
+                                                        const uint8_t* member_secret,
+                                                        size_t ms_len) {
+  try {
+    cg::CredentialPolicy p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    return bytes_result(encode_membership_commit(cg::membership_commit(p, cbv(member_secret, ms_len))));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_blind_issue(const uint8_t* policy, size_t policy_len,
+                                                  const uint8_t* issuer_sk, size_t sk_len,
+                                                  const uint8_t* commitment, size_t commitment_len,
+                                                  uint8_t tier, uint64_t not_after,
+                                                  uint32_t issuer_epoch) {
+  try {
+    cg::CredentialPolicy p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    cg::BlindIssuance b = cg::blind_issue(p, cbv(issuer_sk, sk_len), cbv(commitment, commitment_len),
+                                          tier, not_after, issuer_epoch);
+    return bytes_result(encode_blind_issuance(b));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_finalize_membership(const uint8_t* membership_commit,
+                                                          size_t mc_len,
+                                                          const uint8_t* blind_issuance,
+                                                          size_t bi_len) {
+  try {
+    cg::MembershipCommitment m = decode_membership_commit(membership_commit, mc_len);
+    cg::BlindIssuance b = decode_blind_issuance(blind_issuance, bi_len);
+    return bytes_result(encode_pseudonymous_credential(cg::finalize_membership(m, b)));
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_credential_present_pseudonymous(
+    const uint8_t* policy, size_t policy_len, const uint8_t* credential, size_t cred_len,
+    uint32_t epoch, const char* scope, const uint8_t* challenge, size_t challenge_len) {
+  try {
+    cg::CredentialPolicy p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    cg::PseudonymousCredential c = decode_pseudonymous_credential(credential, cred_len);
+    std::vector<std::uint8_t> pres = cg::CredentialGate::present_pseudonymous(
+        p, c, epoch, scope ? scope : "", cbv(challenge, challenge_len));
+    return bytes_result(pres);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_credential_gate_admit_pseudonymous(
+    BlockchainerCredentialGate g, uint32_t epoch, const char* scope, const uint8_t* challenge,
+    size_t challenge_len, const uint8_t* presentation, size_t presentation_len, uint64_t now) {
+  if (g == nullptr) return error_result("null gate");
+  std::optional<blockchainer::crypto::Bytes> nym =
+      as_gate(g)->admit_pseudonymous(epoch, scope ? scope : "", cbv(challenge, challenge_len),
+                                     cbv(presentation, presentation_len), now);
+  if (!nym) {
+    const std::uint8_t empty = 0;
+    return bytes_result(&empty, 0);  // reject → empty buffer (len 0), no error
+  }
+  return bytes_result(*nym);
+}
+
+void blockchainer_credential_gate_revoke_nym(BlockchainerCredentialGate g, const uint8_t* nym,
+                                             size_t nym_len) {
+  if (g) as_gate(g)->revoke_nym(cbv(nym, nym_len));
+}
+
+int blockchainer_credential_gate_note_admission(BlockchainerCredentialGate g, uint32_t epoch,
+                                                const char* scope, const uint8_t* nym,
+                                                size_t nym_len) {
+  if (g == nullptr) return 0;
+  return as_gate(g)->note_admission(epoch, scope ? scope : "", cbv(nym, nym_len)) ? 1 : 0;
+}
 
 // ── Interop addresses ─────────────────────────────────────────────────────────
 
