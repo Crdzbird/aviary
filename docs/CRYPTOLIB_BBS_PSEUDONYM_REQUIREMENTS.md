@@ -1,5 +1,11 @@
 # cryptolib BBS pseudonym + blind-issuance primitives — feature request
 
+> **Filed upstream** on `Crdzbird/CryptoLib`, one issue per primitive:
+> - §1 pseudonyms → [Crdzbird/CryptoLib#3](https://github.com/Crdzbird/CryptoLib/issues/3) (HIGH — the Option-B blocker)
+> - §2 blind issuance → [Crdzbird/CryptoLib#4](https://github.com/Crdzbird/CryptoLib/issues/4) (MEDIUM — the malicious-issuer fix)
+>
+> This document is the consolidated spec; keep it and the two issues in sync.
+
 > What blockchainer needs added to **cryptolib's C ABI** (`bridge/cryptolib_c.h`
 > + impl) to unblock the **CredentialGate** anonymous-membership feature
 > (`docs/design/CREDENTIAL_GATE.md`). Follows cryptolib's existing conventions:
