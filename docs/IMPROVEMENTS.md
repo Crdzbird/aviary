@@ -226,9 +226,15 @@
   be canonical (< the BLS12-381 order r) — cryptolib does not reduce them, so a
   non-canonical scalar silently breaks the round-trip; the round-trip flow itself
   is byte-exact against cryptolib's own reference vectors. 61 C++ suites, ASan-
-  clean, Go binding still green against the new lib. **Next (Increment 2):**
-  `CredentialGate` Option B — blind interactive issuance + pseudonym-bound
-  present/admit (admit returns the nym → per-epoch nym deny-list + Sybil cap).
+  clean, Go binding still green against the new lib. **Canonical-scalar helper
+  wired (`Crdzbird/CryptoLib#5` shipped):** `crypto::bbs_hash_to_scalar(msg, dst)`
+  + `bbs_random_scalar()` wrap the two new cryptolib fns; the test now derives the
+  nym seed the clean way — `nym_seed = bbs_hash_to_scalar(member_secret, dst)`
+  (deterministic, canonical, so the same member → the same per-context pseudonym)
+  and takes issuer entropy from `bbs_random_scalar()` — no more high-bit clamping.
+  **Next (Increment 2):** `CredentialGate` Option B — blind interactive issuance +
+  pseudonym-bound present/admit (admit returns the nym → per-epoch nym deny-list +
+  Sybil cap).
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

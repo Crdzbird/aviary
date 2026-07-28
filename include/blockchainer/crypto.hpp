@@ -342,6 +342,16 @@ bool bbs_verify_blind_sign(ByteView pk, ByteView signature, ByteView header,
                            const std::vector<Bytes>& msgs, const std::vector<Bytes>& committed_msgs,
                            ByteView secret_prover_blind);
 
+/// Deterministically map [msg] (+ domain [dst]) to a canonical 32-byte scalar in
+/// [0, r) — the safe way to satisfy the SCALAR CONSTRAINT above. A stable
+/// per-holder nym seed is `bbs_hash_to_scalar(member_secret, dst)`, so the same
+/// member gets the same per-context pseudonym across presentations. Throws on
+/// backend failure.
+Bytes bbs_hash_to_scalar(ByteView msg, ByteView dst = {});
+/// A fresh cryptographically-random canonical 32-byte scalar in [0, r). Throws on
+/// backend failure.
+Bytes bbs_random_scalar();
+
 // ── BLS12-381 (consensus votes; ARCHITECTURE §7) ─────────────────────────────
 
 /// Deterministic BLS keypair from input key material (>= 32 bytes).

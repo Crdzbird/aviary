@@ -595,6 +595,19 @@ bool bbs_verify_blind_sign(ByteView pk, ByteView signature, ByteView header,
                                          secret_prover_blind.data(), secret_prover_blind.size()) == 1;
 }
 
+Bytes bbs_hash_to_scalar(ByteView msg, ByteView dst) {
+  CryptoBufferResult r =
+      cryptolib_bbs_hash_to_scalar(msg.data(), msg.size(), dst.data(), dst.size());
+  if (r.buf.data == nullptr) throw_result(r, "bbs_hash_to_scalar");
+  return take_buffer(r.buf);
+}
+
+Bytes bbs_random_scalar() {
+  CryptoBufferResult r = cryptolib_bbs_random_scalar();
+  if (r.buf.data == nullptr) throw_result(r, "bbs_random_scalar");
+  return take_buffer(r.buf);
+}
+
 // ── BLS12-381 ────────────────────────────────────────────────────────────────
 
 KeyPair bls_keygen_from_ikm(ByteView ikm) {

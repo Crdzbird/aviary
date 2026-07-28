@@ -17,15 +17,6 @@ using namespace blockchainer;
 namespace {
 crypto::ByteView view(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
 Bytes msg(const std::string& s) { return Bytes(s.begin(), s.end()); }
-
-// A canonical 32-byte scalar (< the BLS12-381 scalar-field order): cryptolib does
-// NOT reduce nym / entropy scalars, so a value >= r breaks the round-trip. Zeroing
-// the top byte guarantees the value is far below r; the low bytes distinguish it.
-Bytes scalar(std::uint8_t tag) {
-  Bytes s(32, 0);
-  for (std::size_t i = 1; i < 32; ++i) s[i] = static_cast<std::uint8_t>(tag + i);
-  return s;  // s[0] == 0 → < 2^248 << r
-}
 }  // namespace
 
 int main() {
@@ -39,15 +30,26 @@ int main() {
   std::vector<Bytes> signer{msg("tier=3"), msg("not_after=2100")};  // L = 2
   std::vector<Bytes> committed{msg("region=eu"), msg("dob=1990")};
 
-  // ── Blind issuance of a pseudonym seed ─────────────────────────────────────
-  // Holder picks a pseudonym seed and blind-commits it: the issuer signs over it
-  // without ever seeing it.
-  Bytes prover_nym = scalar(0x11);
+  // ── Nym-seed derivation via hash_to_scalar (the canonical-scalar path) ──────
+  // A stable per-holder seed derived from the member secret: same member → same
+  // seed → same per-context pseudonym. hash_to_scalar guarantees a canonical
+  // scalar, so no clamping workaround is needed.
+  Bytes member_secret(32, 0x77);
+  Bytes prover_nym = crypto::bbs_hash_to_scalar(view(member_secret), view(msg("nym-seed.v1")));
+  CHECK(prover_nym.size() == 32);
+  CHECK(prover_nym[0] < 0x74);  // canonical: below the top byte of r (0x73ed…)
+  // Deterministic in (msg, dst); a different domain → a different seed.
+  CHECK(crypto::bbs_hash_to_scalar(view(member_secret), view(msg("nym-seed.v1"))) == prover_nym);
+  CHECK(crypto::bbs_hash_to_scalar(view(member_secret), view(msg("other-dst"))) != prover_nym);
+
+  // ── Blind issuance of the pseudonym seed ───────────────────────────────────
+  // The issuer blind-signs over the seed without ever seeing it.
   std::vector<Bytes> prover_nyms{prover_nym};
   auto commit = crypto::bbs_commit_with_nym(committed, prover_nyms);
   CHECK(commit.secret_prover_blind.size() == 32);
 
-  Bytes entropy = scalar(0x22);
+  Bytes entropy = crypto::bbs_random_scalar();  // issuer contributes fresh entropy
+  CHECK(entropy.size() == 32 && crypto::bbs_random_scalar() != entropy);
   Bytes sig = crypto::bbs_blind_sign_with_nym(view(issuer.secret_key), view(issuer.public_key),
                                               view(commit.commitment), view(header), signer,
                                               view(entropy), /*length_nym_vector=*/1);
@@ -93,9 +95,9 @@ int main() {
   CHECK(nymB != nymA);                                                    // cross-context: unlinkable
   CHECK(crypto::bbs_calculate_pseudonym(view(ctxA), nym_secrets) == nymA);  // same context: stable
 
-  // A different credential (fresh seed) yields a different pseudonym in ctxA →
+  // A different member (fresh seed) yields a different pseudonym in ctxA →
   // one credential = one pseudonym per context (Sybil resistance).
-  Bytes other_nym = scalar(0x33);
+  Bytes other_nym = crypto::bbs_hash_to_scalar(view(Bytes(32, 0x88)), view(msg("nym-seed.v1")));
   auto other_secrets = crypto::bbs_finalize_nym_secrets({other_nym}, view(entropy));
   CHECK(crypto::bbs_calculate_pseudonym(view(ctxA), other_secrets) != nymA);
 
