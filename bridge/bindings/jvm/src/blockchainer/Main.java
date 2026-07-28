@@ -146,6 +146,30 @@ public final class Main {
             }
             System.out.println("credential-gate OK");
 
+            // CredentialGate Option B (pseudonymous — per-epoch Sybil resistance).
+            var pseudoPolicy = bc.new CredentialPolicy(7, issuer.publicKey(),
+                    "blockchainer.credential.v2".getBytes(java.nio.charset.StandardCharsets.UTF_8), 4, 2, 1);
+            byte[] ms = new byte[32];
+            java.util.Arrays.fill(ms, (byte) 0x77);
+            byte[] pmc = pseudoPolicy.membershipCommit(ms);
+            byte[] pbi = pseudoPolicy.blindIssue(issuer.secret(), Blockchainer.extractCommitment(pmc), 3, 4_102_444_800L, 1);
+            byte[] pcred = bc.finalizeMembership(pmc, pbi);
+            byte[] chB = new byte[32];
+            java.util.Arrays.fill(chB, (byte) 1);
+            byte[] chB2 = new byte[32];
+            java.util.Arrays.fill(chB2, (byte) 2);
+            try (var pgate = bc.newCredentialGate(pseudoPolicy)) {
+                byte[] nymA = pgate.admitPseudonymous(5, "gossip", chB, pseudoPolicy.presentPseudonymous(pcred, 5, "gossip", chB), credNow);
+                if (nymA == null || nymA.length != 48) throw new IllegalStateException("pseudonym admit");
+                byte[] nym2 = pgate.admitPseudonymous(5, "gossip", chB2, pseudoPolicy.presentPseudonymous(pcred, 5, "gossip", chB2), credNow);
+                if (!java.util.Arrays.equals(nymA, nym2)) throw new IllegalStateException("same member+epoch+scope must link");
+                if (!pgate.noteAdmission(5, "gossip", nymA) || pgate.noteAdmission(5, "gossip", nym2))
+                    throw new IllegalStateException("Sybil cap");
+                byte[] nymE = pgate.admitPseudonymous(6, "gossip", chB, pseudoPolicy.presentPseudonymous(pcred, 6, "gossip", chB), credNow);
+                if (nymE == null || java.util.Arrays.equals(nymE, nymA)) throw new IllegalStateException("different epoch must unlink");
+            }
+            System.out.println("credential-gate pseudonymous OK");
+
             System.out.println("\nALL GOOD");
         }
     }

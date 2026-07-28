@@ -124,5 +124,32 @@ precondition(!credGate.admit(epoch: 5, scope: "submit", challenge: credChallenge
                              presentation: Data("garbage".utf8), now: credNow), "malformed rejected")
 print("credential-gate OK")
 
+// CredentialGate Option B (pseudonymous — per-epoch Sybil resistance).
+let pseudoPolicy = try Blockchainer.CredentialPolicy(chainID: 7, issuerPublic: issuer.publicKey,
+                                                     header: Data("blockchainer.credential.v2".utf8),
+                                                     minTier: 2, mode: .pseudonymous)
+func issuePseudo(_ secret: Data) throws -> Data {
+    let mc = try pseudoPolicy.membershipCommit(memberSecret: secret)
+    let commitment = Blockchainer.extractCommitment(mc)
+    let bi = try pseudoPolicy.blindIssue(issuerSecret: issuer.secret, commitment: commitment,
+                                         tier: 3, notAfter: 4_102_444_800, issuerEpoch: 1)
+    return try Blockchainer.finalizeMembership(membershipCommit: mc, blindIssuance: bi)
+}
+let pseudoCred = try issuePseudo(Data(repeating: 0x77, count: 32))
+let pseudoGate = Blockchainer.makeCredentialGate(policy: pseudoPolicy)
+func chd(_ b: UInt8) -> Data { Data(repeating: b, count: 32) }
+let presP = try pseudoPolicy.presentPseudonymous(credential: pseudoCred, epoch: 5, scope: "gossip", challenge: chd(1))
+let nymA = try pseudoGate.admitPseudonymous(epoch: 5, scope: "gossip", challenge: chd(1), presentation: presP, now: credNow)
+precondition(nymA != nil && nymA!.count == 48, "admit returns a 48-byte pseudonym")
+let presP2 = try pseudoPolicy.presentPseudonymous(credential: pseudoCred, epoch: 5, scope: "gossip", challenge: chd(2))
+let nym2 = try pseudoGate.admitPseudonymous(epoch: 5, scope: "gossip", challenge: chd(2), presentation: presP2, now: credNow)
+precondition(nym2 == nymA, "same member+epoch+scope → same pseudonym")
+precondition(pseudoGate.noteAdmission(epoch: 5, scope: "gossip", nym: nymA!), "first admission fresh")
+precondition(!pseudoGate.noteAdmission(epoch: 5, scope: "gossip", nym: nym2!), "Sybil cap flags the duplicate")
+let presE = try pseudoPolicy.presentPseudonymous(credential: pseudoCred, epoch: 6, scope: "gossip", challenge: chd(1))
+let nymE = try pseudoGate.admitPseudonymous(epoch: 6, scope: "gossip", challenge: chd(1), presentation: presE, now: credNow)
+precondition(nymE != nil && nymE != nymA, "different epoch → unlinkable pseudonym")
+print("credential-gate pseudonymous OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

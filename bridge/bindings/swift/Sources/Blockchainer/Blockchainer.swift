@@ -318,14 +318,24 @@ public enum Blockchainer {
 
     /// A membership policy. Its canonical `encoded` bytes drive the gate; its
     /// `hash()` is meant to be committed into genesis (like an AssuranceProfile).
+    /// Admission mode (§3): unlinkable = Option A, pseudonymous = Option B.
+    public enum CredentialMode: UInt8 { case unlinkable = 0, pseudonymous = 1 }
+
     public struct CredentialPolicy {
         public let encoded: Data
         public init(chainID: UInt64, issuerPublic: Data, header: Data,
-                    attributeCount: UInt32 = 4, minTier: UInt8 = 0) throws {
+                    attributeCount: UInt32 = 4, minTier: UInt8 = 0,
+                    mode: CredentialMode = .unlinkable) throws {
             Blockchainer.ensureReady()
-            encoded = try consume(issuerPublic.withC { ip, il in header.withC { hp, hl in
-                blockchainer_credential_policy_encode(chainID, ip, il, hp, hl, attributeCount, minTier) } },
-                "credential_policy_encode")
+            if mode == .unlinkable {
+                encoded = try consume(issuerPublic.withC { ip, il in header.withC { hp, hl in
+                    blockchainer_credential_policy_encode(chainID, ip, il, hp, hl, attributeCount, minTier) } },
+                    "credential_policy_encode")
+            } else {
+                encoded = try consume(issuerPublic.withC { ip, il in header.withC { hp, hl in
+                    blockchainer_credential_policy_encode_ex(chainID, ip, il, hp, hl, attributeCount, minTier, mode.rawValue) } },
+                    "credential_policy_encode_ex")
+            }
         }
         /// The 32-byte commitment to commit into genesis.
         public func hash() throws -> Data {
@@ -345,6 +355,41 @@ public enum Blockchainer {
                 blockchainer_credential_present(pp, pl, cp, cl, epoch, scope, chp, chl) } } },
                 "credential_present")
         }
+
+        // ── Option B — pseudonymous ────────────────────────────────────────────
+        /// Holder step 1: derive a nym seed from [memberSecret] and blind-commit it.
+        /// The returned blob is holder-secret; `extractCommitment` gives the part to
+        /// send to the issuer.
+        public func membershipCommit(memberSecret: Data) throws -> Data {
+            try consume(encoded.withC { pp, pl in memberSecret.withC { mp, ml in
+                blockchainer_membership_commit(pp, pl, mp, ml) } }, "membership_commit")
+        }
+        /// Issuer step 2: blind-sign the holder's [commitment] (never sees the seed).
+        public func blindIssue(issuerSecret: Data, commitment: Data, tier: UInt8,
+                               notAfter: UInt64, issuerEpoch: UInt32) throws -> Data {
+            try consume(encoded.withC { pp, pl in issuerSecret.withC { sp, sl in commitment.withC { cp, cl in
+                blockchainer_blind_issue(pp, pl, sp, sl, cp, cl, tier, notAfter, issuerEpoch) } } },
+                "blind_issue")
+        }
+        /// Holder step 3: a per-epoch pseudonymous presentation.
+        public func presentPseudonymous(credential: Data, epoch: UInt32, scope: String, challenge: Data) throws -> Data {
+            try consume(encoded.withC { pp, pl in credential.withC { cp, cl in challenge.withC { chp, chl in
+                blockchainer_credential_present_pseudonymous(pp, pl, cp, cl, epoch, scope, chp, chl) } } },
+                "credential_present_pseudonymous")
+        }
+    }
+
+    /// The commitment is the first length-prefixed field of a membership-commit blob.
+    public static func extractCommitment(_ membershipCommit: Data) -> Data {
+        let b = [UInt8](membershipCommit)
+        let n = Int(b[0]) << 24 | Int(b[1]) << 16 | Int(b[2]) << 8 | Int(b[3])
+        return membershipCommit.subdata(in: 4..<(4 + n))
+    }
+    /// Holder step 3 (assemble): finalize the pseudonymous credential (holder-secret).
+    public static func finalizeMembership(membershipCommit: Data, blindIssuance: Data) throws -> Data {
+        ensureReady()
+        return try consume(membershipCommit.withC { mp, ml in blindIssuance.withC { bp, bl in
+            blockchainer_finalize_membership(mp, ml, bp, bl) } }, "finalize_membership")
     }
 
     /// A verifier's admission gate (holds the issuer-epoch deny-list).
@@ -364,6 +409,22 @@ public enum Blockchainer {
         public func admit(epoch: UInt32, scope: String, challenge: Data, presentation: Data, now: UInt64) -> Bool {
             challenge.withC { chp, chl in presentation.withC { pp, pl in
                 blockchainer_credential_gate_admit(UnsafeMutableRawPointer(h), epoch, scope, chp, chl, pp, pl, now) == 1 } }
+        }
+        /// Option B: admit? Returns the 48-byte pseudonym on success, or nil on reject.
+        public func admitPseudonymous(epoch: UInt32, scope: String, challenge: Data, presentation: Data, now: UInt64) throws -> Data? {
+            let res = challenge.withC { chp, chl in presentation.withC { pp, pl in
+                blockchainer_credential_gate_admit_pseudonymous(UnsafeMutableRawPointer(h), epoch, scope, chp, chl, pp, pl, now) } }
+            let nym = try consume(res, "admit_pseudonymous")
+            return nym.isEmpty ? nil : nym
+        }
+        /// §6.2 targeted revocation of an exact pseudonym.
+        public func revokeNym(_ nym: Data) {
+            nym.withC { np, nl in blockchainer_credential_gate_revoke_nym(UnsafeMutableRawPointer(h), np, nl) }
+        }
+        /// §6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope).
+        public func noteAdmission(epoch: UInt32, scope: String, nym: Data) -> Bool {
+            nym.withC { np, nl in
+                blockchainer_credential_gate_note_admission(UnsafeMutableRawPointer(h), epoch, scope, np, nl) == 1 }
         }
     }
     public static func makeCredentialGate(policy: CredentialPolicy) -> CredentialGate {

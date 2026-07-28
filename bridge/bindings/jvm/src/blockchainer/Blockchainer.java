@@ -29,7 +29,9 @@ public final class Blockchainer implements AutoCloseable {
             thCreate, thInfo, thSeal, thUnseal, thCommit, thCerNew, thCerFree, thSign, thVerify, thAgg,
             asDescribe, txEncode, smSeal, smNew, smAdd, smSize, smReveal, smFree,
             bbsKeygen, credPolicyEncode, credPolicyHash, credIssue, credPresent,
-            credGateNew, credGateRevoke, credGateAdmit, credGateFree;
+            credGateNew, credGateRevoke, credGateAdmit, credGateFree,
+            credPolicyEncodeEx, membershipCommit, blindIssue, finalizeMembership,
+            credPresentPseud, credGateAdmitPseud, credGateRevokeNym, credGateNoteAdmission;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -102,6 +104,14 @@ public final class Blockchainer implements AutoCloseable {
         credGateRevoke = h("blockchainer_credential_gate_revoke_epoch", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT));
         credGateAdmit = h("blockchainer_credential_gate_admit", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
         credGateFree = h("blockchainer_credential_gate_free", FunctionDescriptor.ofVoid(ADDRESS));
+        credPolicyEncodeEx = h("blockchainer_credential_policy_encode_ex", FunctionDescriptor.of(RES, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_INT, JAVA_BYTE, JAVA_BYTE));
+        membershipCommit = h("blockchainer_membership_commit", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        blindIssue = h("blockchainer_blind_issue", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_BYTE, JAVA_LONG, JAVA_INT));
+        finalizeMembership = h("blockchainer_finalize_membership", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        credPresentPseud = h("blockchainer_credential_present_pseudonymous", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        credGateAdmitPseud = h("blockchainer_credential_gate_admit_pseudonymous", FunctionDescriptor.of(RES, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
+        credGateRevokeNym = h("blockchainer_credential_gate_revoke_nym", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_LONG));
+        credGateNoteAdmission = h("blockchainer_credential_gate_note_admission", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -325,9 +335,17 @@ public final class Blockchainer implements AutoCloseable {
     public final class CredentialPolicy {
         final byte[] encoded;
         public CredentialPolicy(long chainId, byte[] issuerPublic, byte[] header, int attributeCount, int minTier) {
-            try { encoded = consume((MemorySegment) credPolicyEncode.invoke(arena.allocate(RES), chainId,
-                    seg(issuerPublic), (long) issuerPublic.length, seg(header), (long) header.length, attributeCount, (byte) minTier)); }
-            catch (Throwable e) { throw new RuntimeException(e); }
+            this(chainId, issuerPublic, header, attributeCount, minTier, 0);
+        }
+        /** mode: 0 = unlinkable (Option A), 1 = pseudonymous (Option B). */
+        public CredentialPolicy(long chainId, byte[] issuerPublic, byte[] header, int attributeCount, int minTier, int mode) {
+            try {
+                encoded = mode == 0
+                    ? consume((MemorySegment) credPolicyEncode.invoke(arena.allocate(RES), chainId,
+                        seg(issuerPublic), (long) issuerPublic.length, seg(header), (long) header.length, attributeCount, (byte) minTier))
+                    : consume((MemorySegment) credPolicyEncodeEx.invoke(arena.allocate(RES), chainId,
+                        seg(issuerPublic), (long) issuerPublic.length, seg(header), (long) header.length, attributeCount, (byte) minTier, (byte) mode));
+            } catch (Throwable e) { throw new RuntimeException(e); }
         }
         public byte[] encoded() { return encoded; }
         /** The 32-byte commitment to commit into genesis. */
@@ -348,6 +366,39 @@ public final class Blockchainer implements AutoCloseable {
                     seg(credential), (long) credential.length, epoch, arena.allocateFrom(scope), seg(challenge), (long) challenge.length)); }
             catch (Throwable e) { throw new RuntimeException(e); }
         }
+
+        // ── Option B — pseudonymous ────────────────────────────────────────────
+        /** Holder step 1: derive a nym seed and blind-commit it (holder-secret blob). */
+        public byte[] membershipCommit(byte[] memberSecret) {
+            try { return consume((MemorySegment) membershipCommit.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length,
+                    seg(memberSecret), (long) memberSecret.length)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Issuer step 2: blind-sign the holder's commitment (never sees the seed). */
+        public byte[] blindIssue(byte[] issuerSecret, byte[] commitment, int tier, long notAfter, int issuerEpoch) {
+            try { return consume((MemorySegment) blindIssue.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length,
+                    seg(issuerSecret), (long) issuerSecret.length, seg(commitment), (long) commitment.length, (byte) tier, notAfter, issuerEpoch)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Holder step 3: a per-epoch pseudonymous presentation. */
+        public byte[] presentPseudonymous(byte[] credential, int epoch, String scope, byte[] challenge) {
+            try { return consume((MemorySegment) credPresentPseud.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length,
+                    seg(credential), (long) credential.length, epoch, arena.allocateFrom(scope), seg(challenge), (long) challenge.length)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+    }
+
+    /** The commitment is the first length-prefixed field of a membership-commit blob. */
+    public static byte[] extractCommitment(byte[] membershipCommit) {
+        int n = ((membershipCommit[0] & 0xFF) << 24) | ((membershipCommit[1] & 0xFF) << 16)
+              | ((membershipCommit[2] & 0xFF) << 8) | (membershipCommit[3] & 0xFF);
+        return java.util.Arrays.copyOfRange(membershipCommit, 4, 4 + n);
+    }
+    /** Holder step 3 (assemble): finalize the pseudonymous credential (holder-secret). */
+    public byte[] finalizeMembership(byte[] membershipCommit, byte[] blindIssuance) {
+        try { return consume((MemorySegment) finalizeMembership.invoke(arena.allocate(RES),
+                seg(membershipCommit), (long) membershipCommit.length, seg(blindIssuance), (long) blindIssuance.length)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
     }
 
     /** A verifier's admission gate (holds the issuer-epoch deny-list). */
@@ -365,6 +416,23 @@ public final class Blockchainer implements AutoCloseable {
         public boolean admit(int epoch, String scope, byte[] challenge, byte[] presentation, long now) {
             try { return (int) credGateAdmit.invoke(h, epoch, arena.allocateFrom(scope), seg(challenge), (long) challenge.length,
                     seg(presentation), (long) presentation.length, now) == 1; }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Option B: admit? Returns the 48-byte pseudonym on success, or null on reject. */
+        public byte[] admitPseudonymous(int epoch, String scope, byte[] challenge, byte[] presentation, long now) {
+            try {
+                byte[] nym = consume((MemorySegment) credGateAdmitPseud.invoke(arena.allocate(RES), h, epoch, arena.allocateFrom(scope),
+                        seg(challenge), (long) challenge.length, seg(presentation), (long) presentation.length, now));
+                return nym.length == 0 ? null : nym;
+            } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** §6.2 targeted revocation of an exact pseudonym. */
+        public void revokeNym(byte[] nym) {
+            try { credGateRevokeNym.invoke(h, seg(nym), (long) nym.length); } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** §6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope). */
+        public boolean noteAdmission(int epoch, String scope, byte[] nym) {
+            try { return (int) credGateNoteAdmission.invoke(h, epoch, arena.allocateFrom(scope), seg(nym), (long) nym.length) == 1; }
             catch (Throwable e) { throw new RuntimeException(e); }
         }
         @Override public void close() { try { credGateFree.invoke(h); } catch (Throwable ignored) {} }

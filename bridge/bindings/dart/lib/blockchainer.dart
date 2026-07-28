@@ -193,6 +193,32 @@ typedef _CredGateAdmitD = int Function(
 typedef _CredGateFreeC = Void Function(Pointer<Void>);
 typedef _CredGateFreeD = void Function(Pointer<Void>);
 
+// CredentialGate Option B (pseudonymous).
+typedef _CredPolicyEncodeExC = _BufResult Function(
+    Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Uint8, Uint8);
+typedef _CredPolicyEncodeExD = _BufResult Function(
+    int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int);
+typedef _MembershipCommitC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _MembershipCommitD = _BufResult Function(Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _BlindIssueC = _BufResult Function(
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint8, Uint64, Uint32);
+typedef _BlindIssueD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int);
+typedef _FinalizeMembershipC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _FinalizeMembershipD = _BufResult Function(Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _CredPresentPseudC = _BufResult Function(
+    Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Pointer<Utf8>, Pointer<Uint8>, Size);
+typedef _CredPresentPseudD = _BufResult Function(
+    Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Uint8>, int);
+typedef _CredGateAdmitPseudC = _BufResult Function(
+    Pointer<Void>, Uint32, Pointer<Utf8>, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint64);
+typedef _CredGateAdmitPseudD = _BufResult Function(
+    Pointer<Void>, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int);
+typedef _CredGateRevokeNymC = Void Function(Pointer<Void>, Pointer<Uint8>, Size);
+typedef _CredGateRevokeNymD = void Function(Pointer<Void>, Pointer<Uint8>, int);
+typedef _CredGateNoteAdmC = Int32 Function(Pointer<Void>, Uint32, Pointer<Utf8>, Pointer<Uint8>, Size);
+typedef _CredGateNoteAdmD = int Function(Pointer<Void>, int, Pointer<Utf8>, Pointer<Uint8>, int);
+
 class BlockchainerException implements Exception {
   BlockchainerException(this.message);
   final String message;
@@ -853,20 +879,28 @@ class Blockchainer {
   }
 
   /// Canonically encode a membership [CredentialPolicy] (attributeCount must be
-  /// 4). Its [CredentialPolicy.hash] can be committed into genesis.
+  /// 4). [mode] is 0 = unlinkable (Option A, default), 1 = pseudonymous (Option
+  /// B). Its [CredentialPolicy.hash] can be committed into genesis.
   CredentialPolicy makeCredentialPolicy(
       {required int chainId,
       required Uint8List issuerPublic,
       required Uint8List header,
       int attributeCount = 4,
-      int minTier = 0}) {
+      int minTier = 0,
+      int mode = 0}) {
     final ip = _alloc(issuerPublic), hp = _alloc(header);
     try {
-      final enc = _take(
-          lib.lookupFunction<_CredPolicyEncodeC, _CredPolicyEncodeD>(
-              'blockchainer_credential_policy_encode')(
-              chainId, ip, issuerPublic.length, hp, header.length, attributeCount, minTier),
-          'credential_policy_encode');
+      final enc = mode == 0
+          ? _take(
+              lib.lookupFunction<_CredPolicyEncodeC, _CredPolicyEncodeD>(
+                  'blockchainer_credential_policy_encode')(
+                  chainId, ip, issuerPublic.length, hp, header.length, attributeCount, minTier),
+              'credential_policy_encode')
+          : _take(
+              lib.lookupFunction<_CredPolicyEncodeExC, _CredPolicyEncodeExD>(
+                  'blockchainer_credential_policy_encode_ex')(
+                  chainId, ip, issuerPublic.length, hp, header.length, attributeCount, minTier, mode),
+              'credential_policy_encode_ex');
       return CredentialPolicy._(this, enc);
     } finally {
       calloc.free(ip);
@@ -884,6 +918,22 @@ class Blockchainer {
       return CredentialGate._(this, h);
     } finally {
       calloc.free(pp);
+    }
+  }
+
+  /// Option B holder step 3: finalize the pseudonymous credential from the
+  /// membership-commit blob and the issuer's blind-issuance blob. HOLDER-SECRET.
+  Uint8List finalizeMembership(Uint8List membershipCommit, Uint8List blindIssuance) {
+    final mp = _alloc(membershipCommit), bp = _alloc(blindIssuance);
+    try {
+      return _take(
+          lib.lookupFunction<_FinalizeMembershipC, _FinalizeMembershipD>(
+              'blockchainer_finalize_membership')(
+              mp, membershipCommit.length, bp, blindIssuance.length),
+          'finalize_membership');
+    } finally {
+      calloc.free(mp);
+      calloc.free(bp);
     }
   }
 
@@ -1370,6 +1420,69 @@ class CredentialPolicy {
       calloc.free(scopeP);
     }
   }
+
+  // ── Option B — pseudonymous ──────────────────────────────────────────────
+  /// Holder step 1: derive a nym seed from [memberSecret] and blind-commit it.
+  /// The blob is HOLDER-SECRET; [extractCommitment] gives the part to send to the
+  /// issuer.
+  Uint8List membershipCommit(Uint8List memberSecret) {
+    final ep = _bc._alloc(encoded), mp = _bc._alloc(memberSecret);
+    try {
+      return _bc._take(
+          _bc.lib.lookupFunction<_MembershipCommitC, _MembershipCommitD>(
+              'blockchainer_membership_commit')(ep, encoded.length, mp, memberSecret.length),
+          'membership_commit');
+    } finally {
+      calloc.free(ep);
+      calloc.free(mp);
+    }
+  }
+
+  /// Issuer step 2: blind-sign the holder's [commitment] (never sees the seed).
+  Uint8List blindIssue(Uint8List issuerSecret, Uint8List commitment, int tier, int notAfter,
+      int issuerEpoch) {
+    final ep = _bc._alloc(encoded), sp = _bc._alloc(issuerSecret), cp = _bc._alloc(commitment);
+    try {
+      return _bc._take(
+          _bc.lib.lookupFunction<_BlindIssueC, _BlindIssueD>('blockchainer_blind_issue')(
+              ep, encoded.length, sp, issuerSecret.length, cp, commitment.length, tier, notAfter,
+              issuerEpoch),
+          'blind_issue');
+    } finally {
+      calloc.free(ep);
+      calloc.free(sp);
+      calloc.free(cp);
+    }
+  }
+
+  /// Holder step 3: a per-epoch pseudonymous presentation for ([epoch], [scope],
+  /// [challenge]).
+  Uint8List presentPseudonymous(Uint8List credential, int epoch, String scope,
+      Uint8List challenge) {
+    final ep = _bc._alloc(encoded), cp = _bc._alloc(credential), chp = _bc._alloc(challenge);
+    final scopeP = scope.toNativeUtf8();
+    try {
+      return _bc._take(
+          _bc.lib.lookupFunction<_CredPresentPseudC, _CredPresentPseudD>(
+              'blockchainer_credential_present_pseudonymous')(
+              ep, encoded.length, cp, credential.length, epoch, scopeP, chp, challenge.length),
+          'credential_present_pseudonymous');
+    } finally {
+      calloc.free(ep);
+      calloc.free(cp);
+      calloc.free(chp);
+      calloc.free(scopeP);
+    }
+  }
+}
+
+/// The commitment is the first length-prefixed field of a membership-commit blob.
+Uint8List extractCommitment(Uint8List membershipCommit) {
+  final n = (membershipCommit[0] << 24) |
+      (membershipCommit[1] << 16) |
+      (membershipCommit[2] << 8) |
+      membershipCommit[3];
+  return Uint8List.sublistView(membershipCommit, 4, 4 + n);
 }
 
 /// A verifier's anonymous-membership admission gate (Option A — unlinkable). It
@@ -1400,6 +1513,52 @@ class CredentialGate {
     } finally {
       calloc.free(chp);
       calloc.free(pp);
+      calloc.free(scopeP);
+    }
+  }
+
+  // ── Option B — pseudonymous ──────────────────────────────────────────────
+  /// Admit? Returns the 48-byte pseudonym on success, or null on any reject.
+  /// Never throws.
+  Uint8List? admitPseudonymous(
+      int epoch, String scope, Uint8List challenge, Uint8List presentation, int now) {
+    final chp = _bc._alloc(challenge), pp = _bc._alloc(presentation);
+    final scopeP = scope.toNativeUtf8();
+    try {
+      final nym = _bc._take(
+          _bc.lib.lookupFunction<_CredGateAdmitPseudC, _CredGateAdmitPseudD>(
+              'blockchainer_credential_gate_admit_pseudonymous')(
+              _h, epoch, scopeP, chp, challenge.length, pp, presentation.length, now),
+          'admit_pseudonymous');
+      return nym.isEmpty ? null : nym;
+    } finally {
+      calloc.free(chp);
+      calloc.free(pp);
+      calloc.free(scopeP);
+    }
+  }
+
+  /// §6.2 targeted revocation of an exact pseudonym.
+  void revokeNym(Uint8List nym) {
+    final np = _bc._alloc(nym);
+    try {
+      _bc.lib.lookupFunction<_CredGateRevokeNymC, _CredGateRevokeNymD>(
+          'blockchainer_credential_gate_revoke_nym')(_h, np, nym.length);
+    } finally {
+      calloc.free(np);
+    }
+  }
+
+  /// §6.3 Sybil cap: record an admitted [nym]; true if first this ([epoch], [scope]).
+  bool noteAdmission(int epoch, String scope, Uint8List nym) {
+    final np = _bc._alloc(nym);
+    final scopeP = scope.toNativeUtf8();
+    try {
+      return _bc.lib.lookupFunction<_CredGateNoteAdmC, _CredGateNoteAdmD>(
+              'blockchainer_credential_gate_note_admission')(_h, epoch, scopeP, np, nym.length) ==
+          1;
+    } finally {
+      calloc.free(np);
       calloc.free(scopeP);
     }
   }

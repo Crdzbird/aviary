@@ -249,8 +249,22 @@
   → different nym, anti-replay, expiry, tier, targeted + bulk revocation,
   forged-issuer / malformed fail closed. 62 C++ suites, ASan-clean; Go binding
   still green (policy `mode` byte round-trips as default 0). Option A stays the
-  unlinkable mode; the policy selects. **Remaining:** surface Option B through the
-  C ABI + 5 bindings (follow-on, as Option A was).
+  unlinkable mode; the policy selects. **Surfaced through the C ABI + ALL 5
+  BINDINGS:** `blockchainer_credential_policy_encode_ex(…, mode)` +
+  `_membership_commit` / `_blind_issue` / `_finalize_membership` (3-step blind
+  issuance; the membership-commit blob's first length-prefixed field is the
+  commitment sent to the issuer) + `_credential_present_pseudonymous` +
+  `_credential_gate_admit_pseudonymous` (returns the 48-byte nym, empty buffer on
+  reject) + `_revoke_nym` / `_note_admission`. Go / npm / JVM / Swift / Dart each
+  gain the pseudonymous flow + a test that drives blind issuance → per-(epoch,
+  scope) pseudonym determinism → Sybil cap → cross-epoch unlinkability →
+  revocation → the reject set. GOTCHA: the Swift demo lazy-bind-crashed because
+  the vendored `CryptoLibC.xcframework` (macOS slice) predated the new cryptolib
+  BBS symbols — fixed by rebuilding cryptolib's macOS slice
+  (`scripts/ios/build_all.sh macosx`) and re-vendoring it into
+  `cryptolib_flutter/{ios,macos}`; then the dynamic blockchainer xcframework
+  rebuild picked it up. **The entire CredentialGate feature (Option A + B) is now
+  end-to-end across all five bindings.**
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

@@ -110,6 +110,15 @@ function ensureLoaded() {
     credGateRevoke: f('void blockchainer_credential_gate_revoke_epoch(void*, uint32_t)'),
     credGateAdmit: f('int blockchainer_credential_gate_admit(void*, uint32_t, const char*, uint8_t*, size_t, uint8_t*, size_t, uint64_t)'),
     credGateFree: f('void blockchainer_credential_gate_free(void*)'),
+    // CredentialGate Option B (pseudonymous)
+    credPolicyEncodeEx: f('BlockchainerBufferResult blockchainer_credential_policy_encode_ex(uint64_t, uint8_t*, size_t, uint8_t*, size_t, uint32_t, uint8_t, uint8_t)'),
+    membershipCommit: f('BlockchainerBufferResult blockchainer_membership_commit(uint8_t*, size_t, uint8_t*, size_t)'),
+    blindIssue: f('BlockchainerBufferResult blockchainer_blind_issue(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t, uint64_t, uint32_t)'),
+    finalizeMembership: f('BlockchainerBufferResult blockchainer_finalize_membership(uint8_t*, size_t, uint8_t*, size_t)'),
+    credPresentPseud: f('BlockchainerBufferResult blockchainer_credential_present_pseudonymous(uint8_t*, size_t, uint8_t*, size_t, uint32_t, const char*, uint8_t*, size_t)'),
+    credGateAdmitPseud: f('BlockchainerBufferResult blockchainer_credential_gate_admit_pseudonymous(void*, uint32_t, const char*, uint8_t*, size_t, uint8_t*, size_t, uint64_t)'),
+    credGateRevokeNym: f('void blockchainer_credential_gate_revoke_nym(void*, uint8_t*, size_t)'),
+    credGateNoteAdmission: f('int blockchainer_credential_gate_note_admission(void*, uint32_t, const char*, uint8_t*, size_t)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -325,9 +334,13 @@ class Ceremony {
 // to a role by proving in zero knowledge it holds an issuer-signed credential
 // whose tier clears the policy and whose expiry has not passed.
 class CredentialPolicy {
-  constructor(chainId, issuerPublic, header, attributeCount = 4, minTier = 0) {
-    this.encoded = consume(fn.credPolicyEncode(BigInt(chainId), u8(issuerPublic), u8(issuerPublic).length,
-      u8(header), u8(header).length, attributeCount, minTier), 'credential_policy_encode');
+  // mode: 0 = unlinkable (Option A, default), 1 = pseudonymous (Option B).
+  constructor(chainId, issuerPublic, header, attributeCount = 4, minTier = 0, mode = 0) {
+    this.encoded = mode === 0
+      ? consume(fn.credPolicyEncode(BigInt(chainId), u8(issuerPublic), u8(issuerPublic).length,
+          u8(header), u8(header).length, attributeCount, minTier), 'credential_policy_encode')
+      : consume(fn.credPolicyEncodeEx(BigInt(chainId), u8(issuerPublic), u8(issuerPublic).length,
+          u8(header), u8(header).length, attributeCount, minTier, mode), 'credential_policy_encode_ex');
   }
   // 32-byte commitment to commit into genesis.
   hash() { return consume(fn.credPolicyHash(this.encoded, this.encoded.length), 'credential_policy_hash'); }
@@ -341,6 +354,35 @@ class CredentialPolicy {
     return consume(fn.credPresent(this.encoded, this.encoded.length, u8(credential), u8(credential).length,
       epoch, scope, u8(challenge), u8(challenge).length), 'credential_present');
   }
+
+  // ── Option B — pseudonymous (per-epoch Sybil resistance) ───────────────────
+  // Holder step 1: derive a nym seed from memberSecret and blind-commit it. The
+  // returned blob is holder-secret; extractCommitment(blob) is sent to the issuer.
+  membershipCommit(memberSecret) {
+    return consume(fn.membershipCommit(this.encoded, this.encoded.length,
+      u8(memberSecret), u8(memberSecret).length), 'membership_commit');
+  }
+  // Issuer step 2: blind-sign the holder's commitment (issuer never sees the seed).
+  blindIssue(issuerSecret, commitment, tier, notAfter, issuerEpoch) {
+    return consume(fn.blindIssue(this.encoded, this.encoded.length, u8(issuerSecret), u8(issuerSecret).length,
+      u8(commitment), u8(commitment).length, tier, BigInt(notAfter), issuerEpoch), 'blind_issue');
+  }
+  // Holder step 3: an unlinkable-per-epoch pseudonymous presentation.
+  presentPseudonymous(credential, epoch, scope, challenge) {
+    return consume(fn.credPresentPseud(this.encoded, this.encoded.length, u8(credential), u8(credential).length,
+      epoch, scope, u8(challenge), u8(challenge).length), 'credential_present_pseudonymous');
+  }
+}
+// The commitment is the first length-prefixed field of a membership-commit blob.
+function extractCommitment(membershipCommit) {
+  const b = u8(membershipCommit);
+  const n = (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+  return b.subarray(4, 4 + n);
+}
+// Holder step 3 (assemble): finalize the pseudonymous credential (holder-secret).
+function finalizeMembership(membershipCommit, blindIssuance) {
+  return consume(fn.finalizeMembership(u8(membershipCommit), u8(membershipCommit).length,
+    u8(blindIssuance), u8(blindIssuance).length), 'finalize_membership');
 }
 class CredentialGate {
   constructor(policy) { this._h = fn.credGateNew(policy.encoded, policy.encoded.length); }
@@ -349,6 +391,18 @@ class CredentialGate {
   admit(epoch, scope, challenge, presentation, now) {
     return fn.credGateAdmit(this._h, epoch, scope, u8(challenge), u8(challenge).length,
       u8(presentation), u8(presentation).length, BigInt(now)) === 1;
+  }
+  // Option B: admit? Returns the 48-byte pseudonym on success, or null on reject.
+  admitPseudonymous(epoch, scope, challenge, presentation, now) {
+    const nym = consume(fn.credGateAdmitPseud(this._h, epoch, scope, u8(challenge), u8(challenge).length,
+      u8(presentation), u8(presentation).length, BigInt(now)), 'admit_pseudonymous');
+    return nym.length === 0 ? null : nym;
+  }
+  // §6.2 targeted revocation of an exact pseudonym.
+  revokeNym(nym) { fn.credGateRevokeNym(this._h, u8(nym), u8(nym).length); }
+  // §6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope).
+  noteAdmission(epoch, scope, nym) {
+    return fn.credGateNoteAdmission(this._h, epoch, scope, u8(nym), u8(nym).length) === 1;
   }
   free() { fn.credGateFree(this._h); }
 }
@@ -419,6 +473,9 @@ module.exports = {
   newBBSIssuer: (keyMaterial) => splitBlob(consume(fn.bbsKeygen(u8(keyMaterial), u8(keyMaterial).length), 'bbs_keygen')),
   CredentialPolicy,
   CredentialGate,
+  extractCommitment,
+  finalizeMembership,
+  CredentialModePseudonymous: 1,
 
   commit(card) {
     const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');
