@@ -469,6 +469,132 @@ bool bbs_proof_verify(ByteView pk, ByteView proof, ByteView header, ByteView ph,
                                     disclosed_indexes.size()) == 1;
 }
 
+// ── BBS per-verifier pseudonyms + blind issuance ─────────────────────────────
+
+namespace {
+// Split a flat buffer of concatenated 32-byte scalars into a vector of scalars.
+std::vector<Bytes> split_scalars(const Bytes& flat) {
+  std::vector<Bytes> out;
+  for (std::size_t off = 0; off + 32 <= flat.size(); off += 32)
+    out.emplace_back(flat.begin() + off, flat.begin() + off + 32);
+  return out;
+}
+
+// A CryptoBufferResult return + a CryptoBuffer out-param, checked and taken.
+[[noreturn]] void throw_result(CryptoBufferResult& r, const char* op) {
+  std::string m = r.error ? r.error : std::string(op) + " failed";
+  if (r.error) cryptolib_str_free(r.error);
+  throw std::runtime_error(m);
+}
+}  // namespace
+
+BbsCommitment bbs_commit_with_nym(const std::vector<Bytes>& committed_msgs,
+                                  const std::vector<Bytes>& prover_nyms) {
+  MsgArrays c = msg_arrays(committed_msgs);
+  MsgArrays n = msg_arrays(prover_nyms);
+  CryptoBuffer spb{};
+  CryptoBufferResult r = cryptolib_bbs_commit_with_nym(c.ptrs.data(), c.lens.data(), c.ptrs.size(),
+                                                       n.ptrs.data(), n.lens.data(), n.ptrs.size(),
+                                                       &spb);
+  if (r.buf.data == nullptr) throw_result(r, "bbs_commit_with_nym");
+  return BbsCommitment{take_buffer(r.buf), take_buffer(spb)};
+}
+
+Bytes bbs_blind_sign_with_nym(ByteView sk, ByteView pk, ByteView commitment, ByteView header,
+                              const std::vector<Bytes>& msgs, ByteView signer_nym_entropy,
+                              std::uint64_t length_nym_vector) {
+  MsgArrays m = msg_arrays(msgs);
+  CryptoBufferResult r = cryptolib_bbs_blind_sign_with_nym(
+      sk.data(), sk.size(), pk.data(), pk.size(), commitment.data(), commitment.size(),
+      header.data(), header.size(), m.ptrs.data(), m.lens.data(), m.ptrs.size(),
+      signer_nym_entropy.data(), signer_nym_entropy.size(), length_nym_vector);
+  if (r.buf.data == nullptr) throw_result(r, "bbs_blind_sign_with_nym");
+  return take_buffer(r.buf);
+}
+
+std::vector<Bytes> bbs_finalize_nym_secrets(const std::vector<Bytes>& prover_nyms,
+                                            ByteView signer_nym_entropy) {
+  MsgArrays n = msg_arrays(prover_nyms);
+  CryptoBufferResult r = cryptolib_bbs_finalize_nym_secrets(
+      n.ptrs.data(), n.lens.data(), n.ptrs.size(), signer_nym_entropy.data(),
+      signer_nym_entropy.size());
+  if (r.buf.data == nullptr) throw_result(r, "bbs_finalize_nym_secrets");
+  return split_scalars(take_buffer(r.buf));
+}
+
+Bytes bbs_calculate_pseudonym(ByteView context_id, const std::vector<Bytes>& nym_secrets) {
+  MsgArrays n = msg_arrays(nym_secrets);
+  CryptoBufferResult r = cryptolib_bbs_calculate_pseudonym(
+      context_id.data(), context_id.size(), n.ptrs.data(), n.lens.data(), n.ptrs.size());
+  if (r.buf.data == nullptr) throw_result(r, "bbs_calculate_pseudonym");
+  return take_buffer(r.buf);
+}
+
+BbsPseudonymProof bbs_proof_gen_with_pseudonym(
+    ByteView pk, ByteView signature, ByteView header, ByteView ph, ByteView context_id,
+    const std::vector<Bytes>& signer_msgs, const std::vector<Bytes>& committed_msgs,
+    ByteView secret_prover_blind, const std::vector<Bytes>& nym_secrets,
+    const std::vector<std::uint64_t>& disclosed_signer_indexes,
+    const std::vector<std::uint64_t>& disclosed_committed_indexes) {
+  MsgArrays s = msg_arrays(signer_msgs);
+  MsgArrays c = msg_arrays(committed_msgs);
+  MsgArrays n = msg_arrays(nym_secrets);
+  CryptoBuffer nym_out{};
+  CryptoBufferResult r = cryptolib_bbs_proof_gen_with_pseudonym(
+      pk.data(), pk.size(), signature.data(), signature.size(), header.data(), header.size(),
+      ph.data(), ph.size(), context_id.data(), context_id.size(), s.ptrs.data(), s.lens.data(),
+      s.ptrs.size(), c.ptrs.data(), c.lens.data(), c.ptrs.size(), secret_prover_blind.data(),
+      secret_prover_blind.size(), n.ptrs.data(), n.lens.data(), n.ptrs.size(),
+      disclosed_signer_indexes.data(), disclosed_signer_indexes.size(),
+      disclosed_committed_indexes.data(), disclosed_committed_indexes.size(), &nym_out);
+  if (r.buf.data == nullptr) throw_result(r, "bbs_proof_gen_with_pseudonym");
+  return BbsPseudonymProof{take_buffer(r.buf), take_buffer(nym_out)};
+}
+
+bool bbs_proof_verify_with_pseudonym(ByteView pk, ByteView proof, ByteView header, ByteView ph,
+                                     ByteView context_id, ByteView pseudonym, std::uint64_t L,
+                                     std::uint64_t length_nym_vector,
+                                     const std::vector<Bytes>& disclosed_msgs,
+                                     const std::vector<std::uint64_t>& disclosed_indexes) {
+  MsgArrays d = msg_arrays(disclosed_msgs);
+  return cryptolib_bbs_proof_verify_with_pseudonym(
+             pk.data(), pk.size(), proof.data(), proof.size(), header.data(), header.size(),
+             ph.data(), ph.size(), context_id.data(), context_id.size(), pseudonym.data(),
+             pseudonym.size(), L, length_nym_vector, d.ptrs.data(), d.lens.data(), d.ptrs.size(),
+             disclosed_indexes.data(), disclosed_indexes.size()) == 1;
+}
+
+BbsCommitment bbs_blind_commit(const std::vector<Bytes>& committed_msgs) {
+  MsgArrays c = msg_arrays(committed_msgs);
+  CryptoBuffer spb{};
+  CryptoBufferResult r =
+      cryptolib_bbs_blind_commit(c.ptrs.data(), c.lens.data(), c.ptrs.size(), &spb);
+  if (r.buf.data == nullptr) throw_result(r, "bbs_blind_commit");
+  return BbsCommitment{take_buffer(r.buf), take_buffer(spb)};
+}
+
+Bytes bbs_blind_sign(ByteView sk, ByteView pk, ByteView commitment, ByteView header,
+                     const std::vector<Bytes>& msgs) {
+  MsgArrays m = msg_arrays(msgs);
+  CryptoBufferResult r = cryptolib_bbs_blind_sign(sk.data(), sk.size(), pk.data(), pk.size(),
+                                                  commitment.data(), commitment.size(),
+                                                  header.data(), header.size(), m.ptrs.data(),
+                                                  m.lens.data(), m.ptrs.size());
+  if (r.buf.data == nullptr) throw_result(r, "bbs_blind_sign");
+  return take_buffer(r.buf);
+}
+
+bool bbs_verify_blind_sign(ByteView pk, ByteView signature, ByteView header,
+                           const std::vector<Bytes>& msgs, const std::vector<Bytes>& committed_msgs,
+                           ByteView secret_prover_blind) {
+  MsgArrays m = msg_arrays(msgs);
+  MsgArrays c = msg_arrays(committed_msgs);
+  return cryptolib_bbs_verify_blind_sign(pk.data(), pk.size(), signature.data(), signature.size(),
+                                         header.data(), header.size(), m.ptrs.data(), m.lens.data(),
+                                         m.ptrs.size(), c.ptrs.data(), c.lens.data(), c.ptrs.size(),
+                                         secret_prover_blind.data(), secret_prover_blind.size()) == 1;
+}
+
 // ── BLS12-381 ────────────────────────────────────────────────────────────────
 
 KeyPair bls_keygen_from_ikm(ByteView ikm) {

@@ -208,9 +208,27 @@
   chain identity, round-trips hash-stable, reconstructs the exact policy, builds a
   working gate from genesis, and proves orthogonality (fortress+permissionless,
   standard+permissioned). Go + Dart golden vectors still replay (genesis encoding
-  changed; tx/block/proof vectors unaffected); ASan-clean. **All unblocked
-  CredentialGate work is now DONE** — only Option B (per-epoch pseudonym) remains,
-  blocked on the filed cryptolib BBS-pseudonym primitive.
+  changed; tx/block/proof vectors unaffected); ASan-clean.
+- **Option B — cryptolib primitive shipped; crypto seam DONE (Increment 1).** The
+  filed requests landed (`Crdzbird/CryptoLib#3`/#4,
+  `draft-irtf-cfrg-bbs-per-verifier-linkability-02`, pseudonyms **coupled with
+  blind issuance** — the seed is committed blindly so the issuer never learns it).
+  Relinked against the rebuilt cryptolib and wrapped all 9 new functions in
+  `crypto::bbs_*`: `bbs_commit_with_nym` / `bbs_blind_sign_with_nym` /
+  `bbs_finalize_nym_secrets` / `bbs_calculate_pseudonym` /
+  `bbs_proof_gen_with_pseudonym` / `bbs_proof_verify_with_pseudonym` + standalone
+  `bbs_blind_commit` / `bbs_blind_sign` / `bbs_verify_blind_sign`.
+  `test_bbs_pseudonym.cpp` proves the blind issuance → finalize → pseudonym →
+  proof → verify round-trip, plus the security invariants: **same context → same
+  pseudonym** (Sybil-linkable within a scope), **different context → unlinkable**,
+  a fresh seed → a different pseudonym, wrong-context / tampered-nym / wrong-blind
+  all fail closed. **Gotcha (documented in the seam):** nym / entropy scalars must
+  be canonical (< the BLS12-381 order r) — cryptolib does not reduce them, so a
+  non-canonical scalar silently breaks the round-trip; the round-trip flow itself
+  is byte-exact against cryptolib's own reference vectors. 61 C++ suites, ASan-
+  clean, Go binding still green against the new lib. **Next (Increment 2):**
+  `CredentialGate` Option B — blind interactive issuance + pseudonym-bound
+  present/admit (admit returns the nym → per-epoch nym deny-list + Sybil cap).
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

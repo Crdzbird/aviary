@@ -259,6 +259,89 @@ bool bbs_proof_verify(ByteView pk, ByteView proof, ByteView header, ByteView ph,
                       const std::vector<Bytes>& disclosed_msgs,
                       const std::vector<std::uint64_t>& disclosed_indexes);
 
+// ── BBS per-verifier pseudonyms + blind issuance ─────────────────────────────
+// draft-irtf-cfrg-bbs-per-verifier-linkability-02. The pseudonym seed is
+// committed BLINDLY at issuance (the issuer never learns it), so a holder derives
+// a deterministic, per-context pseudonym: same holder + same context → the SAME
+// pseudonym (Sybil-resistant within a scope), different context → an unlinkable
+// one. This is the primitive CredentialGate Option B is built on. A pseudonym is
+// a 48-byte compressed G1 point.
+//
+// SCALAR CONSTRAINT: every nym / entropy scalar (prover_nyms, signer_nym_entropy,
+// nym_secrets) is a 32-byte BIG-ENDIAN value that MUST be canonical — strictly
+// less than the BLS12-381 scalar-field order r. The backend does NOT reduce them,
+// so a non-canonical scalar silently breaks the round-trip. Derive nym seeds so
+// they land in [0, r) (e.g. a hash-to-scalar, or clearing enough high bits).
+
+/// A blind commitment: [commitment] (send to the issuer) + [secret_prover_blind]
+/// (32 B, the holder keeps to finalize / prove).
+struct BbsCommitment {
+  Bytes commitment;
+  Bytes secret_prover_blind;
+};
+
+/// Holder: commit to [committed_msgs] + [prover_nyms] (scalars the issuer must
+/// not learn). Throws on backend failure.
+BbsCommitment bbs_commit_with_nym(const std::vector<Bytes>& committed_msgs,
+                                  const std::vector<Bytes>& prover_nyms);
+
+/// Issuer: blind-sign the [commitment] + own [msgs], mixing [signer_nym_entropy]
+/// into the last nym slot. [length_nym_vector] = number of nym scalars. → 80-byte
+/// signature. Throws on failure.
+Bytes bbs_blind_sign_with_nym(ByteView sk, ByteView pk, ByteView commitment, ByteView header,
+                              const std::vector<Bytes>& msgs, ByteView signer_nym_entropy,
+                              std::uint64_t length_nym_vector);
+
+/// Holder: finalize the nym secrets = [prover_nyms] with the last element +=
+/// [signer_nym_entropy]. Returns one 32-byte scalar per nym. Throws on failure.
+std::vector<Bytes> bbs_finalize_nym_secrets(const std::vector<Bytes>& prover_nyms,
+                                            ByteView signer_nym_entropy);
+
+/// The deterministic 48-byte pseudonym for [context_id] under [nym_secrets].
+/// Throws on failure.
+Bytes bbs_calculate_pseudonym(ByteView context_id, const std::vector<Bytes>& nym_secrets);
+
+/// A pseudonym-bound selective-disclosure proof + the 48-byte pseudonym it binds.
+struct BbsPseudonymProof {
+  Bytes proof;
+  Bytes pseudonym;
+};
+
+/// Holder: a pseudonym-bound proof over [signer_msgs] + [committed_msgs] for
+/// [context_id], revealing the chosen signer / committed indexes (each 0-based
+/// into its own vector). Throws on failure.
+BbsPseudonymProof bbs_proof_gen_with_pseudonym(
+    ByteView pk, ByteView signature, ByteView header, ByteView ph, ByteView context_id,
+    const std::vector<Bytes>& signer_msgs, const std::vector<Bytes>& committed_msgs,
+    ByteView secret_prover_blind, const std::vector<Bytes>& nym_secrets,
+    const std::vector<std::uint64_t>& disclosed_signer_indexes,
+    const std::vector<std::uint64_t>& disclosed_committed_indexes);
+
+/// Verifier: check a pseudonym-bound proof. [disclosed_msgs]/[disclosed_indexes]
+/// are the COMBINED signer+committed disclosures — a committed index j is passed
+/// as j + [L] + 1, where [L] is the number of signer messages;
+/// [length_nym_vector] is the number of nym scalars. Never throws — false on any
+/// failure.
+bool bbs_proof_verify_with_pseudonym(ByteView pk, ByteView proof, ByteView header, ByteView ph,
+                                     ByteView context_id, ByteView pseudonym, std::uint64_t L,
+                                     std::uint64_t length_nym_vector,
+                                     const std::vector<Bytes>& disclosed_msgs,
+                                     const std::vector<std::uint64_t>& disclosed_indexes);
+
+// Standalone blind issuance (draft-irtf-cfrg-bbs-blind-signatures-02, no
+// pseudonyms): the holder hides [committed_msgs] from the signer.
+
+/// Holder: commit to [committed_msgs] (the signer never learns them).
+BbsCommitment bbs_blind_commit(const std::vector<Bytes>& committed_msgs);
+/// Signer: blind-sign the [commitment] + own [msgs] → 80-byte signature.
+Bytes bbs_blind_sign(ByteView sk, ByteView pk, ByteView commitment, ByteView header,
+                     const std::vector<Bytes>& msgs);
+/// Verify a blind signature over [msgs] + [committed_msgs] with the holder's
+/// [secret_prover_blind]. Never throws — false on any failure.
+bool bbs_verify_blind_sign(ByteView pk, ByteView signature, ByteView header,
+                           const std::vector<Bytes>& msgs, const std::vector<Bytes>& committed_msgs,
+                           ByteView secret_prover_blind);
+
 // ── BLS12-381 (consensus votes; ARCHITECTURE §7) ─────────────────────────────
 
 /// Deterministic BLS keypair from input key material (>= 32 bytes).
