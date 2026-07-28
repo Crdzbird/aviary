@@ -246,6 +246,7 @@ blockchainer_add_test(test_remote_guard tests/test_remote_guard.cpp)
 blockchainer_add_test(test_bbs tests/test_bbs.cpp)
 blockchainer_add_test(test_bbs_pseudonym tests/test_bbs_pseudonym.cpp)
 blockchainer_add_test(test_credential_gate tests/test_credential_gate.cpp)
+blockchainer_add_test(test_credential_gate_pseudonym tests/test_credential_gate_pseudonym.cpp)
 blockchainer_add_test(test_admission tests/test_admission.cpp)
 blockchainer_add_test(test_admission_socket tests/test_admission_socket.cpp)
 

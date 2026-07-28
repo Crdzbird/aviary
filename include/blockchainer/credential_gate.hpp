@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "blockchainer/crypto.hpp"
@@ -20,15 +22,21 @@ struct GenesisSpec;
 /// whose `tier` clears a policy threshold and whose expiry has not passed —
 /// revealing nothing else (not its identity, not any other attribute).
 ///
-/// This is **Option A — unlinkable** (CREDENTIAL_GATE.md §3.1, §12.2): two
-/// presentations from the same credential are cryptographically unlinkable. That
-/// is maximal privacy but only *weak* Sybil resistance (one credential can back
-/// many "distinct" presentations); the per-connection challenge + the tx's own
-/// signature/nonce bound abuse in practice. Real (per-epoch) Sybil resistance is
-/// **Option B**, which is blocked on an upstream cryptolib BBS-pseudonym
-/// primitive (docs/CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md) and lands as a thin
-/// extension here the day that primitive exists — the attribute schema already
-/// reserves index 0 for the `member_secret` a pseudonym is derived from.
+/// Two modes (CREDENTIAL_GATE.md §3), selected by [CredentialPolicy::mode]:
+///
+/// **Option A — unlinkable** (§3.1, §12.2): two presentations from the same
+/// credential are cryptographically unlinkable. Maximal privacy, but only *weak*
+/// Sybil resistance (one credential can back many "distinct" presentations).
+/// Functions: `issue_credential` / `CredentialGate::present` / `admit`.
+///
+/// **Option B — pseudonymous** (§3.2): each presentation carries a deterministic
+/// per-(epoch, scope) pseudonym derived from a holder seed the issuer never sees
+/// (blind BBS issuance). Same member + same epoch + scope → the SAME pseudonym
+/// (real Sybil resistance + targeted per-epoch revocation), a different epoch →
+/// an unlinkable one. The seed is `bbs_hash_to_scalar(member_secret)`. Functions:
+/// `membership_commit` → `blind_issue` → `finalize_membership` (the 3-step blind
+/// protocol), then `present_pseudonymous` / `admit_pseudonymous` (which returns
+/// the pseudonym for Sybil-cap / nym-revocation bookkeeping).
 namespace blockchainer::consensus {
 
 /// The fixed attribute layout the issuer signs (CREDENTIAL_GATE.md §4). The
@@ -55,12 +63,19 @@ inline std::uint32_t membership_epoch(std::uint64_t height, std::uint32_t epoch_
 /// the issuer, schema, and threshold — see CREDENTIAL_GATE.md §7. (Wiring it into
 /// GenesisSpec is deferred pending the §10.4 schema decision; the policy stands
 /// alone and hashable until then.)
+/// Which admission mode a chain uses (committed in the policy, hence in genesis).
+enum class CredentialMode : std::uint8_t {
+  kUnlinkable = 0,    ///< Option A — bare BBS, unlinkable presentations
+  kPseudonymous = 1,  ///< Option B — per-(epoch, scope) pseudonym, Sybil-resistant
+};
+
 struct CredentialPolicy {
   std::uint64_t chain_id = 0;         ///< the chain this policy governs
   Bytes issuer_public_key;            ///< 96-byte BBS public key of the credential issuer
   Bytes header;                       ///< BBS issuance-domain header (a fixed domain string)
   std::uint32_t attribute_count = credential_attr::kBaseCount;  ///< total signed attributes (>= 4)
   std::uint8_t min_tier = 0;          ///< admit iff disclosed tier >= min_tier
+  CredentialMode mode = CredentialMode::kUnlinkable;  ///< which admission mode (§3)
 
   /// Canonical encoding (docs/CODEC_SPEC.md conventions).
   Bytes encode() const;
@@ -101,6 +116,47 @@ Credential issue_credential(const CredentialPolicy& policy, crypto::ByteView iss
                             std::uint64_t not_after, std::uint32_t issuer_epoch,
                             const std::vector<Bytes>& extra = {});
 
+// ── Option B — pseudonymous, blind issuance (§3.2, §5) ───────────────────────
+
+/// Holder side, step 1: derive a stable nym seed from [member_secret]
+/// (`bbs_hash_to_scalar`, so the same member always gets the same seed) and
+/// blind-commit it. Send [commitment] to the issuer; keep [nym_seed] and
+/// [secret_prover_blind] secret to finalize. Throws on backend failure.
+struct MembershipCommitment {
+  Bytes commitment;           ///< send to the issuer
+  Bytes nym_seed;             ///< holder secret (a canonical scalar)
+  Bytes secret_prover_blind;  ///< holder secret
+};
+MembershipCommitment membership_commit(const CredentialPolicy& policy,
+                                       crypto::ByteView member_secret);
+
+/// Issuer side, step 2: blind-sign the holder's [commitment] with the issuer-set
+/// attributes, contributing fresh nym entropy (so neither party alone fixes the
+/// pseudonym). The issuer never learns the seed. Throws on backend failure.
+struct BlindIssuance {
+  Bytes signature;             ///< 80-byte BBS signature
+  Bytes entropy;              ///< the issuer's nym entropy (the holder needs it to finalize)
+  std::uint8_t tier = 0;      ///< the issuer-set attributes, echoed for the holder
+  std::uint64_t not_after = 0;
+  std::uint32_t issuer_epoch = 0;
+};
+BlindIssuance blind_issue(const CredentialPolicy& policy, crypto::ByteView issuer_secret_key,
+                          crypto::ByteView commitment, std::uint8_t tier, std::uint64_t not_after,
+                          std::uint32_t issuer_epoch);
+
+/// Holder side, step 3: finalize the nym secrets and assemble the credential.
+/// Holder-secret — store sealed at rest. Throws on backend failure.
+struct PseudonymousCredential {
+  Bytes signature;
+  std::uint8_t tier = 0;
+  std::uint64_t not_after = 0;
+  std::uint32_t issuer_epoch = 0;
+  std::vector<Bytes> nym_secrets;   ///< holder secret
+  Bytes secret_prover_blind;        ///< holder secret
+};
+PseudonymousCredential finalize_membership(const MembershipCommitment& commit,
+                                           const BlindIssuance& issued);
+
 /// The admission gate. Holder-side [present] and verifier-side [admit] both bind
 /// the presentation to (chain_id, epoch, scope, challenge) so a proof made for
 /// one context never verifies in another.
@@ -128,6 +184,39 @@ class CredentialGate {
   bool admit(std::uint32_t epoch, std::string_view scope, crypto::ByteView challenge,
              crypto::ByteView presentation, std::uint64_t now) const;
 
+  // ── Option B — pseudonymous (§3.2, §6) ─────────────────────────────────────
+
+  /// Holder side: build a pseudonymous presentation for [challenge] in [scope].
+  /// Discloses {tier, not_after, issuer_epoch}; carries a per-(chain, epoch,
+  /// scope) pseudonym stable across this member's presentations in that context.
+  /// Throws on backend failure.
+  static Bytes present_pseudonymous(const CredentialPolicy& policy,
+                                    const PseudonymousCredential& cred, std::uint32_t epoch,
+                                    std::string_view scope, crypto::ByteView challenge);
+
+  /// Verifier side: admit? Runs the §6 checklist (proof + expiry + issuer-epoch
+  /// revocation + tier + nym not revoked). On success returns the disclosed
+  /// **pseudonym** (for Sybil-cap / revocation bookkeeping); std::nullopt on any
+  /// reject. Never throws. Pure — enforce the Sybil cap on the returned nym via
+  /// [note_admission].
+  std::optional<Bytes> admit_pseudonymous(std::uint32_t epoch, std::string_view scope,
+                                          crypto::ByteView challenge, crypto::ByteView presentation,
+                                          std::uint64_t now) const;
+
+  /// Targeted revocation (§6.2): refuse this exact pseudonym. Because a nym is
+  /// stable only within an epoch+scope, a persistent ban must be re-applied as
+  /// the offender's nym changes each epoch.
+  void revoke_nym(crypto::ByteView nym) { revoked_nyms_.emplace(nym.begin(), nym.end()); }
+  bool nym_revoked(crypto::ByteView nym) const {
+    return revoked_nyms_.count(Bytes(nym.begin(), nym.end())) != 0;
+  }
+
+  /// Sybil cap (§6.3): record an admitted [nym] for ([epoch], [scope]) and report
+  /// whether this is the FIRST session on it — a false means a second distinct
+  /// session is claiming an already-admitted pseudonym (the caller rate-limits or
+  /// refuses). Mutating; call once per accepted session.
+  bool note_admission(std::uint32_t epoch, std::string_view scope, crypto::ByteView nym);
+
   /// Bulk revocation: refuse every credential from [epoch] (§6.1).
   void revoke_issuer_epoch(std::uint32_t epoch) { revoked_epochs_.insert(epoch); }
   bool issuer_epoch_revoked(std::uint32_t epoch) const { return revoked_epochs_.count(epoch) != 0; }
@@ -135,6 +224,8 @@ class CredentialGate {
  private:
   CredentialPolicy policy_;
   std::set<std::uint32_t> revoked_epochs_;
+  std::set<Bytes> revoked_nyms_;
+  std::set<std::pair<std::pair<std::uint32_t, std::string>, Bytes>> admitted_;  // (epoch,scope)→nym
 };
 
 }  // namespace blockchainer::consensus

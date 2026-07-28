@@ -232,9 +232,25 @@
   nym seed the clean way — `nym_seed = bbs_hash_to_scalar(member_secret, dst)`
   (deterministic, canonical, so the same member → the same per-context pseudonym)
   and takes issuer entropy from `bbs_random_scalar()` — no more high-bit clamping.
-  **Next (Increment 2):** `CredentialGate` Option B — blind interactive issuance +
-  pseudonym-bound present/admit (admit returns the nym → per-epoch nym deny-list +
-  Sybil cap).
+- **Option B — pseudonymous CredentialGate DONE (Increment 2).**
+  `CredentialPolicy.mode` (kUnlinkable / kPseudonymous, committed in the genesis
+  hash). Blind issuance as a 3-step protocol — `membership_commit` (holder derives
+  `nym_seed = bbs_hash_to_scalar(member_secret)` and blind-commits it, the issuer
+  never sees it) → `blind_issue` (issuer blind-signs {tier, not_after,
+  issuer_epoch} + fresh entropy) → `finalize_membership` → `PseudonymousCredential`.
+  `CredentialGate::present_pseudonymous` / `admit_pseudonymous`: `admit` returns
+  the per-(chain, epoch, scope) **pseudonym** (std::nullopt on reject), stable
+  across a member's presentations in that context (linkability domain = chain‖
+  epoch‖scope, distinct from the challenge-bound `ph`). `revoke_nym` (targeted,
+  §6.2), `note_admission` (Sybil cap §6.3 — first-vs-duplicate per epoch+scope),
+  plus the Option-A issuer-epoch / expiry / tier checks. `test_credential_gate_
+  pseudonym.cpp` (24 checks): same member+epoch+scope → SAME nym across fresh
+  challenges (Sybil-linkable), different epoch/scope → unlinkable, different member
+  → different nym, anti-replay, expiry, tier, targeted + bulk revocation,
+  forged-issuer / malformed fail closed. 62 C++ suites, ASan-clean; Go binding
+  still green (policy `mode` byte round-trips as default 0). Option A stays the
+  unlinkable mode; the policy selects. **Remaining:** surface Option B through the
+  C ABI + 5 bindings (follow-on, as Option A was).
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
