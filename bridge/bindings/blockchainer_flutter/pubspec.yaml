@@ -33,7 +33,7 @@ dependencies:
   cryptolib_flutter:
     git:
       url: git@github.com:Crdzbird/CryptoLib.git
-      ref: feat/evm-btc-and-go-library
+      ref: main
       path: bridge/bindings/cryptolib_flutter
 
 dev_dependencies:

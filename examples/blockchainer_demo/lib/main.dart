@@ -33,6 +33,14 @@ Uint8List _unhex(String s) {
 String _short(Uint8List b) =>
     b.map((x) => x.toRadixString(16).padLeft(2, '0')).join().substring(0, 12);
 
+bool _eqBytes(Uint8List a, Uint8List b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
 class BlockchainerDemoApp extends StatelessWidget {
   const BlockchainerDemoApp({super.key});
   @override
@@ -71,6 +79,7 @@ class _DashboardState extends State<Dashboard> {
   Map<String, String> _interop = {};
   final _amountCtrl = TextEditingController(text: '100');
   Timer? _timer;
+  final List<String> _membership = [];
 
   @override
   void initState() {
@@ -208,6 +217,7 @@ class _DashboardState extends State<Dashboard> {
           _txCard(),
           _metricsCard(),
           _eventsCard(),
+          _membershipCard(),
           _verifyCard(),
           _interopCard(),
         ],
@@ -315,6 +325,80 @@ class _DashboardState extends State<Dashboard> {
         return 'mempool ${e['mempool_size']}';
     }
   }
+
+  // Anonymous membership (CredentialGate Option B): a member proves it holds an
+  // issuer-signed credential without revealing its identity, carrying a
+  // per-(epoch, scope) pseudonym — the same within an epoch (Sybil-resistant),
+  // unlinkable across epochs. The nym seed is blind-committed, so the issuer
+  // never learns it.
+  void _runMembershipDemo() {
+    try {
+      final bc = _bc!;
+      final issuer = bc.newBBSIssuer(Uint8List(32)..fillRange(0, 32, 0x2a));
+      final policy = bc.makeCredentialPolicy(
+        chainId: 42,
+        issuerPublic: issuer.public,
+        header: Uint8List.fromList('blockchainer.credential.v2'.codeUnits),
+        minTier: 2,
+        mode: 1, // pseudonymous (Option B)
+      );
+      final memberSecret = Uint8List(32)..fillRange(0, 32, 0x77);
+      final mc = policy.membershipCommit(memberSecret);
+      final bi = policy.blindIssue(issuer.secret, extractCommitment(mc), 3, 4102444800, 1);
+      final cred = bc.finalizeMembership(mc, bi);
+
+      final gate = bc.makeCredentialGate(policy);
+      Uint8List ch(int b) => Uint8List(32)..fillRange(0, 32, b);
+      const now = 1700000000;
+      Uint8List? admit(int epoch, String scope, int c) => gate.admitPseudonymous(
+          epoch, scope, ch(c), policy.presentPseudonymous(cred, epoch, scope, ch(c)), now);
+
+      final log = <String>[];
+      final nymA = admit(5, 'gossip', 1);
+      log.add('admitted · pseudonym ${_short(nymA!)}…');
+      final nym2 = admit(5, 'gossip', 2); // fresh challenge, same epoch+scope
+      log.add(_eqBytes(nym2!, nymA)
+          ? 'epoch 5 again → SAME pseudonym (Sybil-linkable ✓)'
+          : 'epoch 5 again → different (unexpected)');
+      log.add(gate.noteAdmission(5, 'gossip', nymA) && !gate.noteAdmission(5, 'gossip', nym2)
+          ? 'Sybil cap: 2nd session on the nym refused ✓'
+          : 'Sybil cap unexpected');
+      final nymE = admit(6, 'gossip', 1); // next epoch
+      log.add(!_eqBytes(nymE!, nymA)
+          ? 'epoch 6 → DIFFERENT pseudonym (unlinkable ✓)'
+          : 'epoch 6 → same (unexpected)');
+      gate.revokeNym(nymA);
+      final banned = admit(5, 'gossip', 3) == null;
+      log.add(banned ? 'revoked nym → refused in epoch 5 ✓' : 'revocation unexpected');
+      gate.free();
+      setState(() => _membership
+        ..clear()
+        ..addAll(log));
+    } catch (e) {
+      setState(() => _membership
+        ..clear()
+        ..add('error: $e'));
+    }
+  }
+
+  Widget _membershipCard() => _section('Anonymous membership (BBS pseudonyms)', Icons.badge, [
+        const Text(
+            'A permissioned chain admits a member by a zero-knowledge proof of an '
+            'issuer-signed credential — no identity revealed — carrying a '
+            'per-epoch pseudonym for Sybil resistance and targeted revocation.',
+            style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 10),
+        FilledButton.icon(
+            onPressed: _runMembershipDemo,
+            icon: const Icon(Icons.how_to_reg),
+            label: const Text('Run membership demo')),
+        if (_membership.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ..._membership.map((l) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)))),
+        ],
+      ]);
 
   Widget _verifyCard() => _section('Verification (light client)', Icons.verified_user, [
         Wrap(spacing: 16, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
