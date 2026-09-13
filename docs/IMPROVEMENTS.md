@@ -287,6 +287,52 @@
   in-process C++ subclasses (cross-language subclassing would need FFI callbacks
   — a follow-up); every language can discover and declare mixtures naming them.
   63 C++ suites, ASan-clean, Go golden vectors replay.
+- **[x] Foreign components — engines / proposers implemented in ANY binding
+  language — DONE** (commits d3ba92e, c712a63). The follow-up above, closed:
+  a mixture component no longer has to be C++. The consensus pipeline stays
+  native (`ForeignEngine : ConsensusEngine` proposes and applies through the
+  Ledger, so atomicity + canonical encoding are never delegated); foreign code
+  supplies only what genuinely varies — the JUSTIFICATION policy (justify a
+  proposed block / verify a justification) and the proposer (leader-election)
+  policy — as C callbacks with an opaque `ctx`: `BlockchainerJustifyFn`
+  (writes into a caller buffer, cap `BLOCKCHAINER_MAX_JUSTIFICATION`=4096),
+  `BlockchainerVerifyFn`, `BlockchainerProposerFn`, registered via
+  `blockchainer_registry_add_engine/_add_proposer`; `blockchainer_chain_seal`
+  dispatches to the foreign justify. A throwing / refusing callback is a failed
+  verification, never a crash. Go (cgo `//export` trampolines + `cgo.Handle`),
+  npm (`koffi.register`), JVM (Panama upcall stubs), Swift (`@convention(c)` +
+  `Unmanaged` ctx), Dart (`NativeCallable.isolateLocal`) each register an
+  engine + a proposer and prove: discovery by id, seal → their justify, a
+  tampered justification refused with the ledger untouched, a valid one commits,
+  call counters confirm the boundary crossing, PoS with a foreign proposer
+  commits. **Contract (documented, unenforceable by the registry):** callbacks
+  run synchronously inside consensus, MUST be deterministic (no clock, no
+  randomness) and must not re-enter the chain. 63 C++ suites, ASan-clean.
+- **[x] Noise XX transport tier — standards-based channel + PQ identity proof
+  — DONE** (commit e0702a7). Consumes cryptolib's newly exposed
+  `cryptolib_noise_*` C ABI as `TransportTier::kNoiseXX`, next to the SIGMA
+  `SecureSession` (kMutual) and the ratcheted `ArmoredChannel`. `crypto::Noise`
+  wraps the raw Noise_XX_25519_ChaChaPoly_SHA256 state (+ `x25519_keygen`);
+  `p2p::NoiseSession` runs the 3-message XX handshake (fixed version‖role hello
+  payloads, checked fail-closed) and then exchanges one identity proof per side:
+  the peer's HYBRID Ed25519+ML-DSA-65 key signs `kNoiseBinding ‖ role ‖ final
+  handshake hash`. The hash commits every handshake byte, so a MITM's two
+  sessions have two hashes and an honest proof never verifies in the other one
+  — authentication survives a quantum adversary even though the channel's
+  confidentiality is classical X25519 (documented: pick kMutual/kRatcheted for
+  PQ confidentiality; kNoiseXX is for interoperating with any Noise stack).
+  `encrypt/decrypt` refuse until the peer's proof verified. Reactor: dialer
+  msg0 → msg1 → (msg2 ‖ proof) → peer proof + pin; accepter msg0 → msg1, msg2 →
+  proof, peer proof + allow-list; no consensus byte flows before the proof step.
+  The X25519 static is fresh per boot unless configured (the identity is the sig
+  key), so no peer key is needed up front beyond the existing sig allow-list;
+  optional shared prologue (e.g. genesis hash). `test_noise_session.cpp`
+  (round trip, fail-closed ordering, tamper/reorder/handshake-tamper/prologue
+  rejects, forged proof, and a full MITM holding both legs' Noise keys who
+  cannot relay Bob's proof into Alice's session); `test_tcp_transport.cpp`:
+  4-validator BFT commits over Noise XX, an unlisted identity is excluded while
+  the quorum commits. 64 suites; ASan/UBSan + TSan clean. Not on the C ABI
+  (no transport tier is — bindings stay 1-1).
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
