@@ -30,6 +30,7 @@ enum class Domain : std::uint8_t {
   kPeerRecord = 0x07,    ///< self-signed peer-discovery record (PEX)
   kCredentialPolicy = 0x08,        ///< commitment to a membership-credential policy
   kCredentialPresentation = 0x09,  ///< binds a credential presentation to its context
+  kChainBlueprint = 0x0A,          ///< commitment to a chain's component mixture
 };
 
 /// BLAKE3-256 over [data, data+len). The chain's primary hash primitive.

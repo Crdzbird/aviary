@@ -52,6 +52,7 @@ Bytes GenesisSpec::encode() const {
   // Optional membership policy (empty = permissionless). Appended last so it is
   // clearly an orthogonal, later-added posture field.
   w.write_bytes(view(membership_policy));
+  w.write_bytes(view(chain_blueprint));
   return w.take();
 }
 
@@ -85,6 +86,7 @@ GenesisSpec GenesisSpec::decode_all(codec::ByteView bytes) {
     return v;
   });
   g.membership_policy = r.read_bytes();
+  g.chain_blueprint = r.read_bytes();
   r.assert_fully_consumed();
   return g;
 }

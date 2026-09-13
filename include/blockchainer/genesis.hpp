@@ -58,6 +58,14 @@ struct GenesisSpec {
   // `consensus::CredentialPolicy::from_genesis`.
   Bytes membership_policy{};
 
+  // An optional composition blueprint (chain_blueprint.hpp): WHICH consensus
+  // engine, state model, and proposer policy assemble this chain, each named by
+  // a stable component id, plus their canonical params. Empty = the default,
+  // posture-driven assembly. Committed into the genesis hash so the MIXTURE is
+  // chain identity — a node cannot boot a different mix and still be this chain.
+  // Reconstruct with `ChainBlueprint::from_genesis`; assemble with ChainAssembler.
+  Bytes chain_blueprint{};
+
   // Initial state. Use `accounts` for the account model, `utxos` for the UTXO
   // model (the other stays empty).
   std::vector<GenesisAccount> accounts;
