@@ -14,6 +14,12 @@
 #include "blockchainer/interop/solana.hpp"
 #include "blockchainer/keyring.hpp"
 #include "blockchainer/assurance.hpp"
+#include "blockchainer/chain_assembler.hpp"
+#include "blockchainer/chain_blueprint.hpp"
+#include "blockchainer/genesis.hpp"
+#include "blockchainer/pos_engine.hpp"
+#include "blockchainer/pow_engine.hpp"
+#include "blockchainer/vrf_pos.hpp"
 #include "blockchainer/credential_gate.hpp"
 #include "blockchainer/node/demo_node.hpp"
 #include "blockchainer/proofs.hpp"
@@ -182,6 +188,18 @@ cg::PseudonymousCredential decode_pseudonymous_credential(const std::uint8_t* p,
   return c;
 }
 
+
+blockchainer::node::AssembledChain* as_chain(BlockchainerChain c) {
+  return static_cast<blockchainer::node::AssembledChain*>(c);
+}
+// [count u32]([len u32][id])×
+std::vector<std::uint8_t> encode_ids(const std::vector<std::string>& ids) {
+  blockchainer::codec::CodecWriter w;
+  w.write_list(ids, [](blockchainer::codec::CodecWriter& ww, const std::string& id) {
+    ww.write_bytes(cbv(reinterpret_cast<const std::uint8_t*>(id.data()), id.size()));
+  });
+  return w.take();
+}
 }  // namespace
 
 extern "C" {
@@ -1084,6 +1102,190 @@ int blockchainer_credential_gate_note_admission(BlockchainerCredentialGate g, ui
   if (g == nullptr) return 0;
   return as_gate(g)->note_admission(epoch, scope ? scope : "", cbv(nym, nym_len)) ? 1 : 0;
 }
+
+
+// ── ChainBlueprint + ChainAssembler (composable chains) ───────────────────────
+
+BlockchainerBufferResult blockchainer_bls_keygen(const uint8_t* ikm, size_t ikm_len) {
+  try {
+    blockchainer::crypto::KeyPair kp = blockchainer::crypto::bls_keygen_from_ikm(cbv(ikm, ikm_len));
+    return account_blob(kp.public_key, kp.secret_key);
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_blueprint_encode(const char* consensus_id,
+                                                       const char* state_model_id,
+                                                       const char* proposer_id,
+                                                       const uint8_t* params, size_t params_len) {
+  try {
+    blockchainer::ChainBlueprint b;
+    b.consensus_id = consensus_id ? consensus_id : "";
+    b.state_model_id = state_model_id ? state_model_id : "";
+    b.proposer_id = proposer_id ? proposer_id : "";
+    if (params && params_len) b.component_params.assign(params, params + params_len);
+    return bytes_result(b.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_blueprint_hash(const uint8_t* blueprint, size_t blueprint_len) {
+  try {
+    blockchainer::crypto::Hash h = blockchainer::ChainBlueprint::decode_all(cbv(blueprint, blueprint_len)).hash();
+    return bytes_result(h.data(), h.size());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_registry_ids(uint8_t kind) {
+  using R = blockchainer::node::ComponentRegistry;
+  try {
+    switch (kind) {
+      case 0: return bytes_result(encode_ids(R::engine_ids()));
+      case 1: return bytes_result(encode_ids(R::state_ids()));
+      case 2: return bytes_result(encode_ids(R::proposer_ids()));
+      default: return error_result("registry: unknown kind (0 engines, 1 states, 2 proposers)");
+    }
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_genesis_build(uint64_t chain_id, uint64_t timestamp,
+                                                    uint16_t assurance_level, uint8_t state_model,
+                                                    const uint8_t* account_addrs,
+                                                    const uint64_t* account_balances,
+                                                    size_t account_count,
+                                                    const uint8_t* validator_pks,
+                                                    const uint64_t* validator_powers,
+                                                    size_t validator_count) {
+  try {
+    blockchainer::GenesisSpec g;
+    g.chain_id = chain_id;
+    g.timestamp = timestamp;
+    if (state_model == 0) g.state_model = blockchainer::StateModel::kAccount;
+    else if (state_model == 1) g.state_model = blockchainer::StateModel::kUtxo;
+    else return error_result("genesis: state_model must be 0 (account) or 1 (utxo)");
+    for (size_t i = 0; i < account_count; ++i) {
+      blockchainer::crypto::Hash a = to_hash32(account_addrs + 32 * i);
+      if (state_model == 0) g.accounts.push_back({a, account_balances[i]});
+      else g.utxos.push_back({a, account_balances[i]});
+    }
+    for (size_t i = 0; i < validator_count; ++i) {
+      g.validators.push_back(blockchainer::consensus::Validator{
+          blockchainer::crypto::Bytes(validator_pks + 48 * i, validator_pks + 48 * (i + 1)),
+          validator_powers[i]});
+    }
+    switch (assurance_level) {
+      case 1: blockchainer::AssuranceProfile::standard().apply_to(g); break;
+      case 2: blockchainer::AssuranceProfile::hardened().apply_to(g); break;
+      case 3: blockchainer::AssuranceProfile::fortress().apply_to(g); break;
+      default: return error_result("genesis: assurance_level must be 1, 2 or 3");
+    }
+    return bytes_result(g.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_genesis_commit_blueprint(const uint8_t* genesis,
+                                                               size_t genesis_len,
+                                                               const uint8_t* blueprint,
+                                                               size_t blueprint_len) {
+  try {
+    blockchainer::GenesisSpec g = blockchainer::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    blockchainer::ChainBlueprint::decode_all(cbv(blueprint, blueprint_len)).commit_to(g);
+    return bytes_result(g.encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_genesis_hash(const uint8_t* genesis, size_t genesis_len) {
+  try {
+    blockchainer::crypto::Hash h = blockchainer::GenesisSpec::decode_all(cbv(genesis, genesis_len)).hash();
+    return bytes_result(h.data(), h.size());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerChain blockchainer_chain_assemble(const uint8_t* genesis, size_t genesis_len, uint32_t me,
+                                              const uint8_t* bls_pub, size_t pub_len,
+                                              const uint8_t* bls_sec, size_t sec_len) {
+  try {
+    blockchainer::GenesisSpec g = blockchainer::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    blockchainer::crypto::KeyPair key{blockchainer::crypto::Bytes(bls_pub, bls_pub + pub_len),
+                                      blockchainer::crypto::Bytes(bls_sec, bls_sec + sec_len)};
+    return new blockchainer::node::AssembledChain(
+        blockchainer::node::ChainAssembler::assemble(g, me, std::move(key)));
+  } catch (...) {
+    return nullptr;  // fail-closed: unknown id / forbidden mix / bad genesis
+  }
+}
+
+uint64_t blockchainer_chain_height(BlockchainerChain c) {
+  return c ? as_chain(c)->engine->height() : 0;
+}
+
+BlockchainerBufferResult blockchainer_chain_blueprint(BlockchainerChain c) {
+  if (!c) return error_result("null chain");
+  return bytes_result(as_chain(c)->blueprint.encode());
+}
+
+BlockchainerBufferResult blockchainer_chain_propose(BlockchainerChain c, uint64_t timestamp) {
+  if (!c) return error_result("null chain");
+  try {
+    return bytes_result(as_chain(c)->engine->propose({}, timestamp).encode());
+  } catch (const std::exception& e) {
+    return error_result(e.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_chain_seal(BlockchainerChain c, const uint8_t* block,
+                                                 size_t block_len) {
+  if (!c) return error_result("null chain");
+  try {
+    blockchainer::Block b = blockchainer::Block::decode_all(cbv(block, block_len));
+    auto* e = as_chain(c)->engine.get();
+    if (auto* pos = dynamic_cast<blockchainer::consensus::PosEngine*>(e)) return bytes_result(pos->seal(b));
+    if (auto* vrf = dynamic_cast<blockchainer::consensus::VrfPosEngine*>(e)) return bytes_result(vrf->seal(b));
+    const std::uint8_t empty = 0;
+    return bytes_result(&empty, 0);  // this engine does not seal
+  } catch (const std::exception& ex) {
+    return error_result(ex.what());
+  }
+}
+
+BlockchainerBufferResult blockchainer_chain_mine(BlockchainerChain c, const uint8_t* block,
+                                                 size_t block_len) {
+  if (!c) return error_result("null chain");
+  try {
+    auto* pow = dynamic_cast<blockchainer::consensus::PowEngine*>(as_chain(c)->engine.get());
+    if (!pow) return error_result("chain: engine is not proof-of-work");
+    blockchainer::Block b = blockchainer::Block::decode_all(cbv(block, block_len));
+    if (!pow->mine(b)) return error_result("chain: no solving nonce found within the bound");
+    return bytes_result(b.encode());
+  } catch (const std::exception& ex) {
+    return error_result(ex.what());
+  }
+}
+
+int blockchainer_chain_submit(BlockchainerChain c, const uint8_t* block, size_t block_len,
+                              const uint8_t* justification, size_t justification_len) {
+  if (!c) return 0;
+  try {
+    blockchainer::Block b = blockchainer::Block::decode_all(cbv(block, block_len));
+    return as_chain(c)->engine->submit(b, cbv(justification, justification_len)).ok ? 1 : 0;
+  } catch (...) {
+    return 0;
+  }
+}
+
+void blockchainer_chain_free(BlockchainerChain c) { delete as_chain(c); }
 
 // ── Interop addresses ─────────────────────────────────────────────────────────
 

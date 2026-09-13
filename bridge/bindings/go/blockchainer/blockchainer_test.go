@@ -793,3 +793,110 @@ func TestCredentialGatePseudonymous(t *testing.T) {
 		t.Fatal("malformed presentation admitted")
 	}
 }
+
+// TestChainBlueprint drives composable chains end to end: discover registered
+// components, declare a mixture, commit it into genesis (identity changes),
+// assemble, and commit blocks through built-in PoS and PoW — then confirm the
+// fail-closed rejects (unknown id, posture-forbidden engine, state mismatch).
+func TestChainBlueprint(t *testing.T) {
+	has := func(xs []string, s string) bool {
+		for _, x := range xs {
+			if x == s {
+				return true
+			}
+		}
+		return false
+	}
+	eng, _ := bc.EngineIDs()
+	if !has(eng, "bft") || !has(eng, "pow") || !has(eng, "pos") || !has(eng, "vrf-pos") {
+		t.Fatalf("engine ids missing built-ins: %v", eng)
+	}
+	st, _ := bc.StateModelIDs()
+	if !has(st, "account") || !has(st, "utxo") {
+		t.Fatalf("state ids: %v", st)
+	}
+	pr, _ := bc.ProposerIDs()
+	if !has(pr, "stake-weighted") || !has(pr, "round-robin") {
+		t.Fatalf("proposer ids: %v", pr)
+	}
+
+	v, err := bc.NewBLSValidator(bytes.Repeat([]byte{0x60}, 32))
+	if err != nil || len(v.Public) != 48 || len(v.Secret) != 32 {
+		t.Fatalf("bls keygen: %v pub=%d sec=%d", err, len(v.Public), len(v.Secret))
+	}
+	accounts := []bc.GenesisAccount{{Address: bytes.Repeat([]byte{0x11}, 32), Balance: 1000}}
+	validators := []bc.GenesisValidator{{PublicKey: v.Public, Power: 1}}
+	genesis, err := bc.BuildGenesis(7, 1, 1, bc.StateModelAccount, accounts, validators)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The mixture is chain identity.
+	pos, _ := bc.NewBlueprint("pos", "account", "round-robin", nil)
+	if h, _ := pos.Hash(); len(h) != 32 {
+		t.Fatal("blueprint hash size")
+	}
+	mixed, err := bc.CommitBlueprint(genesis, pos)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h0, _ := bc.GenesisHash(genesis)
+	h1, _ := bc.GenesisHash(mixed)
+	if bytes.Equal(h0, h1) {
+		t.Fatal("committing a mixture must change the genesis hash")
+	}
+
+	// Built-in PoS: propose → seal → submit.
+	chain, err := bc.AssembleChain(mixed, 0, v.Public, v.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer chain.Free()
+	if got, _ := chain.Blueprint(); !bytes.Equal(got, pos.Encoded()) {
+		t.Fatal("assembled chain should report the committed mixture")
+	}
+	blk, err := chain.Propose(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	just, _ := chain.Seal(blk)
+	if len(just) == 0 || !chain.Submit(blk, just) || chain.Height() != 1 {
+		t.Fatalf("PoS block did not commit (just=%d height=%d)", len(just), chain.Height())
+	}
+
+	// Built-in PoW via params (32-byte easiest target): propose → mine → submit.
+	pow, _ := bc.NewBlueprint("pow", "account", "", bytes.Repeat([]byte{0xFF}, 32))
+	powGen, _ := bc.CommitBlueprint(genesis, pow)
+	pc, err := bc.AssembleChain(powGen, 0, v.Public, v.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pc.Free()
+	cand, _ := pc.Propose(2)
+	if s, _ := pc.Seal(cand); len(s) != 0 {
+		t.Fatal("PoW must not seal")
+	}
+	solved, err := pc.Mine(cand)
+	if err != nil || !pc.Submit(solved, nil) || pc.Height() != 1 {
+		t.Fatalf("PoW block did not commit: %v height=%d", err, pc.Height())
+	}
+
+	// Fail-closed: unknown engine id.
+	bad, _ := bc.NewBlueprint("no-such-engine", "account", "", nil)
+	badGen, _ := bc.CommitBlueprint(genesis, bad)
+	if _, err := bc.AssembleChain(badGen, 0, v.Public, v.Secret); err == nil {
+		t.Fatal("unknown engine id must be rejected")
+	}
+	// Fail-closed: a hardened (VRF) posture forbids a predictable-leader engine.
+	hardened, _ := bc.BuildGenesis(7, 1, 2, bc.StateModelAccount, accounts, validators)
+	hardPos, _ := bc.CommitBlueprint(hardened, pos)
+	if _, err := bc.AssembleChain(hardPos, 0, v.Public, v.Secret); err == nil {
+		t.Fatal("hardened posture must reject a non-grind-proof engine")
+	}
+	// Fail-closed: state id must match the genesis seeding.
+	utxo, _ := bc.NewBlueprint("pos", "utxo", "", nil)
+	mism, _ := bc.CommitBlueprint(genesis, utxo)
+	if _, err := bc.AssembleChain(mism, 0, v.Public, v.Secret); err == nil {
+		t.Fatal("state model mismatch must be rejected")
+	}
+}

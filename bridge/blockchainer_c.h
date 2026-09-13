@@ -487,6 +487,89 @@ BLOCKCHAINER_API int blockchainer_credential_gate_note_admission(
     BlockchainerCredentialGate g, uint32_t epoch, const char* scope, const uint8_t* nym,
     size_t nym_len);
 
+/* ── ChainBlueprint + ChainAssembler (composable chains) ──────────────────────
+ *  A chain is a MIXTURE of pluggable components — consensus engine, state
+ *  model, proposer policy — each named by a stable id. The mixture is committed
+ *  into the genesis hash (it IS chain identity); an id nobody registered, or a
+ *  mix the assurance posture forbids, is rejected at assembly (fail-closed).
+ *  Custom components are C++ subclasses registered in-process
+ *  (ComponentRegistry); every language can DISCOVER what is registered and
+ *  DECLARE mixtures naming it.
+ *
+ *  Blobs: blueprint / genesis / block = canonical encodings (opaque to callers);
+ *  id lists = [count u32]([len u32][id])×; keypairs = account blob
+ *  [pub_len:4][pub][sec]. All exceptions are isolated at this boundary.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** A BLS validator keypair from >= 32 bytes of key material → account blob
+ *  [pub 48][sec 32]. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_bls_keygen(
+    const uint8_t* ikm, size_t ikm_len);
+
+/** Declare a mixture. consensus_id / state_model_id name registered components
+ *  ("bft"|"pow"|"pos"|"vrf-pos", "account"|"utxo", or custom); proposer_id may be
+ *  "" for the engine default; params are component-interpreted (e.g. a 32-byte
+ *  PoW target). Returns the canonical blueprint blob. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_blueprint_encode(
+    const char* consensus_id, const char* state_model_id, const char* proposer_id,
+    const uint8_t* params, size_t params_len);
+/** The 32-byte commitment to a mixture. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_blueprint_hash(
+    const uint8_t* blueprint, size_t blueprint_len);
+
+/** Discovery: the ids a mixture may name. kind: 0 = engines, 1 = state models,
+ *  2 = proposer policies. Built-ins plus anything registered in-process. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_registry_ids(uint8_t kind);
+
+/** A minimal genesis: chain params + one posture (assurance_level 1/2/3) +
+ *  seeded state + validators. state_model: 0 = account (the addr/balance pairs
+ *  fund accounts), 1 = utxo (they become genesis outputs). account_addrs are
+ *  32 bytes each; validator_pks are 48-byte BLS keys. Returns the genesis blob. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_genesis_build(
+    uint64_t chain_id, uint64_t timestamp, uint16_t assurance_level, uint8_t state_model,
+    const uint8_t* account_addrs, const uint64_t* account_balances, size_t account_count,
+    const uint8_t* validator_pks, const uint64_t* validator_powers, size_t validator_count);
+/** Commit a mixture into a genesis → the new genesis blob (its hash changes:
+ *  the mixture is chain identity). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_genesis_commit_blueprint(
+    const uint8_t* genesis, size_t genesis_len, const uint8_t* blueprint, size_t blueprint_len);
+/** The 32-byte genesis hash (chain identity). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_genesis_hash(
+    const uint8_t* genesis, size_t genesis_len);
+
+/** An assembled chain: the engine the mixture named, behind the uniform
+ *  propose → (seal | mine) → submit flow. Opaque handle. */
+typedef void* BlockchainerChain;
+
+/** Assemble a node for validator [me] from [genesis] (using its committed
+ *  mixture, or the posture-driven default). Returns NULL on ANY reject: an
+ *  unknown component id, a state id that does not match the seeding, or an
+ *  engine the posture forbids (fail-closed). VRF engines need extra material;
+ *  use the C++ API for those. */
+BLOCKCHAINER_API BlockchainerChain blockchainer_chain_assemble(
+    const uint8_t* genesis, size_t genesis_len, uint32_t me,
+    const uint8_t* bls_pub, size_t pub_len, const uint8_t* bls_sec, size_t sec_len);
+BLOCKCHAINER_API uint64_t blockchainer_chain_height(BlockchainerChain c);
+/** The mixture this chain runs (encoded blueprint). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_blueprint(BlockchainerChain c);
+/** Propose the next (empty) block → encoded Block. Errors if this node may not
+ *  propose now (e.g. not the leader). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_propose(
+    BlockchainerChain c, uint64_t timestamp);
+/** PoS / VRF-PoS: the leader's justification for [block]. Returns an EMPTY
+ *  buffer for engines that do not seal (PoW, BFT, custom). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_seal(
+    BlockchainerChain c, const uint8_t* block, size_t block_len);
+/** PoW: search a solving nonce → the solved, encoded Block. Errors if the
+ *  engine is not PoW or no solution was found within the bound. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_mine(
+    BlockchainerChain c, const uint8_t* block, size_t block_len);
+/** Verify [justification] + apply [block] atomically. 1 committed, 0 rejected. */
+BLOCKCHAINER_API int blockchainer_chain_submit(
+    BlockchainerChain c, const uint8_t* block, size_t block_len,
+    const uint8_t* justification, size_t justification_len);
+BLOCKCHAINER_API void blockchainer_chain_free(BlockchainerChain c);
+
 /* ── Interop address derivation (showcase) ─────────────────────────────────── */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */
