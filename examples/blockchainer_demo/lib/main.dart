@@ -80,6 +80,7 @@ class _DashboardState extends State<Dashboard> {
   final _amountCtrl = TextEditingController(text: '100');
   Timer? _timer;
   final List<String> _membership = [];
+  final List<String> _mixture = [];
 
   @override
   void initState() {
@@ -218,6 +219,7 @@ class _DashboardState extends State<Dashboard> {
           _metricsCard(),
           _eventsCard(),
           _membershipCard(),
+          _mixtureCard(),
           _verifyCard(),
           _interopCard(),
         ],
@@ -395,6 +397,68 @@ class _DashboardState extends State<Dashboard> {
         if (_membership.isNotEmpty) ...[
           const SizedBox(height: 10),
           ..._membership.map((l) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)))),
+        ],
+      ]);
+
+  // Composable chains: a chain is a MIXTURE of pluggable components (engine,
+  // state model, proposer policy) named by stable ids. The mixture is committed
+  // into the genesis hash — it IS chain identity — and an unknown id or a mix the
+  // assurance posture forbids is rejected at assembly (fail-closed).
+  void _runMixtureDemo() {
+    try {
+      final bc = _bc!;
+      final log = <String>[];
+      log.add('engines: ${bc.engineIds().join(", ")}');
+      log.add('state models: ${bc.stateModelIds().join(", ")} · proposers: ${bc.proposerIds().join(", ")}');
+
+      final v = bc.newBLSValidator(Uint8List(32)..fillRange(0, 32, 0x60));
+      final accounts = [(address: Uint8List(32)..fillRange(0, 32, 0x11), balance: 1000)];
+      final validators = [(publicKey: v.public, power: 1)];
+      final genesis = bc.buildGenesis(chainId: 42, accounts: accounts, validators: validators);
+
+      // Mix 1: PoS + account + round-robin. Committing it changes chain identity.
+      final pos = bc.makeBlueprint(consensus: 'pos', stateModel: 'account', proposer: 'round-robin');
+      final mixed = bc.commitBlueprint(genesis, pos);
+      log.add('genesis ${_short(bc.genesisHash(genesis))}… → with mixture ${_short(bc.genesisHash(mixed))}… (identity changed ✓)');
+      final chain = bc.assembleChain(mixed, 0, v.public, v.secret)!;
+      final blk = chain.propose(2);
+      final ok = chain.submit(blk, chain.seal(blk));
+      log.add('pos/account/round-robin → propose → seal → submit: ${ok ? "height ${chain.height} ✓" : "failed"}');
+      chain.free();
+
+      // Mix 2: PoW with a difficulty target in params.
+      final pow = bc.makeBlueprint(consensus: 'pow', stateModel: 'account', params: Uint8List(32)..fillRange(0, 32, 0xff));
+      final pc = bc.assembleChain(bc.commitBlueprint(genesis, pow), 0, v.public, v.secret)!;
+      final cand = pc.propose(2);
+      final okPow = pc.submit(pc.mine(cand));
+      log.add('pow/account → propose → mine → submit: ${okPow ? "height ${pc.height} ✓" : "failed"}');
+      pc.free();
+
+      // Fail-closed: a mixture nobody registered, and one the posture forbids.
+      final unknown = bc.assembleChain(bc.commitBlueprint(genesis, bc.makeBlueprint(consensus: 'my-custom-engine', stateModel: 'account')), 0, v.public, v.secret);
+      log.add(unknown == null ? 'unregistered "my-custom-engine" → rejected ✓' : 'unexpected');
+      final hardened = bc.buildGenesis(chainId: 42, assuranceLevel: 2, accounts: accounts, validators: validators);
+      final forbidden = bc.assembleChain(bc.commitBlueprint(hardened, pos), 0, v.public, v.secret);
+      log.add(forbidden == null ? 'hardened posture + predictable-leader pos → rejected ✓' : 'unexpected');
+      setState(() => _mixture..clear()..addAll(log));
+    } catch (e) {
+      setState(() => _mixture..clear()..add('error: $e'));
+    }
+  }
+
+  Widget _mixtureCard() => _section('Composable chains (mixtures)', Icons.tune, [
+        const Text(
+            'A chain is a mixture of pluggable components — consensus engine, state '
+            'model, proposer policy — named by id. The mixture is committed into the '
+            'genesis hash, and an unknown or posture-forbidden mix is refused.',
+            style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 10),
+        FilledButton.icon(onPressed: _runMixtureDemo, icon: const Icon(Icons.science), label: const Text('Run mixture demo')),
+        if (_mixture.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ..._mixture.map((l) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)))),
         ],
