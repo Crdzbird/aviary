@@ -119,6 +119,22 @@ function ensureLoaded() {
     credGateAdmitPseud: f('BlockchainerBufferResult blockchainer_credential_gate_admit_pseudonymous(void*, uint32_t, const char*, uint8_t*, size_t, uint8_t*, size_t, uint64_t)'),
     credGateRevokeNym: f('void blockchainer_credential_gate_revoke_nym(void*, uint8_t*, size_t)'),
     credGateNoteAdmission: f('int blockchainer_credential_gate_note_admission(void*, uint32_t, const char*, uint8_t*, size_t)'),
+    // Composable chains (blueprint + registry + assembly)
+    blsKeygen: f('BlockchainerBufferResult blockchainer_bls_keygen(uint8_t*, size_t)'),
+    bpEncode: f('BlockchainerBufferResult blockchainer_blueprint_encode(const char*, const char*, const char*, uint8_t*, size_t)'),
+    bpHash: f('BlockchainerBufferResult blockchainer_blueprint_hash(uint8_t*, size_t)'),
+    registryIds: f('BlockchainerBufferResult blockchainer_registry_ids(uint8_t)'),
+    genesisBuild: f('BlockchainerBufferResult blockchainer_genesis_build(uint64_t, uint64_t, uint16_t, uint8_t, uint8_t*, uint64_t*, size_t, uint8_t*, uint64_t*, size_t)'),
+    genesisCommitBp: f('BlockchainerBufferResult blockchainer_genesis_commit_blueprint(uint8_t*, size_t, uint8_t*, size_t)'),
+    genesisHash: f('BlockchainerBufferResult blockchainer_genesis_hash(uint8_t*, size_t)'),
+    chainAssemble: f('void *blockchainer_chain_assemble(uint8_t*, size_t, uint32_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    chainHeight: f('uint64_t blockchainer_chain_height(void*)'),
+    chainBlueprint: f('BlockchainerBufferResult blockchainer_chain_blueprint(void*)'),
+    chainPropose: f('BlockchainerBufferResult blockchainer_chain_propose(void*, uint64_t)'),
+    chainSeal: f('BlockchainerBufferResult blockchainer_chain_seal(void*, uint8_t*, size_t)'),
+    chainMine: f('BlockchainerBufferResult blockchainer_chain_mine(void*, uint8_t*, size_t)'),
+    chainSubmit: f('int blockchainer_chain_submit(void*, uint8_t*, size_t, uint8_t*, size_t)'),
+    chainFree: f('void blockchainer_chain_free(void*)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -407,6 +423,52 @@ class CredentialGate {
   free() { fn.credGateFree(this._h); }
 }
 
+// Composable chains: a chain is a MIXTURE of pluggable components (engine,
+// state model, proposer policy) named by stable ids, committed into the genesis
+// hash. Unknown ids / posture-forbidden mixes are rejected at assembly.
+const decodeIds = (b) => {
+  const n = (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+  const out = []; let off = 4;
+  for (let i = 0; i < n; i++) {
+    const l = (b[off] << 24) | (b[off+1] << 16) | (b[off+2] << 8) | b[off+3]; off += 4;
+    out.push(b.subarray(off, off + l).toString('utf8')); off += l;
+  }
+  return out;
+};
+const u64arr = (xs) => xs.length ? BigUint64Array.from(xs.map((x) => BigInt(x))) : null;
+class Blueprint {
+  constructor(consensus, stateModel, proposer = '', params = Buffer.alloc(0)) {
+    this.consensus = consensus; this.stateModel = stateModel; this.proposer = proposer; this.params = u8(params);
+    this.encoded = consume(fn.bpEncode(consensus, stateModel, proposer, this.params, this.params.length), 'blueprint_encode');
+  }
+  hash() { return consume(fn.bpHash(this.encoded, this.encoded.length), 'blueprint_hash'); }
+}
+// Assembled node: the engine the mixture named, behind propose → (seal|mine) → submit.
+class Chain {
+  constructor(h) { this._h = h; }
+  get height() { return Number(fn.chainHeight(this._h)); }
+  blueprint() { return consume(fn.chainBlueprint(this._h), 'chain_blueprint'); }
+  propose(timestamp) { return consume(fn.chainPropose(this._h, BigInt(timestamp)), 'chain_propose'); }
+  seal(block) { return consume(fn.chainSeal(this._h, u8(block), u8(block).length), 'chain_seal'); }
+  mine(block) { return consume(fn.chainMine(this._h, u8(block), u8(block).length), 'chain_mine'); }
+  submit(block, justification = Buffer.alloc(0)) {
+    return fn.chainSubmit(this._h, u8(block), u8(block).length, u8(justification), u8(justification).length) === 1;
+  }
+  free() { fn.chainFree(this._h); }
+}
+function buildGenesis({ chainId, timestamp = 1, assuranceLevel = 1, stateModel = 0, accounts = [], validators = [] }) {
+  const addrs = Buffer.concat(accounts.map((a) => u8(a.address)));
+  const pks = Buffer.concat(validators.map((v) => u8(v.publicKey)));
+  return consume(fn.genesisBuild(BigInt(chainId), BigInt(timestamp), assuranceLevel, stateModel,
+    addrs, u64arr(accounts.map((a) => a.balance)), accounts.length,
+    pks, u64arr(validators.map((v) => v.power)), validators.length), 'genesis_build');
+}
+// null = rejected (fail-closed): unknown id, state mismatch, or posture-forbidden engine.
+function assembleChain(genesis, me, blsPublic, blsSecret) {
+  const h = fn.chainAssemble(u8(genesis), u8(genesis).length, me, u8(blsPublic), u8(blsPublic).length, u8(blsSecret), u8(blsSecret).length);
+  return h ? new Chain(h) : null;
+}
+
 // Parse a share card's identity blob [id u16 BE][group_pk 32][public 32].
 function shareInfo(card) {
   const b = consume(fn.thShareInfo(u8(card), u8(card).length), 'threshold_share_info');
@@ -476,6 +538,18 @@ module.exports = {
   extractCommitment,
   finalizeMembership,
   CredentialModePseudonymous: 1,
+
+  // Composable chains.
+  newBLSValidator: (keyMaterial) => splitBlob(consume(fn.blsKeygen(u8(keyMaterial), u8(keyMaterial).length), 'bls_keygen')),
+  Blueprint,
+  engineIds: () => decodeIds(consume(fn.registryIds(0), 'registry_ids')),
+  stateModelIds: () => decodeIds(consume(fn.registryIds(1), 'registry_ids')),
+  proposerIds: () => decodeIds(consume(fn.registryIds(2), 'registry_ids')),
+  buildGenesis,
+  commitBlueprint: (genesis, bp) => consume(fn.genesisCommitBp(u8(genesis), u8(genesis).length, bp.encoded, bp.encoded.length), 'genesis_commit_blueprint'),
+  genesisHash: (genesis) => consume(fn.genesisHash(u8(genesis), u8(genesis).length), 'genesis_hash'),
+  assembleChain,
+  Chain,
 
   commit(card) {
     const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');

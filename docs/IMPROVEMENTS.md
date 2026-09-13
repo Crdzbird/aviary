@@ -265,6 +265,28 @@
   `cryptolib_flutter/{ios,macos}`; then the dynamic blockchainer xcframework
   rebuild picked it up. **The entire CredentialGate feature (Option A + B) is now
   end-to-end across all five bindings.**
+- **[x] Composable chains — ChainBlueprint + ComponentRegistry + ChainAssembler,
+  through the C ABI + ALL FIVE bindings — DONE.** A chain is a declared
+  MIXTURE of pluggable components (consensus engine, state model, proposer
+  policy) named by stable ids, with custom subclasses of the seams joining by
+  registration; the mixture is committed into the genesis hash (chain identity),
+  and an unknown id / seeding-mismatched state / posture-forbidden engine is
+  rejected at assembly (fail-closed). `ChainBlueprint` (encode/decode/hash,
+  `commit_to`/`from_genesis`; `GenesisSpec.chain_blueprint`, orthogonal to
+  posture + membership), `ComponentRegistry` (built-ins bft/pow/pos/vrf-pos,
+  account/utxo, stake-weighted/round-robin; `*_ids()` discovery; engines declare
+  grind-proof), `ChainAssembler::assemble` → a generic `ConsensusEngine`.
+  `test_chain_blueprint.cpp` (32 checks) incl. a custom engine subclass booted
+  through the mixture. C ABI: `blockchainer_bls_keygen`, `_blueprint_encode/
+  _hash`, `_registry_ids(kind)`, a minimal `_genesis_build` + `_genesis_commit_
+  blueprint/_hash`, and an opaque `BlockchainerChain` (`_assemble` NULL on
+  reject, `_propose`/`_seal`/`_mine`/`_submit`) — the uniform propose →
+  (seal|mine) → submit flow. Go / npm / JVM / Swift / Dart each: discovery,
+  Blueprint, buildGenesis, commitBlueprint (hash changes), assembleChain, PoS +
+  PoW commit a block, and the three fail-closed rejects. Custom components stay
+  in-process C++ subclasses (cross-language subclassing would need FFI callbacks
+  — a follow-up); every language can discover and declare mixtures naming them.
+  63 C++ suites, ASan-clean, Go golden vectors replay.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.

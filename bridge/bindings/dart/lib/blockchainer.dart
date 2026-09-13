@@ -219,6 +219,36 @@ typedef _CredGateRevokeNymD = void Function(Pointer<Void>, Pointer<Uint8>, int);
 typedef _CredGateNoteAdmC = Int32 Function(Pointer<Void>, Uint32, Pointer<Utf8>, Pointer<Uint8>, Size);
 typedef _CredGateNoteAdmD = int Function(Pointer<Void>, int, Pointer<Utf8>, Pointer<Uint8>, int);
 
+// Composable chains (blueprint + registry + assembly).
+typedef _BlsKeygenC = _BufResult Function(Pointer<Uint8>, Size);
+typedef _BlsKeygenD = _BufResult Function(Pointer<Uint8>, int);
+typedef _BpEncodeC = _BufResult Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Uint8>, Size);
+typedef _BpEncodeD = _BufResult Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Uint8>, int);
+typedef _BpHashC = _BufResult Function(Pointer<Uint8>, Size);
+typedef _BpHashD = _BufResult Function(Pointer<Uint8>, int);
+typedef _RegistryIdsC = _BufResult Function(Uint8);
+typedef _RegistryIdsD = _BufResult Function(int);
+typedef _GenesisBuildC = _BufResult Function(Uint64, Uint64, Uint16, Uint8, Pointer<Uint8>, Pointer<Uint64>, Size, Pointer<Uint8>, Pointer<Uint64>, Size);
+typedef _GenesisBuildD = _BufResult Function(int, int, int, int, Pointer<Uint8>, Pointer<Uint64>, int, Pointer<Uint8>, Pointer<Uint64>, int);
+typedef _GenesisCommitBpC = _BufResult Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _GenesisCommitBpD = _BufResult Function(Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _GenesisHashC = _BufResult Function(Pointer<Uint8>, Size);
+typedef _GenesisHashD = _BufResult Function(Pointer<Uint8>, int);
+typedef _ChainAssembleC = Pointer<Void> Function(Pointer<Uint8>, Size, Uint32, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _ChainAssembleD = Pointer<Void> Function(Pointer<Uint8>, int, int, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _ChainHeightC = Uint64 Function(Pointer<Void>);
+typedef _ChainHeightD = int Function(Pointer<Void>);
+typedef _ChainBufC = _BufResult Function(Pointer<Void>);
+typedef _ChainBufD = _BufResult Function(Pointer<Void>);
+typedef _ChainProposeC = _BufResult Function(Pointer<Void>, Uint64);
+typedef _ChainProposeD = _BufResult Function(Pointer<Void>, int);
+typedef _ChainBlockC = _BufResult Function(Pointer<Void>, Pointer<Uint8>, Size);
+typedef _ChainBlockD = _BufResult Function(Pointer<Void>, Pointer<Uint8>, int);
+typedef _ChainSubmitC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _ChainSubmitD = int Function(Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _ChainFreeC = Void Function(Pointer<Void>);
+typedef _ChainFreeD = void Function(Pointer<Void>);
+
 class BlockchainerException implements Exception {
   BlockchainerException(this.message);
   final String message;
@@ -937,6 +967,91 @@ class Blockchainer {
     }
   }
 
+  // ── Composable chains (blueprint + registry discovery + assembly) ──────────
+
+  /// A validator BLS keypair (public 48 B, secret 32 B) from [keyMaterial].
+  ({Uint8List public, Uint8List secret}) newBLSValidator(Uint8List keyMaterial) {
+    final p = _alloc(keyMaterial);
+    try {
+      final blob = _take(lib.lookupFunction<_BlsKeygenC, _BlsKeygenD>('blockchainer_bls_keygen')(p, keyMaterial.length), 'bls_keygen');
+      final pl = (blob[0] << 24) | (blob[1] << 16) | (blob[2] << 8) | blob[3];
+      return (public: Uint8List.sublistView(blob, 4, 4 + pl), secret: Uint8List.sublistView(blob, 4 + pl));
+    } finally {
+      calloc.free(p);
+    }
+  }
+
+  /// Declare a mixture: engine / state model / proposer ids + component params.
+  Blueprint makeBlueprint({required String consensus, required String stateModel, String proposer = '', Uint8List? params}) {
+    final pr = params ?? Uint8List(0);
+    final cc = consensus.toNativeUtf8(), cs = stateModel.toNativeUtf8(), cp = proposer.toNativeUtf8(), pp = _alloc(pr);
+    try {
+      return Blueprint._(this, _take(lib.lookupFunction<_BpEncodeC, _BpEncodeD>('blockchainer_blueprint_encode')(cc, cs, cp, pp, pr.length), 'blueprint_encode'));
+    } finally {
+      calloc.free(cc); calloc.free(cs); calloc.free(cp); calloc.free(pp);
+    }
+  }
+
+  List<String> _registryIds(int kind) {
+    final b = _take(lib.lookupFunction<_RegistryIdsC, _RegistryIdsD>('blockchainer_registry_ids')(kind), 'registry_ids');
+    final n = (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+    final out = <String>[]; var off = 4;
+    for (var i = 0; i < n; i++) {
+      final l = (b[off] << 24) | (b[off + 1] << 16) | (b[off + 2] << 8) | b[off + 3]; off += 4;
+      out.add(String.fromCharCodes(b.sublist(off, off + l))); off += l;
+    }
+    return out;
+  }
+  /// The engines / state models / proposer policies a mixture may name.
+  List<String> engineIds() => _registryIds(0);
+  List<String> stateModelIds() => _registryIds(1);
+  List<String> proposerIds() => _registryIds(2);
+
+  /// A minimal genesis: chain params + posture (1/2/3) + seeded state + validators.
+  Uint8List buildGenesis({required int chainId, int timestamp = 1, int assuranceLevel = 1, int stateModel = 0,
+      required List<({Uint8List address, int balance})> accounts, required List<({Uint8List publicKey, int power})> validators}) {
+    final addrs = Uint8List.fromList(accounts.expand((a) => a.address).toList());
+    final pks = Uint8List.fromList(validators.expand((v) => v.publicKey).toList());
+    final ap = _alloc(addrs), kp = _alloc(pks);
+    final bal = calloc<Uint64>(accounts.isEmpty ? 1 : accounts.length), pow = calloc<Uint64>(validators.isEmpty ? 1 : validators.length);
+    for (var i = 0; i < accounts.length; i++) bal[i] = accounts[i].balance;
+    for (var i = 0; i < validators.length; i++) pow[i] = validators[i].power;
+    try {
+      return _take(lib.lookupFunction<_GenesisBuildC, _GenesisBuildD>('blockchainer_genesis_build')(
+          chainId, timestamp, assuranceLevel, stateModel, ap, bal, accounts.length, kp, pow, validators.length), 'genesis_build');
+    } finally {
+      calloc.free(ap); calloc.free(kp); calloc.free(bal); calloc.free(pow);
+    }
+  }
+  /// Commit a mixture into a genesis (its hash changes: the mixture is chain identity).
+  Uint8List commitBlueprint(Uint8List genesis, Blueprint bp) {
+    final gp = _alloc(genesis), bp2 = _alloc(bp.encoded);
+    try {
+      return _take(lib.lookupFunction<_GenesisCommitBpC, _GenesisCommitBpD>('blockchainer_genesis_commit_blueprint')(gp, genesis.length, bp2, bp.encoded.length), 'genesis_commit_blueprint');
+    } finally {
+      calloc.free(gp); calloc.free(bp2);
+    }
+  }
+  Uint8List genesisHash(Uint8List genesis) {
+    final gp = _alloc(genesis);
+    try {
+      return _take(lib.lookupFunction<_GenesisHashC, _GenesisHashD>('blockchainer_genesis_hash')(gp, genesis.length), 'genesis_hash');
+    } finally {
+      calloc.free(gp);
+    }
+  }
+  /// Assemble for validator [me]. Returns null on any fail-closed reject
+  /// (unknown id, state mismatch, posture-forbidden engine).
+  Chain? assembleChain(Uint8List genesis, int me, Uint8List blsPub, Uint8List blsSec) {
+    final gp = _alloc(genesis), pp = _alloc(blsPub), sp = _alloc(blsSec);
+    try {
+      final h = lib.lookupFunction<_ChainAssembleC, _ChainAssembleD>('blockchainer_chain_assemble')(gp, genesis.length, me, pp, blsPub.length, sp, blsSec.length);
+      return h == nullptr ? null : Chain._(this, h);
+    } finally {
+      calloc.free(gp); calloc.free(pp); calloc.free(sp);
+    }
+  }
+
   /// Create a custodial [KeyStore] protected by [passphrase] (returned unlocked).
   KeyStore createKeyStore(String passphrase) {
     final cp = passphrase.toNativeUtf8();
@@ -1483,6 +1598,54 @@ Uint8List extractCommitment(Uint8List membershipCommit) {
       (membershipCommit[2] << 8) |
       membershipCommit[3];
   return Uint8List.sublistView(membershipCommit, 4, 4 + n);
+}
+
+/// A declared chain mixture (engine / state model / proposer ids + params). Its
+/// [hash] is the commitment; commit it with [Blockchainer.commitBlueprint].
+class Blueprint {
+  Blueprint._(this._bc, this.encoded);
+  final Blockchainer _bc;
+  final Uint8List encoded;
+  Uint8List hash() {
+    final p = _bc._alloc(encoded);
+    try {
+      return _bc._take(_bc.lib.lookupFunction<_BpHashC, _BpHashD>('blockchainer_blueprint_hash')(p, encoded.length), 'blueprint_hash');
+    } finally {
+      calloc.free(p);
+    }
+  }
+}
+
+/// An assembled node behind the uniform propose → (seal | mine) → submit flow.
+class Chain {
+  Chain._(this._bc, this._h);
+  final Blockchainer _bc;
+  final Pointer<Void> _h;
+  int get height => _bc.lib.lookupFunction<_ChainHeightC, _ChainHeightD>('blockchainer_chain_height')(_h);
+  Uint8List blueprint() => _bc._take(_bc.lib.lookupFunction<_ChainBufC, _ChainBufD>('blockchainer_chain_blueprint')(_h), 'chain_blueprint');
+  Uint8List propose(int timestamp) => _bc._take(_bc.lib.lookupFunction<_ChainProposeC, _ChainProposeD>('blockchainer_chain_propose')(_h, timestamp), 'chain_propose');
+  Uint8List _blockOp(String fn, Uint8List block) {
+    final p = _bc._alloc(block);
+    try {
+      return _bc._take(_bc.lib.lookupFunction<_ChainBlockC, _ChainBlockD>(fn)(_h, p, block.length), fn);
+    } finally {
+      calloc.free(p);
+    }
+  }
+  /// PoS / VRF justification; empty for engines that do not seal.
+  Uint8List seal(Uint8List block) => _blockOp('blockchainer_chain_seal', block);
+  /// PoW: the solved block.
+  Uint8List mine(Uint8List block) => _blockOp('blockchainer_chain_mine', block);
+  bool submit(Uint8List block, [Uint8List? justification]) {
+    final j = justification ?? Uint8List(0);
+    final bp = _bc._alloc(block), jp = _bc._alloc(j);
+    try {
+      return _bc.lib.lookupFunction<_ChainSubmitC, _ChainSubmitD>('blockchainer_chain_submit')(_h, bp, block.length, jp, j.length) == 1;
+    } finally {
+      calloc.free(bp); calloc.free(jp);
+    }
+  }
+  void free() => _bc.lib.lookupFunction<_ChainFreeC, _ChainFreeD>('blockchainer_chain_free')(_h);
 }
 
 /// A verifier's anonymous-membership admission gate (Option A — unlinkable). It

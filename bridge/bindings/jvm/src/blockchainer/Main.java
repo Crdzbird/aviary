@@ -170,6 +170,29 @@ public final class Main {
             }
             System.out.println("credential-gate pseudonymous OK");
 
+            // Composable chains: declare a mixture, commit it, assemble, commit a block.
+            if (!bc.engineIds().contains("pos") || !bc.stateModelIds().contains("account") || !bc.proposerIds().contains("round-robin"))
+                throw new IllegalStateException("registry discovery");
+            var val = bc.newBLSValidator(new byte[32]);
+            byte[] addr = new byte[32]; java.util.Arrays.fill(addr, (byte) 0x11);
+            byte[] gen = bc.buildGenesis(7, 1, 1, 0, new byte[][]{addr}, new long[]{1000}, new byte[][]{val.publicKey()}, new long[]{1});
+            var posBp = bc.new Blueprint("pos", "account", "round-robin", null);
+            byte[] mixedGen = bc.commitBlueprint(gen, posBp);
+            if (java.util.Arrays.equals(bc.genesisHash(gen), bc.genesisHash(mixedGen))) throw new IllegalStateException("mixture must change genesis hash");
+            try (var ch = bc.assembleChain(mixedGen, 0, val.publicKey(), val.secret())) {
+                if (ch == null) throw new IllegalStateException("PoS chain should assemble");
+                byte[] blk = ch.propose(2);
+                if (!ch.submit(blk, ch.seal(blk)) || ch.height() != 1) throw new IllegalStateException("PoS block did not commit");
+            }
+            byte[] target = new byte[32]; java.util.Arrays.fill(target, (byte) 0xFF);
+            try (var pc = bc.assembleChain(bc.commitBlueprint(gen, bc.new Blueprint("pow", "account", "", target)), 0, val.publicKey(), val.secret())) {
+                byte[] cand = pc.propose(2);
+                if (!pc.submit(pc.mine(cand), null) || pc.height() != 1) throw new IllegalStateException("PoW block did not commit");
+            }
+            if (bc.assembleChain(bc.commitBlueprint(gen, bc.new Blueprint("no-such-engine", "account", "", null)), 0, val.publicKey(), val.secret()) != null)
+                throw new IllegalStateException("unknown engine must be rejected");
+            System.out.println("chain-blueprint OK");
+
             System.out.println("\nALL GOOD");
         }
     }

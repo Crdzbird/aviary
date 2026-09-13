@@ -432,6 +432,101 @@ public enum Blockchainer {
         return CredentialGate(policy: policy)
     }
 
+    // ── Composable chains (blueprint + registry discovery + assembly) ───────────
+
+    /// A validator BLS keypair (public 48 B, secret 32 B).
+    public static func newBLSValidator(keyMaterial: Data) throws -> PortableAccount {
+        ensureReady()
+        return splitAccountBlob(try consume(keyMaterial.withC { p, l in blockchainer_bls_keygen(p, l) }, "bls_keygen"))
+    }
+
+    /// A declared mixture: engine / state model / proposer ids + component params.
+    public struct Blueprint {
+        public let encoded: Data
+        public init(consensus: String, stateModel: String, proposer: String = "", params: Data = Data()) throws {
+            Blockchainer.ensureReady()
+            encoded = try consume(params.withC { pp, pl in
+                blockchainer_blueprint_encode(consensus, stateModel, proposer, pp, pl) }, "blueprint_encode")
+        }
+        public func hash() throws -> Data {
+            try consume(encoded.withC { p, l in blockchainer_blueprint_hash(p, l) }, "blueprint_hash")
+        }
+    }
+
+    private static func decodeIds(_ b: Data) -> [String] {
+        let x = [UInt8](b)
+        let n = Int(x[0]) << 24 | Int(x[1]) << 16 | Int(x[2]) << 8 | Int(x[3])
+        var out: [String] = []; var off = 4
+        for _ in 0..<n {
+            let l = Int(x[off]) << 24 | Int(x[off+1]) << 16 | Int(x[off+2]) << 8 | Int(x[off+3]); off += 4
+            out.append(String(decoding: x[off..<(off + l)], as: UTF8.self)); off += l
+        }
+        return out
+    }
+    public static func engineIds() throws -> [String] { ensureReady(); return decodeIds(try consume(blockchainer_registry_ids(0), "registry_ids")) }
+    public static func stateModelIds() throws -> [String] { ensureReady(); return decodeIds(try consume(blockchainer_registry_ids(1), "registry_ids")) }
+    public static func proposerIds() throws -> [String] { ensureReady(); return decodeIds(try consume(blockchainer_registry_ids(2), "registry_ids")) }
+
+    public struct GenesisAccount { public let address: Data; public let balance: UInt64
+        public init(address: Data, balance: UInt64) { self.address = address; self.balance = balance } }
+    public struct GenesisValidator { public let publicKey: Data; public let power: UInt64
+        public init(publicKey: Data, power: UInt64) { self.publicKey = publicKey; self.power = power } }
+
+    /// A minimal genesis: chain params + posture (1/2/3) + seeded state + validators.
+    public static func buildGenesis(chainID: UInt64, timestamp: UInt64 = 1, assuranceLevel: UInt16 = 1,
+                                    stateModel: UInt8 = 0, accounts: [GenesisAccount],
+                                    validators: [GenesisValidator]) throws -> Data {
+        ensureReady()
+        var addrs = Data(); for a in accounts { addrs.append(a.address) }
+        var pks = Data(); for v in validators { pks.append(v.publicKey) }
+        let balances = accounts.map { $0.balance }, powers = validators.map { $0.power }
+        let res = addrs.withC { ap, _ in pks.withC { kp, _ in
+            balances.withUnsafeBufferPointer { bb in powers.withUnsafeBufferPointer { pb in
+                blockchainer_genesis_build(chainID, timestamp, assuranceLevel, stateModel,
+                                           ap, bb.baseAddress, accounts.count, kp, pb.baseAddress, validators.count) } } } }
+        return try consume(res, "genesis_build")
+    }
+    /// Commit a mixture into a genesis (its hash changes: the mixture is chain identity).
+    public static func commitBlueprint(genesis: Data, blueprint: Blueprint) throws -> Data {
+        try consume(genesis.withC { gp, gl in blueprint.encoded.withC { bp, bl in
+            blockchainer_genesis_commit_blueprint(gp, gl, bp, bl) } }, "genesis_commit_blueprint")
+    }
+    public static func genesisHash(_ genesis: Data) throws -> Data {
+        try consume(genesis.withC { p, l in blockchainer_genesis_hash(p, l) }, "genesis_hash")
+    }
+
+    /// An assembled node behind the uniform propose → (seal | mine) → submit flow.
+    public final class Chain {
+        private let h: OpaquePointer
+        init?(genesis: Data, me: UInt32, blsPub: Data, blsSec: Data) {
+            let raw = genesis.withC { gp, gl in blsPub.withC { pp, pl in blsSec.withC { sp, sl in
+                blockchainer_chain_assemble(gp, gl, me, pp, pl, sp, sl) } } }
+            guard let r = raw else { return nil }
+            h = OpaquePointer(r)
+        }
+        deinit { blockchainer_chain_free(UnsafeMutableRawPointer(h)) }
+        public var height: UInt64 { blockchainer_chain_height(UnsafeMutableRawPointer(h)) }
+        public func blueprint() throws -> Data { try consume(blockchainer_chain_blueprint(UnsafeMutableRawPointer(h)), "chain_blueprint") }
+        public func propose(timestamp: UInt64) throws -> Data { try consume(blockchainer_chain_propose(UnsafeMutableRawPointer(h), timestamp), "chain_propose") }
+        /// PoS / VRF justification; empty for engines that do not seal.
+        public func seal(_ block: Data) throws -> Data {
+            try consume(block.withC { bp, bl in blockchainer_chain_seal(UnsafeMutableRawPointer(h), bp, bl) }, "chain_seal")
+        }
+        /// PoW: the solved block.
+        public func mine(_ block: Data) throws -> Data {
+            try consume(block.withC { bp, bl in blockchainer_chain_mine(UnsafeMutableRawPointer(h), bp, bl) }, "chain_mine")
+        }
+        public func submit(block: Data, justification: Data = Data()) -> Bool {
+            block.withC { bp, bl in justification.withC { jp, jl in
+                blockchainer_chain_submit(UnsafeMutableRawPointer(h), bp, bl, jp, jl) == 1 } }
+        }
+    }
+    /// nil = rejected (fail-closed): unknown id, state mismatch, or posture-forbidden engine.
+    public static func assembleChain(genesis: Data, me: UInt32, blsPub: Data, blsSec: Data) -> Chain? {
+        ensureReady()
+        return Chain(genesis: genesis, me: me, blsPub: blsPub, blsSec: blsSec)
+    }
+
     /// Create a new in-memory single-validator chain.
     public static func makeNode(chainID: UInt64) throws -> Node {
         ensureReady()

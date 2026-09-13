@@ -31,7 +31,9 @@ public final class Blockchainer implements AutoCloseable {
             bbsKeygen, credPolicyEncode, credPolicyHash, credIssue, credPresent,
             credGateNew, credGateRevoke, credGateAdmit, credGateFree,
             credPolicyEncodeEx, membershipCommit, blindIssue, finalizeMembership,
-            credPresentPseud, credGateAdmitPseud, credGateRevokeNym, credGateNoteAdmission;
+            credPresentPseud, credGateAdmitPseud, credGateRevokeNym, credGateNoteAdmission,
+            blsKeygen, bpEncode, bpHash, registryIds, genesisBuild, genesisCommitBp, genesisHash,
+            chainAssemble, chainHeight, chainBlueprint, chainPropose, chainSeal, chainMine, chainSubmit, chainFree;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -112,6 +114,21 @@ public final class Blockchainer implements AutoCloseable {
         credGateAdmitPseud = h("blockchainer_credential_gate_admit_pseudonymous", FunctionDescriptor.of(RES, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
         credGateRevokeNym = h("blockchainer_credential_gate_revoke_nym", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_LONG));
         credGateNoteAdmission = h("blockchainer_credential_gate_note_admission", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        blsKeygen  = h("blockchainer_bls_keygen", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        bpEncode   = h("blockchainer_blueprint_encode", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG));
+        bpHash     = h("blockchainer_blueprint_hash", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        registryIds = h("blockchainer_registry_ids", FunctionDescriptor.of(RES, JAVA_BYTE));
+        genesisBuild = h("blockchainer_genesis_build", FunctionDescriptor.of(RES, JAVA_LONG, JAVA_LONG, JAVA_SHORT, JAVA_BYTE, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, ADDRESS, JAVA_LONG));
+        genesisCommitBp = h("blockchainer_genesis_commit_blueprint", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        genesisHash = h("blockchainer_genesis_hash", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        chainAssemble = h("blockchainer_chain_assemble", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        chainHeight = h("blockchainer_chain_height", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        chainBlueprint = h("blockchainer_chain_blueprint", FunctionDescriptor.of(RES, ADDRESS));
+        chainPropose = h("blockchainer_chain_propose", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        chainSeal  = h("blockchainer_chain_seal", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        chainMine  = h("blockchainer_chain_mine", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        chainSubmit = h("blockchainer_chain_submit", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        chainFree  = h("blockchainer_chain_free", FunctionDescriptor.ofVoid(ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -438,6 +455,92 @@ public final class Blockchainer implements AutoCloseable {
         @Override public void close() { try { credGateFree.invoke(h); } catch (Throwable ignored) {} }
     }
     public CredentialGate newCredentialGate(CredentialPolicy policy) { return new CredentialGate(policy); }
+
+    // ── Composable chains (blueprint + registry discovery + assembly) ───────────
+
+    /** A validator BLS keypair (public 48 B, secret 32 B) from >= 32 B of key material. */
+    public PortableAccount newBLSValidator(byte[] ikm) {
+        try { return splitBlob(consume((MemorySegment) blsKeygen.invoke(arena.allocate(RES), seg(ikm), (long) ikm.length))); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** A declared mixture: engine / state model / proposer ids + component params. */
+    public final class Blueprint {
+        final byte[] encoded;
+        public Blueprint(String consensus, String stateModel, String proposer, byte[] params) {
+            byte[] p = params == null ? new byte[0] : params;
+            try { encoded = consume((MemorySegment) bpEncode.invoke(arena.allocate(RES), arena.allocateFrom(consensus),
+                    arena.allocateFrom(stateModel), arena.allocateFrom(proposer == null ? "" : proposer), seg(p), (long) p.length)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        public byte[] encoded() { return encoded; }
+        public byte[] hash() {
+            try { return consume((MemorySegment) bpHash.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length)); }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+    }
+
+    private java.util.List<String> registryIds(int kind) {
+        byte[] b;
+        try { b = consume((MemorySegment) registryIds.invoke(arena.allocate(RES), (byte) kind)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+        int n = ((b[0] & 0xFF) << 24) | ((b[1] & 0xFF) << 16) | ((b[2] & 0xFF) << 8) | (b[3] & 0xFF);
+        var out = new java.util.ArrayList<String>(n); int off = 4;
+        for (int i = 0; i < n; i++) {
+            int l = ((b[off] & 0xFF) << 24) | ((b[off+1] & 0xFF) << 16) | ((b[off+2] & 0xFF) << 8) | (b[off+3] & 0xFF); off += 4;
+            out.add(new String(b, off, l, java.nio.charset.StandardCharsets.UTF_8)); off += l;
+        }
+        return out;
+    }
+    public java.util.List<String> engineIds() { return registryIds(0); }
+    public java.util.List<String> stateModelIds() { return registryIds(1); }
+    public java.util.List<String> proposerIds() { return registryIds(2); }
+
+    /** A minimal genesis: chain params + posture (1/2/3) + seeded state (32-byte addrs) + validators (48-byte BLS keys). */
+    public byte[] buildGenesis(long chainId, long timestamp, int assuranceLevel, int stateModel,
+                               byte[][] addrs, long[] balances, byte[][] validatorPks, long[] powers) {
+        byte[] a = new byte[32 * addrs.length]; for (int i = 0; i < addrs.length; i++) System.arraycopy(addrs[i], 0, a, 32 * i, 32);
+        byte[] k = new byte[48 * validatorPks.length]; for (int i = 0; i < validatorPks.length; i++) System.arraycopy(validatorPks[i], 0, k, 48 * i, 48);
+        try { return consume((MemorySegment) genesisBuild.invoke(arena.allocate(RES), chainId, timestamp, (short) assuranceLevel, (byte) stateModel,
+                seg(a), arena.allocateFrom(JAVA_LONG, balances), (long) addrs.length,
+                seg(k), arena.allocateFrom(JAVA_LONG, powers), (long) validatorPks.length)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+    /** Commit a mixture into a genesis (its hash changes: the mixture is chain identity). */
+    public byte[] commitBlueprint(byte[] genesis, Blueprint b) {
+        try { return consume((MemorySegment) genesisCommitBp.invoke(arena.allocate(RES), seg(genesis), (long) genesis.length, seg(b.encoded), (long) b.encoded.length)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+    public byte[] genesisHash(byte[] genesis) {
+        try { return consume((MemorySegment) genesisHash.invoke(arena.allocate(RES), seg(genesis), (long) genesis.length)); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** An assembled node behind the uniform propose → (seal | mine) → submit flow. */
+    public final class Chain implements AutoCloseable {
+        private final MemorySegment h;
+        Chain(MemorySegment h) { this.h = h; }
+        public long height() { try { return (long) chainHeight.invoke(h); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public byte[] blueprint() { try { return consume((MemorySegment) chainBlueprint.invoke(arena.allocate(RES), h)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public byte[] propose(long timestamp) { try { return consume((MemorySegment) chainPropose.invoke(arena.allocate(RES), h, timestamp)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** PoS / VRF justification; empty for engines that do not seal. */
+        public byte[] seal(byte[] block) { try { return consume((MemorySegment) chainSeal.invoke(arena.allocate(RES), h, seg(block), (long) block.length)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** PoW: the solved block. */
+        public byte[] mine(byte[] block) { try { return consume((MemorySegment) chainMine.invoke(arena.allocate(RES), h, seg(block), (long) block.length)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public boolean submit(byte[] block, byte[] justification) {
+            byte[] j = justification == null ? new byte[0] : justification;
+            try { return (int) chainSubmit.invoke(h, seg(block), (long) block.length, seg(j), (long) j.length) == 1; }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        @Override public void close() { try { chainFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    /** Assemble for validator me. Returns null on any fail-closed reject (unknown id, state mismatch, posture-forbidden engine). */
+    public Chain assembleChain(byte[] genesis, int me, byte[] blsPub, byte[] blsSec) {
+        try {
+            MemorySegment h = (MemorySegment) chainAssemble.invoke(seg(genesis), (long) genesis.length, me, seg(blsPub), (long) blsPub.length, seg(blsSec), (long) blsSec.length);
+            return h.address() == 0 ? null : new Chain(h);
+        } catch (Throwable e) { throw new RuntimeException(e); }
+    }
 
     public boolean verifyStateProof(byte[] root, byte[] proof) {
         try { return (int) verifyProof.invoke(seg(root), seg(proof), (long) proof.length) == 1; }

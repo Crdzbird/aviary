@@ -151,5 +151,32 @@ let nymE = try pseudoGate.admitPseudonymous(epoch: 6, scope: "gossip", challenge
 precondition(nymE != nil && nymE != nymA, "different epoch → unlinkable pseudonym")
 print("credential-gate pseudonymous OK")
 
+// Composable chains: declare a mixture, commit it into genesis, assemble, commit a block.
+let engIds = try Blockchainer.engineIds()
+precondition(engIds.contains("pos") && engIds.contains("pow"), "registry discovery")
+let val = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: 0x60, count: 32))
+let gen = try Blockchainer.buildGenesis(chainID: 7,
+    accounts: [.init(address: Data(repeating: 0x11, count: 32), balance: 1000)],
+    validators: [.init(publicKey: val.publicKey, power: 1)])
+let posBp = try Blockchainer.Blueprint(consensus: "pos", stateModel: "account", proposer: "round-robin")
+let mixedGen = try Blockchainer.commitBlueprint(genesis: gen, blueprint: posBp)
+let genH0 = try Blockchainer.genesisHash(gen), genH1 = try Blockchainer.genesisHash(mixedGen)
+precondition(genH0 != genH1, "the mixture changes the genesis hash")
+let posChain = Blockchainer.assembleChain(genesis: mixedGen, me: 0, blsPub: val.publicKey, blsSec: val.secret)
+precondition(posChain != nil, "PoS chain assembles")
+let posBlk = try posChain!.propose(timestamp: 2)
+let posJust = try posChain!.seal(posBlk)
+precondition(posChain!.submit(block: posBlk, justification: posJust) && posChain!.height == 1, "PoS block committed")
+let powBp = try Blockchainer.Blueprint(consensus: "pow", stateModel: "account", params: Data(repeating: 0xFF, count: 32))
+let powGen = try Blockchainer.commitBlueprint(genesis: gen, blueprint: powBp)
+let powChain = Blockchainer.assembleChain(genesis: powGen, me: 0, blsPub: val.publicKey, blsSec: val.secret)!
+let cand = try powChain.propose(timestamp: 2)
+let solved = try powChain.mine(cand)
+precondition(powChain.submit(block: solved) && powChain.height == 1, "PoW block committed")
+let badBp = try Blockchainer.Blueprint(consensus: "no-such-engine", stateModel: "account")
+let badGen = try Blockchainer.commitBlueprint(genesis: gen, blueprint: badBp)
+precondition(Blockchainer.assembleChain(genesis: badGen, me: 0, blsPub: val.publicKey, blsSec: val.secret) == nil, "unknown engine rejected")
+print("chain-blueprint OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")
