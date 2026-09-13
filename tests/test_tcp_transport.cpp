@@ -152,6 +152,46 @@ int main() {
       CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "ratcheted validators agree on the block hash");
   }
 
+  std::printf("== BFT over the NOISE XX tier (standards-based channel + PQ identity proof) ==\n");
+  {
+    // No peer static keys up front: Noise XX learns them in-band; the sig
+    // allow-list is the only shared knowledge. Fresh X25519 static per boot.
+    std::vector<SecureConfig> cfgs(n);
+    for (std::uint32_t i = 0; i < n; ++i) {
+      cfgs[i].tier = p2p::TransportTier::kNoiseXX;
+      cfgs[i].identity = ids[i];
+      cfgs[i].noise_prologue = Bytes{'b', 'c', '-', 't', 'e', 's', 't'};
+      for (std::uint32_t j = 0; j < n; ++j)
+        if (j != i) cfgs[i].peer_sig_pk[j] = ids[j].sig.public_key;
+    }
+    auto nodes = build_nodes(n, alice_addr, vset);
+    auto committed = run_mesh(nodes, 47700, &cfgs);
+    for (std::uint32_t i = 0; i < n; ++i)
+      CHECK_MSG(committed[i] == 1, "validator committed over the Noise XX channel");
+    const Hash tip = nodes[0]->ledger().tip().hash();
+    for (std::uint32_t i = 1; i < n; ++i)
+      CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "Noise XX validators agree on the block hash");
+  }
+
+  std::printf("== Noise XX allow-list: a mis-pinned node is excluded, the quorum still commits ==\n");
+  {
+    // Node 3 presents an identity nobody allow-listed (and it pins the others
+    // wrongly) → every link to it fails the proof check; 0-1-2 still commit.
+    auto stranger = SecureSession::generate_identity();
+    std::vector<SecureConfig> cfgs(n);
+    for (std::uint32_t i = 0; i < n; ++i) {
+      cfgs[i].tier = p2p::TransportTier::kNoiseXX;
+      cfgs[i].identity = (i == 3) ? stranger : ids[i];
+      for (std::uint32_t j = 0; j < n; ++j)
+        if (j != i) cfgs[i].peer_sig_pk[j] = ids[j].sig.public_key;
+    }
+    auto nodes = build_nodes(n, alice_addr, vset);
+    auto committed = run_mesh(nodes, 47720, &cfgs);
+    for (std::uint32_t i = 0; i < 3; ++i)
+      CHECK_MSG(committed[i] == 1, "allow-listed Noise XX validator committed");
+    CHECK_MSG(committed[3] == 0, "the unlisted node never joined the Noise XX mesh");
+  }
+
   std::printf("== boot wiring: a profile's transport tier builds the config from records ==\n");
   {
     using blockchainer::AssuranceProfile;

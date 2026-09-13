@@ -253,6 +253,73 @@ Ratchet::~Ratchet() {
   if (h_) cryptolib_session_free(h_);
 }
 
+// ── Noise XX ─────────────────────────────────────────────────────────────────
+
+namespace {
+const std::uint8_t kNoiseEmpty = 0;
+// Borrowed-input contract: hand the backend a valid pointer even for 0 bytes.
+const std::uint8_t* nz(ByteView v) { return v.empty() ? &kNoiseEmpty : v.data(); }
+Bytes noise_take(CryptoBufferResult r, const char* op) {
+  if (r.buf.data == nullptr) {
+    std::string m = r.error ? r.error : "failed";
+    if (r.error) cryptolib_str_free(r.error);
+    throw std::runtime_error(std::string(op) + ": " + m);
+  }
+  return take_buffer(r.buf);
+}
+}  // namespace
+
+KeyPair x25519_keygen() {
+  CryptoKeyPair kp = cryptolib_x25519_keygen();
+  if (kp.public_key.data == nullptr || kp.secret_key.data == nullptr) {
+    cryptolib_keypair_free(&kp);
+    throw std::runtime_error("x25519_keygen failed");
+  }
+  return KeyPair{take_buffer(kp.public_key), take_buffer(kp.secret_key)};
+}
+
+Noise::Noise(bool initiator, ByteView static_pub, ByteView static_sec, ByteView prologue)
+    : h_(cryptolib_noise_create(initiator ? 1 : 0, static_pub.data(), static_pub.size(),
+                                static_sec.data(), static_sec.size(), nz(prologue), prologue.size())) {
+  if (h_ == nullptr) throw std::runtime_error("noise_create: bad static key");
+}
+Bytes Noise::write_message(ByteView payload) {
+  return noise_take(cryptolib_noise_write_message(h_, nz(payload), payload.size()), "noise_write_message");
+}
+Bytes Noise::read_message(ByteView message) {
+  return noise_take(cryptolib_noise_read_message(h_, nz(message), message.size()), "noise_read_message");
+}
+bool Noise::handshake_finished() const { return h_ != nullptr && cryptolib_noise_handshake_finished(h_) == 1; }
+Hash Noise::handshake_hash() const {
+  Bytes b = noise_take(cryptolib_noise_handshake_hash(h_), "noise_handshake_hash");
+  if (b.size() != 32) throw std::runtime_error("noise_handshake_hash: unexpected length");
+  Hash out{};
+  std::copy(b.begin(), b.end(), out.begin());
+  return out;
+}
+Bytes Noise::remote_static() const { return noise_take(cryptolib_noise_remote_static(h_), "noise_remote_static"); }
+void Noise::split() {
+  if (cryptolib_noise_split(h_) != 1) throw std::runtime_error("noise_split: handshake not finished or already split");
+}
+Bytes Noise::encrypt(ByteView plaintext, ByteView ad) {
+  return noise_take(cryptolib_noise_encrypt(h_, nz(plaintext), plaintext.size(), nz(ad), ad.size()), "noise_encrypt");
+}
+Bytes Noise::decrypt(ByteView record, ByteView ad) {
+  return noise_take(cryptolib_noise_decrypt(h_, nz(record), record.size(), nz(ad), ad.size()), "noise_decrypt");
+}
+Noise::Noise(Noise&& o) noexcept : h_(o.h_) { o.h_ = nullptr; }
+Noise& Noise::operator=(Noise&& o) noexcept {
+  if (this != &o) {
+    if (h_) cryptolib_noise_free(h_);
+    h_ = o.h_;
+    o.h_ = nullptr;
+  }
+  return *this;
+}
+Noise::~Noise() {
+  if (h_) cryptolib_noise_free(h_);
+}
+
 // ── SLH-DSA (FIPS 205) — fixed SLH-DSA-SHA2-128s profile ────────────────────
 
 namespace {

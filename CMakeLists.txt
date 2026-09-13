@@ -117,6 +117,7 @@ add_library(blockchainer_core STATIC
   src/p2p/networked_node.cpp
   src/p2p/tcp_transport.cpp
   src/p2p/secure_session.cpp
+  src/p2p/noise_session.cpp
   src/p2p/wire.cpp
   src/observability/metrics.cpp
   src/observability/log.cpp
@@ -202,6 +203,7 @@ blockchainer_add_test(test_consensus tests/test_consensus.cpp)
 blockchainer_add_test(test_bft tests/test_bft.cpp)
 blockchainer_add_test(test_mempool tests/test_mempool.cpp)
 blockchainer_add_test(test_secure_session tests/test_secure_session.cpp)
+blockchainer_add_test(test_noise_session tests/test_noise_session.cpp)
 blockchainer_add_test(test_wire tests/test_wire.cpp)
 blockchainer_add_test(test_p2p_integration tests/test_p2p_integration.cpp)
 blockchainer_add_test(test_observability tests/test_observability.cpp)

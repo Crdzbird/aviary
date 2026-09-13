@@ -31,6 +31,7 @@ enum class Domain : std::uint8_t {
   kCredentialPolicy = 0x08,        ///< commitment to a membership-credential policy
   kCredentialPresentation = 0x09,  ///< binds a credential presentation to its context
   kChainBlueprint = 0x0A,          ///< commitment to a chain's component mixture
+  kNoiseBinding = 0x0B,            ///< PQ identity binding over a Noise XX handshake hash
 };
 
 /// BLAKE3-256 over [data, data+len). The chain's primary hash primitive.
@@ -152,6 +153,53 @@ class Ratchet {
  private:
   explicit Ratchet(void* h) : h_(h) {}
   void* h_ = nullptr;  // CryptoSession
+};
+
+// ── Noise XX (Noise_XX_25519_ChaChaPoly_SHA256) ──────────────────────────────
+// The standards-based interactive handshake: 3 messages, both static keys are
+// transmitted (encrypted) in-band, so neither side needs the other's static key
+// up front. Classical (X25519) — its confidentiality is NOT post-quantum; the
+// p2p::NoiseSession layers a PQ-hybrid identity binding on top so that
+// *authentication* survives a quantum adversary. This is the raw state machine.
+// Stateful (owns an opaque handle); not thread-safe.
+
+/// Fresh X25519 keypair (32-byte public, 32-byte secret): a Noise static key.
+KeyPair x25519_keygen();
+
+class Noise {
+ public:
+  /// A Noise XX state for one side. [prologue] must be identical on both sides
+  /// (it is mixed into the handshake hash — a mismatch aborts the handshake).
+  Noise(bool initiator, ByteView static_pub, ByteView static_sec, ByteView prologue = {});
+
+  /// Produce the next handshake message (this side's turn), embedding [payload].
+  Bytes write_message(ByteView payload);
+  /// Consume the peer's next handshake message; returns its embedded payload.
+  /// Throws on a malformed / tampered / out-of-turn message.
+  Bytes read_message(ByteView message);
+  /// True once all three handshake messages have been processed.
+  bool handshake_finished() const;
+  /// The 32-byte handshake hash (channel binding). Both sides agree on it once
+  /// the handshake completes; it commits every handshake byte incl. both statics.
+  Hash handshake_hash() const;
+  /// The peer's static X25519 public key learned in-band. Throws before known.
+  Bytes remote_static() const;
+  /// Derive the transport cipher states (Noise Split). Throws if the handshake
+  /// is not finished or split was already done.
+  void split();
+  /// Transport record (after split): ciphertext ‖ tag. Sequential nonces — the
+  /// receiver must decrypt in order. Throws on failure.
+  Bytes encrypt(ByteView plaintext, ByteView ad = {});
+  Bytes decrypt(ByteView record, ByteView ad = {});
+
+  Noise(Noise&&) noexcept;
+  Noise& operator=(Noise&&) noexcept;
+  Noise(const Noise&) = delete;
+  Noise& operator=(const Noise&) = delete;
+  ~Noise();
+
+ private:
+  void* h_ = nullptr;  // CryptoNoiseHandle
 };
 
 // ── SLH-DSA (FIPS 205, stateless hash-based) ─────────────────────────────────

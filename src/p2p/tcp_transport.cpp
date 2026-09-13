@@ -1,6 +1,7 @@
 #include "blockchainer/tcp_transport.hpp"
 
 #include "blockchainer/armored.hpp"
+#include "blockchainer/noise_session.hpp"
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -15,6 +16,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -126,6 +128,7 @@ struct Conn {
   Bytes out;                            // outbound framed bytes awaiting POLLOUT flush
   std::unique_ptr<SecureSession> sess;  // kMutual tier
   std::unique_ptr<ArmoredChannel> chan; // kRatcheted tier
+  std::unique_ptr<NoiseSession> noise;  // kNoiseXX tier
 };
 
 crypto::ByteView cv(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
@@ -148,6 +151,7 @@ Bytes conn_encrypt(Conn& c, const Bytes& pt) {
     return c.chan->encrypt(framed);
   }
   if (c.sess) return c.sess->encrypt(pt);
+  if (c.noise) return c.noise->encrypt(pt);
   return pt;
 }
 // Returns the consensus payload, or empty for a ratcheted keepalive (which the
@@ -158,6 +162,7 @@ Bytes conn_decrypt(Conn& c, const Bytes& frame) {
     if (plain.empty() || plain.front() == kFrameKeepalive) return {};
     return Bytes(plain.begin() + 1, plain.end());
   }
+  if (c.noise) return c.noise->decrypt(frame);
   return c.sess->decrypt(frame);  // secure mode guarantees exactly one is set
 }
 
@@ -175,6 +180,8 @@ SecureConfig secure_config_from_records(TransportTier tier, SecureSession::Ident
     cfg.peer_sig_pk[r.id] = r.sig_pk;                     // both tiers: allow-list / pin
     if (tier == TransportTier::kMutual) {
       cfg.peer_kem_pk[r.id] = r.kem_pk;                   // SIGMA dials to the KEM key
+    } else if (tier == TransportTier::kNoiseXX) {
+      // Noise XX learns the peer's static in-band; only the sig allow-list matters.
     } else if (!r.prekey.empty()) {
       cfg.peer_prekey[r.id] = r.prekey;                   // ratchet dials to the prekey
     }
@@ -193,6 +200,15 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   if (secure)
     for (const auto& [id, pk] : secure->peer_sig_pk) id_by_sig[pk] = id;
   const bool ratcheted = secure && secure->tier == TransportTier::kRatcheted;
+  const bool noise = secure && secure->tier == TransportTier::kNoiseXX;
+  // Noise XX static: the configured one, else fresh for this boot (the node's
+  // identity is its hybrid sig key, proven per session — the static is not it).
+  NoiseSession::Identity noise_id;
+  if (noise) {
+    noise_id.sig = secure->identity.sig;
+    noise_id.noise_static = secure->noise_static.public_key.empty() ? crypto::x25519_keygen()
+                                                                    : secure->noise_static;
+  }
 
   int listener = make_listener(listen_port);
   if (listener < 0) return false;
@@ -330,6 +346,13 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
         queue_frame(fd, cit->second.chan->encrypt(Bytes{kFrameKeepalive}));
         on_link_ready(fd, cit->second);
       }
+    } else if (noise) {
+      // Noise XX initiator: msg0 out; ready once msg1 is consumed AND the
+      // responder's identity proof verifies + pins.
+      auto [s, msg0] = NoiseSession::begin_initiator(noise_id, secure->noise_prologue);
+      c.noise = std::make_unique<NoiseSession>(std::move(s));
+      conns.emplace(fd, std::move(c));
+      queue_frame(fd, msg0);
     } else if (secure) {
       auto [s, msg1] = SecureSession::begin_initiator(secure->peer_kem_pk.at(p.id), secure->identity.sig);
       c.sess = std::make_unique<SecureSession>(std::move(s));
@@ -473,6 +496,56 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
             }
           } else {
             pending.emplace_back(c.peer_id, std::move(frame));
+          }
+        } else if (noise) {
+          // Noise XX: dialer = msg1 → (msg2 ‖ our proof), then the peer's proof;
+          // accepter = msg0 → msg1, msg2 → our proof, then the peer's proof.
+          // Nobody is `ready` (no consensus byte flows) until the peer's
+          // PQ identity proof verified for THIS session and pinned/allow-listed.
+          bool waiting = false;  // handshake step done, more frames needed
+          try {
+            if (c.dialer) {
+              if (!c.noise->handshake_done()) {
+                Bytes msg2 = c.noise->complete_initiator(frame);
+                Bytes proof = c.noise->identity_proof();
+                queue_frame(fd, msg2);
+                if (conns.find(fd) == conns.end()) { dropped = true; continue; }
+                queue_frame(fd, proof);
+                if (conns.find(fd) == conns.end()) { dropped = true; continue; }
+                waiting = true;
+              } else {
+                c.noise->verify_identity_proof(frame);
+                if (c.noise->peer_identity() != secure->peer_sig_pk.at(c.peer_id))
+                  throw std::runtime_error("authenticated key isn't the validator we dialed");
+              }
+            } else if (!c.noise) {
+              auto [s, msg1] = NoiseSession::accept_responder(noise_id, frame, secure->noise_prologue);
+              c.noise = std::make_unique<NoiseSession>(std::move(s));
+              queue_frame(fd, msg1);
+              if (conns.find(fd) == conns.end()) { dropped = true; continue; }
+              waiting = true;
+            } else if (!c.noise->handshake_done()) {
+              c.noise->complete_responder(frame);
+              Bytes proof = c.noise->identity_proof();
+              queue_frame(fd, proof);
+              if (conns.find(fd) == conns.end()) { dropped = true; continue; }
+              waiting = true;
+            } else {
+              c.noise->verify_identity_proof(frame);
+              auto found = id_by_sig.find(c.noise->peer_identity());
+              if (found == id_by_sig.end()) throw std::runtime_error("unknown identity");
+              c.peer_id = found->second;  // a redial replaces any stale mapping
+            }
+          } catch (...) {
+            drop(fd);  // bad handshake / proof failed / not on the allow-list
+            dropped = true;
+            continue;
+          }
+          if (waiting) continue;
+          c.ready = true;
+          if (!on_link_ready(fd, c)) {
+            dropped = true;
+            continue;
           }
         } else if (ratcheted) {
           // Ratchet responder consuming the armored hello: accept, map the

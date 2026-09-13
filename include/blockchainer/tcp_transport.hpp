@@ -7,6 +7,7 @@
 
 #include "blockchainer/networked_node.hpp"
 #include "blockchainer/peer_book.hpp"
+#include "blockchainer/noise_session.hpp"
 #include "blockchainer/secure_session.hpp"
 
 /// Real-socket transport for a [NetworkedNode] — the last mile that turns the
@@ -43,10 +44,15 @@ struct PeerAddr {
 ///   - `kRatcheted` — the [ArmoredChannel] hybrid-KEM Double Ratchet: adds
 ///     per-message forward secrecy + post-compromise healing on long-lived
 ///     links. The dialer encapsulates to the peer's published ratchet prekey.
+///   - `kNoiseXX` — the standards-based [NoiseSession]: Noise_XX_25519_ChaChaPoly
+///     _SHA256 (interoperable with any Noise stack) plus a PQ-hybrid identity
+///     proof bound to the handshake hash. PQ-authenticated; confidentiality is
+///     classical. Needs no peer key up front beyond the sig allow-list.
 ///
-/// The tier is what an `AssuranceProfile` selects; `secure_config_for` builds
+/// The tier is what an `AssuranceProfile` selects (kMutual / kRatcheted);
+/// kNoiseXX is an explicit operator choice. `secure_config_from_records` builds
 /// the matching config from a node's identity + its peers' records.
-enum class TransportTier { kMutual, kRatcheted };
+enum class TransportTier { kMutual, kRatcheted, kNoiseXX };
 
 struct SecureConfig {
   TransportTier tier = TransportTier::kMutual;
@@ -59,6 +65,11 @@ struct SecureConfig {
   // kRatcheted: the ratchet prekeys.
   crypto::KeyPair ratchet_prekey;               ///< this node's ratchet prekey (to accept)
   std::map<std::uint32_t, Bytes> peer_prekey;   ///< peer id → ratchet prekey public key (to dial)
+
+  // kNoiseXX: the X25519 static (fresh per boot when empty — identity is .sig)
+  // and an optional prologue both sides must share (e.g. the genesis hash).
+  crypto::KeyPair noise_static;
+  Bytes noise_prologue;
 };
 
 /// Assemble the transport [SecureConfig] for validator [self_id] at [tier] from
