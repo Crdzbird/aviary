@@ -18,6 +18,10 @@
 'use strict';
 const path = require('node:path');
 const koffi = require('koffi');
+// Foreign-component callback prototypes (mirror bridge/blockchainer_c.h).
+koffi.proto('int BlockchainerJustifyFn(void* ctx, const uint8_t* block, size_t block_len, uint8_t* out, size_t out_cap, size_t* out_len)');
+koffi.proto('int BlockchainerVerifyFn(void* ctx, const uint8_t* block, size_t block_len, const uint8_t* justification, size_t just_len)');
+koffi.proto('uint32_t BlockchainerProposerFn(void* ctx, uint64_t height, uint32_t validator_count)');
 
 // ── Resolve the bundled native libraries for this platform/arch ──────────────
 function ext() {
@@ -135,6 +139,9 @@ function ensureLoaded() {
     chainMine: f('BlockchainerBufferResult blockchainer_chain_mine(void*, uint8_t*, size_t)'),
     chainSubmit: f('int blockchainer_chain_submit(void*, uint8_t*, size_t, uint8_t*, size_t)'),
     chainFree: f('void blockchainer_chain_free(void*)'),
+    // Foreign components (engines / proposers implemented in JavaScript)
+    regAddEngine: f('int blockchainer_registry_add_engine(const char*, BlockchainerJustifyFn*, BlockchainerVerifyFn*, void*, int)'),
+    regAddProposer: f('int blockchainer_registry_add_proposer(const char*, BlockchainerProposerFn*, void*)'),
     newAccountHybrid: f('BlockchainerBufferResult blockchainer_node_new_account_hybrid(void*)'),
     submitHybrid: f('BlockchainerBufferResult blockchainer_node_submit_transfer_hybrid(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, uint64_t, uint64_t)'),
     produce: f('int blockchainer_node_produce_block(void*, uint64_t, _Out_ uint64_t *)'),
@@ -463,6 +470,44 @@ function buildGenesis({ chainId, timestamp = 1, assuranceLevel = 1, stateModel =
     addrs, u64arr(accounts.map((a) => a.balance)), accounts.length,
     pks, u64arr(validators.map((v) => v.power)), validators.length), 'genesis_build');
 }
+// ── Foreign components: engines / proposers implemented in JavaScript ─────────
+// The consensus pipeline stays native (propose/apply go through the Ledger); JS
+// supplies the JUSTIFICATION policy (justify a proposed block / verify one) or
+// the proposer (leader-election) policy. Callbacks run synchronously inside
+// consensus: they MUST be deterministic (no clock, no randomness, no Math.random)
+// and must not call back into the chain. Registered callbacks live for the
+// process lifetime (chain identity — never rename an id).
+const MAX_JUSTIFICATION = 4096;
+const foreignKeep = [];
+// engine: { justify(block: Buffer): Buffer | null, verify(block: Buffer, justification: Buffer): boolean }
+function registerEngine(id, engine, grindProof = false) {
+  if (typeof engine.justify !== 'function' || typeof engine.verify !== 'function') throw new TypeError('engine needs justify() and verify()');
+  const justify = koffi.register((_ctx, block, len, out, cap, outLen) => {
+    try {
+      const j = engine.justify(Buffer.from(koffi.decode(block, 'uint8_t', len)));
+      if (!j || j.length > cap) return 0;
+      koffi.encode(out, 'uint8_t', j, j.length);
+      koffi.encode(outLen, 'size_t', j.length);
+      return 1;
+    } catch (e) { if (process.env.BLOCKCHAINER_FOREIGN_DEBUG) console.error('justify callback threw:', e); return 0; }
+  }, koffi.pointer('BlockchainerJustifyFn'));
+  const verify = koffi.register((_ctx, block, len, just, jlen) => {
+    try {
+      return engine.verify(Buffer.from(koffi.decode(block, 'uint8_t', len)), Buffer.from(koffi.decode(just, 'uint8_t', jlen))) ? 1 : 0;
+    } catch (e) { if (process.env.BLOCKCHAINER_FOREIGN_DEBUG) console.error('verify callback threw:', e); return 0; }
+  }, koffi.pointer('BlockchainerVerifyFn'));
+  foreignKeep.push(justify, verify);
+  return fn.regAddEngine(id, justify, verify, null, grindProof ? 1 : 0) === 1;
+}
+// policy(height: bigint, validators: number) => number  (proposer index)
+function registerProposer(id, policy) {
+  const cb = koffi.register((_ctx, height, n) => {
+    try { return policy(height, n) >>> 0; } catch (_) { return 0; }
+  }, koffi.pointer('BlockchainerProposerFn'));
+  foreignKeep.push(cb);
+  return fn.regAddProposer(id, cb, null) === 1;
+}
+
 // null = rejected (fail-closed): unknown id, state mismatch, or posture-forbidden engine.
 function assembleChain(genesis, me, blsPublic, blsSecret) {
   const h = fn.chainAssemble(u8(genesis), u8(genesis).length, me, u8(blsPublic), u8(blsPublic).length, u8(blsSecret), u8(blsSecret).length);
@@ -550,6 +595,9 @@ module.exports = {
   genesisHash: (genesis) => consume(fn.genesisHash(u8(genesis), u8(genesis).length), 'genesis_hash'),
   assembleChain,
   Chain,
+  registerEngine,
+  registerProposer,
+  MAX_JUSTIFICATION,
 
   commit(card) {
     const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');

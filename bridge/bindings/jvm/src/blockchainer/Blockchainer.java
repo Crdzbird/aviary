@@ -33,7 +33,8 @@ public final class Blockchainer implements AutoCloseable {
             credPolicyEncodeEx, membershipCommit, blindIssue, finalizeMembership,
             credPresentPseud, credGateAdmitPseud, credGateRevokeNym, credGateNoteAdmission,
             blsKeygen, bpEncode, bpHash, registryIds, genesisBuild, genesisCommitBp, genesisHash,
-            chainAssemble, chainHeight, chainBlueprint, chainPropose, chainSeal, chainMine, chainSubmit, chainFree;
+            chainAssemble, chainHeight, chainBlueprint, chainPropose, chainSeal, chainMine, chainSubmit, chainFree,
+            regAddEngine, regAddProposer;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -129,6 +130,8 @@ public final class Blockchainer implements AutoCloseable {
         chainMine  = h("blockchainer_chain_mine", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
         chainSubmit = h("blockchainer_chain_submit", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         chainFree  = h("blockchainer_chain_free", FunctionDescriptor.ofVoid(ADDRESS));
+        regAddEngine = h("blockchainer_registry_add_engine", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_INT));
+        regAddProposer = h("blockchainer_registry_add_proposer", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -534,6 +537,74 @@ public final class Blockchainer implements AutoCloseable {
         }
         @Override public void close() { try { chainFree.invoke(h); } catch (Throwable ignored) {} }
     }
+    // ── Foreign components (engines / proposers implemented in Java) ────────────
+
+    /** A consensus engine implemented in Java, plugged into a mixture by id. The
+     *  consensus pipeline stays native; Java supplies the JUSTIFICATION policy.
+     *  Both methods run synchronously inside consensus and MUST be deterministic
+     *  (no clock, no randomness) and must not call back into the chain. */
+    public interface ForeignEngine {
+        /** The justification for a block this node proposed (≤ 4096 B), or null to refuse. */
+        byte[] justify(byte[] block);
+        boolean verify(byte[] block, byte[] justification);
+    }
+    public interface ForeignProposer { int propose(long height, int validators); }
+
+    private static final java.util.Map<Long, Object> FOREIGN = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.atomic.AtomicLong NEXT_HANDLE = new java.util.concurrent.atomic.AtomicLong(1);
+
+    @SuppressWarnings("unused")
+    private static int justifyUpcall(MemorySegment ctx, MemorySegment block, long len, MemorySegment out, long cap, MemorySegment outLen) {
+        Object o = FOREIGN.get(ctx.address());
+        if (!(o instanceof ForeignEngine e)) return 0;
+        byte[] j = e.justify(block.reinterpret(len).toArray(JAVA_BYTE));
+        if (j == null || j.length > cap) return 0;
+        MemorySegment.copy(j, 0, out.reinterpret(cap), JAVA_BYTE, 0, j.length);
+        outLen.reinterpret(8).set(JAVA_LONG, 0, (long) j.length);
+        return 1;
+    }
+    @SuppressWarnings("unused")
+    private static int verifyUpcall(MemorySegment ctx, MemorySegment block, long len, MemorySegment just, long jlen) {
+        Object o = FOREIGN.get(ctx.address());
+        if (!(o instanceof ForeignEngine e)) return 0;
+        return e.verify(block.reinterpret(len).toArray(JAVA_BYTE), just.reinterpret(jlen).toArray(JAVA_BYTE)) ? 1 : 0;
+    }
+    @SuppressWarnings("unused")
+    private static int proposerUpcall(MemorySegment ctx, long height, int validators) {
+        Object o = FOREIGN.get(ctx.address());
+        return (o instanceof ForeignProposer p) ? p.propose(height, validators) : 0;
+    }
+    private MemorySegment upcall(String name, java.lang.invoke.MethodType type, FunctionDescriptor fd) {
+        try {
+            var mh = java.lang.invoke.MethodHandles.lookup().findStatic(Blockchainer.class, name, type);
+            return java.lang.foreign.Linker.nativeLinker().upcallStub(mh, fd, arena);
+        } catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** Register a Java {@link ForeignEngine} under id (chain identity — never rename). */
+    public boolean registerEngine(String id, ForeignEngine engine, boolean grindProof) {
+        long h = NEXT_HANDLE.getAndIncrement();
+        FOREIGN.put(h, engine);
+        MemorySegment j = upcall("justifyUpcall",
+                java.lang.invoke.MethodType.methodType(int.class, MemorySegment.class, MemorySegment.class, long.class, MemorySegment.class, long.class, MemorySegment.class),
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS));
+        MemorySegment v = upcall("verifyUpcall",
+                java.lang.invoke.MethodType.methodType(int.class, MemorySegment.class, MemorySegment.class, long.class, MemorySegment.class, long.class),
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        try { return (int) regAddEngine.invoke(arena.allocateFrom(id), j, v, MemorySegment.ofAddress(h), grindProof ? 1 : 0) == 1; }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+    /** Register a Java proposer policy under id. Must be deterministic. */
+    public boolean registerProposer(String id, ForeignProposer policy) {
+        long h = NEXT_HANDLE.getAndIncrement();
+        FOREIGN.put(h, policy);
+        MemorySegment p = upcall("proposerUpcall",
+                java.lang.invoke.MethodType.methodType(int.class, MemorySegment.class, long.class, int.class),
+                FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, JAVA_INT));
+        try { return (int) regAddProposer.invoke(arena.allocateFrom(id), p, MemorySegment.ofAddress(h)) == 1; }
+        catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
     /** Assemble for validator me. Returns null on any fail-closed reject (unknown id, state mismatch, posture-forbidden engine). */
     public Chain assembleChain(byte[] genesis, int me, byte[] blsPub, byte[] blsSec) {
         try {

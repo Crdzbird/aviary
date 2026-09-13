@@ -178,5 +178,32 @@ let badGen = try Blockchainer.commitBlueprint(genesis: gen, blueprint: badBp)
 precondition(Blockchainer.assembleChain(genesis: badGen, me: 0, blsPub: val.publicKey, blsSec: val.secret) == nil, "unknown engine rejected")
 print("chain-blueprint OK")
 
+// Foreign components: a Swift-implemented engine + proposer join the mixture.
+final class SwiftHashEngine: Blockchainer.ForeignEngine {
+    var justified = 0, verified = 0
+    static func tag(_ b: Data) -> Data { Data("swift-just:".utf8) + b.prefix(16) }
+    func justify(block: Data) -> Data? { justified += 1; return Self.tag(block) }
+    func verify(block: Data, justification: Data) -> Bool { verified += 1; return justification == Self.tag(block) }
+}
+let swiftEngine = SwiftHashEngine()
+precondition(Blockchainer.registerEngine(id: "swift-engine", swiftEngine), "register Swift engine")
+precondition(Blockchainer.registerProposer(id: "swift-first") { _, _ in 0 }, "register Swift proposer")
+let feBp = try Blockchainer.Blueprint(consensus: "swift-engine", stateModel: "account")
+let feGen = try Blockchainer.commitBlueprint(genesis: gen, blueprint: feBp)
+let feChain = Blockchainer.assembleChain(genesis: feGen, me: 0, blsPub: val.publicKey, blsSec: val.secret)!
+let feBlk = try feChain.propose(timestamp: 2)
+let feJust = try feChain.seal(feBlk)   // → Swift justify
+precondition(feJust.starts(with: Data("swift-just:".utf8)), "seal via Swift justify")
+var feBad = feJust; feBad[feBad.count - 1] ^= 1
+precondition(!feChain.submit(block: feBlk, justification: feBad) && feChain.height == 0, "tampered justification refused, ledger untouched")
+precondition(feChain.submit(block: feBlk, justification: feJust) && feChain.height == 1, "Swift-justified block committed")
+precondition(swiftEngine.justified >= 1 && swiftEngine.verified >= 2, "callbacks crossed the boundary")
+let fpBp = try Blockchainer.Blueprint(consensus: "pos", stateModel: "account", proposer: "swift-first")
+let fpChain = Blockchainer.assembleChain(genesis: try Blockchainer.commitBlueprint(genesis: gen, blueprint: fpBp), me: 0, blsPub: val.publicKey, blsSec: val.secret)!
+let fpBlk = try fpChain.propose(timestamp: 2)
+let fpJust = try fpChain.seal(fpBlk)
+precondition(fpChain.submit(block: fpBlk, justification: fpJust) && fpChain.height == 1, "PoS with a Swift proposer committed")
+print("foreign-components OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

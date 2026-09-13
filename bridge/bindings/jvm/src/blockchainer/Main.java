@@ -193,6 +193,32 @@ public final class Main {
                 throw new IllegalStateException("unknown engine must be rejected");
             System.out.println("chain-blueprint OK");
 
+            // Foreign components: a Java-implemented engine + proposer join the mixture.
+            final int[] calls = {0, 0};
+            var javaEngine = new Blockchainer.ForeignEngine() {
+                byte[] tag(byte[] b) { byte[] p = "java-just:".getBytes(); int n = Math.min(16, b.length); byte[] t = new byte[p.length + n];
+                    System.arraycopy(p, 0, t, 0, p.length); System.arraycopy(b, 0, t, p.length, n); return t; }
+                public byte[] justify(byte[] block) { calls[0]++; return tag(block); }
+                public boolean verify(byte[] block, byte[] just) { calls[1]++; return java.util.Arrays.equals(just, tag(block)); }
+            };
+            if (!bc.registerEngine("java-engine", javaEngine, false) || !bc.registerProposer("java-first", (hh, n) -> 0))
+                throw new IllegalStateException("register foreign");
+            if (!bc.engineIds().contains("java-engine")) throw new IllegalStateException("java-engine not discoverable");
+            try (var fc = bc.assembleChain(bc.commitBlueprint(gen, bc.new Blueprint("java-engine", "account", "", null)), 0, val.publicKey(), val.secret())) {
+                byte[] fb = fc.propose(2);
+                byte[] fj = fc.seal(fb);  // → Java justify
+                if (!new String(fj, 0, 10).equals("java-just:")) throw new IllegalStateException("seal via Java justify");
+                byte[] bad = fj.clone(); bad[bad.length - 1] ^= 1;
+                if (fc.submit(fb, bad) || fc.height() != 0) throw new IllegalStateException("tampered justification must be refused, ledger untouched");
+                if (!fc.submit(fb, fj) || fc.height() != 1) throw new IllegalStateException("Java-justified block did not commit");
+                if (calls[0] < 1 || calls[1] < 2) throw new IllegalStateException("callbacks did not cross the boundary");
+            }
+            try (var pc2 = bc.assembleChain(bc.commitBlueprint(gen, bc.new Blueprint("pos", "account", "java-first", null)), 0, val.publicKey(), val.secret())) {
+                byte[] pb = pc2.propose(2);
+                if (!pc2.submit(pb, pc2.seal(pb)) || pc2.height() != 1) throw new IllegalStateException("PoS with a Java proposer did not commit");
+            }
+            System.out.println("foreign-components OK");
+
             System.out.println("\nALL GOOD");
         }
     }

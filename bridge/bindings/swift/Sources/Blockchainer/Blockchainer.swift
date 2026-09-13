@@ -527,6 +527,56 @@ public enum Blockchainer {
         return Chain(genesis: genesis, me: me, blsPub: blsPub, blsSec: blsSec)
     }
 
+    // ── Foreign components (engines / proposers implemented in Swift) ──────────
+
+    /// A consensus engine implemented in Swift, plugged into a mixture by id. The
+    /// consensus pipeline stays native; Swift supplies the JUSTIFICATION policy.
+    /// Both methods run synchronously inside consensus and MUST be deterministic
+    /// (no clock, no randomness) and must not call back into the chain.
+    public protocol ForeignEngine: AnyObject {
+        /// The justification for a block this node proposed (≤ 4096 B), or nil to refuse.
+        func justify(block: Data) -> Data?
+        func verify(block: Data, justification: Data) -> Bool
+    }
+    private final class ProposerBox { let fn: (UInt64, UInt32) -> UInt32; init(_ f: @escaping (UInt64, UInt32) -> UInt32) { fn = f } }
+    private static var retainedForeign: [AnyObject] = []  // kept alive for the process lifetime
+
+    /// Register a Swift [ForeignEngine] under [id] (chain identity — never rename).
+    @discardableResult
+    public static func registerEngine(id: String, _ engine: ForeignEngine, grindProof: Bool = false) -> Bool {
+        ensureReady()
+        retainedForeign.append(engine)
+        let ctx = Unmanaged.passUnretained(engine as AnyObject).toOpaque()
+        let justify: BlockchainerJustifyFn = { ctx, block, len, out, cap, outLen in
+            guard let ctx, let block, let out, let outLen,
+                  let e = Unmanaged<AnyObject>.fromOpaque(ctx).takeUnretainedValue() as? ForeignEngine,
+                  let j = e.justify(block: Data(bytes: block, count: len)), j.count <= cap else { return 0 }
+            j.copyBytes(to: out, count: j.count)
+            outLen.pointee = j.count
+            return 1
+        }
+        let verify: BlockchainerVerifyFn = { ctx, block, len, just, jlen in
+            guard let ctx, let block, let just,
+                  let e = Unmanaged<AnyObject>.fromOpaque(ctx).takeUnretainedValue() as? ForeignEngine else { return 0 }
+            return e.verify(block: Data(bytes: block, count: len), justification: Data(bytes: just, count: jlen)) ? 1 : 0
+        }
+        return blockchainer_registry_add_engine(id, justify, verify, ctx, grindProof ? 1 : 0) == 1
+    }
+
+    /// Register a Swift proposer policy under [id]. Must be deterministic.
+    @discardableResult
+    public static func registerProposer(id: String, _ policy: @escaping (UInt64, UInt32) -> UInt32) -> Bool {
+        ensureReady()
+        let box = ProposerBox(policy)
+        retainedForeign.append(box)
+        let ctx = Unmanaged.passUnretained(box).toOpaque()
+        let fn: BlockchainerProposerFn = { ctx, height, n in
+            guard let ctx else { return 0 }
+            return Unmanaged<ProposerBox>.fromOpaque(ctx).takeUnretainedValue().fn(height, n)
+        }
+        return blockchainer_registry_add_proposer(id, fn, ctx) == 1
+    }
+
     /// Create a new in-memory single-validator chain.
     public static func makeNode(chainID: UInt64) throws -> Node {
         ensureReady()

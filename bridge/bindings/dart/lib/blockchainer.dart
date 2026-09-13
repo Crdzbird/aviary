@@ -249,6 +249,50 @@ typedef _ChainSubmitD = int Function(Pointer<Void>, Pointer<Uint8>, int, Pointer
 typedef _ChainFreeC = Void Function(Pointer<Void>);
 typedef _ChainFreeD = void Function(Pointer<Void>);
 
+// Foreign components (engines / proposers implemented in Dart).
+typedef _JustifyC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Size>);
+typedef _FVerifyC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _ProposerC = Uint32 Function(Pointer<Void>, Uint64, Uint32);
+typedef _RegEngineC = Int32 Function(Pointer<Utf8>, Pointer<NativeFunction<_JustifyC>>, Pointer<NativeFunction<_FVerifyC>>, Pointer<Void>, Int32);
+typedef _RegEngineD = int Function(Pointer<Utf8>, Pointer<NativeFunction<_JustifyC>>, Pointer<NativeFunction<_FVerifyC>>, Pointer<Void>, int);
+typedef _RegProposerC = Int32 Function(Pointer<Utf8>, Pointer<NativeFunction<_ProposerC>>, Pointer<Void>);
+typedef _RegProposerD = int Function(Pointer<Utf8>, Pointer<NativeFunction<_ProposerC>>, Pointer<Void>);
+
+/// A consensus engine implemented in Dart, plugged into a chain mixture by id.
+/// The consensus pipeline stays native (propose/apply go through the Ledger);
+/// Dart supplies the JUSTIFICATION policy. Both methods run synchronously inside
+/// consensus and MUST be deterministic (no clock, no randomness) and must not
+/// call back into the chain.
+abstract class ForeignEngine {
+  /// The justification for a block this node proposed (≤ 4096 bytes), or null to refuse.
+  Uint8List? justify(Uint8List block);
+  bool verify(Uint8List block, Uint8List justification);
+}
+
+final Map<int, ForeignEngine> _foreignEngines = {};
+final Map<int, int Function(int height, int validators)> _foreignProposers = {};
+int _nextForeignHandle = 1;
+final List<NativeCallable> _foreignCallables = []; // kept alive for the process lifetime
+
+int _justifyTrampoline(Pointer<Void> ctx, Pointer<Uint8> block, int len, Pointer<Uint8> out, int cap, Pointer<Size> outLen) {
+  final e = _foreignEngines[ctx.address];
+  if (e == null) return 0;
+  final j = e.justify(Uint8List.fromList(block.asTypedList(len)));
+  if (j == null || j.length > cap) return 0;
+  out.asTypedList(cap).setAll(0, j);
+  outLen.value = j.length;
+  return 1;
+}
+int _verifyTrampoline(Pointer<Void> ctx, Pointer<Uint8> block, int len, Pointer<Uint8> just, int jlen) {
+  final e = _foreignEngines[ctx.address];
+  if (e == null) return 0;
+  return e.verify(Uint8List.fromList(block.asTypedList(len)), Uint8List.fromList(just.asTypedList(jlen))) ? 1 : 0;
+}
+int _proposerTrampoline(Pointer<Void> ctx, int height, int validators) {
+  final p = _foreignProposers[ctx.address];
+  return p == null ? 0 : p(height, validators);
+}
+
 class BlockchainerException implements Exception {
   BlockchainerException(this.message);
   final String message;
@@ -1049,6 +1093,39 @@ class Blockchainer {
       return h == nullptr ? null : Chain._(this, h);
     } finally {
       calloc.free(gp); calloc.free(pp); calloc.free(sp);
+    }
+  }
+
+  /// Register a Dart [ForeignEngine] under [id] (chain identity — never rename).
+  /// [grindProof] declares whether its leader election is unpredictable.
+  bool registerEngine(String id, ForeignEngine engine, {bool grindProof = false}) {
+    final h = _nextForeignHandle++;
+    _foreignEngines[h] = engine;
+    final j = NativeCallable<_JustifyC>.isolateLocal(_justifyTrampoline, exceptionalReturn: 0)..keepIsolateAlive = false;
+    final v = NativeCallable<_FVerifyC>.isolateLocal(_verifyTrampoline, exceptionalReturn: 0)..keepIsolateAlive = false;
+    _foreignCallables..add(j)..add(v);
+    final cid = id.toNativeUtf8();
+    try {
+      return lib.lookupFunction<_RegEngineC, _RegEngineD>('blockchainer_registry_add_engine')(
+              cid, j.nativeFunction, v.nativeFunction, Pointer<Void>.fromAddress(h), grindProof ? 1 : 0) == 1;
+    } finally {
+      calloc.free(cid);
+    }
+  }
+
+  /// Register a Dart proposer policy under [id]: the proposer index for a height
+  /// among [validators]. Must be deterministic.
+  bool registerProposer(String id, int Function(int height, int validators) policy) {
+    final h = _nextForeignHandle++;
+    _foreignProposers[h] = policy;
+    final p = NativeCallable<_ProposerC>.isolateLocal(_proposerTrampoline, exceptionalReturn: 0)..keepIsolateAlive = false;
+    _foreignCallables.add(p);
+    final cid = id.toNativeUtf8();
+    try {
+      return lib.lookupFunction<_RegProposerC, _RegProposerD>('blockchainer_registry_add_proposer')(
+              cid, p.nativeFunction, Pointer<Void>.fromAddress(h)) == 1;
+    } finally {
+      calloc.free(cid);
     }
   }
 
