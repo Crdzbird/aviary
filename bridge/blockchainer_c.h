@@ -570,6 +570,37 @@ BLOCKCHAINER_API int blockchainer_chain_submit(
     const uint8_t* justification, size_t justification_len);
 BLOCKCHAINER_API void blockchainer_chain_free(BlockchainerChain c);
 
+/* ── Foreign components: implement engines / proposers in ANY language ────────
+ *  The consensus pipeline stays in C++ (a foreign engine proposes and applies
+ *  via the Ledger); the foreign code supplies the JUSTIFICATION policy through
+ *  C callbacks. Callbacks are invoked synchronously inside consensus and MUST
+ *  be deterministic (no clock / randomness / map order) and must not re-enter
+ *  the chain. [ctx] is passed back verbatim (an opaque handle to your object).
+ *  A foreign engine seals via blockchainer_chain_seal (→ your justify) and
+ *  submits via blockchainer_chain_submit (→ your verify, then apply). */
+
+/** Justify a block this node proposed: write up to out_cap bytes into [out],
+ *  set *out_len. Return 1 on success, 0 to refuse. */
+typedef int (*BlockchainerJustifyFn)(void* ctx, const uint8_t* block, size_t block_len,
+                                     uint8_t* out, size_t out_cap, size_t* out_len);
+/** Verify a justification for a block. Return 1 valid, 0 invalid. */
+typedef int (*BlockchainerVerifyFn)(void* ctx, const uint8_t* block, size_t block_len,
+                                    const uint8_t* justification, size_t just_len);
+/** Leader election: the proposer index for [height] among [validator_count]. */
+typedef uint32_t (*BlockchainerProposerFn)(void* ctx, uint64_t height, uint32_t validator_count);
+
+/** Register a foreign engine under [id] (chain identity — never rename).
+ *  Returns 1 on success, 0 on bad arguments. */
+BLOCKCHAINER_API int blockchainer_registry_add_engine(
+    const char* id, BlockchainerJustifyFn justify, BlockchainerVerifyFn verify, void* ctx,
+    int grind_proof);
+/** Register a foreign proposer policy under [id]. Returns 1 on success. */
+BLOCKCHAINER_API int blockchainer_registry_add_proposer(
+    const char* id, BlockchainerProposerFn fn, void* ctx);
+/** Max justification size a foreign justify callback may produce. */
+#define BLOCKCHAINER_MAX_JUSTIFICATION 4096
+
+
 /* ── Interop address derivation (showcase) ─────────────────────────────────── */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */

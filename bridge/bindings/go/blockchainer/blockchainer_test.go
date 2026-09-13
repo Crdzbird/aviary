@@ -900,3 +900,86 @@ func TestChainBlueprint(t *testing.T) {
 		t.Fatal("state model mismatch must be rejected")
 	}
 }
+
+// goHashEngine is a consensus engine implemented in Go: the justification is a
+// tag over the block's first bytes; verification checks it. Counters prove the
+// callbacks really cross the language boundary.
+type goHashEngine struct{ justified, verified int }
+
+func (e *goHashEngine) Justify(block []byte) []byte {
+	e.justified++
+	n := 16
+	if len(block) < n {
+		n = len(block)
+	}
+	return append([]byte("go-just:"), block[:n]...)
+}
+func (e *goHashEngine) Verify(block, just []byte) bool {
+	e.verified++
+	return bytes.Equal(just, (&goHashEngine{}).Justify(block))
+}
+
+// TestForeignComponents: a consensus engine and a proposer policy implemented IN
+// GO join a chain mixture by id, the chain assembles, and blocks commit through
+// the Go justification policy — with a tampered justification refused by the Go
+// verifier while the ledger stays untouched.
+func TestForeignComponents(t *testing.T) {
+	eng := &goHashEngine{}
+	if err := bc.RegisterEngine("go-engine", eng, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := bc.RegisterProposer("go-first", func(uint64, uint32) uint32 { return 0 }); err != nil {
+		t.Fatal(err)
+	}
+	ids, _ := bc.EngineIDs()
+	found := false
+	for _, x := range ids {
+		found = found || x == "go-engine"
+	}
+	if !found {
+		t.Fatalf("go-engine not discoverable: %v", ids)
+	}
+
+	v, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x60}, 32))
+	genesis, _ := bc.BuildGenesis(7, 1, 1, bc.StateModelAccount,
+		[]bc.GenesisAccount{{Address: bytes.Repeat([]byte{0x11}, 32), Balance: 1000}},
+		[]bc.GenesisValidator{{PublicKey: v.Public, Power: 1}})
+	bp, _ := bc.NewBlueprint("go-engine", "account", "", nil)
+	mixed, _ := bc.CommitBlueprint(genesis, bp)
+	chain, err := bc.AssembleChain(mixed, 0, v.Public, v.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer chain.Free()
+
+	blk, _ := chain.Propose(2)
+	just, err := chain.Seal(blk) // → Go Justify
+	if err != nil || !bytes.HasPrefix(just, []byte("go-just:")) {
+		t.Fatalf("seal via Go justify: %v %q", err, just)
+	}
+	bad := append([]byte(nil), just...)
+	bad[len(bad)-1] ^= 1
+	if chain.Submit(blk, bad) || chain.Height() != 0 { // → Go Verify refuses; ledger untouched
+		t.Fatal("tampered justification must be refused with the ledger untouched")
+	}
+	if !chain.Submit(blk, just) || chain.Height() != 1 {
+		t.Fatal("valid Go-justified block should commit")
+	}
+	if eng.justified < 1 || eng.verified < 2 {
+		t.Fatalf("callbacks did not cross the boundary: justified=%d verified=%d", eng.justified, eng.verified)
+	}
+
+	// A Go proposer policy plugs into a built-in engine.
+	pbp, _ := bc.NewBlueprint("pos", "account", "go-first", nil)
+	pmixed, _ := bc.CommitBlueprint(genesis, pbp)
+	pc, err := bc.AssembleChain(pmixed, 0, v.Public, v.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pc.Free()
+	pblk, _ := pc.Propose(2)
+	pj, _ := pc.Seal(pblk)
+	if !pc.Submit(pblk, pj) || pc.Height() != 1 {
+		t.Fatal("PoS with a Go proposer should commit")
+	}
+}

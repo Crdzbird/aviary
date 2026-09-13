@@ -16,6 +16,7 @@
 #include "blockchainer/assurance.hpp"
 #include "blockchainer/chain_assembler.hpp"
 #include "blockchainer/chain_blueprint.hpp"
+#include "blockchainer/foreign_engine.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/pos_engine.hpp"
 #include "blockchainer/pow_engine.hpp"
@@ -1253,6 +1254,7 @@ BlockchainerBufferResult blockchainer_chain_seal(BlockchainerChain c, const uint
     auto* e = as_chain(c)->engine.get();
     if (auto* pos = dynamic_cast<blockchainer::consensus::PosEngine*>(e)) return bytes_result(pos->seal(b));
     if (auto* vrf = dynamic_cast<blockchainer::consensus::VrfPosEngine*>(e)) return bytes_result(vrf->seal(b));
+    if (auto* fe = dynamic_cast<blockchainer::node::ForeignEngine*>(e)) return bytes_result(fe->justify(b));
     const std::uint8_t empty = 0;
     return bytes_result(&empty, 0);  // this engine does not seal
   } catch (const std::exception& ex) {
@@ -1286,6 +1288,45 @@ int blockchainer_chain_submit(BlockchainerChain c, const uint8_t* block, size_t 
 }
 
 void blockchainer_chain_free(BlockchainerChain c) { delete as_chain(c); }
+
+// ── Foreign components (C callbacks → registry) ───────────────────────────────
+
+int blockchainer_registry_add_engine(const char* id, BlockchainerJustifyFn justify,
+                                     BlockchainerVerifyFn verify, void* ctx, int grind_proof) {
+  if (!id || !*id || !justify || !verify) return 0;
+  try {
+    blockchainer::node::register_foreign_engine(
+        id,
+        [justify, ctx](const blockchainer::Block& b) -> blockchainer::crypto::Bytes {
+          const blockchainer::crypto::Bytes enc = b.encode();
+          std::vector<std::uint8_t> out(BLOCKCHAINER_MAX_JUSTIFICATION);
+          size_t n = 0;
+          if (justify(ctx, enc.data(), enc.size(), out.data(), out.size(), &n) != 1 || n > out.size())
+            throw std::runtime_error("foreign justify refused");
+          out.resize(n);
+          return out;
+        },
+        [verify, ctx](const blockchainer::Block& b, blockchainer::crypto::ByteView j) -> bool {
+          const blockchainer::crypto::Bytes enc = b.encode();
+          return verify(ctx, enc.data(), enc.size(), j.data(), j.size()) == 1;
+        },
+        grind_proof != 0);
+    return 1;
+  } catch (...) {
+    return 0;
+  }
+}
+
+int blockchainer_registry_add_proposer(const char* id, BlockchainerProposerFn fn, void* ctx) {
+  if (!id || !*id || !fn) return 0;
+  try {
+    blockchainer::node::register_foreign_proposer(
+        id, [fn, ctx](std::uint64_t height, std::uint32_t n) { return fn(ctx, height, n); });
+    return 1;
+  } catch (...) {
+    return 0;
+  }
+}
 
 // ── Interop addresses ─────────────────────────────────────────────────────────
 

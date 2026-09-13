@@ -3,6 +3,7 @@
 // Built-ins assemble by id; a custom subclass of a seam registers under its
 // own id and joins the mixture; anything unknown, or a mix the assurance
 // posture forbids, is rejected at boot (fail-closed) — integrity preserved.
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "blockchainer/assurance.hpp"
 #include "blockchainer/chain_assembler.hpp"
 #include "blockchainer/chain_blueprint.hpp"
+#include "blockchainer/foreign_engine.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/pos_engine.hpp"
 #include "blockchainer/pow_engine.hpp"
@@ -171,6 +173,49 @@ int main() {
     b2.consensus_id = "pos";
     b2.state_model_id = "account";
     b2.proposer_id = "always-zero";
+    b2.commit_to(g2);
+    CHECK(ChainAssembler::assemble(g2, 0, bls(0x60)).engine->height() == 0);
+  }
+
+  // ── FOREIGN components: justification + proposer policies supplied from
+  //    outside C++ (here: lambdas standing in for FFI callbacks) ─────────────
+  {
+    // Justification = the block's own header hash; verify = it must match.
+    node::register_foreign_engine(
+        "foreign-hash",
+        [](const Block& b) { const auto h = b.header.hash(); return Bytes(h.begin(), h.end()); },
+        [](const Block& b, crypto::ByteView j) {
+          const auto h = b.header.hash();
+          return j.size() == h.size() && std::equal(h.begin(), h.end(), j.begin());
+        },
+        /*grind_proof=*/false);
+    node::register_foreign_proposer("foreign-last", [](std::uint64_t, std::uint32_t n) { return n - 1; });
+
+    GenesisSpec g = genesis(AssuranceProfile::standard());
+    ChainBlueprint b;
+    b.consensus_id = "foreign-hash";
+    b.state_model_id = "account";
+    b.commit_to(g);
+    auto chain = ChainAssembler::assemble(g, 0, bls(0x60));
+    auto* fe = dynamic_cast<node::ForeignEngine*>(chain.engine.get());
+    CHECK(fe != nullptr);
+    Block blk = chain.engine->propose({}, 2);
+    Bytes just = fe->justify(blk);
+    CHECK(just.size() == 32);
+    // A tampered justification is refused by the FOREIGN verifier — and the
+    // ledger is untouched (fail-closed, atomic).
+    Bytes bad = just; bad[0] ^= 1;
+    CHECK(!chain.engine->submit(blk, view(bad)).ok);
+    CHECK(chain.engine->height() == 0);
+    CHECK(chain.engine->submit(blk, view(just)).ok);
+    CHECK(chain.engine->height() == 1);
+
+    // A foreign proposer plugs into a built-in engine.
+    GenesisSpec g2 = genesis(AssuranceProfile::standard());
+    ChainBlueprint b2;
+    b2.consensus_id = "pos";
+    b2.state_model_id = "account";
+    b2.proposer_id = "foreign-last";
     b2.commit_to(g2);
     CHECK(ChainAssembler::assemble(g2, 0, bls(0x60)).engine->height() == 0);
   }
