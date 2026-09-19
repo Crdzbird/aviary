@@ -101,6 +101,7 @@ int main() {
     totality_ok &= total([&] { (void)Anchor::decode_all(v); });
     totality_ok &= total([&] { (void)SubchainPolicy::decode_all(v); });
     totality_ok &= total([&] { (void)ParentBinding::decode_all(v); });
+    totality_ok &= total([&] { (void)SubchainProof::decode_all(v); });
     totality_ok &= total([&] { (void)p2p::AddressBook::decode(v); });
     totality_ok &= total([&] { (void)custody::ShareCard::decode(v); });
     totality_ok &= total([&] { (void)consensus::CredentialPolicy::decode_all(v); });

@@ -23,20 +23,19 @@ Hash to_hash(const Bytes& b) {
 Bytes ChildRegistration::encode() const {
   codec::CodecWriter w;
   w.write_u64(chain_id);
-  w.write_fixed_bytes(hview(genesis_hash), 32);
   Bytes hdr = genesis_header.encode();
   w.write_bytes(bview(hdr));
   w.write_list(validators, [](codec::CodecWriter& w, const consensus::Validator& v) {
     w.write_bytes(bview(v.bls_pubkey));
     w.write_u64(v.power);
   });
+  w.write_u8(child_max_depth);
   return w.take();
 }
 
 ChildRegistration ChildRegistration::decode(codec::CodecReader& r) {
   ChildRegistration c;
   c.chain_id = r.read_u64();
-  c.genesis_hash = to_hash(r.read_fixed_bytes(32));
   Bytes hdr = r.read_bytes();
   c.genesis_header = BlockHeader::decode_all(bview(hdr));
   c.validators = r.read_list<consensus::Validator>([](codec::CodecReader& r) {
@@ -45,6 +44,7 @@ ChildRegistration ChildRegistration::decode(codec::CodecReader& r) {
     v.power = r.read_u64();
     return v;
   });
+  c.child_max_depth = r.read_u8();
   return c;
 }
 
@@ -98,6 +98,8 @@ std::string SubchainPolicy::validate(std::uint64_t own_chain_id) const {
     if (c.genesis_header.chain_id != c.chain_id) return "subchain policy: child genesis header chain_id mismatch";
     for (const auto& v : c.validators)
       if (v.power == 0) return "subchain policy: child validator with zero power";
+    if (static_cast<unsigned>(c.child_max_depth) + 1 > max_depth)
+      return "subchain policy: child subtree deeper than max_depth allows";
   }
   return {};
 }
@@ -196,18 +198,93 @@ std::string SubchainRegistry::apply_anchors(const std::vector<Anchor>& anchors) 
   return {};
 }
 
-Hash SubchainRegistry::root() const {
+Hash registry_root(const std::vector<ChildSummary>& summaries) {
   codec::CodecWriter w;
-  w.write_u32(static_cast<std::uint32_t>(children_.size()));
-  for (const ChildEntry& e : children_) {
-    w.write_u64(e.reg.chain_id);
-    w.write_fixed_bytes(hview(e.reg.genesis_hash), 32);
-    const Hash th = e.tip.hash();
+  w.write_u32(static_cast<std::uint32_t>(summaries.size()));
+  for (const ChildSummary& s : summaries) {
+    w.write_u64(s.chain_id);
+    w.write_fixed_bytes(hview(s.genesis_header_hash), 32);
+    const Hash th = s.tip.hash();
     w.write_fixed_bytes(hview(th), 32);
-    w.write_u64(e.tip.height);
-    w.write_fixed_bytes(hview(e.tip.state_root), 32);
+    w.write_u64(s.tip.height);
+    w.write_fixed_bytes(hview(s.tip.state_root), 32);
   }
   return crypto::hash_tagged(crypto::Domain::kSubchainRegistry, w.take());
+}
+
+std::vector<ChildSummary> SubchainRegistry::summaries() const {
+  std::vector<ChildSummary> out;
+  out.reserve(children_.size());
+  for (const ChildEntry& e : children_)
+    out.push_back(ChildSummary{e.reg.chain_id, e.reg.genesis_header.hash(), e.tip});
+  return out;
+}
+
+Hash SubchainRegistry::root() const { return registry_root(summaries()); }
+
+SubchainProof::Hop SubchainRegistry::hop(std::uint64_t child_chain_id) const {
+  if (tip_of(child_chain_id) == nullptr) throw std::invalid_argument("hop: child not registered");
+  return SubchainProof::Hop{summaries(), child_chain_id};
+}
+
+// ── SubchainProof ────────────────────────────────────────────────────────────
+
+Bytes SubchainProof::encode() const {
+  codec::CodecWriter w;
+  w.write_list(hops, [](codec::CodecWriter& w, const Hop& h) {
+    w.write_list(h.summaries, [](codec::CodecWriter& w, const ChildSummary& s) {
+      w.write_u64(s.chain_id);
+      w.write_fixed_bytes(hview(s.genesis_header_hash), 32);
+      Bytes t = s.tip.encode();
+      w.write_bytes(bview(t));
+    });
+    w.write_u64(h.child_chain_id);
+  });
+  Bytes sp = state_proof.encode();
+  w.write_bytes(bview(sp));
+  return w.take();
+}
+
+SubchainProof SubchainProof::decode_all(crypto::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  SubchainProof p;
+  p.hops = r.read_list<Hop>([](codec::CodecReader& r) {
+    Hop h;
+    h.summaries = r.read_list<ChildSummary>([](codec::CodecReader& r) {
+      ChildSummary s;
+      s.chain_id = r.read_u64();
+      s.genesis_header_hash = to_hash(r.read_fixed_bytes(32));
+      Bytes t = r.read_bytes();
+      s.tip = BlockHeader::decode_all(bview(t));
+      return s;
+    });
+    h.child_chain_id = r.read_u64();
+    return h;
+  });
+  Bytes sp = r.read_bytes();
+  p.state_proof = StateProof::decode_all(bview(sp));
+  r.assert_fully_consumed();
+  return p;
+}
+
+bool verify_subchain_proof(const Hash& parent_subchain_root, const SubchainProof& p) {
+  if (p.hops.empty()) return false;
+  Hash root = parent_subchain_root;
+  const BlockHeader* tip = nullptr;
+  for (const SubchainProof::Hop& h : p.hops) {
+    // The list must be canonical (ascending, unique) — otherwise two lists
+    // could not be told apart from the root alone.
+    for (std::size_t i = 1; i < h.summaries.size(); ++i)
+      if (!(h.summaries[i - 1].chain_id < h.summaries[i].chain_id)) return false;
+    if (registry_root(h.summaries) != root) return false;
+    tip = nullptr;
+    for (const ChildSummary& s : h.summaries)
+      if (s.chain_id == h.child_chain_id) tip = &s.tip;
+    if (tip == nullptr) return false;
+    if (tip->chain_id != h.child_chain_id) return false;
+    root = tip->subchain_root;  // descend (zero unless that child is itself a parent)
+  }
+  return verify_state_proof(tip->state_root, p.state_proof);
 }
 
 Bytes SubchainRegistry::serialize_tips() const {

@@ -1,6 +1,6 @@
 # Subchains — a block that anchors a whole blockchain — Design Doc
 
-Status: **ACCEPTED (recommendations approved 2026-09-19) — stage 1 built.** This document exists because the feature
+Status: **ACCEPTED (recommendations approved 2026-09-19) — stages 1–3 built.** This document exists because the feature
 is delicate: it changes what a block commits to, adds a second trust level, and
 touches consensus-critical code. Every question in §9 must be answered before a
 line of implementation is written; every invariant in §5 must have a test in
@@ -145,10 +145,20 @@ chain's own state is account- or UTXO-shaped.
 ```
 struct ChildEntry {
   std::uint64_t chain_id;
-  Hash          genesis_hash;       // the child's full identity (blueprint, posture, membership, validators)
+  BlockHeader   genesis_header;     // the child's identity anchor (see note)
   consensus::ValidatorSet vset;     // the child's validator set (fixed in v1 — §8)
+  std::uint8_t  child_max_depth;    // the child's own subtree depth (I10)
   BlockHeader   tip;                // last anchored child header (height 0 = none yet)
 };
+```
+**Note (found while building):** registering the child by its genesis *hash*
+is circular — the child's genesis hash commits its `ParentBinding` (the
+parent's genesis hash), and the parent's genesis hash commits the
+registration. The child's genesis *header* (chain id, genesis state root, and,
+for a child that is itself a parent, its initial registry root) does not depend
+on the binding, so it is the identity the parent commits to; the binding then
+holds the parent's genesis hash without a cycle.
+```
 class SubchainRegistry {
   // Deterministic, pure: returns an error string or applies the anchor.
   std::string apply(const Anchor& a);                  // §6 rules, in order
@@ -161,7 +171,7 @@ Internally each `ChildEntry` drives a `LightClient` — `LightClient::accept
 
 ### 4.5 `subchain_root`
 `BLAKE3( kSubchainRegistry ‖ count ‖ for each child ascending by chain_id:
-chain_id ‖ genesis_hash ‖ tip.hash() ‖ tip.height ‖ tip.state_root )`.
+chain_id ‖ genesis_header.hash() ‖ tip.hash() ‖ tip.height ‖ tip.state_root )`.
 A flat hash is enough for v1 (the child count is policy-bounded and small); a
 Merkle root can replace it under a version bump if per-child proofs must be
 O(log n). Proof of a child's tip = the full sorted list (bounded by

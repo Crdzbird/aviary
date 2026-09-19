@@ -44,7 +44,12 @@ class BftEngine : public ConsensusEngine {
   /// certificate that finalized the parent) — so the produced chain is
   /// self-certifying and bound to this validator set.
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override {
-    Block b = ledger_->build_block(std::move(txs), timestamp);
+    return propose(std::move(txs), timestamp, {});
+  }
+  /// A parent chain's proposal: the same block, also anchoring [anchors]
+  /// (docs/design/SUBCHAINS.md). Throws if an anchor is invalid.
+  Block propose(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors) {
+    Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
     b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
     return b;
   }

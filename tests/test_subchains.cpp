@@ -2,6 +2,7 @@
 // version-3 header fence, and genesis commitment — no anchoring behaviour yet.
 #include <cstdio>
 
+#include "blockchainer/account_state.hpp"
 #include "blockchainer/bft_engine.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/ledger.hpp"
@@ -19,33 +20,44 @@ crypto::KeyPair bls_key(std::uint8_t seed) {
   return crypto::bls_keygen_from_ikm(v(ikm));
 }
 
-// A real child chain: 3 BFT validators finalizing empty blocks with genuine
-// certificates — exactly what a parent anchors.
+// A real chain: 3 BFT validators finalizing blocks with genuine certificates —
+// what a parent anchors. May itself be a parent (policy) and/or a child (binding).
 struct ChildChain {
   GenesisSpec genesis;
   std::vector<crypto::KeyPair> keys;
   std::unique_ptr<consensus::BftEngine> engine;
 
-  explicit ChildChain(std::uint64_t chain_id, std::uint8_t seed = 0x10) {
-    genesis.chain_id = chain_id;
-    genesis.timestamp = 1;
+  static GenesisSpec make_genesis(std::uint64_t chain_id, std::uint8_t seed, std::vector<crypto::KeyPair>& keys) {
+    GenesisSpec g;
+    g.chain_id = chain_id;
+    g.timestamp = 1;
     for (std::uint8_t i = 0; i < 3; ++i) {
       keys.push_back(bls_key(static_cast<std::uint8_t>(seed + i)));
-      genesis.validators.push_back(consensus::Validator{keys.back().public_key, 1});
+      g.validators.push_back(consensus::Validator{keys.back().public_key, 1});
     }
-    engine = std::make_unique<consensus::BftEngine>(genesis.validator_set(), ledger_from_genesis(genesis));
+    return g;
   }
-  ChildRegistration registration() const {
+  explicit ChildChain(std::uint64_t chain_id, std::uint8_t seed = 0x10) {
+    genesis = make_genesis(chain_id, seed, keys);
+    boot();
+  }
+  ChildChain(GenesisSpec g, std::vector<crypto::KeyPair> k) : genesis(std::move(g)), keys(std::move(k)) { boot(); }
+  void boot() { engine = std::make_unique<consensus::BftEngine>(genesis.validator_set(), ledger_from_genesis(genesis)); }
+
+  static ChildRegistration registration_of(const GenesisSpec& g, std::uint8_t depth = 0) {
     ChildRegistration c;
-    c.chain_id = genesis.chain_id;
-    c.genesis_hash = genesis.hash();
-    c.genesis_header = ledger_from_genesis(genesis)->tip();
-    c.validators = genesis.validators;
+    c.chain_id = g.chain_id;
+    c.genesis_header = ledger_from_genesis(g)->tip();
+    c.validators = g.validators;
+    c.child_max_depth = depth;
     return c;
   }
+  ChildRegistration registration(std::uint8_t depth = 0) const { return registration_of(genesis, depth); }
+
   // Propose + certify (all 3 sign) WITHOUT finalizing — for equivocation tests.
-  CertifiedHeader certify(std::uint64_t ts, Block* out = nullptr) {
-    Block b = engine->propose({}, ts);
+  CertifiedHeader certify(std::uint64_t ts, Block* out = nullptr, std::vector<Anchor> anchors = {},
+                          std::vector<Transaction> txs = {}) {
+    Block b = engine->propose(std::move(txs), ts, std::move(anchors));
     std::vector<consensus::Vote> votes;
     for (std::uint32_t i = 0; i < 3; ++i) votes.push_back(engine->precommit(b, i, keys[i]));
     auto cert = engine->try_commit(b, votes);
@@ -53,10 +65,10 @@ struct ChildChain {
     if (out) *out = b;
     return CertifiedHeader{b.header, cert->encode()};
   }
-  // Produce the next finalized child block.
-  CertifiedHeader next(std::uint64_t ts) {
+  // Produce the next finalized block (optionally anchoring its own children).
+  CertifiedHeader next(std::uint64_t ts, std::vector<Anchor> anchors = {}, std::vector<Transaction> txs = {}) {
     Block b;
-    CertifiedHeader ch = certify(ts, &b);
+    CertifiedHeader ch = certify(ts, &b, std::move(anchors), std::move(txs));
     auto cert = consensus::CommitCertificate::decode_all(v(ch.certificate));
     BlockError e = engine->finalize(b, cert);
     if (!e.ok) throw std::runtime_error("child finalize: " + e.error);
@@ -139,10 +151,10 @@ int main() {
   const Hash plain_hash = parent.hash();
   {
     ChildRegistration c;
-    c.chain_id = 42; c.genesis_hash = fill(0x42);
+    c.chain_id = 42;
     c.genesis_header = header(1, 42, 0);
     c.validators = {consensus::Validator{Bytes(48, 0x02), 1}, consensus::Validator{Bytes(48, 0x03), 2}};
-    ChildRegistration d = c; d.chain_id = 43; d.genesis_hash = fill(0x43); d.genesis_header.chain_id = 43;
+    ChildRegistration d = c; d.chain_id = 43; d.genesis_header.chain_id = 43;
     SubchainPolicy p;
     p.max_children = 2; p.max_depth = 2; p.max_anchors_per_block = 2; p.max_headers_per_anchor = 8;
     p.children = {c, d};
@@ -161,6 +173,8 @@ int main() {
     bad = p; bad.children[0].validators[0].power = 0;         CHECK(!bad.validate(1).empty());
     bad = p; bad.children[0].genesis_header.height = 1;       CHECK(!bad.validate(1).empty());
     bad = p; bad.children[0].genesis_header.chain_id = 7;     CHECK(!bad.validate(1).empty());
+    bad = p; bad.children[0].child_max_depth = 2;             CHECK(!bad.validate(1).empty());  // I10: 2+1 > max_depth 2
+    bad = p; bad.children[0].child_max_depth = 1;             CHECK(bad.validate(1).empty());   // 1+1 ≤ 2 fits
 
     CHECK(!SubchainPolicy::from_genesis(parent).has_value());
     p.commit_to(parent);
@@ -368,6 +382,112 @@ int main() {
     const Bytes plain_snap = np->snapshot();
     codec::CodecReader rd(v(plain_snap)); (void)rd.read_bytes(); (void)rd.read_bytes();
     CHECK(rd.fully_consumed());
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────────────
+  std::printf("== STAGE 3: three-level tree root ← child ← grandchild, real chains ==\n");
+  const crypto::KeyPair alice = crypto::ed25519_keygen_from_seed(v(Bytes(32, 0xA1)));
+  const Hash alice_addr = crypto::address_of(v(alice.public_key));
+  // Grandchild G (leaf, account model with a funded account).
+  std::vector<crypto::KeyPair> gkeys;
+  GenesisSpec ggen = ChildChain::make_genesis(420, 0x30, gkeys);
+  ggen.accounts.push_back(GenesisAccount{alice_addr, 1000});
+  // Child C: a parent of G (policy) — its genesis HEADER is fixed before any binding.
+  std::vector<crypto::KeyPair> ckeys;
+  GenesisSpec cgen = ChildChain::make_genesis(42, 0x40, ckeys);
+  { SubchainPolicy cp; cp.max_children = 1; cp.max_depth = 1; cp.children = {ChildChain::registration_of(ggen)}; cp.commit_to(cgen); }
+  const BlockHeader c_header_before_binding = ledger_from_genesis(cgen)->tip();
+  // Root R: a parent of C (depth 2 below it).
+  GenesisSpec rgen;
+  rgen.chain_id = 1; rgen.timestamp = 1;
+  rgen.validators = {consensus::Validator{bls_key(0x01).public_key, 1}};
+  { SubchainPolicy rp; rp.max_children = 1; rp.max_depth = 2; rp.children = {ChildChain::registration_of(cgen, /*depth=*/1)}; rp.commit_to(rgen); }
+  // Bind C → R and G → C (child genesis hashes now commit their parents).
+  ParentBinding{1, rgen.hash()}.commit_to(cgen);
+  ParentBinding{42, cgen.hash()}.commit_to(ggen);
+  CHECK(ledger_from_genesis(cgen)->tip() == c_header_before_binding);   // no cycle: the binding does not move the header
+  CHECK(ParentBinding::from_genesis(ggen)->parent_genesis_hash == cgen.hash());
+  ChildChain G(ggen, gkeys), C(cgen, ckeys);
+  auto R = ledger_from_genesis(rgen);
+  {
+    // A registration declaring a subtree deeper than the root allows is refused at boot.
+    GenesisSpec deep = rgen; SubchainPolicy rp = SubchainPolicy::from_genesis(rgen).value();
+    rp.children[0].child_max_depth = 2; rp.commit_to(deep);
+    CHECK_THROWS(ledger_from_genesis(deep));
+  }
+
+  std::printf("== anchors flow upward: G → C → R ==\n");
+  Transaction pay;
+  {
+    pay.version = 1; pay.chain_id = 420;
+    pay.body = AccountStateMachine::encode_transfer({0, fill(0xB0), 250});
+    pay.author = alice.public_key;
+    pay.signature = crypto::ed25519_sign(v(pay.signing_bytes()), v(alice.secret_key));
+  }
+  CertifiedHeader g1 = G.next(2, {}, {pay});   // alice: 1000 → 750 on G
+  CertifiedHeader g2 = G.next(3);
+  CHECK(g1.header.version == 1);              // a leaf chain is untouched by subchains
+  Anchor ga; ga.child_chain_id = 420; ga.headers = {g1, g2};
+  CertifiedHeader c1 = C.next(2, {ga});        // C anchors G[1..2]
+  CHECK(c1.header.version == 3 && C.engine->ledger().subchains()->tip_of(420)->height == 2);
+  Anchor ca; ca.child_chain_id = 42; ca.headers = {c1};
+  Block r1 = R->build_block({}, 2, {ca});
+  CHECK(R->process_block(r1).ok && R->subchains()->tip_of(42)->hash() == c1.header.hash());
+  // R's registry commits C's tip, whose subchain_root commits G's tip.
+  CHECK(R->subchains()->tip_of(42)->subchain_root == C.engine->ledger().subchains()->root());
+
+  std::printf("== cross-chain proof: alice's balance on G, verified from R's header alone ==\n");
+  SubchainProof proof;
+  {
+    const auto& gstate = dynamic_cast<const AccountStateMachine&>(G.engine->ledger().state());
+    proof.hops = {R->subchains()->hop(42), C.engine->ledger().subchains()->hop(420)};
+    proof.state_proof = gstate.prove_account(alice_addr);
+    CHECK(proof.state_proof.present);
+    CHECK(verify_subchain_proof(R->tip().subchain_root, proof));
+    // The proof survives the wire.
+    SubchainProof back = SubchainProof::decode_all(v(proof.encode()));
+    CHECK(back.hops == proof.hops && back.encode() == proof.encode());
+    CHECK(verify_subchain_proof(R->tip().subchain_root, back));
+    // A one-hop proof from C's own header works the same way.
+    SubchainProof one; one.hops = {C.engine->ledger().subchains()->hop(420)}; one.state_proof = proof.state_proof;
+    CHECK(verify_subchain_proof(C.engine->tip().subchain_root, one));
+    CHECK(!verify_subchain_proof(R->tip().subchain_root, one));  // but not from R (wrong level)
+  }
+
+  std::printf("== tamper each link → rejected ==\n");
+  {
+    auto bad = [&](const char* what, auto mutate) {
+      SubchainProof t = proof; mutate(t);
+      CHECK_MSG(!verify_subchain_proof(R->tip().subchain_root, t), what);
+    };
+    CHECK(!verify_subchain_proof(fill(0x01), proof));                                        // wrong root
+    bad("no hops", [](SubchainProof& t) { t.hops.clear(); });
+    bad("hop dropped", [](SubchainProof& t) { t.hops.pop_back(); });                          // proves G's state against C's tip → root mismatch
+    bad("descend into unknown child", [](SubchainProof& t) { t.hops[0].child_chain_id = 7; });
+    bad("child tip height forged", [](SubchainProof& t) { t.hops[0].summaries[0].tip.height += 1; });
+    bad("child tip subchain_root forged", [](SubchainProof& t) { t.hops[0].summaries[0].tip.subchain_root = fill(0x9); });
+    bad("grandchild state_root forged", [](SubchainProof& t) { t.hops[1].summaries[0].tip.state_root = fill(0x9); });
+    bad("registry line injected", [](SubchainProof& t) { t.hops[0].summaries.push_back(t.hops[0].summaries[0]); t.hops[0].summaries.back().chain_id = 43; });
+    bad("registry order broken", [](SubchainProof& t) { t.hops[0].summaries.insert(t.hops[0].summaries.begin(), t.hops[0].summaries[0]); });
+    bad("leaf tampered", [](SubchainProof& t) { t.state_proof.leaf_preimage.back() ^= 1; });
+    bad("absence proof", [](SubchainProof& t) { t.state_proof.present = false; });
+    bad("hops swapped", [](SubchainProof& t) { std::swap(t.hops[0], t.hops[1]); });
+  }
+
+  std::printf("== the tree keeps moving: a later root block re-anchors; old proof no longer verifies at the new tip ==\n");
+  {
+    CertifiedHeader g3 = G.next(4);
+    Anchor ga2; ga2.child_chain_id = 420; ga2.headers = {g3};
+    CertifiedHeader c2 = C.next(3, {ga2});
+    Anchor ca2; ca2.child_chain_id = 42; ca2.headers = {c2};
+    CHECK(R->process_block(R->build_block({}, 3, {ca2})).ok);
+    CHECK(!verify_subchain_proof(R->tip().subchain_root, proof));   // stale registry lists
+    SubchainProof fresh;
+    fresh.hops = {R->subchains()->hop(42), C.engine->ledger().subchains()->hop(420)};
+    fresh.state_proof = dynamic_cast<const AccountStateMachine&>(G.engine->ledger().state()).prove_account(alice_addr);
+    CHECK(verify_subchain_proof(R->tip().subchain_root, fresh));
+    CHECK(verify_subchain_proof(r1.header.subchain_root, proof));     // and still verifies at the OLD root (history is immutable)
   }
 
   return bctest::summary();
