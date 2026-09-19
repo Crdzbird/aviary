@@ -53,6 +53,9 @@ class ValidatorSet {
 
   Bytes encode() const;
   static ValidatorSet decode_all(codec::ByteView bytes);
+  const std::vector<Validator>& validators() const { return validators_; }
+  /// The index of [bls_pubkey] in this set, or nullopt if it is not a member.
+  std::optional<std::uint32_t> index_of(const Bytes& bls_pubkey) const;
 
  private:
   std::vector<Validator> validators_;
@@ -117,6 +120,12 @@ CommitError verify_commit(std::uint64_t chain_id, const ValidatorSet& vset,
 struct ConsensusData {
   Hash validator_set_hash{};
   std::optional<CommitCertificate> last_commit;  ///< absent only for the first block
+  /// A VALIDATOR-SET CHANGE: the set in force from the NEXT height on. The
+  /// block announcing it is certified by the CURRENT set (>2/3 of the old set
+  /// attests the new one), so the change is itself finalized; the following
+  /// block's last_commit is verified under the old set and its own certificate
+  /// under the new one. Absent = no change.
+  std::optional<std::vector<Validator>> next_validators;
 
   Bytes encode() const;
   static ConsensusData decode_all(codec::ByteView bytes);
@@ -128,6 +137,19 @@ struct ConsensusData {
 /// height-1 (the first block after genesis carries none). Never throws.
 CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& vset,
                                     const BlockHeader& h, const Hash& parent_hash);
+
+/// The rotation-aware form: [current] is the set in force at h.height (its hash
+/// must be committed by the header and it certifies h itself); [certifying] is
+/// the set that finalized the PARENT (it verifies the embedded last commit) —
+/// they differ exactly for the block after a validator-set change. Also checks
+/// that an announced next set is well-formed. Never throws.
+CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& current,
+                                    const ValidatorSet& certifying, const BlockHeader& h,
+                                    const Hash& parent_hash);
+
+/// The validator set a header announces for the next height, or nullopt when it
+/// announces none or its consensus data is malformed / the set is invalid.
+std::optional<ValidatorSet> announced_validator_set(const BlockHeader& h);
 
 // ── Equivocation evidence (S4) ──────────────────────────────────────────────
 //

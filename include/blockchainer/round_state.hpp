@@ -67,7 +67,12 @@ class RoundStateMachine {
     const ValidatorSet* validators = nullptr;     ///< power + quorum source
     std::function<std::uint32_t(std::uint32_t round)> proposer;  ///< proposer(round)
     std::function<Hash()> get_value;              ///< a fresh value to propose
-    std::function<bool(const Hash&)> valid;       ///< is a proposed value acceptable
+    std::function<bool(const Hash&)> valid;       ///< is a proposed value acceptable (to VOTE for)
+    /// May this value be DECIDED once 2f+1 precommit it? Defaults to `valid`.
+    /// Split so a node can refuse to vote for something (governance, e.g. an
+    /// unscheduled validator-set change) yet still follow the network's
+    /// decision when a quorum certifies it — otherwise it would strand itself.
+    std::function<bool(const Hash&)> finalizable;
   };
 
   explicit RoundStateMachine(Config cfg) : cfg_(std::move(cfg)) {}

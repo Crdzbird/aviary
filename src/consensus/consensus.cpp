@@ -203,11 +203,24 @@ CommitError verify_commit(std::uint64_t chain_id, const ValidatorSet& vset,
 
 // ── Consensus header payload (S4) ───────────────────────────────────────────
 
+std::optional<std::uint32_t> ValidatorSet::index_of(const Bytes& bls_pubkey) const {
+  for (std::size_t i = 0; i < validators_.size(); ++i)
+    if (validators_[i].bls_pubkey == bls_pubkey) return static_cast<std::uint32_t>(i);
+  return std::nullopt;
+}
+
 Bytes ConsensusData::encode() const {
   codec::CodecWriter w;
   w.write_fixed_bytes(view(validator_set_hash), 32);
   w.write_u8(last_commit ? 1 : 0);
   if (last_commit) w.write_bytes(view(last_commit->encode()));
+  w.write_u8(next_validators ? 1 : 0);
+  if (next_validators) {
+    w.write_list(*next_validators, [](codec::CodecWriter& w, const Validator& v) {
+      w.write_bytes(view(v.bls_pubkey));
+      w.write_u64(v.power);
+    });
+  }
   return w.take();
 }
 
@@ -218,21 +231,53 @@ ConsensusData ConsensusData::decode_all(codec::ByteView bytes) {
   if (r.read_u8() != 0) {
     cd.last_commit = CommitCertificate::decode_all(view(r.read_bytes()));
   }
+  if (r.read_u8() != 0) {
+    cd.next_validators = r.read_list<Validator>([](codec::CodecReader& r) {
+      Validator v;
+      v.bls_pubkey = r.read_bytes();
+      v.power = r.read_u64();
+      return v;
+    });
+  }
   r.assert_fully_consumed();
   return cd;
 }
 
+std::optional<ValidatorSet> announced_validator_set(const BlockHeader& h) {
+  try {
+    ConsensusData cd = ConsensusData::decode_all(view(h.consensus_data));
+    if (!cd.next_validators) return std::nullopt;
+    return ValidatorSet(*cd.next_validators);
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
 CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& vset,
                                     const BlockHeader& h, const Hash& parent_hash) {
+  return validate_consensus_data(chain_id, vset, vset, h, parent_hash);
+}
+
+CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& current,
+                                    const ValidatorSet& certifying, const BlockHeader& h,
+                                    const Hash& parent_hash) {
   ConsensusData cd;
   try {
     cd = ConsensusData::decode_all(view(h.consensus_data));
   } catch (...) {
     return CommitError::failure("malformed consensus data");
   }
-  if (cd.validator_set_hash != vset.hash()) {
+  if (cd.validator_set_hash != current.hash()) {
     return CommitError::failure("validator-set hash mismatch");
   }
+  if (cd.next_validators) {
+    try {
+      (void)ValidatorSet(*cd.next_validators);  // well-formed: non-empty, 48-byte unique keys, live power
+    } catch (const std::exception& e) {
+      return CommitError::failure(std::string("invalid next validator set: ") + e.what());
+    }
+  }
+  const ValidatorSet& vset = certifying;  // verifies the parent's commit
   // The first block after genesis (height 1) has no finalized parent to certify.
   if (h.height <= 1) {
     if (cd.last_commit) return CommitError::failure("first block must not carry a last commit");

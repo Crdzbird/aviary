@@ -29,10 +29,23 @@ namespace blockchainer::consensus {
 class BftEngine : public ConsensusEngine {
  public:
   BftEngine(ValidatorSet vset, std::unique_ptr<Ledger> ledger)
-      : vset_(std::move(vset)), ledger_(std::move(ledger)) {}
+      : vset_(vset), prev_vset_(std::move(vset)), ledger_(std::move(ledger)) {}
 
   const Ledger& ledger() const override { return *ledger_; }
+  /// The set in force for the next block (follows finalized rotations).
   const ValidatorSet& validators() const { return vset_; }
+  /// The set that certified the current tip.
+  const ValidatorSet& tip_validators() const { return prev_vset_; }
+
+  // ── Validator-set changes (coordinated rotation) ───────────────────────────
+  // Operators agree a new set out of band and each SCHEDULES it; the next block
+  // this node proposes announces it, and this node only VOTES for a block whose
+  // announced set equals what it scheduled (precommit refuses otherwise). Once
+  // a rotation block is certified by >2/3 of the current set, finalize follows
+  // it regardless — voting is the governance act, finalization follows consensus.
+  void schedule_validator_set(ValidatorSet next) { pending_ = std::move(next); }
+  void cancel_scheduled_validator_set() { pending_.reset(); }
+  const std::optional<ValidatorSet>& scheduled_validator_set() const { return pending_; }
   std::uint64_t height() const override { return ledger_->tip().height; }
   const BlockHeader& tip() const override { return ledger_->tip(); }
 
@@ -50,7 +63,9 @@ class BftEngine : public ConsensusEngine {
   /// (docs/design/SUBCHAINS.md). Throws if an anchor is invalid.
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors) {
     Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
-    b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
+    ConsensusData cd{vset_.hash(), last_commit_};
+    if (pending_) cd.next_validators = pending_->validators();
+    b.header.consensus_data = cd.encode();
     return b;
   }
   Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
@@ -100,7 +115,9 @@ class BftEngine : public ConsensusEngine {
   ValidatorSet slashed_validator_set() const;
 
  private:
-  ValidatorSet vset_;
+  ValidatorSet vset_;       // in force for the next block
+  ValidatorSet prev_vset_;  // certified the tip
+  std::optional<ValidatorSet> pending_;  // scheduled rotation (announced by our proposals)
   std::unique_ptr<Ledger> ledger_;
   // The certificate that finalized the current tip — embedded as the next
   // block's last commit. Absent until the first block finalizes.

@@ -69,6 +69,8 @@ struct ChildSummary {
   std::uint64_t chain_id = 0;
   Hash genesis_header_hash{};
   BlockHeader tip;
+  Hash vset_hash{};      ///< the child's validator set in force after [tip] (follows rotations)
+  Hash tip_vset_hash{};  ///< the set that certified [tip]
   bool operator==(const ChildSummary&) const = default;
 };
 /// `subchain_root` over an ascending summary list (the registry uses this too).
@@ -122,8 +124,9 @@ class SubchainRegistry {
  public:
   struct ChildEntry {
     ChildRegistration reg;
-    consensus::ValidatorSet vset;  ///< built once from reg.validators
-    BlockHeader tip;               ///< last anchored header (genesis until anchored)
+    consensus::ValidatorSet vset;      ///< in force for the child's NEXT header (follows announced rotations)
+    consensus::ValidatorSet tip_vset;  ///< the set that certified [tip]
+    BlockHeader tip;                   ///< last anchored header (genesis until anchored)
   };
 
   /// Build from a validated policy (throws std::invalid_argument on a policy
@@ -141,7 +144,9 @@ class SubchainRegistry {
   /// failure returns the reason and THIS COPY is unspecified — discard it.
   std::string apply_anchors(const std::vector<Anchor>& anchors);
 
-  /// `subchain_root` = registry_root(summaries()).
+  /// `subchain_root` = registry_root(summaries()) — commits each child's tip AND
+  /// its current validator sets, so a parent header attests which set rules the
+  /// child next and a snapshot cannot carry a tampered set unnoticed.
   Hash root() const;
   /// The registry as a summary list (what a proof carries).
   std::vector<ChildSummary> summaries() const;

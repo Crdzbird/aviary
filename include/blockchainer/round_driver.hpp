@@ -48,6 +48,15 @@ class RoundDriver {
   /// any other block content. Replaced wholesale; empty = anchor nothing.
   void set_anchors(std::vector<Anchor> anchors) { anchors_ = std::move(anchors); }
 
+  /// Coordinated validator-set change (see BftEngine): the set this node
+  /// announces when it proposes and the only change it will vote for. A
+  /// certified rotation is followed at advance() regardless. If this node's
+  /// key is not in the new set it keeps following the chain but stops voting.
+  void schedule_validator_set(ValidatorSet next) { pending_ = std::move(next); }
+  const ValidatorSet& validators() const { return vset_; }
+  bool is_validator() const { return me_ != kNotValidator; }
+  static constexpr std::uint32_t kNotValidator = 0xFFFFFFFFu;
+
   Output start();
   /// Ingest a peer's consensus message (verifies signatures; drops bad ones).
   Output deliver(const wire::ConsensusMsg& msg);
@@ -69,7 +78,8 @@ class RoundDriver {
   RoundStateMachine::Config make_config();
   Output run(const std::vector<Action>& actions);
   Hash get_value();                 // build a block extending the tip; store it
-  bool valid(const Hash& block_id); // do we hold a block that legally extends the tip
+  bool valid(const Hash& block_id);        // applicable AND the governance rule (what we VOTE for)
+  bool applicable(const Hash& block_id);   // do we hold a block the ledger + consensus rules accept (what we FOLLOW)
   void commit(std::uint32_t round, const Value& value);
 
   std::uint64_t chain_id_;
@@ -86,6 +96,8 @@ class RoundDriver {
   std::optional<CommitCertificate> last_commit_;
   std::map<Hash, Block> blocks_;  // block id → block (self-produced or from a proposal)
   std::vector<Anchor> anchors_;   // subchain anchors to include in our next proposal (parent chains)
+  ValidatorSet prev_vset_;        // the set that certified the tip
+  std::optional<ValidatorSet> pending_;       // scheduled rotation
   // Precommit signatures collected for cert building: round → value → validator → sig.
   // A nil precommit uses the zero-hash sentinel value.
   std::map<std::uint32_t, std::map<Hash, std::map<std::uint32_t, Bytes>>> precommit_sigs_;

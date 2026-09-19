@@ -47,6 +47,10 @@ class NetworkedNode {
   std::uint32_t id() const { return gossip_.self(); }
   /// Parent chains: anchors to include when this node proposes (see RoundDriver).
   void set_anchors(std::vector<Anchor> anchors) { driver_.set_anchors(std::move(anchors)); }
+  /// Coordinated validator-set change (see RoundDriver::schedule_validator_set).
+  void schedule_validator_set(consensus::ValidatorSet next) { driver_.schedule_validator_set(std::move(next)); }
+  /// The validator set in force for the next height.
+  const consensus::ValidatorSet& validators() const { return driver_.validators(); }
   void add_peer(std::uint32_t peer) { gossip_.add_peer(peer); }
 
   /// Begin consensus (StartRound(0)); consensus broadcasts are gossiped.

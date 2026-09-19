@@ -1,5 +1,7 @@
 #include "blockchainer/bft_engine.hpp"
 
+#include <stdexcept>
+
 #include "blockchainer/observability/event_bus.hpp"
 #include "blockchainer/observability/events.hpp"
 #include "blockchainer/observability/metrics.hpp"
@@ -37,6 +39,12 @@ BlockError BftEngine::submit(const Block& b, codec::ByteView justification) {
 Vote BftEngine::precommit(const Block& b, std::uint32_t validator_index,
                           const crypto::KeyPair& bls_key,
                           std::uint32_t round) const {
+  // Governance at vote time: never sign for a validator-set change this node
+  // did not schedule (or one that differs from what it scheduled).
+  if (auto next = announced_validator_set(b.header)) {
+    if (!pending_ || pending_->hash() != next->hash())
+      throw std::runtime_error("bft: refusing to vote for an unscheduled validator-set change");
+  }
   return sign_vote(ledger_->spec().chain_id, b.header.height, round, block_id(b),
                    validator_index, bls_key);
 }
@@ -57,8 +65,8 @@ CommitError BftEngine::check_finalization(const Block& b,
   }
   // The block must bind to this validator set and carry a valid last commit for
   // its parent (self-certifying history + anti validator-set-swap).
-  if (CommitError ce = validate_consensus_data(ledger_->spec().chain_id, vset_, b.header,
-                                               b.header.parent_hash);
+  if (CommitError ce = validate_consensus_data(ledger_->spec().chain_id, vset_, prev_vset_,
+                                               b.header, b.header.parent_hash);
       !ce.ok) {
     return ce;
   }
@@ -76,6 +84,11 @@ BlockError BftEngine::finalize(const Block& b, const CommitCertificate& cert) {
 
   if (be.ok) {
     last_commit_ = cert;  // becomes the next block's certified last commit
+    prev_vset_ = vset_;   // this set certified the new tip
+    if (auto next = announced_validator_set(b.header)) {  // a finalized rotation takes effect now
+      vset_ = std::move(*next);
+      pending_.reset();
+    }
     if (bus_) {
       bus_->publish(observe::BlockFinalized{b.header.height, block_id(b),
                                             b.header.state_root,

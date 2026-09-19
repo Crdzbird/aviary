@@ -227,7 +227,8 @@ void RoundStateMachine::try_transitions(std::vector<Action>& out) {
         if (pit == precommits_.end()) continue;
         auto vit = pit->second.find(prop.value);
         if (vit == pit->second.end()) continue;
-        if (power_of(vit->second) >= quorum() && cfg_.valid(*prop.value)) {
+        if (power_of(vit->second) >= quorum() &&
+            (cfg_.finalizable ? cfg_.finalizable(*prop.value) : cfg_.valid(*prop.value))) {
           decision_ = prop.value;
           Action d;
           d.kind = Action::Kind::kDecide;

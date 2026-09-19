@@ -238,6 +238,22 @@ int main() {
       CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "non-proposers validated the anchors identically");
   }
 
+  std::printf("== VALIDATOR ROTATION over TCP: 0-1-2 schedule dropping node 3; node 3 refuses to vote but follows ==\n");
+  {
+    std::vector<Validator> smaller;
+    for (std::uint32_t i = 0; i < 3; ++i) smaller.push_back(Validator{bls(static_cast<std::uint8_t>(0x60 + i)).public_key, 1});
+    ValidatorSet new_set(smaller);
+    auto nodes = build_nodes(n, alice_addr, vset);
+    for (std::uint32_t i = 0; i < 3; ++i) nodes[i]->schedule_validator_set(new_set);   // node 3 did not agree
+    auto committed = run_mesh(nodes, 47760, /*secure=*/nullptr);
+    for (std::uint32_t i = 0; i < n; ++i) {
+      CHECK_MSG(committed[i] == 1, "every node committed the rotation block (node 3 followed the certificate)");
+      CHECK_MSG(nodes[i]->validators().hash() == new_set.hash(), "the new set is in force on every node");
+    }
+    const Hash tip = nodes[0]->ledger().tip().hash();
+    for (std::uint32_t i = 1; i < n; ++i) CHECK(nodes[i]->ledger().tip().hash() == tip);
+  }
+
   std::printf("== boot wiring: a profile's transport tier builds the config from records ==\n");
   {
     using blockchainer::AssuranceProfile;

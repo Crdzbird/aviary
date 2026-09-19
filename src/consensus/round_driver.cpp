@@ -16,6 +16,7 @@ RoundStateMachine::Config RoundDriver::make_config() {
   cfg.proposer = [n](std::uint32_t round) { return n == 0 ? 0 : round % n; };
   cfg.get_value = [this]() { return get_value(); };
   cfg.valid = [this](const Hash& id) { return valid(id); };
+  cfg.finalizable = [this](const Hash& id) { return applicable(id); };
   return cfg;
 }
 
@@ -28,34 +29,54 @@ RoundDriver::RoundDriver(std::uint64_t chain_id, ValidatorSet vset, std::uint32_
       ledger_(ledger),
       timestamp_(timestamp),
       height_(ledger->tip().height + 1),
-      sm_(make_config()) {}
+      sm_(make_config()),
+      prev_vset_(vset_) {}
 
 Hash RoundDriver::get_value() {
   // Build an empty block extending the tip; stamp consensus_data with the
   // validator-set hash and the LastCommit (absent for the first block).
   Block b = ledger_->build_block({}, timestamp_, anchors_);
-  b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
+  ConsensusData cd{vset_.hash(), last_commit_};
+  if (pending_) cd.next_validators = pending_->validators();
+  b.header.consensus_data = cd.encode();
   const Hash id = b.header.hash();
   blocks_[id] = std::move(b);
   return id;
 }
 
-bool RoundDriver::valid(const Hash& block_id) {
+bool RoundDriver::applicable(const Hash& block_id) {
   auto it = blocks_.find(block_id);
   if (it == blocks_.end()) return false;  // we don't hold the block
   const BlockHeader& h = it->second.header;
   if (h.height != height_) return false;
   if (h.parent_hash != ledger_->tip().hash()) return false;
-  if (!validate_consensus_data(chain_id_, vset_, h, ledger_->tip().hash()).ok) return false;
-  // Never vote for a block the ledger would refuse at commit (txs, roots,
+  if (!validate_consensus_data(chain_id_, vset_, prev_vset_, h, ledger_->tip().hash()).ok) return false;
+  // Never accept a block the ledger would refuse at commit (txs, roots,
   // subchain anchors): a certified-but-unapplicable block would strand the
   // height. Full dry run, no state change.
   return ledger_->validate_block(it->second).ok;
 }
 
+bool RoundDriver::valid(const Hash& block_id) {
+  if (!applicable(block_id)) return false;
+  // Governance at vote time: only a validator-set change this node scheduled
+  // gets our vote. (A certified one is still FOLLOWED — see Config::finalizable.)
+  auto it = blocks_.find(block_id);
+  if (auto next = announced_validator_set(it->second.header)) {
+    if (!pending_ || pending_->hash() != next->hash()) return false;
+  }
+  return true;
+}
+
 RoundDriver::Output RoundDriver::run(const std::vector<Action>& actions) {
   Output out;
   for (const auto& a : actions) {
+    // A node rotated out of the set keeps following (delivering, committing)
+    // but must not propose or vote: it has no index to sign under.
+    if (!is_validator() && (a.kind == Action::Kind::kBroadcastProposal ||
+                            a.kind == Action::Kind::kBroadcastPrevote ||
+                            a.kind == Action::Kind::kBroadcastPrecommit))
+      continue;
     switch (a.kind) {
       case Action::Kind::kBroadcastProposal: {
         wire::ConsensusMsg c;
@@ -174,6 +195,16 @@ void RoundDriver::commit(std::uint32_t round, const Value& value) {
   if (ledger_->process_block(bit->second).ok) {
     cert_ = std::move(cert);
     committed_ = true;
+    // A finalized rotation takes effect NOW for the next height: validators()
+    // answers "in force next" immediately, and any late message for this
+    // (decided) height simply no longer verifies — harmless.
+    prev_vset_ = vset_;  // this set certified the new tip
+    if (auto next = announced_validator_set(bit->second.header)) {
+      vset_ = std::move(*next);
+      pending_.reset();
+      auto idx = vset_.index_of(bls_.public_key);
+      me_ = idx ? *idx : kNotValidator;  // our index may have moved — or we may be out
+    }
   }
 }
 

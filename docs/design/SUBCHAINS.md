@@ -171,7 +171,10 @@ Internally each `ChildEntry` drives a `LightClient` — `LightClient::accept
 
 ### 4.5 `subchain_root`
 `BLAKE3( kSubchainRegistry ‖ count ‖ for each child ascending by chain_id:
-chain_id ‖ genesis_header.hash() ‖ tip.hash() ‖ tip.height ‖ tip.state_root )`.
+chain_id ‖ genesis_header.hash() ‖ tip.hash() ‖ tip.height ‖ tip.state_root
+‖ vset.hash() ‖ tip_vset.hash() )` — the child's validator set in force next and
+the set that certified the tip (added with validator rotation, so a parent
+header attests the child's current set and a snapshot cannot smuggle one).
 A flat hash is enough for v1 (the child count is policy-bounded and small); a
 Merkle root can replace it under a version bump if per-child proofs must be
 O(log n). Proof of a child's tip = the full sorted list (bounded by

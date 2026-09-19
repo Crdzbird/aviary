@@ -150,7 +150,8 @@ SubchainRegistry SubchainRegistry::from_policy(std::uint64_t own_chain_id, Subch
   for (const ChildRegistration& c : r.policy_.children) {
     // ValidatorSet's constructor rejects a malformed set (bad key length, no
     // power) — surfaced here, at boot, never at anchor time.
-    r.children_.push_back(ChildEntry{c, consensus::ValidatorSet(c.validators), c.genesis_header});
+    consensus::ValidatorSet vs(c.validators);
+    r.children_.push_back(ChildEntry{c, vs, vs, c.genesis_header});
   }
   return r;
 }
@@ -182,7 +183,7 @@ std::string SubchainRegistry::apply_anchors(const std::vector<Anchor>& anchors) 
     ChildEntry* e = nullptr;
     for (ChildEntry& c : children_)
       if (c.reg.chain_id == a.child_chain_id) e = &c;
-    client::LightClient lc(e->reg.chain_id, e->vset, e->tip);
+    client::LightClient lc(e->reg.chain_id, e->vset, e->tip, e->tip_vset);
     for (const CertifiedHeader& ch : a.headers) {
       consensus::CommitCertificate cert;
       try {
@@ -194,6 +195,8 @@ std::string SubchainRegistry::apply_anchors(const std::vector<Anchor>& anchors) 
       if (!r.ok) return "child " + std::to_string(a.child_chain_id) + " header rejected: " + r.error;
     }
     e->tip = lc.tip();
+    e->vset = lc.validators();          // a child's finalized rotation is followed here too
+    e->tip_vset = lc.tip_validators();
   }
   return {};
 }
@@ -208,6 +211,8 @@ Hash registry_root(const std::vector<ChildSummary>& summaries) {
     w.write_fixed_bytes(hview(th), 32);
     w.write_u64(s.tip.height);
     w.write_fixed_bytes(hview(s.tip.state_root), 32);
+    w.write_fixed_bytes(hview(s.vset_hash), 32);
+    w.write_fixed_bytes(hview(s.tip_vset_hash), 32);
   }
   return crypto::hash_tagged(crypto::Domain::kSubchainRegistry, w.take());
 }
@@ -216,7 +221,7 @@ std::vector<ChildSummary> SubchainRegistry::summaries() const {
   std::vector<ChildSummary> out;
   out.reserve(children_.size());
   for (const ChildEntry& e : children_)
-    out.push_back(ChildSummary{e.reg.chain_id, e.reg.genesis_header.hash(), e.tip});
+    out.push_back(ChildSummary{e.reg.chain_id, e.reg.genesis_header.hash(), e.tip, e.vset.hash(), e.tip_vset.hash()});
   return out;
 }
 
@@ -236,6 +241,8 @@ Bytes SubchainProof::Hop::encode() const {
     w.write_fixed_bytes(hview(s.genesis_header_hash), 32);
     Bytes t = s.tip.encode();
     w.write_bytes(bview(t));
+    w.write_fixed_bytes(hview(s.vset_hash), 32);
+    w.write_fixed_bytes(hview(s.tip_vset_hash), 32);
   });
   w.write_u64(child_chain_id);
   return w.take();
@@ -250,6 +257,8 @@ SubchainProof::Hop SubchainProof::Hop::decode_all(crypto::ByteView bytes) {
     s.genesis_header_hash = to_hash(r.read_fixed_bytes(32));
     Bytes t = r.read_bytes();
     s.tip = BlockHeader::decode_all(bview(t));
+    s.vset_hash = to_hash(r.read_fixed_bytes(32));
+    s.tip_vset_hash = to_hash(r.read_fixed_bytes(32));
     return s;
   });
   h.child_chain_id = r.read_u64();
@@ -307,18 +316,24 @@ Bytes SubchainRegistry::serialize_tips() const {
     w.write_u64(e.reg.chain_id);
     Bytes t = e.tip.encode();
     w.write_bytes(bview(t));
+    Bytes vs = e.vset.encode();
+    w.write_bytes(bview(vs));
+    Bytes ts = e.tip_vset.encode();
+    w.write_bytes(bview(ts));
   });
   return w.take();
 }
 
 void SubchainRegistry::restore_tips(crypto::ByteView bytes) {
   codec::CodecReader r(bytes);
-  struct Tip { std::uint64_t id; BlockHeader h; };
+  struct Tip { std::uint64_t id; BlockHeader h; Bytes vs; Bytes ts; };
   auto tips = r.read_list<Tip>([](codec::CodecReader& r) {
     Tip t;
     t.id = r.read_u64();
     Bytes h = r.read_bytes();
     t.h = BlockHeader::decode_all(bview(h));
+    t.vs = r.read_bytes();
+    t.ts = r.read_bytes();
     return t;
   });
   r.assert_fully_consumed();
@@ -327,6 +342,8 @@ void SubchainRegistry::restore_tips(crypto::ByteView bytes) {
     if (tips[i].id != children_[i].reg.chain_id || tips[i].h.chain_id != tips[i].id)
       throw std::invalid_argument("subchain snapshot: child id mismatch");
     children_[i].tip = tips[i].h;
+    children_[i].vset = consensus::ValidatorSet::decode_all(bview(tips[i].vs));      // throws on a malformed set
+    children_[i].tip_vset = consensus::ValidatorSet::decode_all(bview(tips[i].ts));
   }
 }
 

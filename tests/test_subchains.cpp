@@ -65,11 +65,19 @@ struct ChildChain {
                           std::vector<Transaction> txs = {}) {
     Block b = engine->propose(std::move(txs), ts, std::move(anchors));
     std::vector<consensus::Vote> votes;
-    for (std::uint32_t i = 0; i < 3; ++i) votes.push_back(engine->precommit(b, i, keys[i]));
+    const std::uint32_t n = static_cast<std::uint32_t>(engine->validators().size());  // sign under the set in force
+    for (std::uint32_t i = 0; i < n && i < keys.size(); ++i) votes.push_back(engine->precommit(b, i, keys[i]));
     auto cert = engine->try_commit(b, votes);
     if (!cert) throw std::runtime_error("child: no quorum");
     if (out) *out = b;
     return CertifiedHeader{b.header, cert->encode()};
+  }
+  // Schedule adding a validator (seed) — the next block announces it.
+  void rotate_add(std::uint8_t seed) {
+    keys.push_back(bls_key(seed));
+    std::vector<consensus::Validator> vs = engine->validators().validators();
+    vs.push_back(consensus::Validator{keys.back().public_key, 1});
+    engine->schedule_validator_set(consensus::ValidatorSet(vs));
   }
   // Produce the next finalized block (optionally anchoring its own children).
   CertifiedHeader next(std::uint64_t ts, std::vector<Anchor> anchors = {}, std::vector<Transaction> txs = {}) {
@@ -582,6 +590,56 @@ int main() {
     } plain(ledger_from_genesis(pg));
     CHECK_THROWS(plain.propose_anchored({}, 2, {*first}));
     CHECK(plain.propose_anchored({}, 2, {}).header.version == 3);
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────────────
+  std::printf("== VALIDATOR ROTATION on a child: the parent follows it through anchors and snapshots ==\n");
+  {
+    ChildChain K(88, 0x70);
+    GenesisSpec pg;
+    pg.chain_id = 4; pg.timestamp = 1;
+    pg.validators = {consensus::Validator{bls_key(0x01).public_key, 1}};
+    SubchainPolicy pp; pp.max_children = 1; pp.max_depth = 1; pp.children = {K.registration()};
+    pp.commit_to(pg);
+    auto P = ledger_from_genesis(pg);
+    CertifiedHeader k1 = K.next(2);
+    K.rotate_add(0x73);                        // 3 → 4 validators
+    CertifiedHeader k2 = K.next(3);            // announces the rotation, certified by the 3
+    CHECK(K.engine->validators().size() == 4);
+    CertifiedHeader k3 = K.next(4);            // certified by the 4
+    Anchor a; a.child_chain_id = 88; a.headers = {k1, k2, k3};
+    CHECK(P->process_block(P->build_block({}, 2, {a})).ok);
+    CHECK(P->subchains()->tip_of(88)->height == 3);
+    CHECK(P->subchains()->children()[0].vset.size() == 4 && P->subchains()->children()[0].tip_vset.size() == 4);
+    // A parent that ignored the rotation (registered set only) cannot verify k3.
+    {
+      auto Q = ledger_from_genesis(pg);
+      Anchor upto2; upto2.child_chain_id = 88; upto2.headers = {k1, k2};
+      CHECK(Q->process_block(Q->build_block({}, 2, {upto2})).ok);
+      CHECK(Q->subchains()->children()[0].vset.size() == 4 && Q->subchains()->children()[0].tip_vset.size() == 3);
+      // Snapshot/restore mid-rotation keeps both sets; the next anchor (certified by 4) verifies.
+      auto R = Ledger::restore(pg.chain_spec(), v(Q->snapshot()));
+      CHECK(R->subchains()->children()[0].vset.size() == 4 && R->subchains()->children()[0].tip_vset.size() == 3);
+      Anchor n3; n3.child_chain_id = 88; n3.headers = {k3};
+      CHECK(R->process_block(R->build_block({}, 3, {n3})).ok && R->subchains()->tip_of(88)->height == 3);
+    }
+    // A forged k3 certified by the OLD 3-set (as if no rotation happened) is refused.
+    {
+      auto Q = ledger_from_genesis(pg);
+      Anchor upto2; upto2.child_chain_id = 88; upto2.headers = {k1, k2};
+      CHECK(Q->process_block(Q->build_block({}, 2, {upto2})).ok);
+      BlockHeader fh = k3.header;
+      consensus::ConsensusData cd = consensus::ConsensusData::decode_all(v(fh.consensus_data));
+      cd.validator_set_hash = consensus::ValidatorSet(K.genesis.validators).hash();
+      fh.consensus_data = cd.encode();
+      std::vector<consensus::Vote> votes;
+      for (std::uint32_t i = 0; i < 3; ++i) votes.push_back(consensus::sign_vote(88, fh.height, 0, fh.hash(), i, K.keys[i]));
+      auto fc = consensus::aggregate_commit(88, consensus::ValidatorSet(K.genesis.validators), fh.height, 0, fh.hash(), votes);
+      CHECK(fc.has_value());
+      Anchor forged; forged.child_chain_id = 88; forged.headers = {CertifiedHeader{fh, fc->encode()}};
+      CHECK_THROWS(Q->build_block({}, 3, {forged}));
+    }
   }
 
   return bctest::summary();
