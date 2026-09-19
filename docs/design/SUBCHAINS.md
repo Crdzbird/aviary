@@ -287,10 +287,11 @@ the child's own registry list — the same function applied twice. No new crypto
 
 ## 8. Known limits (state up front, do not paper over)
 
-- **Child validator sets are fixed at registration** in v1, because
-  `LightClient` has no validator-set-change rule yet (it is an open [H] item in
-  `IMPROVEMENTS.md`). A child that rotates validators cannot be anchored until
-  that lands — and it must land *in `LightClient`*, so anchoring inherits it.
+- ~~Child validator sets are fixed at registration~~ — **lifted** (validator
+  rotation, 2026-09-19): it landed in `LightClient`, so anchoring inherited it.
+  The registration is the child's *genesis* set; the registry tracks the set in
+  force next and the set that certified the tip, and `subchain_root` commits
+  both hashes (§4.5).
 - **Only BFT children can be anchored in v1.** Correction found while building:
   in this codebase the PoS and VRF-PoS engines justify a block with a single
   *leader signature* and carry `PosData`/`VrfPosData` in `consensus_data`, not

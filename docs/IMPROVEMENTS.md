@@ -367,9 +367,30 @@
   first), static registration, the parent never executes children (a child
   supermajority can anchor a false state root — same limit as any light
   client). 65 suites; ASan/UBSan + TSan clean.
-- **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
-  transitions, governance, or anti-downgrade overlap rule. The set is fixed at
-  construction.
+- **[x] Validator-set changes — announced rotation — DONE** (commits 5c04e78,
+  e322fb3). A block may announce the set in force from the NEXT height
+  (`ConsensusData.next_validators`); the announcing block is certified by the
+  CURRENT set (>2/3 of the old set attests the new one), so the change is
+  itself finalized; the following block commits the new set's hash while its
+  embedded last commit is verified under the old set (`validate_consensus_data
+  (current, certifying, …)`). Followed everywhere a set lives: `LightClient`
+  (tracks the set in force next and the set that certified the tip; resume-
+  mid-chain ctor takes both; a client that ignores a rotation or resumes with
+  the wrong certifying set cannot continue), `BftEngine`, `RoundDriver` /
+  `NetworkedNode`, `SubchainRegistry` (a child's rotation is followed through
+  anchors and snapshots; `subchain_root` and proof hops now commit each
+  child's current set hashes). **Governance = coordinated rotation:** operators
+  schedule the agreed set; the next proposal announces it; `precommit` /
+  `valid()` refuse an UNSCHEDULED change (governance at vote time); a
+  certified rotation is FOLLOWED regardless (`RoundStateMachine::Config::
+  finalizable`, split from `valid` — found by the TCP test, where the one
+  node that had not scheduled the change would otherwise strand itself on the
+  network's decision); a node's index is remapped and a node rotated out keeps
+  following without voting. C ABI `blockchainer_chain_schedule_validators` /
+  `_chain_validators` + five-binding parity (grow, certify under each set,
+  rotate out, PoS refuses). Still open: staking / bonding economics, epoch
+  schedules, and an anti-long-range overlap rule for light clients that were
+  offline across many rotations (they must replay every rotation header).
 - **[~] Equivocation evidence & slashing — DETECTION DONE.** `Evidence` +
   `detect_equivocation` (scan precommits at one height/round for a validator that
   signed two different block ids) + `verify_equivocation` (both signatures valid

@@ -59,6 +59,16 @@ quorum (≥1/3 power) of colluding validators; physical key extraction.
 | Long-range / nothing-at-stake | N/A for BFT instant finality; relevant only to the deferred PoS engine. | *(deferred w/ PoS)* |
 | Liveness loss (≥1/3 offline) | Chain halts, does not fork (by design). | ✅ |
 
+### 4.1b Validator-set changes (rotation)
+| Threat | Mitigation | Status |
+|---|---|---|
+| A proposer swaps the validator set unilaterally | The announcing block needs >2/3 of the CURRENT set; each validator only votes for a change it scheduled itself (governance at vote time). | ✅ |
+| A certified rotation is ignored by some node (fork) | Finalization follows the certificate regardless of local schedule (`finalizable` split from `valid`); the node remaps its index or stops voting if it left. | ✅ |
+| Old validators keep signing after being rotated out | The next header commits the NEW set's hash; old-index votes no longer verify; a block "certified" by the old set is refused. | ✅ |
+| Malformed announced set (empty, bad key, zero power) | Checked well-formed at validation, before it can take effect. | ✅ |
+| Light client resumed with the wrong set across a rotation | Needs both the set in force next and the set that certified its tip; otherwise the next header fails. | ✅ |
+| Long-range attack on a light client offline across many rotations | Not mitigated: it must replay every rotation header; no trusting-period / overlap rule yet. | *(deferred)* |
+
 ### 4.2 Serialization / codec (the prime untrusted-input surface)
 | Threat | Mitigation | Status |
 |---|---|---|
@@ -94,7 +104,7 @@ quorum (≥1/3 power) of colluding validators; physical key extraction.
 | Child re-parented / parent swapped | `ParentBinding` committed in the child's genesis hash; registration by the child's genesis header (no hash cycle). | ✅ |
 | Forged cross-chain proof | Every hop recomputes `subchain_root` from a canonical (ascending, unique) list; descends only through the committed child tip; final state proof verified under that tip's root. | ✅ |
 | Child validator supermajority anchors a false state root | **Undetectable by the parent** (it never executes children) — the same limit as any light client. Documented, not mitigated. | *(accepted)* |
-| Child rotates validators | Not supported in v1 (registration is a fixed set); needs validator-set changes in `LightClient` first. | *(deferred)* |
+| Child rotates validators | Followed: the child's rotation header is anchored like any other, the registry tracks the set in force next + the set that certified the tip, and `subchain_root` commits both hashes (a snapshot cannot smuggle a set). | ✅ |
 
 ### 4.5 Interop & bridge (highest-loss-history component)
 | Threat | Mitigation | Status |
@@ -140,8 +150,10 @@ X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
 
 ## 7. Residual risks (consciously accepted, tracked in IMPROVEMENTS)
 
-- BFT round liveness machinery, validator-set changes, and **equivocation
-  slashing** are not implemented.
+- BFT round liveness machinery and **equivocation slashing** are not
+  implemented. Validator-set changes exist as coordinated rotation (§4.1b);
+  staking/bonding economics and a long-range-attack overlap rule for stale
+  light clients do not.
 - The bridge is **federated** (trusts a >2/3 attestor set), not trustless.
 - P2P lacks **peer-identity authentication**, discovery, and a gossip overlay
   with anti-eclipse/DoS controls.
