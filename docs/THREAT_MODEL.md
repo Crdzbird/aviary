@@ -67,7 +67,7 @@ quorum (≥1/3 power) of colluding validators; physical key extraction.
 | Old validators keep signing after being rotated out | The next header commits the NEW set's hash; old-index votes no longer verify; a block "certified" by the old set is refused. | ✅ |
 | Malformed announced set (empty, bad key, zero power) | Checked well-formed at validation, before it can take effect. | ✅ |
 | Light client resumed with the wrong set across a rotation | Needs both the set in force next and the set that certified its tip; otherwise the next header fails. | ✅ |
-| Long-range attack on a light client offline across many rotations | Not mitigated: it must replay every rotation header; no trusting-period / overlap rule yet. | *(deferred)* |
+| Long-range attack on a light client offline across many rotations | Overlap (skipping) rule: a far header is trusted only if its own set certifies it AND signers holding > 1/3 of the client's trusted set signed it; bisection otherwise. Sound only within the trusting period — `max_skip` is the operator's bound (no consensus clock), documented in `light_client.hpp`. | ✅ (trusting period: *operator-bound*) |
 
 ### 4.2 Serialization / codec (the prime untrusted-input surface)
 | Threat | Mitigation | Status |
@@ -94,6 +94,7 @@ quorum (≥1/3 power) of colluding validators; physical key extraction.
 | Light client accepts an invalid header | Verifies each header's commit certificate against the validator set + parent linkage; trusts roots only after >2/3 attests. | ✅ |
 | Forged inclusion proof | Domain-separated Merkle leaf hashing; proof recomputes the trusted root; tampered proof / wrong root rejected. | ✅ |
 | Proving non-membership | Only presence proofs supported; absence proofs not yet verifiable. | *(deferred)* |
+| Skipping to a header the trusted set never vouched for | `accept_skipping` requires signers holding > trust_level (1/3) of the TRUSTED set; a wrong or forged set fails the header's committed hash; a mis-certified header fails its own >2/3 rule. | ✅ |
 
 ### 4.4b Subchains (anchoring — docs/design/SUBCHAINS.md)
 | Threat | Mitigation | Status |
@@ -151,9 +152,9 @@ X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
 ## 7. Residual risks (consciously accepted, tracked in IMPROVEMENTS)
 
 - BFT round liveness machinery and **equivocation slashing** are not
-  implemented. Validator-set changes exist as coordinated rotation (§4.1b);
-  staking/bonding economics and a long-range-attack overlap rule for stale
-  light clients do not.
+  implemented. Validator-set changes exist as coordinated rotation (§4.1b) and
+  light clients skip with the overlap rule (§4.4); staking/bonding economics
+  and an enforced trusting period (there is no consensus clock) do not.
 - The bridge is **federated** (trusts a >2/3 attestor set), not trustless.
 - P2P lacks **peer-identity authentication**, discovery, and a gossip overlay
   with anti-eclipse/DoS controls.

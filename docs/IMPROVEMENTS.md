@@ -388,9 +388,25 @@
   network's decision); a node's index is remapped and a node rotated out keeps
   following without voting. C ABI `blockchainer_chain_schedule_validators` /
   `_chain_validators` + five-binding parity (grow, certify under each set,
-  rotate out, PoS refuses). Still open: staking / bonding economics, epoch
-  schedules, and an anti-long-range overlap rule for light clients that were
-  offline across many rotations (they must replay every rotation header).
+  rotate out, PoS refuses). Still open: staking / bonding economics and epoch
+  schedules.
+- **[x] Light-client OVERLAP (skipping) rule + bisection — DONE** (commits
+  b689a20, eed5bf2). `LightClient::accept_skipping(h, cert, h_set)` jumps to
+  a far header iff (1) h commits `hash(h_set)`, (2) cert is a >2/3 certificate
+  under h_set (h's own rule), and (3) the signers who are also in the client's
+  TRUSTED set hold strictly more than `trust_level` (default 1/3) of its power —
+  with fewer than 1/3 Byzantine among validators already trusted, at least one
+  honest one vouched. Integer-exact, no floats. `Result.insufficient_overlap`
+  separates "bisect" from "refuse": tampering (wrong set, altered powers,
+  tampered header/cert, wrong chain, stale cert, not ahead, over `max_skip`)
+  is always a hard failure. `sync_to(target, fetch)` bisects iteratively with
+  a bounded fetch budget and fails closed on a missing or mis-heighted
+  checkpoint. **Trusting-period assumption is documented, not enforced**:
+  blockchainer has no consensus clock, so operators bound `set_max_skip` to
+  their unbonding period and re-bootstrap a client whose tip is older. C ABI
+  `blockchainer_light_client_*` handle + five-binding parity, each proving a
+  no-overlap jump is "thin" (never a refusal), bisection through the rotation
+  header, and continuation under the new set. 67 suites, ASan-clean.
 - **[~] Equivocation evidence & slashing — DETECTION DONE.** `Evidence` +
   `detect_equivocation` (scan precommits at one height/round for a validator that
   signed two different block ids) + `verify_equivocation` (both signatures valid
