@@ -81,6 +81,7 @@ class _DashboardState extends State<Dashboard> {
   Timer? _timer;
   final List<String> _membership = [];
   final List<String> _mixture = [];
+  final List<String> _subchain = [];
 
   @override
   void initState() {
@@ -220,6 +221,7 @@ class _DashboardState extends State<Dashboard> {
           _eventsCard(),
           _membershipCard(),
           _mixtureCard(),
+          _subchainCard(),
           _verifyCard(),
           _interopCard(),
         ],
@@ -447,6 +449,86 @@ class _DashboardState extends State<Dashboard> {
       setState(() => _mixture..clear()..add('error: $e'));
     }
   }
+
+  void _runSubchainDemo() {
+    try {
+      final bc = _bc!;
+      final log = <String>[];
+      final cv = bc.newBLSValidator(Uint8List(32)..fillRange(0, 32, 0x71));
+      final pv = bc.newBLSValidator(Uint8List(32)..fillRange(0, 32, 0x72));
+      final alice = Uint8List(32)..fillRange(0, 32, 0xA1);
+      final bft = bc.makeBlueprint(consensus: 'bft', stateModel: 'account');
+
+      // The child: chain 42, BFT (finality = a commit certificate), alice funded.
+      final childGen = bc.commitBlueprint(
+          bc.buildGenesis(chainId: 42, accounts: [(address: alice, balance: 1000)], validators: [(publicKey: cv.public, power: 1)]), bft);
+      final childHeader = bc.genesisHeader(childGen);
+      // The parent: chain 1, registering the child by its genesis header + validator set.
+      var parentGen = bc.commitBlueprint(bc.buildGenesis(chainId: 1, accounts: [], validators: [(publicKey: pv.public, power: 1)]), bft);
+      final reg = bc.encodeChildRegistration(chainId: 42, genesisHeader: childHeader, validators: [(publicKey: cv.public, power: 1)]);
+      final policy = bc.encodeSubchainPolicy(maxChildren: 1, maxHeadersPerAnchor: 8, children: [reg]);
+      final plain = bc.genesisHash(parentGen);
+      parentGen = bc.commitSubchainPolicy(parentGen, policy);
+      log.add('parent genesis ${_short(plain)}… → with subchain policy ${_short(bc.genesisHash(parentGen))}… (identity changed ✓)');
+      // The child binds to its parent: its hash changes, its genesis header does not.
+      final bound = bc.commitParentBinding(childGen, 1, bc.genesisHash(parentGen));
+      log.add('child bound to parent: hash ${_short(bc.genesisHash(childGen))}… → ${_short(bc.genesisHash(bound))}… (cannot be re-parented ✓)');
+
+      final child = bc.assembleChain(bound, 0, cv.public, cv.secret)!;
+      final parent = bc.assembleChain(parentGen, 0, pv.public, pv.secret)!;
+      // The child finalizes two blocks with real certificates.
+      final certified = <Uint8List>[];
+      for (var ts = 2; ts <= 3; ts++) {
+        final blk = child.propose(ts);
+        final cert = child.certify(blk);
+        child.submit(blk, cert);
+        certified.add(bc.certifiedHeader(bc.blockHeader(blk), cert));
+      }
+      log.add('child (BFT) finalized ${child.height} blocks with commit certificates');
+      // One parent block anchors the whole segment; every parent validator re-verifies it.
+      final anchor = bc.encodeAnchor(42, certified);
+      final pblk = parent.proposeAnchored(2, [anchor]);
+      final okParent = parent.submit(pblk, parent.certify(pblk));
+      log.add('parent block anchors child[1..2]: ${okParent ? "height ${parent.height}, child tip recorded ✓" : "failed"}');
+      // Tamper: a flipped certificate byte, and a stale re-anchor — both refused before proposal.
+      final tampered = Uint8List.fromList(certified[1])..[certified[1].length - 1] ^= 1;
+      var refused = false;
+      try { parent.proposeAnchored(3, [bc.encodeAnchor(42, [tampered])]); } catch (_) { refused = true; }
+      log.add(refused ? 'tampered child certificate → anchor refused ✓' : 'unexpected');
+      refused = false;
+      try { parent.proposeAnchored(3, [anchor]); } catch (_) { refused = true; }
+      log.add(refused ? 're-anchoring an already-anchored height → refused ✓' : 'unexpected');
+      // Cross-chain proof: alice's balance on the CHILD, verified from the PARENT header alone.
+      final root = bc.headerSubchainRoot(bc.blockHeader(pblk));
+      final proof = bc.encodeSubchainProof([parent.subchainHop(42)], child.proveAccount(alice));
+      final ok = bc.verifySubchainProof(root, proof);
+      final bad = Uint8List.fromList(proof)..[proof.length - 1] ^= 1;
+      final badOk = bc.verifySubchainProof(root, bad);
+      log.add('alice on chain 42 proven from chain 1 header (subchain_root ${_short(root)}…): ${ok ? "verified ✓" : "FAILED"}; tampered proof: ${badOk ? "accepted ✗" : "rejected ✓"}');
+      child.free();
+      parent.free();
+      setState(() => _subchain..clear()..addAll(log));
+    } catch (e) {
+      setState(() => _subchain..clear()..add('error: $e'));
+    }
+  }
+
+  Widget _subchainCard() => _section('Subchains (a block anchors a blockchain)', Icons.account_tree_outlined, [
+        const Text(
+            'A parent block carries a child chain\'s finalized headers + certificates; '
+            'parent validators verify them with the light-client rule and commit the '
+            'child\'s tip in the parent header. Anything on the child can then be proven '
+            'from the parent\'s header alone.',
+            style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 10),
+        FilledButton.icon(onPressed: _runSubchainDemo, icon: const Icon(Icons.layers), label: const Text('Run subchain demo')),
+        if (_subchain.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ..._subchain.map((l) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)))),
+        ],
+      ]);
 
   Widget _mixtureCard() => _section('Composable chains (mixtures)', Icons.tune, [
         const Text(
