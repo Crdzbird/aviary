@@ -1198,3 +1198,100 @@ func TestValidatorRotation(t *testing.T) {
 		t.Fatal("PoS must refuse")
 	}
 }
+
+
+// Light-client overlap rule over the Go binding: power moves from validator A
+// (the genesis set) to validator B; a client that only trusts the genesis set
+// cannot skip straight to a B-certified header (no overlap), bisects through
+// the rotation header A certified, and then follows B.
+func TestLightClientSkipping(t *testing.T) {
+	must := func(b []byte, err error) []byte {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	va, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x91}, 32))
+	vb, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x92}, 32))
+	bft, _ := bc.NewBlueprint("bft", "account", "", nil)
+	genesisSet := []bc.GenesisValidator{{PublicKey: va.Public, Power: 1}}
+	gen := must(bc.CommitBlueprint(must(bc.BuildGenesis(8, 1, 1, bc.StateModelAccount, nil, genesisSet)), bft))
+	gh := must(bc.GenesisHeader(gen))
+	A, _ := bc.AssembleChain(gen, 0, va.Public, va.Secret)
+	B, _ := bc.AssembleChain(gen, 0, vb.Public, vb.Secret)
+	defer A.Free()
+	defer B.Free()
+	cps := map[uint64]bc.Checkpoint{}
+	// Height 1: A announces {A:1, B:3}, certified by A alone (the genesis set).
+	if err := A.ScheduleValidators([]bc.GenesisValidator{{PublicKey: va.Public, Power: 1}, {PublicKey: vb.Public, Power: 3}}); err != nil {
+		t.Fatal(err)
+	}
+	b1 := must(A.Propose(2))
+	c1 := must(A.Certify(b1))
+	if !A.Submit(b1, c1) || !B.Submit(b1, c1) {
+		t.Fatal("rotation block")
+	}
+	cps[1] = bc.Checkpoint{Header: must(bc.BlockHeader(b1)), Certificate: c1, Validators: genesisSet}
+	// Heights 2-3: certified by B alone (3 of 4).
+	newSet, _ := B.Validators()
+	for ts := uint64(3); ts <= 4; ts++ {
+		blk := must(B.Propose(ts))
+		cert := must(B.Certify(blk))
+		if !B.Submit(blk, cert) || !A.Submit(blk, cert) {
+			t.Fatal("B block")
+		}
+		cps[ts-1] = bc.Checkpoint{Header: must(bc.BlockHeader(blk)), Certificate: cert, Validators: newSet}
+	}
+	lc, err := bc.NewLightClient(8, genesisSet, gh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lc.Free()
+	if r := lc.AcceptSkipping(cps[3]); r != bc.SkipInsufficientOverlap {
+		t.Fatalf("no-overlap skip must report thin overlap, got %d", r)
+	}
+	wrong := cps[3]
+	wrong.Validators = genesisSet
+	if lc.AcceptSkipping(wrong) != bc.SkipRefused {
+		t.Fatal("wrong set must be refused")
+	}
+	bad := cps[3]
+	bad.Certificate = append([]byte(nil), cps[3].Certificate...)
+	bad.Certificate[len(bad.Certificate)-1] ^= 1
+	if lc.AcceptSkipping(bad) != bc.SkipRefused || lc.Height() != 0 {
+		t.Fatal("tampered certificate must be refused")
+	}
+	fetched := 0
+	if err := lc.SyncTo(cps[3], 3, func(h uint64) (bc.Checkpoint, bool) { fetched++; cp, ok := cps[h]; return cp, ok }); err != nil {
+		t.Fatal(err)
+	}
+	if lc.Height() != 3 || fetched == 0 {
+		t.Fatalf("sync: height %d fetched %d", lc.Height(), fetched)
+	}
+	vs, _ := lc.Validators()
+	if len(vs) != 2 || vs[1].Power != 3 {
+		t.Fatalf("client must now trust the new set: %v", vs)
+	}
+	// Continues sequentially.
+	b4 := must(B.Propose(5))
+	c4 := must(B.Certify(b4))
+	B.Submit(b4, c4)
+	if !lc.Accept(must(bc.BlockHeader(b4)), c4) || lc.Height() != 4 {
+		t.Fatal("sequential accept after a sync")
+	}
+	// max_skip bounds a jump; an unavailable checkpoint fails closed.
+	lc2, _ := bc.NewLightClient(8, genesisSet, gh)
+	defer lc2.Free()
+	lc2.SetMaxSkip(1)
+	if lc2.AcceptSkipping(cps[2]) != bc.SkipRefused {
+		t.Fatal("max_skip must refuse a 2-block jump")
+	}
+	lc2.SetMaxSkip(0)
+	if err := lc2.SyncTo(cps[3], 3, func(uint64) (bc.Checkpoint, bool) { return bc.Checkpoint{}, false }); err == nil {
+		t.Fatal("unavailable checkpoint must fail")
+	}
+	if _, err := bc.NewLightClient(8, nil, gh); err == nil {
+		t.Fatal("empty set must be refused")
+	}
+}

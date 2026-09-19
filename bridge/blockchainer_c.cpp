@@ -20,6 +20,7 @@
 #include "blockchainer/account_state.hpp"
 #include "blockchainer/bft_engine.hpp"
 #include "blockchainer/subchain.hpp"
+#include "blockchainer/light_client.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/pos_engine.hpp"
 #include "blockchainer/pow_engine.hpp"
@@ -1429,6 +1430,67 @@ BlockchainerBufferResult blockchainer_chain_certify(BlockchainerChain c, const u
     return bytes_result(cert->encode());
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
+
+// ── Light client ──────────────────────────────────────────────────────────────
+
+namespace {
+blockchainer::client::LightClient* as_lc(BlockchainerLightClient lc) {
+  return static_cast<blockchainer::client::LightClient*>(lc);
+}
+}  // namespace
+
+BlockchainerLightClient blockchainer_light_client_new(uint64_t chain_id, const uint8_t* validators,
+                                                      size_t validators_len, const uint8_t* trusted_header,
+                                                      size_t header_len) {
+  try {
+    return new blockchainer::client::LightClient(
+        chain_id, blockchainer::consensus::ValidatorSet::decode_all(cbv(validators, validators_len)),
+        blockchainer::BlockHeader::decode_all(cbv(trusted_header, header_len)));
+  } catch (...) { return nullptr; }
+}
+
+int blockchainer_light_client_accept(BlockchainerLightClient lc, const uint8_t* header, size_t header_len,
+                                     const uint8_t* certificate, size_t certificate_len) {
+  if (!lc) return 0;
+  try {
+    return as_lc(lc)->accept(blockchainer::BlockHeader::decode_all(cbv(header, header_len)),
+                             blockchainer::consensus::CommitCertificate::decode_all(cbv(certificate, certificate_len))).ok ? 1 : 0;
+  } catch (...) { return 0; }
+}
+
+int blockchainer_light_client_accept_skipping(BlockchainerLightClient lc, const uint8_t* header, size_t header_len,
+                                              const uint8_t* certificate, size_t certificate_len,
+                                              const uint8_t* validators, size_t validators_len) {
+  if (!lc) return 0;
+  try {
+    blockchainer::client::LightClient::Result r = as_lc(lc)->accept_skipping(
+        blockchainer::BlockHeader::decode_all(cbv(header, header_len)),
+        blockchainer::consensus::CommitCertificate::decode_all(cbv(certificate, certificate_len)),
+        blockchainer::consensus::ValidatorSet::decode_all(cbv(validators, validators_len)));
+    if (r.ok) return 1;
+    return r.insufficient_overlap ? 2 : 0;
+  } catch (...) { return 0; }
+}
+
+uint64_t blockchainer_light_client_height(BlockchainerLightClient lc) { return lc ? as_lc(lc)->height() : 0; }
+
+BlockchainerBufferResult blockchainer_light_client_tip(BlockchainerLightClient lc) {
+  if (!lc) return error_result("null light client");
+  return bytes_result(as_lc(lc)->tip().encode());
+}
+
+BlockchainerBufferResult blockchainer_light_client_validators(BlockchainerLightClient lc) {
+  if (!lc) return error_result("null light client");
+  return bytes_result(as_lc(lc)->validators().encode());
+}
+
+void blockchainer_light_client_set_trust_level(BlockchainerLightClient lc, uint32_t numerator, uint32_t denominator) {
+  if (lc) as_lc(lc)->set_trust_level(numerator, denominator);
+}
+void blockchainer_light_client_set_max_skip(BlockchainerLightClient lc, uint64_t blocks) {
+  if (lc) as_lc(lc)->set_max_skip(blocks);
+}
+void blockchainer_light_client_free(BlockchainerLightClient lc) { delete as_lc(lc); }
 
 int blockchainer_chain_schedule_validators(BlockchainerChain c, const uint8_t* validator_pks,
                                            const uint64_t* validator_powers, size_t validator_count) {

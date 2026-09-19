@@ -171,6 +171,11 @@ func (c *Chain) Validators() ([]GenesisValidator, error) {
 	if err != nil {
 		return nil, err
 	}
+	return decodeValidatorSet(blob)
+}
+
+// decodeValidatorSet parses the canonical ValidatorSet encoding.
+func decodeValidatorSet(blob []byte) ([]GenesisValidator, error) {
 	if len(blob) < 4 {
 		return nil, errors.New("validators: short blob")
 	}

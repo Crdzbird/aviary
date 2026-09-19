@@ -290,5 +290,47 @@ do {
 }
 print("validator-rotation OK")
 
+// Light-client overlap rule: power moves A → B; a client trusting only A bisects through the rotation.
+do {
+    let va = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: 0x91, count: 32))
+    let vb = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: 0x92, count: 32))
+    let bft = try Blockchainer.Blueprint(consensus: "bft", stateModel: "account")
+    let genesisSet = [Blockchainer.GenesisValidator(publicKey: va.publicKey, power: 1)]
+    let lgen = try Blockchainer.commitBlueprint(genesis: try Blockchainer.buildGenesis(chainID: 8, accounts: [], validators: genesisSet), blueprint: bft)
+    let gh = try Blockchainer.genesisHeader(lgen)
+    let A = Blockchainer.assembleChain(genesis: lgen, me: 0, blsPub: va.publicKey, blsSec: va.secret)!
+    let B = Blockchainer.assembleChain(genesis: lgen, me: 0, blsPub: vb.publicKey, blsSec: vb.secret)!
+    var cps: [UInt64: Blockchainer.Checkpoint] = [:]
+    try A.scheduleValidators([.init(publicKey: va.publicKey, power: 1), .init(publicKey: vb.publicKey, power: 3)])
+    let b1 = try A.propose(timestamp: 2); let c1 = try A.certify(b1)
+    precondition(A.submit(block: b1, justification: c1) && B.submit(block: b1, justification: c1), "rotation block")
+    cps[1] = .init(header: try Blockchainer.blockHeader(b1), certificate: c1, validators: genesisSet)
+    let newSet = try B.validators()
+    for ts: UInt64 in 3...4 {
+        let blk = try B.propose(timestamp: ts); let cert = try B.certify(blk)
+        precondition(B.submit(block: blk, justification: cert) && A.submit(block: blk, justification: cert), "B block")
+        cps[ts - 1] = .init(header: try Blockchainer.blockHeader(blk), certificate: cert, validators: newSet)
+    }
+    let lc = Blockchainer.newLightClient(chainID: 8, validators: genesisSet, trustedHeader: gh)!
+    precondition(lc.acceptSkipping(cps[3]!) == .insufficientOverlap, "no-overlap skip reports thin overlap")
+    precondition(lc.acceptSkipping(.init(header: cps[3]!.header, certificate: cps[3]!.certificate, validators: genesisSet)) == .refused, "wrong set refused")
+    var badCert = cps[3]!.certificate; badCert[badCert.count - 1] ^= 1
+    precondition(lc.acceptSkipping(.init(header: cps[3]!.header, certificate: badCert, validators: newSet)) == .refused && lc.height == 0, "tampered cert refused")
+    var fetched = 0
+    try lc.syncTo(cps[3]!, targetHeight: 3) { hh in fetched += 1; return cps[hh] }
+    let lcSet = try lc.validators()
+    precondition(lc.height == 3 && fetched > 0 && lcSet.count == 2 && lcSet[1].power == 3, "bisection sync")
+    let b4 = try B.propose(timestamp: 5); let c4 = try B.certify(b4); _ = B.submit(block: b4, justification: c4)
+    let h4 = try Blockchainer.blockHeader(b4)
+    precondition(lc.accept(header: h4, certificate: c4) && lc.height == 4, "sequential accept after a sync")
+    let lc2 = Blockchainer.newLightClient(chainID: 8, validators: genesisSet, trustedHeader: gh)!
+    lc2.setMaxSkip(1)
+    precondition(lc2.acceptSkipping(cps[2]!) == .refused, "max_skip refuses a 2-block jump")
+    lc2.setMaxSkip(0)
+    precondition((try? lc2.syncTo(cps[3]!, targetHeight: 3) { _ in nil }) == nil, "unavailable checkpoint fails")
+    precondition(Blockchainer.newLightClient(chainID: 8, validators: [], trustedHeader: gh) == nil, "empty set refused")
+}
+print("light-client-skip OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

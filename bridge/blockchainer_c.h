@@ -624,6 +624,41 @@ BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_propose_anchored(
  *  validators' precommits with the C++ API). */
 BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_certify(
     BlockchainerChain c, const uint8_t* block, size_t block_len);
+/* ── Light client: follow a header chain with certificates only ──────────────
+ *  Sequential accept, plus the OVERLAP (skipping) rule: jump to a far header
+ *  when its own set certifies it AND the signers hold more than trust_level
+ *  (default 1/3) of the set the client already trusts. Validator sets are
+ *  the canonical ValidatorSet encoding: [count u32]([len u32][pk][power u64])×
+ *  (what blockchainer_chain_validators returns). Handles are not thread-safe. */
+typedef void* BlockchainerLightClient;
+/** Trust a header (e.g. from blockchainer_genesis_header) and the set in force
+ *  for the next header. NULL on malformed input. */
+BLOCKCHAINER_API BlockchainerLightClient blockchainer_light_client_new(
+    uint64_t chain_id, const uint8_t* validators, size_t validators_len,
+    const uint8_t* trusted_header, size_t header_len);
+/** Sequential rule: 1 accepted (tip advanced), 0 refused. */
+BLOCKCHAINER_API int blockchainer_light_client_accept(
+    BlockchainerLightClient lc, const uint8_t* header, size_t header_len,
+    const uint8_t* certificate, size_t certificate_len);
+/** Skipping rule with [validators] = the set in force at the header's height.
+ *  1 accepted, 0 refused (hard: malformed / mis-certified / not ahead / over
+ *  max_skip), 2 insufficient overlap (bisect: try an intermediate header). */
+BLOCKCHAINER_API int blockchainer_light_client_accept_skipping(
+    BlockchainerLightClient lc, const uint8_t* header, size_t header_len,
+    const uint8_t* certificate, size_t certificate_len,
+    const uint8_t* validators, size_t validators_len);
+BLOCKCHAINER_API uint64_t blockchainer_light_client_height(BlockchainerLightClient lc);
+/** The trusted tip header. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_light_client_tip(BlockchainerLightClient lc);
+/** The set in force for the next header (follows rotations). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_light_client_validators(BlockchainerLightClient lc);
+/** Overlap threshold numerator/denominator (default 1/3; bad values ignored). */
+BLOCKCHAINER_API void blockchainer_light_client_set_trust_level(
+    BlockchainerLightClient lc, uint32_t numerator, uint32_t denominator);
+/** Largest single jump in blocks (0 = unbounded). Tie to the unbonding period. */
+BLOCKCHAINER_API void blockchainer_light_client_set_max_skip(BlockchainerLightClient lc, uint64_t blocks);
+BLOCKCHAINER_API void blockchainer_light_client_free(BlockchainerLightClient lc);
+
 /* ── Validator-set changes (coordinated rotation, BFT engines) ────────────────
  *  Operators agree a new set out of band and each SCHEDULES it; the next block
  *  this node proposes announces it; blockchainer_chain_certify refuses to vote

@@ -153,6 +153,15 @@ function ensureLoaded() {
     chainCertify: f('BlockchainerBufferResult blockchainer_chain_certify(void*, uint8_t*, size_t)'),
     chainChildTip: f('BlockchainerBufferResult blockchainer_chain_child_tip(void*, uint64_t)'),
     chainScheduleValidators: f('int blockchainer_chain_schedule_validators(void*, uint8_t*, uint64_t*, size_t)'),
+    lcNew: f('void *blockchainer_light_client_new(uint64_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    lcAccept: f('int blockchainer_light_client_accept(void*, uint8_t*, size_t, uint8_t*, size_t)'),
+    lcAcceptSkipping: f('int blockchainer_light_client_accept_skipping(void*, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    lcHeight: f('uint64_t blockchainer_light_client_height(void*)'),
+    lcTip: f('BlockchainerBufferResult blockchainer_light_client_tip(void*)'),
+    lcValidators: f('BlockchainerBufferResult blockchainer_light_client_validators(void*)'),
+    lcSetTrust: f('void blockchainer_light_client_set_trust_level(void*, uint32_t, uint32_t)'),
+    lcSetMaxSkip: f('void blockchainer_light_client_set_max_skip(void*, uint64_t)'),
+    lcFree: f('void blockchainer_light_client_free(void*)'),
     chainValidators: f('BlockchainerBufferResult blockchainer_chain_validators(void*)'),
     chainSubchainHop: f('BlockchainerBufferResult blockchainer_chain_subchain_hop(void*, uint64_t)'),
     chainProveAccount: f('BlockchainerBufferResult blockchainer_chain_prove_account(void*, uint8_t*)'),
@@ -497,12 +506,7 @@ class Chain {
       throw new Error('chain: cannot schedule validators (not BFT, or malformed set)');
   }
   /** BFT: the validator set in force for the next block → [{publicKey, power}]. */
-  validators() {
-    const b = consume(fn.chainValidators(this._h), 'chain_validators');
-    const n = b.readUInt32BE(0); const out = []; let off = 4;
-    for (let i = 0; i < n; i++) { const l = b.readUInt32BE(off); off += 4; const pk = b.subarray(off, off + l); off += l; out.push({ publicKey: pk, power: Number(b.readBigUInt64BE(off)) }); off += 8; }
-    return out;
-  }
+  validators() { return decodeValidatorSet(consume(fn.chainValidators(this._h), 'chain_validators')); }
   /** A parent's last anchored header for a child. */
   childTip(childChainId) { return consume(fn.chainChildTip(this._h, BigInt(childChainId)), 'chain_child_tip'); }
   /** A proof hop from this parent's current registry into a child. */
@@ -510,6 +514,59 @@ class Chain {
   /** State-inclusion proof for a 32-byte address on this account-model chain. */
   proveAccount(address) { return consume(fn.chainProveAccount(this._h, u8(address)), 'chain_prove_account'); }
 }
+// The canonical ValidatorSet encoding: [count]([len][pk][power u64])×.
+function decodeValidatorSet(b) {
+  const n = b.readUInt32BE(0); const out = []; let off = 4;
+  for (let i = 0; i < n; i++) { const l = b.readUInt32BE(off); off += 4; const pk = b.subarray(off, off + l); off += l; out.push({ publicKey: pk, power: Number(b.readBigUInt64BE(off)) }); off += 8; }
+  return out;
+}
+function encodeValidatorSet(vs) {
+  const parts = [Buffer.alloc(4)]; parts[0].writeUInt32BE(vs.length);
+  for (const v of vs) { const l = Buffer.alloc(4); l.writeUInt32BE(u8(v.publicKey).length); const p = Buffer.alloc(8); p.writeBigUInt64BE(BigInt(v.power)); parts.push(l, u8(v.publicKey), p); }
+  return Buffer.concat(parts);
+}
+/** Skip results of LightClient.acceptSkipping. */
+const SkipRefused = 0, SkipAccepted = 1, SkipInsufficientOverlap = 2;
+/** A light client: follows a header chain with certificates only. Sequential accept() plus the
+ *  OVERLAP (skipping) rule — acceptSkipping({header, certificate, validators}) jumps to a far header
+ *  when its own set certifies it and the signers hold more than the trust level (default 1/3) of the
+ *  set the client already trusts; syncTo bisects when the overlap is too thin. */
+class LightClient {
+  constructor(chainId, validators, trustedHeader) {
+    const vs = encodeValidatorSet(validators);
+    this._h = fn.lcNew(BigInt(chainId), vs, vs.length, u8(trustedHeader), u8(trustedHeader).length);
+    if (!this._h) throw new Error('light client: malformed validator set or header');
+  }
+  get height() { return Number(fn.lcHeight(this._h)); }
+  tip() { return consume(fn.lcTip(this._h), 'light_client_tip'); }
+  validators() { return decodeValidatorSet(consume(fn.lcValidators(this._h), 'light_client_validators')); }
+  setTrustLevel(numerator, denominator) { fn.lcSetTrust(this._h, numerator, denominator); }
+  setMaxSkip(blocks) { fn.lcSetMaxSkip(this._h, BigInt(blocks)); }
+  accept(header, certificate) { return fn.lcAccept(this._h, u8(header), u8(header).length, u8(certificate), u8(certificate).length) === 1; }
+  acceptSkipping({ header, certificate, validators }) {
+    const vs = encodeValidatorSet(validators);
+    return fn.lcAcceptSkipping(this._h, u8(header), u8(header).length, u8(certificate), u8(certificate).length, vs, vs.length);
+  }
+  /** Bisection: fetch(height) → checkpoint | null. Throws on a hard refusal / missing checkpoint. */
+  syncTo(target, targetHeight, fetch) {
+    const stack = [[target, targetHeight]];
+    for (let n = 0; stack.length; n++) {
+      if (n > 128) throw new Error('light client: bisection exceeded its fetch budget');
+      const [cp, h] = stack[stack.length - 1];
+      const r = this.acceptSkipping(cp);
+      if (r === SkipAccepted) { stack.pop(); continue; }
+      if (r !== SkipInsufficientOverlap) throw new Error('light client: checkpoint refused');
+      const lo = this.height, hi = h;
+      if (hi - lo <= 1) throw new Error('light client: insufficient overlap and no intermediate header');
+      const mid = lo + Math.floor((hi - lo) / 2);
+      const m = fetch(mid);
+      if (!m) throw new Error('light client: checkpoint unavailable at ' + mid);
+      stack.push([m, mid]);
+    }
+  }
+  free() { if (this._h) { fn.lcFree(this._h); this._h = null; } }
+}
+
 // [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
 function blobList(items) {
   const parts = [Buffer.alloc(4)];
@@ -680,6 +737,8 @@ module.exports = {
   registerEngine,
   registerProposer,
   MAX_JUSTIFICATION,
+  // Light client.
+  LightClient, SkipRefused, SkipAccepted, SkipInsufficientOverlap,
   // Subchains.
   genesisHeader, encodeChildRegistration, encodeSubchainPolicy, commitSubchainPolicy, commitParentBinding,
   blockHeader, headerSubchainRoot, certifiedHeader, encodeAnchor, encodeSubchainProof, verifySubchainProof,

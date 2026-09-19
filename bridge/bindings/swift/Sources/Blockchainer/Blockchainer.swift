@@ -558,6 +558,78 @@ public enum Blockchainer {
         }
     }
 
+    // ── Light client: follow a header chain with certificates only ────────────
+
+    static func encodeValidatorSet(_ vs: [GenesisValidator]) -> Data {
+        var d = Data(); d.append(contentsOf: withUnsafeBytes(of: UInt32(vs.count).bigEndian) { Data($0) })
+        for v in vs {
+            d.append(contentsOf: withUnsafeBytes(of: UInt32(v.publicKey.count).bigEndian) { Data($0) }); d.append(v.publicKey)
+            d.append(contentsOf: withUnsafeBytes(of: v.power.bigEndian) { Data($0) })
+        }
+        return d
+    }
+    static func decodeValidatorSet(_ b: Data) -> [GenesisValidator] {
+        func u32(_ o: Int) -> Int { Int(UInt32(bigEndian: b.subdata(in: o..<o+4).withUnsafeBytes { $0.load(as: UInt32.self) })) }
+        func u64(_ o: Int) -> UInt64 { UInt64(bigEndian: b.subdata(in: o..<o+8).withUnsafeBytes { $0.load(as: UInt64.self) }) }
+        var out: [GenesisValidator] = []; var off = 4
+        for _ in 0..<u32(0) { let l = u32(off); off += 4; let pk = b.subdata(in: off..<off+l); off += l; out.append(.init(publicKey: pk, power: u64(off))); off += 8 }
+        return out
+    }
+    /// A header, its certificate, and the set in force at its height.
+    public struct Checkpoint { public var header: Data; public var certificate: Data; public var validators: [GenesisValidator]
+        public init(header: Data, certificate: Data, validators: [GenesisValidator]) { self.header = header; self.certificate = certificate; self.validators = validators } }
+    public enum SkipResult: Int32 { case refused = 0, accepted = 1, insufficientOverlap = 2 }
+
+    /// Sequential accept plus the OVERLAP (skipping) rule: acceptSkipping jumps to a far header when
+    /// its own set certifies it and the signers hold more than the trust level (default 1/3) of the
+    /// set the client already trusts; syncTo bisects when the overlap is too thin.
+    public final class LightClient {
+        private let h: OpaquePointer
+        init?(chainID: UInt64, validators: [GenesisValidator], trustedHeader: Data) {
+            let vs = Blockchainer.encodeValidatorSet(validators)
+            let raw = vs.withC { vp, vl in trustedHeader.withC { hp, hl in blockchainer_light_client_new(chainID, vp, vl, hp, hl) } }
+            guard let r = raw else { return nil }
+            h = OpaquePointer(r)
+        }
+        deinit { blockchainer_light_client_free(UnsafeMutableRawPointer(h)) }
+        public var height: UInt64 { blockchainer_light_client_height(UnsafeMutableRawPointer(h)) }
+        public func tip() throws -> Data { try consume(blockchainer_light_client_tip(UnsafeMutableRawPointer(h)), "light_client_tip") }
+        public func validators() throws -> [GenesisValidator] { Blockchainer.decodeValidatorSet(try consume(blockchainer_light_client_validators(UnsafeMutableRawPointer(h)), "light_client_validators")) }
+        public func setTrustLevel(numerator: UInt32, denominator: UInt32) { blockchainer_light_client_set_trust_level(UnsafeMutableRawPointer(h), numerator, denominator) }
+        public func setMaxSkip(_ blocks: UInt64) { blockchainer_light_client_set_max_skip(UnsafeMutableRawPointer(h), blocks) }
+        public func accept(header: Data, certificate: Data) -> Bool {
+            header.withC { hp, hl in certificate.withC { cp, cl in blockchainer_light_client_accept(UnsafeMutableRawPointer(h), hp, hl, cp, cl) == 1 } }
+        }
+        public func acceptSkipping(_ cp: Checkpoint) -> SkipResult {
+            let vs = Blockchainer.encodeValidatorSet(cp.validators)
+            let r = cp.header.withC { hp, hl in cp.certificate.withC { cpp, cl in vs.withC { vp, vl in
+                blockchainer_light_client_accept_skipping(UnsafeMutableRawPointer(h), hp, hl, cpp, cl, vp, vl) } } }
+            return SkipResult(rawValue: r) ?? .refused
+        }
+        /// Bisection: fetch(height) → checkpoint or nil. Throws on a hard refusal / missing checkpoint.
+        public func syncTo(_ target: Checkpoint, targetHeight: UInt64, fetch: (UInt64) -> Checkpoint?) throws {
+            var stack: [(Checkpoint, UInt64)] = [(target, targetHeight)]
+            var n = 0
+            while let (cp, hi) = stack.last {
+                n += 1; if n > 128 { throw BlockchainerError(message: "light client: bisection exceeded its fetch budget") }
+                switch acceptSkipping(cp) {
+                case .accepted: stack.removeLast()
+                case .refused: throw BlockchainerError(message: "light client: checkpoint refused")
+                case .insufficientOverlap:
+                    let lo = height
+                    if hi - lo <= 1 { throw BlockchainerError(message: "light client: insufficient overlap and no intermediate header") }
+                    let mid = lo + (hi - lo) / 2
+                    guard let m = fetch(mid) else { throw BlockchainerError(message: "light client: checkpoint unavailable at \(mid)") }
+                    stack.append((m, mid))
+                }
+            }
+        }
+    }
+    /// nil = malformed validator set or header.
+    public static func newLightClient(chainID: UInt64, validators: [GenesisValidator], trustedHeader: Data) -> LightClient? {
+        ensureReady(); return LightClient(chainID: chainID, validators: validators, trustedHeader: trustedHeader)
+    }
+
     // ── Subchains: a parent block anchors a child chain's finalized headers ────
     // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
     // genesis HEADER + fixed validator set; anchor its certified headers; prove a

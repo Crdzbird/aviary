@@ -38,7 +38,8 @@ public final class Blockchainer implements AutoCloseable {
             genesisHeaderH, childRegEncode, subchainPolicyEncode, genesisCommitSubchains, genesisCommitBinding,
             blockHeaderH, headerSubchainRootH, certifiedHeaderEncode, anchorEncode, chainProposeAnchored, chainCertify,
             chainChildTip, chainSubchainHop, chainProveAccount, subchainProofEncode, subchainProofVerify,
-            chainScheduleValidators, chainValidatorsH;
+            chainScheduleValidators, chainValidatorsH,
+            lcNew, lcAccept, lcAcceptSkipping, lcHeight, lcTip, lcValidators, lcSetTrust, lcSetMaxSkip, lcFree;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -154,6 +155,15 @@ public final class Blockchainer implements AutoCloseable {
         subchainProofVerify = h("blockchainer_subchain_proof_verify", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
         chainScheduleValidators = h("blockchainer_chain_schedule_validators", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG));
         chainValidatorsH = h("blockchainer_chain_validators", FunctionDescriptor.of(RES, ADDRESS));
+        lcNew = h("blockchainer_light_client_new", FunctionDescriptor.of(ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        lcAccept = h("blockchainer_light_client_accept", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        lcAcceptSkipping = h("blockchainer_light_client_accept_skipping", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        lcHeight = h("blockchainer_light_client_height", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        lcTip = h("blockchainer_light_client_tip", FunctionDescriptor.of(RES, ADDRESS));
+        lcValidators = h("blockchainer_light_client_validators", FunctionDescriptor.of(RES, ADDRESS));
+        lcSetTrust = h("blockchainer_light_client_set_trust_level", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, JAVA_INT));
+        lcSetMaxSkip = h("blockchainer_light_client_set_max_skip", FunctionDescriptor.ofVoid(ADDRESS, JAVA_LONG));
+        lcFree = h("blockchainer_light_client_free", FunctionDescriptor.ofVoid(ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -577,11 +587,7 @@ public final class Blockchainer implements AutoCloseable {
         }
         /** BFT: the validator set in force for the next block. */
         public java.util.List<ValidatorEntry> validators() {
-            byte[] b; try { b = consume((MemorySegment) chainValidatorsH.invoke(arena.allocate(RES), h)); } catch (Throwable e) { throw new RuntimeException(e); }
-            java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
-            int n = bb.getInt(); var out = new java.util.ArrayList<ValidatorEntry>(n);
-            for (int i = 0; i < n; i++) { byte[] pk = new byte[bb.getInt()]; bb.get(pk); out.add(new ValidatorEntry(pk, bb.getLong())); }
-            return out;
+            try { return decodeValidatorSet(consume((MemorySegment) chainValidatorsH.invoke(arena.allocate(RES), h))); } catch (Throwable e) { throw new RuntimeException(e); }
         }
         /** A parent's last anchored header for a child. */
         public byte[] childTip(long childChainId) { try { return consume((MemorySegment) chainChildTip.invoke(arena.allocate(RES), h, childChainId)); } catch (Throwable e) { throw new RuntimeException(e); } }
@@ -590,6 +596,67 @@ public final class Blockchainer implements AutoCloseable {
         /** State-inclusion proof for a 32-byte address on this account-model chain. */
         public byte[] proveAccount(byte[] address) { try { return consume((MemorySegment) chainProveAccount.invoke(arena.allocate(RES), h, seg(address))); } catch (Throwable e) { throw new RuntimeException(e); } }
     }
+
+    /** The canonical ValidatorSet encoding: [count]([len][pk][power u64])×. */
+    static java.util.List<ValidatorEntry> decodeValidatorSet(byte[] b) {
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
+        int n = bb.getInt(); var out = new java.util.ArrayList<ValidatorEntry>(n);
+        for (int i = 0; i < n; i++) { byte[] pk = new byte[bb.getInt()]; bb.get(pk); out.add(new ValidatorEntry(pk, bb.getLong())); }
+        return out;
+    }
+    static byte[] encodeValidatorSet(java.util.List<ValidatorEntry> vs) {
+        int n = 4; for (var v : vs) n += 4 + v.publicKey().length + 8;
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(n).putInt(vs.size());
+        for (var v : vs) bb.putInt(v.publicKey().length).put(v.publicKey()).putLong(v.power());
+        return bb.array();
+    }
+    /** A header, its certificate, and the set in force at its height. */
+    public record Checkpoint(byte[] header, byte[] certificate, java.util.List<ValidatorEntry> validators) {}
+    public static final int SKIP_REFUSED = 0, SKIP_ACCEPTED = 1, SKIP_INSUFFICIENT_OVERLAP = 2;
+
+    /** A light client: follows a header chain with certificates only. Sequential accept plus the
+     *  OVERLAP (skipping) rule — acceptSkipping jumps to a far header when its own set certifies it
+     *  and the signers hold more than the trust level (default 1/3) of the set the client already
+     *  trusts; syncTo bisects when the overlap is too thin. */
+    public final class LightClient implements AutoCloseable {
+        private final MemorySegment h;
+        LightClient(long chainId, java.util.List<ValidatorEntry> validators, byte[] trustedHeader) {
+            byte[] vs = encodeValidatorSet(validators);
+            try { h = (MemorySegment) lcNew.invoke(chainId, seg(vs), (long) vs.length, seg(trustedHeader), (long) trustedHeader.length); } catch (Throwable e) { throw new RuntimeException(e); }
+            if (h.address() == 0) throw new IllegalArgumentException("light client: malformed validator set or header");
+        }
+        public long height() { try { return (long) lcHeight.invoke(h); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public byte[] tip() { try { return consume((MemorySegment) lcTip.invoke(arena.allocate(RES), h)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public java.util.List<ValidatorEntry> validators() { try { return decodeValidatorSet(consume((MemorySegment) lcValidators.invoke(arena.allocate(RES), h))); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public void setTrustLevel(int numerator, int denominator) { try { lcSetTrust.invoke(h, numerator, denominator); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public void setMaxSkip(long blocks) { try { lcSetMaxSkip.invoke(h, blocks); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public boolean accept(byte[] header, byte[] certificate) {
+            try { return (int) lcAccept.invoke(h, seg(header), (long) header.length, seg(certificate), (long) certificate.length) == 1; } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        public int acceptSkipping(Checkpoint cp) {
+            byte[] vs = encodeValidatorSet(cp.validators());
+            try { return (int) lcAcceptSkipping.invoke(h, seg(cp.header()), (long) cp.header().length, seg(cp.certificate()), (long) cp.certificate().length, seg(vs), (long) vs.length); } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** Bisection: fetch(height) → checkpoint or null. Throws on a hard refusal / missing checkpoint. */
+        public void syncTo(Checkpoint target, long targetHeight, java.util.function.LongFunction<Checkpoint> fetch) {
+            var stack = new java.util.ArrayDeque<Object[]>(); stack.push(new Object[]{target, targetHeight});
+            for (int n = 0; !stack.isEmpty(); n++) {
+                if (n > 128) throw new IllegalStateException("light client: bisection exceeded its fetch budget");
+                Object[] top = stack.peek(); Checkpoint cp = (Checkpoint) top[0]; long hi = (Long) top[1];
+                int r = acceptSkipping(cp);
+                if (r == SKIP_ACCEPTED) { stack.pop(); continue; }
+                if (r != SKIP_INSUFFICIENT_OVERLAP) throw new IllegalStateException("light client: checkpoint refused");
+                long lo = height();
+                if (hi - lo <= 1) throw new IllegalStateException("light client: insufficient overlap and no intermediate header");
+                long mid = lo + (hi - lo) / 2;
+                Checkpoint m = fetch.apply(mid);
+                if (m == null) throw new IllegalStateException("light client: checkpoint unavailable at " + mid);
+                stack.push(new Object[]{m, mid});
+            }
+        }
+        @Override public void close() { try { lcFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    public LightClient newLightClient(long chainId, java.util.List<ValidatorEntry> validators, byte[] trustedHeader) { return new LightClient(chainId, validators, trustedHeader); }
 
     // ── Subchains: a parent block anchors a child chain's finalized headers ────
     // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its

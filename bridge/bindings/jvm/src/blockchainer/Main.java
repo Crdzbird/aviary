@@ -293,6 +293,48 @@ public final class Main {
             }
             System.out.println("validator-rotation OK");
 
+            // Light-client overlap rule: power moves A → B; a client trusting only A bisects through the rotation.
+            {
+                var va = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{(byte) 0x91}, 32));
+                var vb = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{(byte) 0x92}, 32));
+                var bft = bc.new Blueprint("bft", "account", "", null);
+                var genesisSet = java.util.List.of(new Blockchainer.ValidatorEntry(va.publicKey(), 1));
+                byte[] lgen = bc.commitBlueprint(bc.buildGenesis(8, 1, 1, 0, new byte[0][], new long[0], new byte[][]{va.publicKey()}, new long[]{1}), bft);
+                byte[] gh = bc.genesisHeader(lgen);
+                try (var A = bc.assembleChain(lgen, 0, va.publicKey(), va.secret()); var B = bc.assembleChain(lgen, 0, vb.publicKey(), vb.secret())) {
+                    var cps = new java.util.HashMap<Long, Blockchainer.Checkpoint>();
+                    if (!A.scheduleValidators(new byte[][]{va.publicKey(), vb.publicKey()}, new long[]{1, 3})) throw new IllegalStateException("schedule");
+                    byte[] b1 = A.propose(2); byte[] c1 = A.certify(b1);
+                    if (!A.submit(b1, c1) || !B.submit(b1, c1)) throw new IllegalStateException("rotation block");
+                    cps.put(1L, new Blockchainer.Checkpoint(bc.blockHeader(b1), c1, genesisSet));
+                    var newSet = B.validators();
+                    for (long ts = 3; ts <= 4; ts++) {
+                        byte[] blk = B.propose(ts); byte[] cert = B.certify(blk);
+                        if (!B.submit(blk, cert) || !A.submit(blk, cert)) throw new IllegalStateException("B block");
+                        cps.put(ts - 1, new Blockchainer.Checkpoint(bc.blockHeader(blk), cert, newSet));
+                    }
+                    try (var lc = bc.newLightClient(8, genesisSet, gh)) {
+                        if (lc.acceptSkipping(cps.get(3L)) != Blockchainer.SKIP_INSUFFICIENT_OVERLAP) throw new IllegalStateException("no-overlap skip must report thin overlap");
+                        if (lc.acceptSkipping(new Blockchainer.Checkpoint(cps.get(3L).header(), cps.get(3L).certificate(), genesisSet)) != Blockchainer.SKIP_REFUSED) throw new IllegalStateException("wrong set must be refused");
+                        byte[] badCert = cps.get(3L).certificate().clone(); badCert[badCert.length - 1] ^= 1;
+                        if (lc.acceptSkipping(new Blockchainer.Checkpoint(cps.get(3L).header(), badCert, newSet)) != Blockchainer.SKIP_REFUSED || lc.height() != 0) throw new IllegalStateException("tampered cert must be refused");
+                        final int[] fetched = {0};
+                        lc.syncTo(cps.get(3L), 3, hh -> { fetched[0]++; return cps.get(hh); });
+                        if (lc.height() != 3 || fetched[0] == 0 || lc.validators().size() != 2 || lc.validators().get(1).power() != 3) throw new IllegalStateException("bisection sync");
+                        byte[] b4 = B.propose(5); byte[] c4 = B.certify(b4); B.submit(b4, c4);
+                        if (!lc.accept(bc.blockHeader(b4), c4) || lc.height() != 4) throw new IllegalStateException("sequential accept after a sync");
+                    }
+                    try (var lc2 = bc.newLightClient(8, genesisSet, gh)) {
+                        lc2.setMaxSkip(1);
+                        if (lc2.acceptSkipping(cps.get(2L)) != Blockchainer.SKIP_REFUSED) throw new IllegalStateException("max_skip must refuse a 2-block jump");
+                        lc2.setMaxSkip(0);
+                        try { lc2.syncTo(cps.get(3L), 3, hh -> null); throw new IllegalStateException("unavailable checkpoint must fail"); } catch (IllegalStateException e) { if (!e.getMessage().contains("unavailable")) throw e; }
+                    }
+                    try { bc.newLightClient(8, java.util.List.of(), gh); throw new IllegalStateException("empty set must be refused"); } catch (IllegalArgumentException expected) {}
+                }
+            }
+            System.out.println("light-client-skip OK");
+
             System.out.println("\nALL GOOD");
         }
     }

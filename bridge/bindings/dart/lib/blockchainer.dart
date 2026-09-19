@@ -269,6 +269,39 @@ typedef _ScChainAddrC = _BufResult Function(Pointer<Void>, Pointer<Uint8>);
 typedef _ScChainAddrD = _BufResult Function(Pointer<Void>, Pointer<Uint8>);
 typedef _ScVerifyC = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size);
 typedef _ScSchedC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Pointer<Uint64>, Size);
+typedef _LcNewC = Pointer<Void> Function(Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _LcNewD = Pointer<Void> Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _LcAcceptC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _LcAcceptD = int Function(Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _LcSkipC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _LcSkipD = int Function(Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _LcTrustC = Void Function(Pointer<Void>, Uint32, Uint32);
+typedef _LcTrustD = void Function(Pointer<Void>, int, int);
+typedef _LcMaxSkipC = Void Function(Pointer<Void>, Uint64);
+typedef _LcMaxSkipD = void Function(Pointer<Void>, int);
+
+/// The canonical ValidatorSet encoding: [count]([len][pk][power u64])×.
+List<({Uint8List publicKey, int power})> _decodeValidatorSet(Uint8List b) {
+  final bd = ByteData.sublistView(b);
+  final n = bd.getUint32(0); var off = 4;
+  final out = <({Uint8List publicKey, int power})>[];
+  for (var i = 0; i < n; i++) {
+    final l = bd.getUint32(off); off += 4;
+    final pk = Uint8List.fromList(b.sublist(off, off + l)); off += l;
+    out.add((publicKey: pk, power: bd.getUint64(off))); off += 8;
+  }
+  return out;
+}
+Uint8List _encodeValidatorSet(List<({Uint8List publicKey, int power})> vs) {
+  final b = BytesBuilder();
+  b.add((ByteData(4)..setUint32(0, vs.length)).buffer.asUint8List());
+  for (final v in vs) {
+    b.add((ByteData(4)..setUint32(0, v.publicKey.length)).buffer.asUint8List());
+    b.add(v.publicKey);
+    b.add((ByteData(8)..setUint64(0, v.power)).buffer.asUint8List());
+  }
+  return b.toBytes();
+}
 typedef _ScSchedD = int Function(Pointer<Void>, Pointer<Uint8>, Pointer<Uint64>, int);
 typedef _ScVerifyD = int Function(Pointer<Uint8>, Pointer<Uint8>, int);
 
@@ -1103,6 +1136,16 @@ class Blockchainer {
       calloc.free(ap); calloc.free(kp); calloc.free(bal); calloc.free(pow);
     }
   }
+  /// A light client trusting [trustedHeader] and the set in force for the next header; null if malformed.
+  LightClient? newLightClient(int chainId, List<({Uint8List publicKey, int power})> validators, Uint8List trustedHeader) {
+    final vs = _encodeValidatorSet(validators);
+    final vp = _alloc(vs), hp = _alloc(trustedHeader);
+    try {
+      final h = lib.lookupFunction<_LcNewC, _LcNewD>('blockchainer_light_client_new')(chainId, vp, vs.length, hp, trustedHeader.length);
+      return h == nullptr ? null : LightClient._(this, h);
+    } finally { calloc.free(vp); calloc.free(hp); }
+  }
+
   // ── Subchains: a parent block anchors a child chain's finalized headers ────
   // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
   // genesis HEADER + fixed validator set; anchor its certified headers; prove a
@@ -1845,18 +1888,8 @@ class Chain {
     } finally { calloc.free(kp); calloc.free(pw); }
   }
   /// BFT: the validator set in force for the next block.
-  List<({Uint8List publicKey, int power})> validators() {
-    final b = _bc._take(_bc.lib.lookupFunction<_ChainBufC, _ChainBufD>('blockchainer_chain_validators')(_h), 'chain_validators');
-    final bd = ByteData.sublistView(b);
-    final n = bd.getUint32(0); var off = 4;
-    final out = <({Uint8List publicKey, int power})>[];
-    for (var i = 0; i < n; i++) {
-      final l = bd.getUint32(off); off += 4;
-      final pk = Uint8List.fromList(b.sublist(off, off + l)); off += l;
-      out.add((publicKey: pk, power: bd.getUint64(off))); off += 8;
-    }
-    return out;
-  }
+  List<({Uint8List publicKey, int power})> validators() =>
+      _decodeValidatorSet(_bc._take(_bc.lib.lookupFunction<_ChainBufC, _ChainBufD>('blockchainer_chain_validators')(_h), 'chain_validators'));
   /// A parent's last anchored header for a child.
   Uint8List childTip(int childChainId) => _bc._take(_bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>('blockchainer_chain_child_tip')(_h, childChainId), 'chain_child_tip');
   /// A proof hop from this parent's current registry into a child.
@@ -1948,4 +1981,57 @@ class CredentialGate {
 
   void free() =>
       _bc.lib.lookupFunction<_CredGateFreeC, _CredGateFreeD>('blockchainer_credential_gate_free')(_h);
+}
+
+/// A header, its certificate, and the validator set in force at its height.
+typedef Checkpoint = ({Uint8List header, Uint8List certificate, List<({Uint8List publicKey, int power})> validators});
+
+/// Skip results of [LightClient.acceptSkipping].
+enum SkipResult { refused, accepted, insufficientOverlap }
+
+/// A light client: follows a header chain with certificates only. Sequential [accept] plus the
+/// OVERLAP (skipping) rule — [acceptSkipping] jumps to a far header when its own set certifies it
+/// and the signers hold more than the trust level (default 1/3) of the set the client already
+/// trusts; [syncTo] bisects when the overlap is too thin.
+class LightClient {
+  LightClient._(this._bc, this._h);
+  final Blockchainer _bc;
+  final Pointer<Void> _h;
+  int get height => _bc.lib.lookupFunction<_ChainHeightC, _ChainHeightD>('blockchainer_light_client_height')(_h);
+  Uint8List tip() => _bc._take(_bc.lib.lookupFunction<_ChainBufC, _ChainBufD>('blockchainer_light_client_tip')(_h), 'light_client_tip');
+  List<({Uint8List publicKey, int power})> validators() =>
+      _decodeValidatorSet(_bc._take(_bc.lib.lookupFunction<_ChainBufC, _ChainBufD>('blockchainer_light_client_validators')(_h), 'light_client_validators'));
+  void setTrustLevel(int numerator, int denominator) => _bc.lib.lookupFunction<_LcTrustC, _LcTrustD>('blockchainer_light_client_set_trust_level')(_h, numerator, denominator);
+  void setMaxSkip(int blocks) => _bc.lib.lookupFunction<_LcMaxSkipC, _LcMaxSkipD>('blockchainer_light_client_set_max_skip')(_h, blocks);
+  bool accept(Uint8List header, Uint8List certificate) {
+    final hp = _bc._alloc(header), cp = _bc._alloc(certificate);
+    try { return _bc.lib.lookupFunction<_LcAcceptC, _LcAcceptD>('blockchainer_light_client_accept')(_h, hp, header.length, cp, certificate.length) == 1; }
+    finally { calloc.free(hp); calloc.free(cp); }
+  }
+  SkipResult acceptSkipping(Checkpoint cp) {
+    final vs = _encodeValidatorSet(cp.validators);
+    final hp = _bc._alloc(cp.header), cpp = _bc._alloc(cp.certificate), vp = _bc._alloc(vs);
+    try {
+      final r = _bc.lib.lookupFunction<_LcSkipC, _LcSkipD>('blockchainer_light_client_accept_skipping')(_h, hp, cp.header.length, cpp, cp.certificate.length, vp, vs.length);
+      return r == 1 ? SkipResult.accepted : (r == 2 ? SkipResult.insufficientOverlap : SkipResult.refused);
+    } finally { calloc.free(hp); calloc.free(cpp); calloc.free(vp); }
+  }
+  /// Bisection: [fetch](height) → checkpoint or null. Throws on a hard refusal / missing checkpoint.
+  void syncTo(Checkpoint target, int targetHeight, Checkpoint? Function(int height) fetch) {
+    final stack = <(Checkpoint, int)>[(target, targetHeight)];
+    for (var n = 0; stack.isNotEmpty; n++) {
+      if (n > 128) throw StateError('light client: bisection exceeded its fetch budget');
+      final (cp, hi) = stack.last;
+      final r = acceptSkipping(cp);
+      if (r == SkipResult.accepted) { stack.removeLast(); continue; }
+      if (r != SkipResult.insufficientOverlap) throw StateError('light client: checkpoint refused');
+      final lo = height;
+      if (hi - lo <= 1) throw StateError('light client: insufficient overlap and no intermediate header');
+      final mid = lo + (hi - lo) ~/ 2;
+      final m = fetch(mid);
+      if (m == null) throw StateError('light client: checkpoint unavailable at $mid');
+      stack.add((m, mid));
+    }
+  }
+  void free() => _bc.lib.lookupFunction<_ChainFreeC, _ChainFreeD>('blockchainer_light_client_free')(_h);
 }
