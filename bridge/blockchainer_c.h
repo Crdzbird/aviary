@@ -624,6 +624,21 @@ BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_propose_anchored(
  *  validators' precommits with the C++ API). */
 BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_certify(
     BlockchainerChain c, const uint8_t* block, size_t block_len);
+/* ── Validator-set changes (coordinated rotation, BFT engines) ────────────────
+ *  Operators agree a new set out of band and each SCHEDULES it; the next block
+ *  this node proposes announces it; blockchainer_chain_certify refuses to vote
+ *  for an unscheduled change; once a rotation block is certified by >2/3 of
+ *  the current set it takes effect for the next block (this node follows it
+ *  even if it did not schedule it, and stops certifying if it left the set). */
+
+/** Schedule the next validator set (48-byte BLS keys + powers). Returns 1, or
+ *  0 if the engine is not BFT or the set is malformed. */
+BLOCKCHAINER_API int blockchainer_chain_schedule_validators(
+    BlockchainerChain c, const uint8_t* validator_pks, const uint64_t* validator_powers,
+    size_t validator_count);
+/** The validator set in force for the next block: [count u32]([len u32][pk][power u64])×. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_validators(BlockchainerChain c);
+
 /** A parent's last anchored header for [child_chain_id] (errors if this chain
  *  is not a parent or the child is not registered). */
 BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_child_tip(

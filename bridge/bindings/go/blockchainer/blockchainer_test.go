@@ -1124,3 +1124,77 @@ func TestSubchains(t *testing.T) {
 		t.Fatal("fresh proof must verify at the new root")
 	}
 }
+
+
+// Validator rotation over the Go binding: a single-validator BFT chain grows
+// to two validators (keeping its own quorum), then rotates itself out and can
+// no longer certify. Every step is certified by the set in force at that time.
+func TestValidatorRotation(t *testing.T) {
+	must := func(b []byte, err error) []byte {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	me, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x81}, 32))
+	other, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x82}, 32))
+	bft, _ := bc.NewBlueprint("bft", "account", "", nil)
+	gen := must(bc.CommitBlueprint(must(bc.BuildGenesis(5, 1, 1, bc.StateModelAccount, nil, []bc.GenesisValidator{{PublicKey: me.Public, Power: 1}})), bft))
+	chain, err := bc.AssembleChain(gen, 0, me.Public, me.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer chain.Free()
+	vs, _ := chain.Validators()
+	if len(vs) != 1 || !bytes.Equal(vs[0].PublicKey, me.Public) {
+		t.Fatalf("initial set: %v", vs)
+	}
+	// Grow: {me:3, other:1} — announced by block 1, certified by the old set (me alone).
+	grown := []bc.GenesisValidator{{PublicKey: me.Public, Power: 3}, {PublicKey: other.Public, Power: 1}}
+	if err := chain.ScheduleValidators(grown); err != nil {
+		t.Fatal(err)
+	}
+	b1 := must(chain.Propose(2))
+	if !chain.Submit(b1, must(chain.Certify(b1))) {
+		t.Fatal("rotation block")
+	}
+	vs, _ = chain.Validators()
+	if len(vs) != 2 || vs[0].Power != 3 || !bytes.Equal(vs[1].PublicKey, other.Public) {
+		t.Fatalf("set after rotation: %v", vs)
+	}
+	// Block 2 under the new set: me (3 of 4) still reaches quorum alone.
+	b2 := must(chain.Propose(3))
+	if !chain.Submit(b2, must(chain.Certify(b2))) || chain.Height() != 2 {
+		t.Fatal("block under the new set")
+	}
+	// Malformed / non-member cases.
+	if err := chain.ScheduleValidators(nil); err == nil {
+		t.Fatal("empty set must be refused")
+	}
+	if err := chain.ScheduleValidators([]bc.GenesisValidator{{PublicKey: me.Public, Power: 0}}); err == nil {
+		t.Fatal("zero-power set must be refused")
+	}
+	// Rotate out: {other:1}. Block 3 announces it (me certifies under the old set); afterwards me cannot certify.
+	if err := chain.ScheduleValidators([]bc.GenesisValidator{{PublicKey: other.Public, Power: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	b3 := must(chain.Propose(4))
+	if !chain.Submit(b3, must(chain.Certify(b3))) || chain.Height() != 3 {
+		t.Fatal("leaving block")
+	}
+	b4 := must(chain.Propose(5))
+	if _, err := chain.Certify(b4); err == nil {
+		t.Fatal("a node that left the set must not certify")
+	}
+	// A PoS chain has no validator-set governance surface.
+	pos, _ := bc.NewBlueprint("pos", "account", "round-robin", nil)
+	pc, err := bc.AssembleChain(must(bc.CommitBlueprint(must(bc.BuildGenesis(6, 1, 1, bc.StateModelAccount, nil, []bc.GenesisValidator{{PublicKey: me.Public, Power: 1}})), pos)), 0, me.Public, me.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pc.Free()
+	if err := pc.ScheduleValidators(grown); err == nil {
+		t.Fatal("PoS must refuse")
+	}
+}

@@ -1420,10 +1420,37 @@ BlockchainerBufferResult blockchainer_chain_certify(BlockchainerChain c, const u
     if (!bft) return error_result("chain: engine is not BFT (only BFT blocks carry commit certificates)");
     blockchainer::Block b = blockchainer::Block::decode_all(cbv(block, block_len));
     ChainBox* box = as_box(c);
-    blockchainer::consensus::Vote vote = bft->precommit(b, box->me, box->key);
+    // Our index follows rotations (and we may have left the set).
+    auto idx = bft->validators().index_of(box->key.public_key);
+    if (!idx) return error_result("chain: this node is not in the current validator set");
+    blockchainer::consensus::Vote vote = bft->precommit(b, *idx, box->key);
     auto cert = bft->try_commit(b, {vote});
     if (!cert) return error_result("chain: this validator alone does not reach quorum; gather the other precommits");
     return bytes_result(cert->encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int blockchainer_chain_schedule_validators(BlockchainerChain c, const uint8_t* validator_pks,
+                                           const uint64_t* validator_powers, size_t validator_count) {
+  if (!c || !validator_pks || !validator_powers || validator_count == 0) return 0;
+  try {
+    auto* bft = dynamic_cast<blockchainer::consensus::BftEngine*>(as_chain(c)->engine.get());
+    if (!bft) return 0;
+    std::vector<blockchainer::consensus::Validator> vs;
+    for (size_t i = 0; i < validator_count; ++i)
+      vs.push_back(blockchainer::consensus::Validator{
+          blockchainer::crypto::Bytes(validator_pks + 48 * i, validator_pks + 48 * (i + 1)), validator_powers[i]});
+    bft->schedule_validator_set(blockchainer::consensus::ValidatorSet(std::move(vs)));  // throws if malformed
+    return 1;
+  } catch (...) { return 0; }
+}
+
+BlockchainerBufferResult blockchainer_chain_validators(BlockchainerChain c) {
+  if (!c) return error_result("null chain");
+  try {
+    auto* bft = dynamic_cast<blockchainer::consensus::BftEngine*>(as_chain(c)->engine.get());
+    if (!bft) return error_result("chain: engine is not BFT");
+    return bytes_result(bft->validators().encode());
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
 

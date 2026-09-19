@@ -37,7 +37,8 @@ public final class Blockchainer implements AutoCloseable {
             regAddEngine, regAddProposer,
             genesisHeaderH, childRegEncode, subchainPolicyEncode, genesisCommitSubchains, genesisCommitBinding,
             blockHeaderH, headerSubchainRootH, certifiedHeaderEncode, anchorEncode, chainProposeAnchored, chainCertify,
-            chainChildTip, chainSubchainHop, chainProveAccount, subchainProofEncode, subchainProofVerify;
+            chainChildTip, chainSubchainHop, chainProveAccount, subchainProofEncode, subchainProofVerify,
+            chainScheduleValidators, chainValidatorsH;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -151,6 +152,8 @@ public final class Blockchainer implements AutoCloseable {
         chainProveAccount = h("blockchainer_chain_prove_account", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
         subchainProofEncode = h("blockchainer_subchain_proof_encode", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         subchainProofVerify = h("blockchainer_subchain_proof_verify", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        chainScheduleValidators = h("blockchainer_chain_schedule_validators", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG));
+        chainValidatorsH = h("blockchainer_chain_validators", FunctionDescriptor.of(RES, ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -168,6 +171,7 @@ public final class Blockchainer implements AutoCloseable {
 
     /** A signing account's material (or a KEM device key), returned by the open calls. */
     public record PortableAccount(byte[] publicKey, byte[] secret) {}
+    public record ValidatorEntry(byte[] publicKey, long power) {}
 
     private PortableAccount splitBlob(byte[] blob) {
         int pl = ((blob[0] & 0xFF) << 24) | ((blob[1] & 0xFF) << 16) | ((blob[2] & 0xFF) << 8) | (blob[3] & 0xFF);
@@ -564,6 +568,21 @@ public final class Blockchainer implements AutoCloseable {
         }
         /** BFT: this validator's precommit aggregated into a commit certificate (the justification for submit; what a parent anchors). */
         public byte[] certify(byte[] block) { try { return consume((MemorySegment) chainCertify.invoke(arena.allocate(RES), h, seg(block), (long) block.length)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** BFT: schedule a coordinated validator-set change (48-byte keys + powers); the next proposal announces it. */
+        public boolean scheduleValidators(byte[][] pks, long[] powers) {
+            byte[] k = new byte[48 * pks.length];
+            for (int i = 0; i < pks.length; i++) System.arraycopy(pks[i], 0, k, 48 * i, 48);
+            try { return (int) chainScheduleValidators.invoke(h, seg(k), arena.allocateFrom(JAVA_LONG, powers), (long) pks.length) == 1; }
+            catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** BFT: the validator set in force for the next block. */
+        public java.util.List<ValidatorEntry> validators() {
+            byte[] b; try { b = consume((MemorySegment) chainValidatorsH.invoke(arena.allocate(RES), h)); } catch (Throwable e) { throw new RuntimeException(e); }
+            java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
+            int n = bb.getInt(); var out = new java.util.ArrayList<ValidatorEntry>(n);
+            for (int i = 0; i < n; i++) { byte[] pk = new byte[bb.getInt()]; bb.get(pk); out.add(new ValidatorEntry(pk, bb.getLong())); }
+            return out;
+        }
         /** A parent's last anchored header for a child. */
         public byte[] childTip(long childChainId) { try { return consume((MemorySegment) chainChildTip.invoke(arena.allocate(RES), h, childChainId)); } catch (Throwable e) { throw new RuntimeException(e); } }
         /** A proof hop from this parent's current registry into a child. */

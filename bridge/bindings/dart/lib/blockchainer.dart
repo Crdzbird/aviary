@@ -268,6 +268,8 @@ typedef _ScChainIdD = _BufResult Function(Pointer<Void>, int);
 typedef _ScChainAddrC = _BufResult Function(Pointer<Void>, Pointer<Uint8>);
 typedef _ScChainAddrD = _BufResult Function(Pointer<Void>, Pointer<Uint8>);
 typedef _ScVerifyC = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size);
+typedef _ScSchedC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Pointer<Uint64>, Size);
+typedef _ScSchedD = int Function(Pointer<Void>, Pointer<Uint8>, Pointer<Uint64>, int);
 typedef _ScVerifyD = int Function(Pointer<Uint8>, Pointer<Uint8>, int);
 
 /// [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
@@ -1831,6 +1833,30 @@ class Chain {
   }
   /// BFT: this validator's precommit aggregated into a commit certificate (the justification for submit; what a parent anchors).
   Uint8List certify(Uint8List block) => _blockOp('blockchainer_chain_certify', block);
+  /// BFT: schedule a coordinated validator-set change; the next proposal announces it. Throws if not BFT / malformed.
+  void scheduleValidators(List<({Uint8List publicKey, int power})> validators) {
+    final pks = Uint8List.fromList(validators.expand((v) => v.publicKey).toList());
+    final kp = _bc._alloc(pks), pw = calloc<Uint64>(validators.isEmpty ? 1 : validators.length);
+    for (var i = 0; i < validators.length; i++) pw[i] = validators[i].power;
+    try {
+      if (_bc.lib.lookupFunction<_ScSchedC, _ScSchedD>('blockchainer_chain_schedule_validators')(_h, kp, pw, validators.length) != 1) {
+        throw StateError('chain: cannot schedule validators (not BFT, or malformed set)');
+      }
+    } finally { calloc.free(kp); calloc.free(pw); }
+  }
+  /// BFT: the validator set in force for the next block.
+  List<({Uint8List publicKey, int power})> validators() {
+    final b = _bc._take(_bc.lib.lookupFunction<_ChainBufC, _ChainBufD>('blockchainer_chain_validators')(_h), 'chain_validators');
+    final bd = ByteData.sublistView(b);
+    final n = bd.getUint32(0); var off = 4;
+    final out = <({Uint8List publicKey, int power})>[];
+    for (var i = 0; i < n; i++) {
+      final l = bd.getUint32(off); off += 4;
+      final pk = Uint8List.fromList(b.sublist(off, off + l)); off += l;
+      out.add((publicKey: pk, power: bd.getUint64(off))); off += 8;
+    }
+    return out;
+  }
   /// A parent's last anchored header for a child.
   Uint8List childTip(int childChainId) => _bc._take(_bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>('blockchainer_chain_child_tip')(_h, childChainId), 'chain_child_tip');
   /// A proof hop from this parent's current registry into a child.

@@ -269,6 +269,30 @@ public final class Main {
             }
             System.out.println("subchains OK");
 
+            // Validator rotation: grow, certify under each set, rotate out, PoS refuses.
+            {
+                var me = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{(byte) 0x81}, 32));
+                var other = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{(byte) 0x82}, 32));
+                var bft = bc.new Blueprint("bft", "account", "", null);
+                byte[] rgen = bc.commitBlueprint(bc.buildGenesis(5, 1, 1, 0, new byte[0][], new long[0], new byte[][]{me.publicKey()}, new long[]{1}), bft);
+                try (var chain = bc.assembleChain(rgen, 0, me.publicKey(), me.secret())) {
+                    if (chain.validators().size() != 1) throw new IllegalStateException("initial set");
+                    if (!chain.scheduleValidators(new byte[][]{me.publicKey(), other.publicKey()}, new long[]{3, 1})) throw new IllegalStateException("schedule");
+                    byte[] b1 = chain.propose(2); if (!chain.submit(b1, chain.certify(b1))) throw new IllegalStateException("rotation block");
+                    var vs = chain.validators();
+                    if (vs.size() != 2 || vs.get(0).power() != 3 || !java.util.Arrays.equals(vs.get(1).publicKey(), other.publicKey())) throw new IllegalStateException("set after rotation");
+                    byte[] b2 = chain.propose(3); if (!chain.submit(b2, chain.certify(b2)) || chain.height() != 2) throw new IllegalStateException("block under the new set");
+                    if (chain.scheduleValidators(new byte[0][], new long[0]) || chain.scheduleValidators(new byte[][]{me.publicKey()}, new long[]{0})) throw new IllegalStateException("malformed sets must be refused");
+                    if (!chain.scheduleValidators(new byte[][]{other.publicKey()}, new long[]{1})) throw new IllegalStateException("schedule leave");
+                    byte[] b3 = chain.propose(4); if (!chain.submit(b3, chain.certify(b3)) || chain.height() != 3) throw new IllegalStateException("leaving block");
+                    try { chain.certify(chain.propose(5)); throw new IllegalStateException("a node that left must not certify"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                }
+                try (var pc = bc.assembleChain(bc.commitBlueprint(bc.buildGenesis(6, 1, 1, 0, new byte[0][], new long[0], new byte[][]{me.publicKey()}, new long[]{1}), bc.new Blueprint("pos", "account", "round-robin", null)), 0, me.publicKey(), me.secret())) {
+                    if (pc.scheduleValidators(new byte[][]{me.publicKey()}, new long[]{1})) throw new IllegalStateException("PoS must refuse");
+                }
+            }
+            System.out.println("validator-rotation OK");
+
             System.out.println("\nALL GOOD");
         }
     }

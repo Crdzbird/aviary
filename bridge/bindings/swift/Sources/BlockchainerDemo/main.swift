@@ -262,5 +262,33 @@ do {
 }
 print("subchains OK")
 
+// Validator rotation: grow, certify under each set, rotate out, PoS refuses.
+do {
+    let me = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: 0x81, count: 32))
+    let other = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: 0x82, count: 32))
+    let bft = try Blockchainer.Blueprint(consensus: "bft", stateModel: "account")
+    let gen = try Blockchainer.commitBlueprint(genesis: try Blockchainer.buildGenesis(chainID: 5, accounts: [], validators: [.init(publicKey: me.publicKey, power: 1)]), blueprint: bft)
+    let chain = Blockchainer.assembleChain(genesis: gen, me: 0, blsPub: me.publicKey, blsSec: me.secret)!
+    let initial = try chain.validators()
+    precondition(initial.count == 1 && initial[0].publicKey == me.publicKey, "initial set")
+    try chain.scheduleValidators([.init(publicKey: me.publicKey, power: 3), .init(publicKey: other.publicKey, power: 1)])
+    let b1 = try chain.propose(timestamp: 2); let c1 = try chain.certify(b1)
+    precondition(chain.submit(block: b1, justification: c1), "rotation block")
+    let vs = try chain.validators()
+    precondition(vs.count == 2 && vs[0].power == 3 && vs[1].publicKey == other.publicKey, "set after rotation")
+    let b2 = try chain.propose(timestamp: 3); let c2 = try chain.certify(b2)
+    precondition(chain.submit(block: b2, justification: c2) && chain.height == 2, "block under the new set")
+    precondition((try? chain.scheduleValidators([])) == nil && (try? chain.scheduleValidators([.init(publicKey: me.publicKey, power: 0)])) == nil, "malformed sets refused")
+    try chain.scheduleValidators([.init(publicKey: other.publicKey, power: 1)])
+    let b3 = try chain.propose(timestamp: 4); let c3 = try chain.certify(b3)
+    precondition(chain.submit(block: b3, justification: c3) && chain.height == 3, "leaving block")
+    let b4 = try chain.propose(timestamp: 5)
+    precondition((try? chain.certify(b4)) == nil, "a node that left cannot certify")
+    let posGen = try Blockchainer.commitBlueprint(genesis: try Blockchainer.buildGenesis(chainID: 6, accounts: [], validators: [.init(publicKey: me.publicKey, power: 1)]), blueprint: try Blockchainer.Blueprint(consensus: "pos", stateModel: "account", proposer: "round-robin"))
+    let pc = Blockchainer.assembleChain(genesis: posGen, me: 0, blsPub: me.publicKey, blsSec: me.secret)!
+    precondition((try? pc.scheduleValidators([.init(publicKey: me.publicKey, power: 1)])) == nil, "PoS refuses")
+}
+print("validator-rotation OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

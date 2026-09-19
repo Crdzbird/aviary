@@ -146,6 +146,54 @@ func (c *Chain) Certify(block []byte) ([]byte, error) {
 	return takeBuf(C.blockchainer_chain_certify(c.h, bp(block), C.size_t(len(block))))
 }
 
+// ScheduleValidators (BFT) schedules a coordinated validator-set change: the
+// next block this node proposes announces it; Certify refuses an unscheduled
+// change; a certified rotation takes effect for the next block.
+func (c *Chain) ScheduleValidators(validators []GenesisValidator) error {
+	pks := make([]byte, 0, 48*len(validators))
+	powers := make([]uint64, 0, len(validators))
+	for _, v := range validators {
+		if len(v.PublicKey) != 48 {
+			return errors.New("validators: key must be 48 bytes")
+		}
+		pks = append(pks, v.PublicKey...)
+		powers = append(powers, v.Power)
+	}
+	if C.blockchainer_chain_schedule_validators(c.h, bp(pks), u64p(powers), C.size_t(len(validators))) != 1 {
+		return errors.New("chain: cannot schedule (not BFT, or malformed set)")
+	}
+	return nil
+}
+
+// Validators is the set in force for the next block (BFT).
+func (c *Chain) Validators() ([]GenesisValidator, error) {
+	blob, err := takeBuf(C.blockchainer_chain_validators(c.h))
+	if err != nil {
+		return nil, err
+	}
+	if len(blob) < 4 {
+		return nil, errors.New("validators: short blob")
+	}
+	n := int(binary.BigEndian.Uint32(blob[:4]))
+	out := make([]GenesisValidator, 0, n)
+	off := 4
+	for i := 0; i < n; i++ {
+		if off+4 > len(blob) {
+			return nil, errors.New("validators: truncated")
+		}
+		l := int(binary.BigEndian.Uint32(blob[off : off+4]))
+		off += 4
+		if off+l+8 > len(blob) {
+			return nil, errors.New("validators: truncated")
+		}
+		pk := append([]byte(nil), blob[off:off+l]...)
+		off += l
+		out = append(out, GenesisValidator{PublicKey: pk, Power: binary.BigEndian.Uint64(blob[off : off+8])})
+		off += 8
+	}
+	return out, nil
+}
+
 // ChildTip is a parent's last anchored header for a child.
 func (c *Chain) ChildTip(childChainID uint64) ([]byte, error) {
 	return takeBuf(C.blockchainer_chain_child_tip(c.h, C.uint64_t(childChainID)))

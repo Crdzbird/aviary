@@ -152,6 +152,8 @@ function ensureLoaded() {
     chainProposeAnchored: f('BlockchainerBufferResult blockchainer_chain_propose_anchored(void*, uint64_t, uint8_t*, size_t)'),
     chainCertify: f('BlockchainerBufferResult blockchainer_chain_certify(void*, uint8_t*, size_t)'),
     chainChildTip: f('BlockchainerBufferResult blockchainer_chain_child_tip(void*, uint64_t)'),
+    chainScheduleValidators: f('int blockchainer_chain_schedule_validators(void*, uint8_t*, uint64_t*, size_t)'),
+    chainValidators: f('BlockchainerBufferResult blockchainer_chain_validators(void*)'),
     chainSubchainHop: f('BlockchainerBufferResult blockchainer_chain_subchain_hop(void*, uint64_t)'),
     chainProveAccount: f('BlockchainerBufferResult blockchainer_chain_prove_account(void*, uint8_t*)'),
     subchainProofEncode: f('BlockchainerBufferResult blockchainer_subchain_proof_encode(uint8_t*, size_t, uint8_t*, size_t)'),
@@ -488,6 +490,19 @@ class Chain {
   }
   /** BFT: this validator's precommit aggregated into a commit certificate (the justification for submit; what a parent anchors). */
   certify(block) { return consume(fn.chainCertify(this._h, u8(block), u8(block).length), 'chain_certify'); }
+  /** BFT: schedule a coordinated validator-set change ([{publicKey, power}]); the next proposal announces it. Throws if not BFT / malformed. */
+  scheduleValidators(validators) {
+    const pks = Buffer.concat(validators.map((v) => u8(v.publicKey)));
+    if (fn.chainScheduleValidators(this._h, pks, u64arr(validators.map((v) => v.power)), validators.length) !== 1)
+      throw new Error('chain: cannot schedule validators (not BFT, or malformed set)');
+  }
+  /** BFT: the validator set in force for the next block → [{publicKey, power}]. */
+  validators() {
+    const b = consume(fn.chainValidators(this._h), 'chain_validators');
+    const n = b.readUInt32BE(0); const out = []; let off = 4;
+    for (let i = 0; i < n; i++) { const l = b.readUInt32BE(off); off += 4; const pk = b.subarray(off, off + l); off += l; out.push({ publicKey: pk, power: Number(b.readBigUInt64BE(off)) }); off += 8; }
+    return out;
+  }
   /** A parent's last anchored header for a child. */
   childTip(childChainId) { return consume(fn.chainChildTip(this._h, BigInt(childChainId)), 'chain_child_tip'); }
   /** A proof hop from this parent's current registry into a child. */

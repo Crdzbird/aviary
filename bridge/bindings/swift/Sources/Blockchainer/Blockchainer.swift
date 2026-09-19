@@ -531,6 +531,23 @@ public enum Blockchainer {
         public func certify(_ block: Data) throws -> Data {
             try consume(block.withC { bp, bl in blockchainer_chain_certify(UnsafeMutableRawPointer(h), bp, bl) }, "chain_certify")
         }
+        /// BFT: schedule a coordinated validator-set change; the next proposal announces it. Throws if not BFT / malformed.
+        public func scheduleValidators(_ validators: [GenesisValidator]) throws {
+            var pks = Data(); for v in validators { pks.append(v.publicKey) }
+            let powers = validators.map { $0.power }
+            let ok = pks.withC { kp, _ in powers.withUnsafeBufferPointer { pb in
+                blockchainer_chain_schedule_validators(UnsafeMutableRawPointer(h), kp, pb.baseAddress, validators.count) } }
+            if ok != 1 { throw BlockchainerError(message: "chain_schedule_validators: not BFT, or malformed set") }
+        }
+        /// BFT: the validator set in force for the next block.
+        public func validators() throws -> [GenesisValidator] {
+            let b = try consume(blockchainer_chain_validators(UnsafeMutableRawPointer(h)), "chain_validators")
+            func u32(_ o: Int) -> Int { Int(UInt32(bigEndian: b.subdata(in: o..<o+4).withUnsafeBytes { $0.load(as: UInt32.self) })) }
+            func u64(_ o: Int) -> UInt64 { UInt64(bigEndian: b.subdata(in: o..<o+8).withUnsafeBytes { $0.load(as: UInt64.self) }) }
+            var out: [GenesisValidator] = []; var off = 4
+            for _ in 0..<u32(0) { let l = u32(off); off += 4; let pk = b.subdata(in: off..<off+l); off += l; out.append(.init(publicKey: pk, power: u64(off))); off += 8 }
+            return out
+        }
         /// A parent's last anchored header for a child.
         public func childTip(_ childChainID: UInt64) throws -> Data { try consume(blockchainer_chain_child_tip(UnsafeMutableRawPointer(h), childChainID), "chain_child_tip") }
         /// A proof hop from this parent's current registry into a child.
