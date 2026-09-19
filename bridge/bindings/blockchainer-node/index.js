@@ -139,6 +139,23 @@ function ensureLoaded() {
     chainMine: f('BlockchainerBufferResult blockchainer_chain_mine(void*, uint8_t*, size_t)'),
     chainSubmit: f('int blockchainer_chain_submit(void*, uint8_t*, size_t, uint8_t*, size_t)'),
     chainFree: f('void blockchainer_chain_free(void*)'),
+    // Subchains (a parent block anchors a child chain's finalized headers)
+    genesisHeader: f('BlockchainerBufferResult blockchainer_genesis_header(uint8_t*, size_t)'),
+    childRegEncode: f('BlockchainerBufferResult blockchainer_child_registration_encode(uint64_t, uint8_t*, size_t, uint8_t*, uint64_t*, size_t, uint8_t)'),
+    subchainPolicyEncode: f('BlockchainerBufferResult blockchainer_subchain_policy_encode(uint16_t, uint8_t, uint16_t, uint16_t, uint8_t*, size_t)'),
+    genesisCommitSubchains: f('BlockchainerBufferResult blockchainer_genesis_commit_subchain_policy(uint8_t*, size_t, uint8_t*, size_t)'),
+    genesisCommitBinding: f('BlockchainerBufferResult blockchainer_genesis_commit_parent_binding(uint8_t*, size_t, uint64_t, uint8_t*)'),
+    blockHeader: f('BlockchainerBufferResult blockchainer_block_header(uint8_t*, size_t)'),
+    headerSubchainRoot: f('BlockchainerBufferResult blockchainer_header_subchain_root(uint8_t*, size_t)'),
+    certifiedHeaderEncode: f('BlockchainerBufferResult blockchainer_certified_header_encode(uint8_t*, size_t, uint8_t*, size_t)'),
+    anchorEncode: f('BlockchainerBufferResult blockchainer_anchor_encode(uint64_t, uint8_t*, size_t)'),
+    chainProposeAnchored: f('BlockchainerBufferResult blockchainer_chain_propose_anchored(void*, uint64_t, uint8_t*, size_t)'),
+    chainCertify: f('BlockchainerBufferResult blockchainer_chain_certify(void*, uint8_t*, size_t)'),
+    chainChildTip: f('BlockchainerBufferResult blockchainer_chain_child_tip(void*, uint64_t)'),
+    chainSubchainHop: f('BlockchainerBufferResult blockchainer_chain_subchain_hop(void*, uint64_t)'),
+    chainProveAccount: f('BlockchainerBufferResult blockchainer_chain_prove_account(void*, uint8_t*)'),
+    subchainProofEncode: f('BlockchainerBufferResult blockchainer_subchain_proof_encode(uint8_t*, size_t, uint8_t*, size_t)'),
+    subchainProofVerify: f('int blockchainer_subchain_proof_verify(uint8_t*, uint8_t*, size_t)'),
     // Foreign components (engines / proposers implemented in JavaScript)
     regAddEngine: f('int blockchainer_registry_add_engine(const char*, BlockchainerJustifyFn*, BlockchainerVerifyFn*, void*, int)'),
     regAddProposer: f('int blockchainer_registry_add_proposer(const char*, BlockchainerProposerFn*, void*)'),
@@ -462,7 +479,57 @@ class Chain {
     return fn.chainSubmit(this._h, u8(block), u8(block).length, u8(justification), u8(justification).length) === 1;
   }
   free() { fn.chainFree(this._h); }
+
+  // ── Subchains ──
+  /** Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor. */
+  proposeAnchored(timestamp, anchors) {
+    const blob = blobList(anchors);
+    return consume(fn.chainProposeAnchored(this._h, BigInt(timestamp), blob, blob.length), 'chain_propose_anchored');
+  }
+  /** BFT: this validator's precommit aggregated into a commit certificate (the justification for submit; what a parent anchors). */
+  certify(block) { return consume(fn.chainCertify(this._h, u8(block), u8(block).length), 'chain_certify'); }
+  /** A parent's last anchored header for a child. */
+  childTip(childChainId) { return consume(fn.chainChildTip(this._h, BigInt(childChainId)), 'chain_child_tip'); }
+  /** A proof hop from this parent's current registry into a child. */
+  subchainHop(childChainId) { return consume(fn.chainSubchainHop(this._h, BigInt(childChainId)), 'chain_subchain_hop'); }
+  /** State-inclusion proof for a 32-byte address on this account-model chain. */
+  proveAccount(address) { return consume(fn.chainProveAccount(this._h, u8(address)), 'chain_prove_account'); }
 }
+// [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
+function blobList(items) {
+  const parts = [Buffer.alloc(4)];
+  parts[0].writeUInt32BE(items.length);
+  for (const it of items) { const l = Buffer.alloc(4); l.writeUInt32BE(u8(it).length); parts.push(l, u8(it)); }
+  return Buffer.concat(parts);
+}
+// ── Subchains: a parent block anchors a child chain's finalized headers ───────
+// (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
+// genesis HEADER + fixed validator set; anchor its certified headers; prove a
+// state entry on a descendant from the parent's header. v1 anchors BFT children.
+const genesisHeader = (genesis) => consume(fn.genesisHeader(u8(genesis), u8(genesis).length), 'genesis_header');
+function encodeChildRegistration({ chainId, genesisHeader: hdr, validators, maxDepth = 0 }) {
+  const pks = Buffer.concat(validators.map((v) => u8(v.publicKey)));
+  return consume(fn.childRegEncode(BigInt(chainId), u8(hdr), u8(hdr).length, pks, u64arr(validators.map((v) => v.power)), validators.length, maxDepth), 'child_registration_encode');
+}
+function encodeSubchainPolicy({ maxChildren, maxDepth = 1, maxAnchorsPerBlock = 0, maxHeadersPerAnchor = 0, children = [] }) {
+  const blob = blobList(children.map((c) => Buffer.isBuffer(c) ? c : encodeChildRegistration(c)));
+  return consume(fn.subchainPolicyEncode(maxChildren, maxDepth, maxAnchorsPerBlock, maxHeadersPerAnchor, blob, blob.length), 'subchain_policy_encode');
+}
+const commitSubchainPolicy = (genesis, policy) => consume(fn.genesisCommitSubchains(u8(genesis), u8(genesis).length, u8(policy), u8(policy).length), 'genesis_commit_subchain_policy');
+const commitParentBinding = (genesis, parentChainId, parentGenesisHash) => consume(fn.genesisCommitBinding(u8(genesis), u8(genesis).length, BigInt(parentChainId), u8(parentGenesisHash)), 'genesis_commit_parent_binding');
+const blockHeader = (block) => consume(fn.blockHeader(u8(block), u8(block).length), 'block_header');
+const headerSubchainRoot = (header) => consume(fn.headerSubchainRoot(u8(header), u8(header).length), 'header_subchain_root');
+const certifiedHeader = (header, certificate) => consume(fn.certifiedHeaderEncode(u8(header), u8(header).length, u8(certificate), u8(certificate).length), 'certified_header_encode');
+function encodeAnchor(childChainId, certifiedHeaders) {
+  const blob = blobList(certifiedHeaders);
+  return consume(fn.anchorEncode(BigInt(childChainId), blob, blob.length), 'anchor_encode');
+}
+function encodeSubchainProof(hops, stateProof) {
+  const blob = blobList(hops);
+  return consume(fn.subchainProofEncode(blob, blob.length, u8(stateProof), u8(stateProof).length), 'subchain_proof_encode');
+}
+const verifySubchainProof = (parentSubchainRoot, proof) => u8(parentSubchainRoot).length === 32 && fn.subchainProofVerify(u8(parentSubchainRoot), u8(proof), u8(proof).length) === 1;
+
 function buildGenesis({ chainId, timestamp = 1, assuranceLevel = 1, stateModel = 0, accounts = [], validators = [] }) {
   const addrs = Buffer.concat(accounts.map((a) => u8(a.address)));
   const pks = Buffer.concat(validators.map((v) => u8(v.publicKey)));
@@ -598,6 +665,9 @@ module.exports = {
   registerEngine,
   registerProposer,
   MAX_JUSTIFICATION,
+  // Subchains.
+  genesisHeader, encodeChildRegistration, encodeSubchainPolicy, commitSubchainPolicy, commitParentBinding,
+  blockHeader, headerSubchainRoot, certifiedHeader, encodeAnchor, encodeSubchainProof, verifySubchainProof,
 
   commit(card) {
     const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');

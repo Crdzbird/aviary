@@ -248,6 +248,40 @@ typedef _ChainSubmitC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Poin
 typedef _ChainSubmitD = int Function(Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int);
 typedef _ChainFreeC = Void Function(Pointer<Void>);
 typedef _ChainFreeD = void Function(Pointer<Void>);
+// Subchains.
+typedef _ScBufC = _BufResult Function(Pointer<Uint8>, Size);
+typedef _ScBufD = _BufResult Function(Pointer<Uint8>, int);
+typedef _ScBuf2C = _BufResult Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _ScBuf2D = _BufResult Function(Pointer<Uint8>, int, Pointer<Uint8>, int);
+typedef _ScChildRegC = _BufResult Function(Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Pointer<Uint64>, Size, Uint8);
+typedef _ScChildRegD = _BufResult Function(int, Pointer<Uint8>, int, Pointer<Uint8>, Pointer<Uint64>, int, int);
+typedef _ScPolicyC = _BufResult Function(Uint16, Uint8, Uint16, Uint16, Pointer<Uint8>, Size);
+typedef _ScPolicyD = _BufResult Function(int, int, int, int, Pointer<Uint8>, int);
+typedef _ScBindingC = _BufResult Function(Pointer<Uint8>, Size, Uint64, Pointer<Uint8>);
+typedef _ScBindingD = _BufResult Function(Pointer<Uint8>, int, int, Pointer<Uint8>);
+typedef _ScAnchorC = _BufResult Function(Uint64, Pointer<Uint8>, Size);
+typedef _ScAnchorD = _BufResult Function(int, Pointer<Uint8>, int);
+typedef _ScChainAnchoredC = _BufResult Function(Pointer<Void>, Uint64, Pointer<Uint8>, Size);
+typedef _ScChainAnchoredD = _BufResult Function(Pointer<Void>, int, Pointer<Uint8>, int);
+typedef _ScChainIdC = _BufResult Function(Pointer<Void>, Uint64);
+typedef _ScChainIdD = _BufResult Function(Pointer<Void>, int);
+typedef _ScChainAddrC = _BufResult Function(Pointer<Void>, Pointer<Uint8>);
+typedef _ScChainAddrD = _BufResult Function(Pointer<Void>, Pointer<Uint8>);
+typedef _ScVerifyC = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size);
+typedef _ScVerifyD = int Function(Pointer<Uint8>, Pointer<Uint8>, int);
+
+/// [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
+Uint8List _blobList(List<Uint8List> items) {
+  final b = BytesBuilder();
+  final n = ByteData(4)..setUint32(0, items.length);
+  b.add(n.buffer.asUint8List());
+  for (final it in items) {
+    final l = ByteData(4)..setUint32(0, it.length);
+    b.add(l.buffer.asUint8List());
+    b.add(it);
+  }
+  return b.toBytes();
+}
 
 // Foreign components (engines / proposers implemented in Dart).
 typedef _JustifyC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Size>);
@@ -1067,6 +1101,70 @@ class Blockchainer {
       calloc.free(ap); calloc.free(kp); calloc.free(bal); calloc.free(pow);
     }
   }
+  // ── Subchains: a parent block anchors a child chain's finalized headers ────
+  // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
+  // genesis HEADER + fixed validator set; anchor its certified headers; prove a
+  // state entry on a descendant from the parent's header. v1 anchors BFT children.
+
+  Uint8List _bufOp(String fn, Uint8List a) {
+    final p = _alloc(a);
+    try { return _take(lib.lookupFunction<_ScBufC, _ScBufD>(fn)(p, a.length), fn); } finally { calloc.free(p); }
+  }
+  Uint8List _buf2Op(String fn, Uint8List a, Uint8List b) {
+    final pa = _alloc(a), pb = _alloc(b);
+    try { return _take(lib.lookupFunction<_ScBuf2C, _ScBuf2D>(fn)(pa, a.length, pb, b.length), fn); } finally { calloc.free(pa); calloc.free(pb); }
+  }
+  /// A genesis's genesis HEADER — the identity a parent registers a child by.
+  Uint8List genesisHeader(Uint8List genesis) => _bufOp('blockchainer_genesis_header', genesis);
+  /// Encode a child registration (48-byte BLS keys; [maxDepth] = the child's own subtree depth, 0 = leaf).
+  Uint8List encodeChildRegistration({required int chainId, required Uint8List genesisHeader,
+      required List<({Uint8List publicKey, int power})> validators, int maxDepth = 0}) {
+    final pks = Uint8List.fromList(validators.expand((v) => v.publicKey).toList());
+    final hp = _alloc(genesisHeader), kp = _alloc(pks), pw = calloc<Uint64>(validators.isEmpty ? 1 : validators.length);
+    for (var i = 0; i < validators.length; i++) pw[i] = validators[i].power;
+    try {
+      return _take(lib.lookupFunction<_ScChildRegC, _ScChildRegD>('blockchainer_child_registration_encode')(
+          chainId, hp, genesisHeader.length, kp, pw, validators.length, maxDepth), 'child_registration_encode');
+    } finally { calloc.free(hp); calloc.free(kp); calloc.free(pw); }
+  }
+  /// Encode a parent's subchain policy from encoded registrations (ascending, unique chain ids). 0 = unlimited.
+  Uint8List encodeSubchainPolicy({required int maxChildren, int maxDepth = 1, int maxAnchorsPerBlock = 0,
+      int maxHeadersPerAnchor = 0, required List<Uint8List> children}) {
+    final blob = _blobList(children);
+    final p = _alloc(blob);
+    try {
+      return _take(lib.lookupFunction<_ScPolicyC, _ScPolicyD>('blockchainer_subchain_policy_encode')(
+          maxChildren, maxDepth, maxAnchorsPerBlock, maxHeadersPerAnchor, p, blob.length), 'subchain_policy_encode');
+    } finally { calloc.free(p); }
+  }
+  /// Commit a policy into a genesis (this chain becomes a PARENT; its hash changes). Throws on an invalid policy.
+  Uint8List commitSubchainPolicy(Uint8List genesis, Uint8List policy) => _buf2Op('blockchainer_genesis_commit_subchain_policy', genesis, policy);
+  /// Bind a child genesis to its parent (id + 32-byte parent genesis hash); the child can never be re-parented.
+  Uint8List commitParentBinding(Uint8List genesis, int parentChainId, Uint8List parentGenesisHash) {
+    final gp = _alloc(genesis), hp = _alloc(parentGenesisHash);
+    try {
+      return _take(lib.lookupFunction<_ScBindingC, _ScBindingD>('blockchainer_genesis_commit_parent_binding')(gp, genesis.length, parentChainId, hp), 'genesis_commit_parent_binding');
+    } finally { calloc.free(gp); calloc.free(hp); }
+  }
+  Uint8List blockHeader(Uint8List block) => _bufOp('blockchainer_block_header', block);
+  /// A header's 32-byte subchain root (zero below version 3).
+  Uint8List headerSubchainRoot(Uint8List header) => _bufOp('blockchainer_header_subchain_root', header);
+  Uint8List certifiedHeader(Uint8List header, Uint8List certificate) => _buf2Op('blockchainer_certified_header_encode', header, certificate);
+  /// An anchor: one child's CONSECUTIVE certified headers.
+  Uint8List encodeAnchor(int childChainId, List<Uint8List> certifiedHeaders) {
+    final blob = _blobList(certifiedHeaders);
+    final p = _alloc(blob);
+    try { return _take(lib.lookupFunction<_ScAnchorC, _ScAnchorD>('blockchainer_anchor_encode')(childChainId, p, blob.length), 'anchor_encode'); } finally { calloc.free(p); }
+  }
+  /// A cross-chain proof: hops (parent → … → the chain holding the entry) + that chain's state proof.
+  Uint8List encodeSubchainProof(List<Uint8List> hops, Uint8List stateProof) => _buf2Op('blockchainer_subchain_proof_encode', _blobList(hops), stateProof);
+  /// Whether the proof is committed under the parent's 32-byte subchain root all the way down and its state proof holds.
+  bool verifySubchainProof(Uint8List parentSubchainRoot, Uint8List proof) {
+    if (parentSubchainRoot.length != 32) return false;
+    final rp = _alloc(parentSubchainRoot), pp = _alloc(proof);
+    try { return lib.lookupFunction<_ScVerifyC, _ScVerifyD>('blockchainer_subchain_proof_verify')(rp, pp, proof.length) == 1; } finally { calloc.free(rp); calloc.free(pp); }
+  }
+
   /// Commit a mixture into a genesis (its hash changes: the mixture is chain identity).
   Uint8List commitBlueprint(Uint8List genesis, Blueprint bp) {
     final gp = _alloc(genesis), bp2 = _alloc(bp.encoded);
@@ -1723,6 +1821,25 @@ class Chain {
     }
   }
   void free() => _bc.lib.lookupFunction<_ChainFreeC, _ChainFreeD>('blockchainer_chain_free')(_h);
+
+  // ── Subchains ──
+  /// Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor.
+  Uint8List proposeAnchored(int timestamp, List<Uint8List> anchors) {
+    final blob = _blobList(anchors);
+    final p = _bc._alloc(blob);
+    try { return _bc._take(_bc.lib.lookupFunction<_ScChainAnchoredC, _ScChainAnchoredD>('blockchainer_chain_propose_anchored')(_h, timestamp, p, blob.length), 'chain_propose_anchored'); } finally { calloc.free(p); }
+  }
+  /// BFT: this validator's precommit aggregated into a commit certificate (the justification for submit; what a parent anchors).
+  Uint8List certify(Uint8List block) => _blockOp('blockchainer_chain_certify', block);
+  /// A parent's last anchored header for a child.
+  Uint8List childTip(int childChainId) => _bc._take(_bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>('blockchainer_chain_child_tip')(_h, childChainId), 'chain_child_tip');
+  /// A proof hop from this parent's current registry into a child.
+  Uint8List subchainHop(int childChainId) => _bc._take(_bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>('blockchainer_chain_subchain_hop')(_h, childChainId), 'chain_subchain_hop');
+  /// State-inclusion proof for a 32-byte address on this account-model chain.
+  Uint8List proveAccount(Uint8List address) {
+    final p = _bc._alloc(address);
+    try { return _bc._take(_bc.lib.lookupFunction<_ScChainAddrC, _ScChainAddrD>('blockchainer_chain_prove_account')(_h, p), 'chain_prove_account'); } finally { calloc.free(p); }
+  }
 }
 
 /// A verifier's anonymous-membership admission gate (Option A — unlinkable). It

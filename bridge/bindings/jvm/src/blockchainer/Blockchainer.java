@@ -34,7 +34,10 @@ public final class Blockchainer implements AutoCloseable {
             credPresentPseud, credGateAdmitPseud, credGateRevokeNym, credGateNoteAdmission,
             blsKeygen, bpEncode, bpHash, registryIds, genesisBuild, genesisCommitBp, genesisHash,
             chainAssemble, chainHeight, chainBlueprint, chainPropose, chainSeal, chainMine, chainSubmit, chainFree,
-            regAddEngine, regAddProposer;
+            regAddEngine, regAddProposer,
+            genesisHeaderH, childRegEncode, subchainPolicyEncode, genesisCommitSubchains, genesisCommitBinding,
+            blockHeaderH, headerSubchainRootH, certifiedHeaderEncode, anchorEncode, chainProposeAnchored, chainCertify,
+            chainChildTip, chainSubchainHop, chainProveAccount, subchainProofEncode, subchainProofVerify;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -132,6 +135,22 @@ public final class Blockchainer implements AutoCloseable {
         chainFree  = h("blockchainer_chain_free", FunctionDescriptor.ofVoid(ADDRESS));
         regAddEngine = h("blockchainer_registry_add_engine", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_INT));
         regAddProposer = h("blockchainer_registry_add_proposer", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS));
+        genesisHeaderH = h("blockchainer_genesis_header", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        childRegEncode = h("blockchainer_child_registration_encode", FunctionDescriptor.of(RES, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, ADDRESS, JAVA_LONG, JAVA_BYTE));
+        subchainPolicyEncode = h("blockchainer_subchain_policy_encode", FunctionDescriptor.of(RES, JAVA_SHORT, JAVA_BYTE, JAVA_SHORT, JAVA_SHORT, ADDRESS, JAVA_LONG));
+        genesisCommitSubchains = h("blockchainer_genesis_commit_subchain_policy", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        genesisCommitBinding = h("blockchainer_genesis_commit_parent_binding", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, JAVA_LONG, ADDRESS));
+        blockHeaderH = h("blockchainer_block_header", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        headerSubchainRootH = h("blockchainer_header_subchain_root", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        certifiedHeaderEncode = h("blockchainer_certified_header_encode", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        anchorEncode = h("blockchainer_anchor_encode", FunctionDescriptor.of(RES, JAVA_LONG, ADDRESS, JAVA_LONG));
+        chainProposeAnchored = h("blockchainer_chain_propose_anchored", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        chainCertify = h("blockchainer_chain_certify", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        chainChildTip = h("blockchainer_chain_child_tip", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        chainSubchainHop = h("blockchainer_chain_subchain_hop", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        chainProveAccount = h("blockchainer_chain_prove_account", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        subchainProofEncode = h("blockchainer_subchain_proof_encode", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        subchainProofVerify = h("blockchainer_subchain_proof_verify", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -536,6 +555,69 @@ public final class Blockchainer implements AutoCloseable {
             catch (Throwable e) { throw new RuntimeException(e); }
         }
         @Override public void close() { try { chainFree.invoke(h); } catch (Throwable ignored) {} }
+
+        // ── Subchains ──
+        /** Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor. */
+        public byte[] proposeAnchored(long timestamp, byte[][] anchors) {
+            byte[] blob = blobList(anchors);
+            try { return consume((MemorySegment) chainProposeAnchored.invoke(arena.allocate(RES), h, timestamp, seg(blob), (long) blob.length)); } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** BFT: this validator's precommit aggregated into a commit certificate (the justification for submit; what a parent anchors). */
+        public byte[] certify(byte[] block) { try { return consume((MemorySegment) chainCertify.invoke(arena.allocate(RES), h, seg(block), (long) block.length)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** A parent's last anchored header for a child. */
+        public byte[] childTip(long childChainId) { try { return consume((MemorySegment) chainChildTip.invoke(arena.allocate(RES), h, childChainId)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** A proof hop from this parent's current registry into a child. */
+        public byte[] subchainHop(long childChainId) { try { return consume((MemorySegment) chainSubchainHop.invoke(arena.allocate(RES), h, childChainId)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** State-inclusion proof for a 32-byte address on this account-model chain. */
+        public byte[] proveAccount(byte[] address) { try { return consume((MemorySegment) chainProveAccount.invoke(arena.allocate(RES), h, seg(address))); } catch (Throwable e) { throw new RuntimeException(e); } }
+    }
+
+    // ── Subchains: a parent block anchors a child chain's finalized headers ────
+    // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
+    // genesis HEADER + fixed validator set; anchor its certified headers; prove a
+    // state entry on a descendant from the parent's header. v1 anchors BFT children.
+
+    /** [count u32]([len u32][bytes])× — the C ABI's blob-list convention. */
+    static byte[] blobList(byte[][] items) {
+        int n = 4; for (byte[] it : items) n += 4 + it.length;
+        java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(n).putInt(items.length);
+        for (byte[] it : items) b.putInt(it.length).put(it);
+        return b.array();
+    }
+    private byte[] call(MethodHandle mh, Object... args) {
+        Object[] all = new Object[args.length + 1];
+        all[0] = arena.allocate(RES); System.arraycopy(args, 0, all, 1, args.length);
+        try { return consume((MemorySegment) mh.invokeWithArguments(all)); } catch (Throwable e) { throw new RuntimeException(e); }
+    }
+    /** A genesis's genesis HEADER — the identity a parent registers a child by. */
+    public byte[] genesisHeader(byte[] genesis) { return call(genesisHeaderH, seg(genesis), (long) genesis.length); }
+    /** Encode a child registration (48-byte BLS keys; maxDepth = the child's own subtree depth, 0 = leaf). */
+    public byte[] encodeChildRegistration(long chainId, byte[] genesisHeader, byte[][] validatorPks, long[] powers, int maxDepth) {
+        byte[] k = new byte[48 * validatorPks.length];
+        for (int i = 0; i < validatorPks.length; i++) System.arraycopy(validatorPks[i], 0, k, 48 * i, 48);
+        return call(childRegEncode, chainId, seg(genesisHeader), (long) genesisHeader.length, seg(k), arena.allocateFrom(JAVA_LONG, powers), (long) validatorPks.length, (byte) maxDepth);
+    }
+    /** Encode a parent's subchain policy from encoded registrations (ascending, unique chain ids). 0 = unlimited. */
+    public byte[] encodeSubchainPolicy(int maxChildren, int maxDepth, int maxAnchorsPerBlock, int maxHeadersPerAnchor, byte[][] registrations) {
+        byte[] blob = blobList(registrations);
+        return call(subchainPolicyEncode, (short) maxChildren, (byte) maxDepth, (short) maxAnchorsPerBlock, (short) maxHeadersPerAnchor, seg(blob), (long) blob.length);
+    }
+    /** Commit a policy into a genesis (this chain becomes a PARENT; its hash changes). Throws on an invalid policy. */
+    public byte[] commitSubchainPolicy(byte[] genesis, byte[] policy) { return call(genesisCommitSubchains, seg(genesis), (long) genesis.length, seg(policy), (long) policy.length); }
+    /** Bind a child genesis to its parent (id + 32-byte parent genesis hash); the child can never be re-parented. */
+    public byte[] commitParentBinding(byte[] genesis, long parentChainId, byte[] parentGenesisHash) { return call(genesisCommitBinding, seg(genesis), (long) genesis.length, parentChainId, seg(parentGenesisHash)); }
+    public byte[] blockHeader(byte[] block) { return call(blockHeaderH, seg(block), (long) block.length); }
+    /** A header's 32-byte subchain root (zero below version 3). */
+    public byte[] headerSubchainRoot(byte[] header) { return call(headerSubchainRootH, seg(header), (long) header.length); }
+    public byte[] certifiedHeader(byte[] header, byte[] certificate) { return call(certifiedHeaderEncode, seg(header), (long) header.length, seg(certificate), (long) certificate.length); }
+    /** An anchor: one child's CONSECUTIVE certified headers. */
+    public byte[] encodeAnchor(long childChainId, byte[][] certifiedHeaders) { byte[] blob = blobList(certifiedHeaders); return call(anchorEncode, childChainId, seg(blob), (long) blob.length); }
+    /** A cross-chain proof: hops (parent → … → the chain holding the entry) + that chain's state proof. */
+    public byte[] encodeSubchainProof(byte[][] hops, byte[] stateProof) { byte[] blob = blobList(hops); return call(subchainProofEncode, seg(blob), (long) blob.length, seg(stateProof), (long) stateProof.length); }
+    /** Whether the proof is committed under the parent's 32-byte subchain root all the way down and its state proof holds. */
+    public boolean verifySubchainProof(byte[] parentSubchainRoot, byte[] proof) {
+        if (parentSubchainRoot.length != 32) return false;
+        try { return (int) subchainProofVerify.invoke(seg(parentSubchainRoot), seg(proof), (long) proof.length) == 1; } catch (Throwable e) { throw new RuntimeException(e); }
     }
     // ── Foreign components (engines / proposers implemented in Java) ────────────
 

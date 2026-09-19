@@ -219,6 +219,56 @@ public final class Main {
             }
             System.out.println("foreign-components OK");
 
+            // Subchains: a BFT child anchored by a parent; a balance on the child proven from the parent header.
+            {
+                var cv = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{0x71}, 32));
+                var pv = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{0x72}, 32));
+                byte[] aliceS = new byte[32]; java.util.Arrays.fill(aliceS, (byte) 0xA1);
+                var bft = bc.new Blueprint("bft", "account", "", null);
+                byte[] childGen = bc.commitBlueprint(bc.buildGenesis(42, 1, 1, 0, new byte[][]{aliceS}, new long[]{1000}, new byte[][]{cv.publicKey()}, new long[]{1}), bft);
+                byte[] childHeader = bc.genesisHeader(childGen);
+                byte[] parentGen = bc.commitBlueprint(bc.buildGenesis(1, 1, 1, 0, new byte[0][], new long[0], new byte[][]{pv.publicKey()}, new long[]{1}), bft);
+                byte[] reg = bc.encodeChildRegistration(42, childHeader, new byte[][]{cv.publicKey()}, new long[]{1}, 0);
+                byte[] policy = bc.encodeSubchainPolicy(1, 1, 0, 4, new byte[][]{reg});
+                byte[] plainHash = bc.genesisHash(parentGen);
+                parentGen = bc.commitSubchainPolicy(parentGen, policy);
+                if (java.util.Arrays.equals(plainHash, bc.genesisHash(parentGen))) throw new IllegalStateException("policy must change the parent genesis hash");
+                try { bc.commitSubchainPolicy(parentGen, bc.encodeSubchainPolicy(1, 1, 0, 0, new byte[][]{bc.encodeChildRegistration(1, childHeader, new byte[][]{cv.publicKey()}, new long[]{1}, 0)})); throw new IllegalStateException("own-chain child must be refused"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                byte[] bound = bc.commitParentBinding(childGen, 1, bc.genesisHash(parentGen));
+                if (java.util.Arrays.equals(bc.genesisHash(bound), bc.genesisHash(childGen)) || !java.util.Arrays.equals(bc.genesisHeader(bound), childHeader)) throw new IllegalStateException("binding must change the hash, not the header");
+                try (var child = bc.assembleChain(bound, 0, cv.publicKey(), cv.secret()); var parent = bc.assembleChain(parentGen, 0, pv.publicKey(), pv.secret())) {
+                    if (child == null || parent == null) throw new IllegalStateException("assemble");
+                    byte[][] certified = new byte[2][];
+                    for (int ts = 2; ts <= 3; ts++) {
+                        byte[] blk = child.propose(ts); byte[] cert = child.certify(blk);
+                        if (!child.submit(blk, cert)) throw new IllegalStateException("child submit");
+                        certified[ts - 2] = bc.certifiedHeader(bc.blockHeader(blk), cert);
+                    }
+                    if (child.height() != 2 || parent.childTip(42).length == 0) throw new IllegalStateException("child state");
+                    try { parent.childTip(99); throw new IllegalStateException("unknown child must fail"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                    byte[] anchor = bc.encodeAnchor(42, certified);
+                    byte[] pblk = parent.proposeAnchored(2, new byte[][]{anchor});
+                    if (!parent.submit(pblk, parent.certify(pblk)) || parent.height() != 1) throw new IllegalStateException("parent anchored");
+                    byte[] tampered = certified[1].clone(); tampered[tampered.length - 1] ^= 1;
+                    try { parent.proposeAnchored(3, new byte[][]{bc.encodeAnchor(42, new byte[][]{tampered})}); throw new IllegalStateException("tampered anchor must be refused"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                    try { parent.proposeAnchored(3, new byte[][]{anchor}); throw new IllegalStateException("stale anchor must be refused"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                    byte[] root = bc.headerSubchainRoot(bc.blockHeader(pblk));
+                    byte[] scProof = bc.encodeSubchainProof(new byte[][]{parent.subchainHop(42)}, child.proveAccount(aliceS));
+                    if (!bc.verifySubchainProof(root, scProof)) throw new IllegalStateException("cross-chain proof must verify");
+                    byte[] wrong = new byte[32]; java.util.Arrays.fill(wrong, (byte) 1);
+                    byte[] bad = scProof.clone(); bad[bad.length - 1] ^= 1;
+                    if (bc.verifySubchainProof(wrong, scProof) || bc.verifySubchainProof(root, bad) || bc.verifySubchainProof(root, bc.encodeSubchainProof(new byte[0][], child.proveAccount(aliceS))))
+                        throw new IllegalStateException("tampered / rootless proofs must fail");
+                    byte[] blk3 = child.propose(4); byte[] cert3 = child.certify(blk3); child.submit(blk3, cert3);
+                    byte[] pblk2 = parent.proposeAnchored(3, new byte[][]{bc.encodeAnchor(42, new byte[][]{bc.certifiedHeader(bc.blockHeader(blk3), cert3)})});
+                    if (!parent.submit(pblk2, parent.certify(pblk2))) throw new IllegalStateException("parent block 2");
+                    byte[] root2 = bc.headerSubchainRoot(bc.blockHeader(pblk2));
+                    if (bc.verifySubchainProof(root2, scProof) || !bc.verifySubchainProof(root, scProof)) throw new IllegalStateException("stale proof semantics");
+                    if (!bc.verifySubchainProof(root2, bc.encodeSubchainProof(new byte[][]{parent.subchainHop(42)}, child.proveAccount(aliceS)))) throw new IllegalStateException("fresh proof");
+                }
+            }
+            System.out.println("subchains OK");
+
             System.out.println("\nALL GOOD");
         }
     }

@@ -205,5 +205,62 @@ let fpJust = try fpChain.seal(fpBlk)
 precondition(fpChain.submit(block: fpBlk, justification: fpJust) && fpChain.height == 1, "PoS with a Swift proposer committed")
 print("foreign-components OK")
 
+// Subchains: a BFT child anchored by a parent; a balance on the child proven from the parent header.
+do {
+    let cv = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: 0x71, count: 32))
+    let pv = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: 0x72, count: 32))
+    let alice = Data(repeating: 0xA1, count: 32)
+    let bft = try Blockchainer.Blueprint(consensus: "bft", stateModel: "account")
+    let childGen = try Blockchainer.commitBlueprint(genesis: try Blockchainer.buildGenesis(chainID: 42, accounts: [.init(address: alice, balance: 1000)], validators: [.init(publicKey: cv.publicKey, power: 1)]), blueprint: bft)
+    let childHeader = try Blockchainer.genesisHeader(childGen)
+    var parentGen = try Blockchainer.commitBlueprint(genesis: try Blockchainer.buildGenesis(chainID: 1, accounts: [], validators: [.init(publicKey: pv.publicKey, power: 1)]), blueprint: bft)
+    let policy = try Blockchainer.encodeSubchainPolicy(maxChildren: 1, maxHeadersPerAnchor: 4, children: [.init(chainID: 42, genesisHeader: childHeader, validators: [.init(publicKey: cv.publicKey, power: 1)])])
+    let plainHash = try Blockchainer.genesisHash(parentGen)
+    parentGen = try Blockchainer.commitSubchainPolicy(genesis: parentGen, policy: policy)
+    let parentHash = try Blockchainer.genesisHash(parentGen)
+    precondition(plainHash != parentHash, "policy changes the parent genesis hash")
+    let ownChild = try Blockchainer.encodeSubchainPolicy(maxChildren: 1, children: [.init(chainID: 1, genesisHeader: childHeader, validators: [.init(publicKey: cv.publicKey, power: 1)])])
+    let refused = (try? Blockchainer.commitSubchainPolicy(genesis: parentGen, policy: ownChild)) == nil
+    precondition(refused, "own-chain child refused")
+    let bound = try Blockchainer.commitParentBinding(genesis: childGen, parentChainID: 1, parentGenesisHash: parentHash)
+    let boundHash = try Blockchainer.genesisHash(bound), childHash = try Blockchainer.genesisHash(childGen), boundHeader = try Blockchainer.genesisHeader(bound)
+    precondition(boundHash != childHash && boundHeader == childHeader, "binding changes the hash, not the header")
+    let child = Blockchainer.assembleChain(genesis: bound, me: 0, blsPub: cv.publicKey, blsSec: cv.secret)!
+    let parent = Blockchainer.assembleChain(genesis: parentGen, me: 0, blsPub: pv.publicKey, blsSec: pv.secret)!
+    var certified: [Data] = []
+    for ts: UInt64 in 2...3 {
+        let blk = try child.propose(timestamp: ts); let cert = try child.certify(blk)
+        precondition(child.submit(block: blk, justification: cert), "child submit")
+        certified.append(try Blockchainer.certifiedHeader(header: try Blockchainer.blockHeader(blk), certificate: cert))
+    }
+    let tip = try parent.childTip(42)
+    precondition(child.height == 2 && !tip.isEmpty, "child state")
+    precondition((try? parent.childTip(99)) == nil && (try? child.childTip(42)) == nil, "unknown child / non-parent refused")
+    let anchor = try Blockchainer.encodeAnchor(childChainID: 42, certifiedHeaders: certified)
+    let pblk = try parent.proposeAnchored(timestamp: 2, anchors: [anchor])
+    let pcert = try parent.certify(pblk)
+    precondition(parent.submit(block: pblk, justification: pcert) && parent.height == 1, "parent anchored")
+    var tampered = certified[1]; tampered[tampered.count - 1] ^= 1
+    let badAnchor = try Blockchainer.encodeAnchor(childChainID: 42, certifiedHeaders: [tampered])
+    precondition((try? parent.proposeAnchored(timestamp: 3, anchors: [badAnchor])) == nil, "tampered anchor refused")
+    precondition((try? parent.proposeAnchored(timestamp: 3, anchors: [anchor])) == nil, "stale anchor refused")
+    let root = try Blockchainer.headerSubchainRoot(try Blockchainer.blockHeader(pblk))
+    let proof = try Blockchainer.encodeSubchainProof(hops: [try parent.subchainHop(42)], stateProof: try child.proveAccount(alice))
+    precondition(Blockchainer.verifySubchainProof(parentSubchainRoot: root, proof: proof), "cross-chain proof verifies")
+    var bad = proof; bad[bad.count - 1] ^= 1
+    let rootless = try Blockchainer.encodeSubchainProof(hops: [], stateProof: try child.proveAccount(alice))
+    precondition(!Blockchainer.verifySubchainProof(parentSubchainRoot: Data(repeating: 1, count: 32), proof: proof) && !Blockchainer.verifySubchainProof(parentSubchainRoot: root, proof: bad) && !Blockchainer.verifySubchainProof(parentSubchainRoot: root, proof: rootless), "tampered / rootless proofs fail")
+    let blk3 = try child.propose(timestamp: 4); let cert3 = try child.certify(blk3); _ = child.submit(block: blk3, justification: cert3)
+    let a2 = try Blockchainer.encodeAnchor(childChainID: 42, certifiedHeaders: [try Blockchainer.certifiedHeader(header: try Blockchainer.blockHeader(blk3), certificate: cert3)])
+    let pblk2 = try parent.proposeAnchored(timestamp: 3, anchors: [a2])
+    let pcert2 = try parent.certify(pblk2)
+    precondition(parent.submit(block: pblk2, justification: pcert2), "parent block 2")
+    let root2 = try Blockchainer.headerSubchainRoot(try Blockchainer.blockHeader(pblk2))
+    precondition(!Blockchainer.verifySubchainProof(parentSubchainRoot: root2, proof: proof) && Blockchainer.verifySubchainProof(parentSubchainRoot: root, proof: proof), "old proof stale at new root, valid at old")
+    let fresh = try Blockchainer.encodeSubchainProof(hops: [try parent.subchainHop(42)], stateProof: try child.proveAccount(alice))
+    precondition(Blockchainer.verifySubchainProof(parentSubchainRoot: root2, proof: fresh), "fresh proof at new root")
+}
+print("subchains OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

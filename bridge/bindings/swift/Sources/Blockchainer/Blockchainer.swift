@@ -520,6 +520,92 @@ public enum Blockchainer {
             block.withC { bp, bl in justification.withC { jp, jl in
                 blockchainer_chain_submit(UnsafeMutableRawPointer(h), bp, bl, jp, jl) == 1 } }
         }
+
+        // ── Subchains ──
+        /// Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor.
+        public func proposeAnchored(timestamp: UInt64, anchors: [Data]) throws -> Data {
+            let blob = blobList(anchors)
+            return try consume(blob.withC { ap, al in blockchainer_chain_propose_anchored(UnsafeMutableRawPointer(h), timestamp, ap, al) }, "chain_propose_anchored")
+        }
+        /// BFT: this validator's precommit aggregated into a commit certificate (the justification for submit; what a parent anchors).
+        public func certify(_ block: Data) throws -> Data {
+            try consume(block.withC { bp, bl in blockchainer_chain_certify(UnsafeMutableRawPointer(h), bp, bl) }, "chain_certify")
+        }
+        /// A parent's last anchored header for a child.
+        public func childTip(_ childChainID: UInt64) throws -> Data { try consume(blockchainer_chain_child_tip(UnsafeMutableRawPointer(h), childChainID), "chain_child_tip") }
+        /// A proof hop from this parent's current registry into a child.
+        public func subchainHop(_ childChainID: UInt64) throws -> Data { try consume(blockchainer_chain_subchain_hop(UnsafeMutableRawPointer(h), childChainID), "chain_subchain_hop") }
+        /// State-inclusion proof for a 32-byte address on this account-model chain.
+        public func proveAccount(_ address: Data) throws -> Data {
+            try consume(address.withC { ap, _ in blockchainer_chain_prove_account(UnsafeMutableRawPointer(h), ap) }, "chain_prove_account")
+        }
+    }
+
+    // ── Subchains: a parent block anchors a child chain's finalized headers ────
+    // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
+    // genesis HEADER + fixed validator set; anchor its certified headers; prove a
+    // state entry on a descendant from the parent's header. v1 anchors BFT children.
+
+    /// [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
+    static func blobList(_ items: [Data]) -> Data {
+        var d = Data(); d.append(contentsOf: withUnsafeBytes(of: UInt32(items.count).bigEndian) { Data($0) })
+        for it in items { d.append(contentsOf: withUnsafeBytes(of: UInt32(it.count).bigEndian) { Data($0) }); d.append(it) }
+        return d
+    }
+    /// A child registered at a parent's genesis: its genesis HEADER, fixed validators, and its own subtree depth.
+    public struct ChildRegistration {
+        public var chainID: UInt64; public var genesisHeader: Data; public var validators: [GenesisValidator]; public var maxDepth: UInt8
+        public init(chainID: UInt64, genesisHeader: Data, validators: [GenesisValidator], maxDepth: UInt8 = 0) {
+            self.chainID = chainID; self.genesisHeader = genesisHeader; self.validators = validators; self.maxDepth = maxDepth
+        }
+        public func encode() throws -> Data {
+            ensureReady()
+            var pks = Data(); for v in validators { pks.append(v.publicKey) }
+            let powers = validators.map { $0.power }
+            let res = genesisHeader.withC { hp, hl in pks.withC { kp, _ in powers.withUnsafeBufferPointer { pb in
+                blockchainer_child_registration_encode(chainID, hp, hl, kp, pb.baseAddress, validators.count, maxDepth) } } }
+            return try consume(res, "child_registration_encode")
+        }
+    }
+    /// A genesis's genesis HEADER — the identity a parent registers a child by.
+    public static func genesisHeader(_ genesis: Data) throws -> Data {
+        ensureReady(); return try consume(genesis.withC { gp, gl in blockchainer_genesis_header(gp, gl) }, "genesis_header")
+    }
+    /// Encode a parent's subchain policy (children ascending, unique chain ids). 0 = unlimited.
+    public static func encodeSubchainPolicy(maxChildren: UInt16, maxDepth: UInt8 = 1, maxAnchorsPerBlock: UInt16 = 0,
+                                            maxHeadersPerAnchor: UInt16 = 0, children: [ChildRegistration]) throws -> Data {
+        ensureReady()
+        let blob = blobList(try children.map { try $0.encode() })
+        return try consume(blob.withC { bp, bl in blockchainer_subchain_policy_encode(maxChildren, maxDepth, maxAnchorsPerBlock, maxHeadersPerAnchor, bp, bl) }, "subchain_policy_encode")
+    }
+    /// Commit a policy into a genesis (this chain becomes a PARENT; its hash changes). Throws on an invalid policy.
+    public static func commitSubchainPolicy(genesis: Data, policy: Data) throws -> Data {
+        ensureReady(); return try consume(genesis.withC { gp, gl in policy.withC { pp, pl in blockchainer_genesis_commit_subchain_policy(gp, gl, pp, pl) } }, "genesis_commit_subchain_policy")
+    }
+    /// Bind a child genesis to its parent (id + 32-byte parent genesis hash); the child can never be re-parented.
+    public static func commitParentBinding(genesis: Data, parentChainID: UInt64, parentGenesisHash: Data) throws -> Data {
+        ensureReady(); return try consume(genesis.withC { gp, gl in parentGenesisHash.withC { hp, _ in blockchainer_genesis_commit_parent_binding(gp, gl, parentChainID, hp) } }, "genesis_commit_parent_binding")
+    }
+    public static func blockHeader(_ block: Data) throws -> Data { ensureReady(); return try consume(block.withC { bp, bl in blockchainer_block_header(bp, bl) }, "block_header") }
+    /// A header's 32-byte subchain root (zero below version 3).
+    public static func headerSubchainRoot(_ header: Data) throws -> Data { ensureReady(); return try consume(header.withC { hp, hl in blockchainer_header_subchain_root(hp, hl) }, "header_subchain_root") }
+    public static func certifiedHeader(header: Data, certificate: Data) throws -> Data {
+        ensureReady(); return try consume(header.withC { hp, hl in certificate.withC { cp, cl in blockchainer_certified_header_encode(hp, hl, cp, cl) } }, "certified_header_encode")
+    }
+    /// An anchor: one child's CONSECUTIVE certified headers.
+    public static func encodeAnchor(childChainID: UInt64, certifiedHeaders: [Data]) throws -> Data {
+        ensureReady(); let blob = blobList(certifiedHeaders)
+        return try consume(blob.withC { bp, bl in blockchainer_anchor_encode(childChainID, bp, bl) }, "anchor_encode")
+    }
+    /// A cross-chain proof: hops (parent → … → the chain holding the entry) + that chain's state proof.
+    public static func encodeSubchainProof(hops: [Data], stateProof: Data) throws -> Data {
+        ensureReady(); let blob = blobList(hops)
+        return try consume(blob.withC { hp, hl in stateProof.withC { sp, sl in blockchainer_subchain_proof_encode(hp, hl, sp, sl) } }, "subchain_proof_encode")
+    }
+    /// Whether the proof is committed under the parent's 32-byte subchain root all the way down and its state proof holds.
+    public static func verifySubchainProof(parentSubchainRoot: Data, proof: Data) -> Bool {
+        ensureReady(); guard parentSubchainRoot.count == 32 else { return false }
+        return parentSubchainRoot.withC { rp, _ in proof.withC { pp, pl in blockchainer_subchain_proof_verify(rp, pp, pl) == 1 } }
     }
     /// nil = rejected (fail-closed): unknown id, state mismatch, or posture-forbidden engine.
     public static func assembleChain(genesis: Data, me: UInt32, blsPub: Data, blsSec: Data) -> Chain? {
