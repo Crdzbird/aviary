@@ -67,4 +67,48 @@ struct ParentBinding {
   bool operator==(const ParentBinding&) const = default;
 };
 
+/// The parent's live view of its children: for each registered child, the
+/// last anchored (finalized) header. Anchor verification IS `LightClient::
+/// accept` — each child header must be the next one (height +1, parent hash,
+/// embedded last-commit) under the child's FIXED registered validator set, and
+/// its certificate must reach quorum. Pure and deterministic: the result is a
+/// function of (registry, anchors) only. Copy it, apply, and commit the copy
+/// only on success (the Ledger does exactly that).
+class SubchainRegistry {
+ public:
+  struct ChildEntry {
+    ChildRegistration reg;
+    consensus::ValidatorSet vset;  ///< built once from reg.validators
+    BlockHeader tip;               ///< last anchored header (genesis until anchored)
+  };
+
+  /// Build from a validated policy (throws std::invalid_argument on a policy
+  /// that fails `validate` or a malformed child validator set).
+  static SubchainRegistry from_policy(std::uint64_t own_chain_id, SubchainPolicy policy);
+
+  const SubchainPolicy& policy() const { return policy_; }
+  const std::vector<ChildEntry>& children() const { return children_; }
+  /// The last anchored header of [child], or nullptr if not registered.
+  const BlockHeader* tip_of(std::uint64_t child_chain_id) const;
+
+  /// Validate a block's anchors (docs/design/SUBCHAINS.md §6: count bound,
+  /// canonical order, registered child, segment bound, then per header the
+  /// light-client rule) and advance the tips. Returns "" on success; on
+  /// failure returns the reason and THIS COPY is unspecified — discard it.
+  std::string apply_anchors(const std::vector<Anchor>& anchors);
+
+  /// `subchain_root`: hash_tagged(kSubchainRegistry, count ‖ per child
+  /// ascending: chain_id ‖ genesis_hash ‖ tip.hash() ‖ tip.height ‖ tip.state_root).
+  Hash root() const;
+
+  /// The mutable part (child tips) for snapshots; the registrations come from
+  /// the policy. `restore_tips` throws on a blob that does not match the policy.
+  Bytes serialize_tips() const;
+  void restore_tips(crypto::ByteView bytes);
+
+ private:
+  SubchainPolicy policy_;
+  std::vector<ChildEntry> children_;  // ascending chain_id (policy order)
+};
+
 }  // namespace blockchainer

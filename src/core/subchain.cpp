@@ -2,6 +2,9 @@
 
 #include "blockchainer/codec.hpp"
 #include "blockchainer/genesis.hpp"
+#include "blockchainer/light_client.hpp"
+
+#include <stdexcept>
 
 namespace blockchainer {
 
@@ -133,6 +136,107 @@ void ParentBinding::commit_to(GenesisSpec& g) const { g.parent_binding = encode(
 std::optional<ParentBinding> ParentBinding::from_genesis(const GenesisSpec& g) {
   if (g.parent_binding.empty()) return std::nullopt;
   return decode_all(crypto::ByteView(g.parent_binding.data(), g.parent_binding.size()));
+}
+
+// ── SubchainRegistry ─────────────────────────────────────────────────────────
+
+SubchainRegistry SubchainRegistry::from_policy(std::uint64_t own_chain_id, SubchainPolicy policy) {
+  if (std::string e = policy.validate(own_chain_id); !e.empty()) throw std::invalid_argument(e);
+  SubchainRegistry r;
+  r.policy_ = std::move(policy);
+  r.children_.reserve(r.policy_.children.size());
+  for (const ChildRegistration& c : r.policy_.children) {
+    // ValidatorSet's constructor rejects a malformed set (bad key length, no
+    // power) — surfaced here, at boot, never at anchor time.
+    r.children_.push_back(ChildEntry{c, consensus::ValidatorSet(c.validators), c.genesis_header});
+  }
+  return r;
+}
+
+const BlockHeader* SubchainRegistry::tip_of(std::uint64_t child_chain_id) const {
+  for (const ChildEntry& e : children_)
+    if (e.reg.chain_id == child_chain_id) return &e.tip;
+  return nullptr;
+}
+
+std::string SubchainRegistry::apply_anchors(const std::vector<Anchor>& anchors) {
+  // Cheap structural rules first (docs/design/SUBCHAINS.md §6 step 3b), so a
+  // peer cannot make us do BLS work on a block that is malformed anyway.
+  if (policy_.max_anchors_per_block != 0 && anchors.size() > policy_.max_anchors_per_block)
+    return "too many anchors in block";
+  for (std::size_t i = 0; i < anchors.size(); ++i) {
+    const Anchor& a = anchors[i];
+    if (i > 0 && !(anchors[i - 1].child_chain_id < a.child_chain_id))
+      return "anchors must be ascending, unique by child chain_id";
+    if (a.headers.empty()) return "empty anchor";
+    if (policy_.max_headers_per_anchor != 0 && a.headers.size() > policy_.max_headers_per_anchor)
+      return "anchor segment exceeds max_headers_per_anchor";
+    bool known = false;
+    for (const ChildEntry& e : children_) known |= (e.reg.chain_id == a.child_chain_id);
+    if (!known) return "anchor for an unregistered child chain";
+  }
+  // Then the light-client rule per header (step 3c).
+  for (const Anchor& a : anchors) {
+    ChildEntry* e = nullptr;
+    for (ChildEntry& c : children_)
+      if (c.reg.chain_id == a.child_chain_id) e = &c;
+    client::LightClient lc(e->reg.chain_id, e->vset, e->tip);
+    for (const CertifiedHeader& ch : a.headers) {
+      consensus::CommitCertificate cert;
+      try {
+        cert = consensus::CommitCertificate::decode_all(bview(ch.certificate));
+      } catch (const std::exception& ex) {
+        return std::string("malformed child certificate: ") + ex.what();
+      }
+      client::LightClient::Result r = lc.accept(ch.header, cert);
+      if (!r.ok) return "child " + std::to_string(a.child_chain_id) + " header rejected: " + r.error;
+    }
+    e->tip = lc.tip();
+  }
+  return {};
+}
+
+Hash SubchainRegistry::root() const {
+  codec::CodecWriter w;
+  w.write_u32(static_cast<std::uint32_t>(children_.size()));
+  for (const ChildEntry& e : children_) {
+    w.write_u64(e.reg.chain_id);
+    w.write_fixed_bytes(hview(e.reg.genesis_hash), 32);
+    const Hash th = e.tip.hash();
+    w.write_fixed_bytes(hview(th), 32);
+    w.write_u64(e.tip.height);
+    w.write_fixed_bytes(hview(e.tip.state_root), 32);
+  }
+  return crypto::hash_tagged(crypto::Domain::kSubchainRegistry, w.take());
+}
+
+Bytes SubchainRegistry::serialize_tips() const {
+  codec::CodecWriter w;
+  w.write_list(children_, [](codec::CodecWriter& w, const ChildEntry& e) {
+    w.write_u64(e.reg.chain_id);
+    Bytes t = e.tip.encode();
+    w.write_bytes(bview(t));
+  });
+  return w.take();
+}
+
+void SubchainRegistry::restore_tips(crypto::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  struct Tip { std::uint64_t id; BlockHeader h; };
+  auto tips = r.read_list<Tip>([](codec::CodecReader& r) {
+    Tip t;
+    t.id = r.read_u64();
+    Bytes h = r.read_bytes();
+    t.h = BlockHeader::decode_all(bview(h));
+    return t;
+  });
+  r.assert_fully_consumed();
+  if (tips.size() != children_.size()) throw std::invalid_argument("subchain snapshot: child count mismatch");
+  for (std::size_t i = 0; i < tips.size(); ++i) {
+    if (tips[i].id != children_[i].reg.chain_id || tips[i].h.chain_id != tips[i].id)
+      throw std::invalid_argument("subchain snapshot: child id mismatch");
+    children_[i].tip = tips[i].h;
+  }
 }
 
 }  // namespace blockchainer

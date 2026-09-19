@@ -2,10 +2,12 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "blockchainer/state.hpp"
+#include "blockchainer/subchain.hpp"
 #include "blockchainer/types.hpp"
 
 namespace blockchainer {
@@ -35,6 +37,12 @@ struct ChainSpec {
   /// `receipt_root` (one receipt per tx). Default false → version-1 blocks, no
   /// receipts, byte-identical to before.
   bool produce_receipts = false;
+
+  /// Canonical `SubchainPolicy` bytes (docs/design/SUBCHAINS.md) when this
+  /// chain is a PARENT. Empty = anchors nothing; every version-3 header is then
+  /// refused. Non-empty = every produced block is version 3 and commits the
+  /// child-tip registry; a lower-version header is refused.
+  Bytes subchain_policy{};
 
   /// Whether [algo] is permitted on this chain.
   bool accepts(SigAlgo algo) const {
@@ -71,10 +79,15 @@ class Ledger {
   /// receipt-inclusion proof against the committed receipt_root.
   const std::vector<Receipt>& last_receipts() const { return last_receipts_; }
 
-  /// Single-node producer: assemble the next block from [txs]. Does NOT mutate
-  /// the ledger; the returned block commits the resulting tx/state roots. Throws
-  /// std::runtime_error (with the reason) if any tx is invalid.
-  Block build_block(std::vector<Transaction> txs, std::uint64_t timestamp);
+  /// Single-node producer: assemble the next block from [txs] (and, on a parent
+  /// chain, the subchain [anchors]). Does NOT mutate the ledger; the returned
+  /// block commits the resulting tx/state (and anchor/subchain) roots. Throws
+  /// std::runtime_error (with the reason) if any tx or anchor is invalid.
+  Block build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
+                    std::vector<Anchor> anchors = {});
+
+  /// The subchain registry (child tips) when this chain is a parent, else null.
+  const SubchainRegistry* subchains() const { return registry_ ? &*registry_ : nullptr; }
 
   /// Validate + apply [block] atomically. On success the ledger advances; on
   /// failure it is left completely unchanged.
@@ -95,6 +108,7 @@ class Ledger {
   std::unique_ptr<StateMachine> state_;
   BlockHeader tip_;
   std::vector<Receipt> last_receipts_;
+  std::optional<SubchainRegistry> registry_;  // parent chains only
 };
 
 }  // namespace blockchainer

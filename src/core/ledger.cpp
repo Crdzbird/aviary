@@ -1,5 +1,6 @@
 #include "blockchainer/ledger.hpp"
 
+#include <optional>
 #include <stdexcept>
 
 namespace blockchainer {
@@ -27,30 +28,47 @@ std::string block_limit_error(const ChainSpec& spec, const std::vector<Transacti
 Ledger::Ledger(ChainSpec spec, std::unique_ptr<StateMachine> genesis_state,
                std::uint64_t genesis_timestamp)
     : spec_(spec), state_(std::move(genesis_state)) {
-  tip_.version = 1;
+  if (!spec_.subchain_policy.empty()) {
+    // A parent chain: an invalid policy is a boot failure, never a silent
+    // "anchors nothing" (std::invalid_argument propagates).
+    registry_ = SubchainRegistry::from_policy(
+        spec_.chain_id, SubchainPolicy::decode_all(
+                            crypto::ByteView(spec_.subchain_policy.data(), spec_.subchain_policy.size())));
+  }
+  tip_.version = registry_ ? 3 : 1;
   tip_.chain_id = spec_.chain_id;
   tip_.height = 0;
   tip_.parent_hash = crypto::zero_hash();
   tip_.timestamp = genesis_timestamp;
   tip_.tx_root = compute_tx_root({});
   tip_.state_root = state_->state_root();
+  if (registry_) tip_.subchain_root = registry_->root();  // anchor_root = zero (no anchors)
 }
 
 BlockError Ledger::check_header(const BlockHeader& h) const {
   if (h.chain_id != spec_.chain_id) return BlockError::failure("chain_id mismatch");
-  // Anchor-carrying headers are refused until subchain validation lands (a
-  // header this ledger cannot fully validate must never be accepted).
-  if (h.version >= 3) return BlockError::failure("version-3 headers (subchain anchors) not enabled");
+  // Version fence (docs/design/SUBCHAINS.md I2): anchor-carrying headers only
+  // on a parent chain, and a parent chain only accepts anchor-carrying headers
+  // (a lower version would skip the subchain_root commitment).
+  if (h.version >= 3 && !registry_) return BlockError::failure("version-3 header on a chain with no subchain policy");
+  if (h.version < 3 && registry_) return BlockError::failure("parent chain requires version-3 headers");
   if (h.height != tip_.height + 1) return BlockError::failure("non-sequential height");
   if (h.parent_hash != tip_.hash()) return BlockError::failure("parent hash mismatch");
   if (h.timestamp < tip_.timestamp) return BlockError::failure("non-monotonic timestamp");
   return BlockError::success();
 }
 
-Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp) {
+Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
+                          std::vector<Anchor> anchors) {
   if (std::string e = block_limit_error(spec_, txs); !e.empty()) {
     throw std::runtime_error("build_block: " + e);
   }
+  if (!anchors.empty() && !registry_) throw std::runtime_error("build_block: anchors on a non-parent chain");
+  std::optional<SubchainRegistry> reg = registry_;  // working copy
+  if (reg) {
+    if (std::string e = reg->apply_anchors(anchors); !e.empty()) throw std::runtime_error("build_block: invalid anchor: " + e);
+  }
+  const bool with_receipts = spec_.produce_receipts || registry_.has_value();  // v3 implies v2's receipts
   auto working = state_->clone();
   std::vector<Receipt> receipts;
   for (const auto& tx : txs) {
@@ -65,19 +83,24 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp)
     }
     const ValidationResult vr = working->validate(tx);
     if (!vr.ok) throw std::runtime_error("build_block: invalid tx: " + vr.error);
-    if (spec_.produce_receipts) receipts.push_back(Receipt{1, working->tx_fee(tx)});  // pre-apply
+    if (with_receipts) receipts.push_back(Receipt{1, working->tx_fee(tx)});  // pre-apply
     working->apply(tx);
   }
 
   Block block;
-  block.header.version = spec_.produce_receipts ? 2 : 1;
+  block.header.version = registry_ ? 3 : (spec_.produce_receipts ? 2 : 1);
   block.header.chain_id = spec_.chain_id;
   block.header.height = tip_.height + 1;
   block.header.parent_hash = tip_.hash();
   block.header.timestamp = timestamp;
   block.header.tx_root = compute_tx_root(txs);
   block.header.state_root = working->state_root();
-  if (spec_.produce_receipts) block.header.receipt_root = compute_receipt_root(receipts);
+  if (with_receipts) block.header.receipt_root = compute_receipt_root(receipts);
+  if (reg) {
+    block.header.anchor_root = compute_anchor_root(anchors);
+    block.header.subchain_root = reg->root();
+    block.anchors = std::move(anchors);
+  }
   block.transactions = std::move(txs);
   return block;
 }
@@ -95,6 +118,20 @@ BlockError Ledger::process_block(const Block& block) {
   // 3. Recompute and compare the transaction root.
   if (compute_tx_root(block.transactions) != block.header.tx_root) {
     return BlockError::failure("tx_root mismatch");
+  }
+
+  // 3b/3c. Subchain anchors (docs/design/SUBCHAINS.md §6): structural root +
+  // order first, then the per-header light-client verification — all on a
+  // working copy of the registry, BEFORE any transaction work.
+  if (!block.anchors.empty() && !registry_) return BlockError::failure("anchors on a chain with no subchain policy");
+  std::optional<SubchainRegistry> reg = registry_;
+  if (reg) {
+    if (compute_anchor_root(block.anchors) != block.header.anchor_root) {
+      return BlockError::failure("anchor_root mismatch");
+    }
+    if (std::string e = reg->apply_anchors(block.anchors); !e.empty()) {
+      return BlockError::failure("invalid anchor: " + e);
+    }
   }
 
   // 4. Per-tx: signature verify → state validate → apply, on a working copy so
@@ -128,10 +165,16 @@ BlockError Ledger::process_block(const Block& block) {
     return BlockError::failure("receipt_root mismatch");
   }
 
+  // 5b. The post-anchor registry commitment.
+  if (reg && reg->root() != block.header.subchain_root) {
+    return BlockError::failure("subchain_root mismatch");
+  }
+
   // 6. (consensus verification — M2)
   // 7. Commit atomically.
   state_ = std::move(working);
   last_receipts_ = std::move(receipts);
+  if (reg) registry_ = std::move(reg);
   tip_ = block.header;
   return BlockError::success();
 }
@@ -142,6 +185,10 @@ Bytes Ledger::snapshot() const {
   const Bytes state_bytes = state_->serialize();
   w.write_bytes(codec::ByteView(tip_bytes.data(), tip_bytes.size()));
   w.write_bytes(codec::ByteView(state_bytes.data(), state_bytes.size()));
+  if (registry_) {  // parent chains append their child tips; others are byte-identical to before
+    const Bytes reg_bytes = registry_->serialize_tips();
+    w.write_bytes(codec::ByteView(reg_bytes.data(), reg_bytes.size()));
+  }
   return w.take();
 }
 
@@ -149,6 +196,8 @@ std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot
   codec::CodecReader r(snapshot);
   const Bytes tip_bytes = r.read_bytes();
   const Bytes state_bytes = r.read_bytes();
+  Bytes reg_bytes;
+  if (!spec.subchain_policy.empty()) reg_bytes = r.read_bytes();
   r.assert_fully_consumed();
 
   BlockHeader tip = BlockHeader::decode_all(codec::ByteView(tip_bytes.data(), tip_bytes.size()));
@@ -158,6 +207,10 @@ std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot
   // tip so the chain resumes at the snapshotted height.
   auto ledger = std::make_unique<Ledger>(spec, std::move(state), tip.timestamp);
   ledger->tip_ = tip;
+  if (ledger->registry_) {
+    ledger->registry_->restore_tips(codec::ByteView(reg_bytes.data(), reg_bytes.size()));
+    if (ledger->registry_->root() != tip.subchain_root) throw std::invalid_argument("snapshot: subchain_root mismatch");
+  }
   return ledger;
 }
 
