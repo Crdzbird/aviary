@@ -570,6 +570,79 @@ BLOCKCHAINER_API int blockchainer_chain_submit(
     const uint8_t* justification, size_t justification_len);
 BLOCKCHAINER_API void blockchainer_chain_free(BlockchainerChain c);
 
+/* ── Subchains: a parent block anchors a child chain's finalized headers ─────
+ *  (docs/design/SUBCHAINS.md). A child is registered at the parent's genesis
+ *  by its genesis HEADER + fixed validator set; a parent block carries anchors
+ *  (consecutive certified child headers) which every parent validator verifies
+ *  with the light-client rule; the child's tip is committed in the parent
+ *  header's subchain_root. Cross-chain proofs descend hop by hop from a parent
+ *  header to a state entry on a descendant. v1 anchors BFT children only.
+ *  Blob LISTS below are [count u32]([len u32][bytes])× (big-endian). */
+
+/** A genesis's genesis HEADER (the identity a parent registers a child by). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_genesis_header(
+    const uint8_t* genesis, size_t genesis_len);
+/** Encode a child registration: its chain id, genesis header, validators
+ *  (48-byte BLS keys + powers) and its own subtree depth (0 = leaf). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_child_registration_encode(
+    uint64_t chain_id, const uint8_t* genesis_header, size_t header_len,
+    const uint8_t* validator_pks, const uint64_t* validator_powers, size_t validator_count,
+    uint8_t child_max_depth);
+/** Encode a parent's subchain policy from a LIST of registrations (ascending,
+ *  unique chain ids). 0 for an unlimited per-block / per-anchor bound. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_subchain_policy_encode(
+    uint16_t max_children, uint8_t max_depth, uint16_t max_anchors_per_block,
+    uint16_t max_headers_per_anchor, const uint8_t* registrations, size_t registrations_len);
+/** Commit a subchain policy into a genesis → the parent's genesis blob (hash changes). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_genesis_commit_subchain_policy(
+    const uint8_t* genesis, size_t genesis_len, const uint8_t* policy, size_t policy_len);
+/** Bind a child genesis to its parent (id + 32-byte parent genesis hash) →
+ *  the child's genesis blob (hash changes: it can never be re-parented). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_genesis_commit_parent_binding(
+    const uint8_t* genesis, size_t genesis_len, uint64_t parent_chain_id,
+    const uint8_t* parent_genesis_hash);
+/** The encoded header of an encoded block. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_block_header(
+    const uint8_t* block, size_t block_len);
+/** A header's 32-byte subchain_root (all-zero below version 3). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_header_subchain_root(
+    const uint8_t* header, size_t header_len);
+/** A child header + the certificate that finalized it → CertifiedHeader bytes. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_certified_header_encode(
+    const uint8_t* header, size_t header_len, const uint8_t* certificate, size_t certificate_len);
+/** An anchor: one child's CONSECUTIVE certified headers (a LIST) → Anchor bytes. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_anchor_encode(
+    uint64_t child_chain_id, const uint8_t* certified_headers, size_t certified_headers_len);
+/** Propose the next block on a PARENT chain, anchoring a LIST of anchors
+ *  (ascending child id). Errors if any anchor is invalid — never proposes it. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_propose_anchored(
+    BlockchainerChain c, uint64_t timestamp, const uint8_t* anchors, size_t anchors_len);
+/** BFT engines: this validator's precommit aggregated into a commit
+ *  certificate for [block] → CommitCertificate bytes (the justification for
+ *  blockchainer_chain_submit, and what a parent anchors). Errors if the engine
+ *  is not BFT or this validator alone does not reach quorum (gather the other
+ *  validators' precommits with the C++ API). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_certify(
+    BlockchainerChain c, const uint8_t* block, size_t block_len);
+/** A parent's last anchored header for [child_chain_id] (errors if this chain
+ *  is not a parent or the child is not registered). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_child_tip(
+    BlockchainerChain c, uint64_t child_chain_id);
+/** A proof hop from this parent's CURRENT registry into [child_chain_id]. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_subchain_hop(
+    BlockchainerChain c, uint64_t child_chain_id);
+/** State-inclusion proof for a 32-byte address on this (account-model) chain. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_prove_account(
+    BlockchainerChain c, const uint8_t* address);
+/** A cross-chain proof: a LIST of hops (parent → … → the chain holding the
+ *  entry) + that chain's state proof → SubchainProof bytes. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_subchain_proof_encode(
+    const uint8_t* hops, size_t hops_len, const uint8_t* state_proof, size_t state_proof_len);
+/** 1 iff [proof] is committed under the 32-byte [parent_subchain_root] all the
+ *  way down and its state proof holds; 0 otherwise. Never throws. */
+BLOCKCHAINER_API int blockchainer_subchain_proof_verify(
+    const uint8_t* parent_subchain_root, const uint8_t* proof, size_t proof_len);
+
 /* ── Foreign components: implement engines / proposers in ANY language ────────
  *  The consensus pipeline stays in C++ (a foreign engine proposes and applies
  *  via the Ledger); the foreign code supplies the JUSTIFICATION policy through

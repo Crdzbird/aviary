@@ -983,3 +983,144 @@ func TestForeignComponents(t *testing.T) {
 		t.Fatal("PoS with a Go proposer should commit")
 	}
 }
+
+// Subchains over the Go binding: a single-validator BFT child finalizes blocks
+// with real certificates; a parent registers it at genesis, anchors the child's
+// certified headers, and a state entry on the child is proven from the parent's
+// header alone. Tamper → refused.
+func TestSubchains(t *testing.T) {
+	must := func(b []byte, err error) []byte {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	cv, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x71}, 32))
+	pv, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x72}, 32))
+	alice := bytes.Repeat([]byte{0xA1}, 32)
+	bft, _ := bc.NewBlueprint("bft", "account", "", nil)
+
+	// Child chain 42 (BFT, one validator = quorum alone).
+	childGen := must(bc.BuildGenesis(42, 1, 1, bc.StateModelAccount,
+		[]bc.GenesisAccount{{Address: alice, Balance: 1000}}, []bc.GenesisValidator{{PublicKey: cv.Public, Power: 1}}))
+	childGen = must(bc.CommitBlueprint(childGen, bft))
+	childHeader := must(bc.GenesisHeader(childGen))
+
+	// Parent chain 1 registering the child.
+	parentGen := must(bc.BuildGenesis(1, 1, 1, bc.StateModelAccount, nil, []bc.GenesisValidator{{PublicKey: pv.Public, Power: 1}}))
+	parentGen = must(bc.CommitBlueprint(parentGen, bft))
+	policy := must(bc.SubchainPolicy{MaxChildren: 1, MaxDepth: 1, MaxHeadersPerAnchor: 4,
+		Children: []bc.ChildRegistration{{ChainID: 42, GenesisHeader: childHeader,
+			Validators: []bc.GenesisValidator{{PublicKey: cv.Public, Power: 1}}}}}.Encode())
+	plainHash := must(bc.GenesisHash(parentGen))
+	parentGen = must(bc.CommitSubchainPolicy(parentGen, policy))
+	if bytes.Equal(plainHash, must(bc.GenesisHash(parentGen))) {
+		t.Fatal("policy must change the parent's genesis hash")
+	}
+	// A structurally invalid policy is refused at commit (own chain as child).
+	badPolicy := must(bc.SubchainPolicy{MaxChildren: 1, MaxDepth: 1,
+		Children: []bc.ChildRegistration{{ChainID: 1, GenesisHeader: childHeader, Validators: []bc.GenesisValidator{{PublicKey: cv.Public, Power: 1}}}}}.Encode())
+	if _, err := bc.CommitSubchainPolicy(parentGen, badPolicy); err == nil {
+		t.Fatal("own-chain child must be refused")
+	}
+	// Bind the child to its parent: hash changes, header does not.
+	boundChild := must(bc.CommitParentBinding(childGen, 1, must(bc.GenesisHash(parentGen))))
+	if bytes.Equal(must(bc.GenesisHash(boundChild)), must(bc.GenesisHash(childGen))) || !bytes.Equal(must(bc.GenesisHeader(boundChild)), childHeader) {
+		t.Fatal("binding must change the child's hash but not its genesis header")
+	}
+
+	child, err := bc.AssembleChain(boundChild, 0, cv.Public, cv.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer child.Free()
+	parent, err := bc.AssembleChain(parentGen, 0, pv.Public, pv.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parent.Free()
+
+	// The child finalizes two blocks with real certificates.
+	var certified [][]byte
+	for ts := uint64(2); ts <= 3; ts++ {
+		blk := must(child.Propose(ts))
+		cert := must(child.Certify(blk))
+		if !child.Submit(blk, cert) {
+			t.Fatal("child submit")
+		}
+		certified = append(certified, must(bc.CertifiedHeader(must(bc.BlockHeader(blk)), cert)))
+	}
+	if child.Height() != 2 {
+		t.Fatalf("child height %d", child.Height())
+	}
+	if _, err := parent.ChildTip(42); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parent.ChildTip(99); err == nil {
+		t.Fatal("unknown child must error")
+	}
+	if _, err := child.ChildTip(42); err == nil {
+		t.Fatal("a non-parent has no child tips")
+	}
+
+	// The parent anchors the child's segment.
+	anchor := must(bc.EncodeAnchor(42, certified))
+	pblk := must(parent.ProposeAnchored(2, [][]byte{anchor}))
+	pcert := must(parent.Certify(pblk))
+	if !parent.Submit(pblk, pcert) || parent.Height() != 1 {
+		t.Fatal("parent submit")
+	}
+	if tip := must(parent.ChildTip(42)); len(tip) == 0 {
+		t.Fatal("child tip")
+	}
+	// A tampered certificate is refused by the producer (never proposed).
+	tampered := append([]byte(nil), certified[1]...)
+	tampered[len(tampered)-1] ^= 1
+	badAnchor := must(bc.EncodeAnchor(42, [][]byte{tampered}))
+	if _, err := parent.ProposeAnchored(3, [][]byte{badAnchor}); err == nil {
+		t.Fatal("tampered anchor must be refused")
+	}
+	// Re-anchoring the same segment (stale) is refused.
+	if _, err := parent.ProposeAnchored(3, [][]byte{anchor}); err == nil {
+		t.Fatal("stale anchor must be refused")
+	}
+
+	// Cross-chain proof: alice's balance on the child from the parent's header.
+	root := must(bc.HeaderSubchainRoot(must(bc.BlockHeader(pblk))))
+	hop := must(parent.SubchainHop(42))
+	sp := must(child.ProveAccount(alice))
+	proof := must(bc.EncodeSubchainProof([][]byte{hop}, sp))
+	if !bc.VerifySubchainProof(root, proof) {
+		t.Fatal("cross-chain proof must verify")
+	}
+	if bc.VerifySubchainProof(bytes.Repeat([]byte{1}, 32), proof) {
+		t.Fatal("wrong root must fail")
+	}
+	bad := append([]byte(nil), proof...)
+	bad[len(bad)-1] ^= 1
+	if bc.VerifySubchainProof(root, bad) {
+		t.Fatal("tampered proof must fail")
+	}
+	if bc.VerifySubchainProof(root, must(bc.EncodeSubchainProof(nil, sp))) {
+		t.Fatal("no hops must fail")
+	}
+	// After the child moves on and the parent re-anchors, the old proof is stale
+	// at the new root but still verifies at the old one.
+	blk3 := must(child.Propose(4))
+	cert3 := must(child.Certify(blk3))
+	child.Submit(blk3, cert3)
+	a2 := must(bc.EncodeAnchor(42, [][]byte{must(bc.CertifiedHeader(must(bc.BlockHeader(blk3)), cert3))}))
+	pblk2 := must(parent.ProposeAnchored(3, [][]byte{a2}))
+	if !parent.Submit(pblk2, must(parent.Certify(pblk2))) {
+		t.Fatal("parent block 2")
+	}
+	root2 := must(bc.HeaderSubchainRoot(must(bc.BlockHeader(pblk2))))
+	if bc.VerifySubchainProof(root2, proof) || !bc.VerifySubchainProof(root, proof) {
+		t.Fatal("stale proof semantics")
+	}
+	fresh := must(bc.EncodeSubchainProof([][]byte{must(parent.SubchainHop(42))}, must(child.ProveAccount(alice))))
+	if !bc.VerifySubchainProof(root2, fresh) {
+		t.Fatal("fresh proof must verify at the new root")
+	}
+}

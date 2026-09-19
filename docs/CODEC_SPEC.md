@@ -65,7 +65,7 @@ with an internal node or a header:
 - `ChildRegistration` = `u64 chain_id ‖ bytes(genesis_header) ‖ list(bytes(bls_pubkey) ‖ u64 power) ‖ u8 child_max_depth`
   (identity = the child's genesis HEADER hash — its genesis hash would be circular with the child's ParentBinding).
 - `subchain_root` = `H(0x0D ‖ u32 count ‖ per child ascending: u64 chain_id ‖ genesis_header_hash[32] ‖ tip_hash[32] ‖ u64 tip_height ‖ tip_state_root[32])`.
-- `SubchainProof` = `list(hop) ‖ bytes(StateProof)`, hop = `list(u64 chain_id ‖ genesis_header_hash[32] ‖ bytes(tip_header)) ‖ u64 child_chain_id`.
+- `SubchainProof` = `list(bytes(hop)) ‖ bytes(StateProof)`, hop = `list(u64 chain_id ‖ genesis_header_hash[32] ‖ bytes(tip_header)) ‖ u64 child_chain_id`.
 - `SubchainPolicy` = `u16 max_children ‖ u8 max_depth ‖ u16 max_anchors_per_block ‖ u16 max_headers_per_anchor ‖ list(bytes(ChildRegistration))`.
 - `ParentBinding` = `u64 parent_chain_id ‖ parent_genesis_hash[32]`.
 - `GenesisSpec` gains `bytes(subchain_policy) ‖ bytes(parent_binding)` appended last

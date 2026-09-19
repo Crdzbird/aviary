@@ -229,16 +229,39 @@ SubchainProof::Hop SubchainRegistry::hop(std::uint64_t child_chain_id) const {
 
 // ── SubchainProof ────────────────────────────────────────────────────────────
 
+Bytes SubchainProof::Hop::encode() const {
+  codec::CodecWriter w;
+  w.write_list(summaries, [](codec::CodecWriter& w, const ChildSummary& s) {
+    w.write_u64(s.chain_id);
+    w.write_fixed_bytes(hview(s.genesis_header_hash), 32);
+    Bytes t = s.tip.encode();
+    w.write_bytes(bview(t));
+  });
+  w.write_u64(child_chain_id);
+  return w.take();
+}
+
+SubchainProof::Hop SubchainProof::Hop::decode_all(crypto::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  Hop h;
+  h.summaries = r.read_list<ChildSummary>([](codec::CodecReader& r) {
+    ChildSummary s;
+    s.chain_id = r.read_u64();
+    s.genesis_header_hash = to_hash(r.read_fixed_bytes(32));
+    Bytes t = r.read_bytes();
+    s.tip = BlockHeader::decode_all(bview(t));
+    return s;
+  });
+  h.child_chain_id = r.read_u64();
+  r.assert_fully_consumed();
+  return h;
+}
+
 Bytes SubchainProof::encode() const {
   codec::CodecWriter w;
   w.write_list(hops, [](codec::CodecWriter& w, const Hop& h) {
-    w.write_list(h.summaries, [](codec::CodecWriter& w, const ChildSummary& s) {
-      w.write_u64(s.chain_id);
-      w.write_fixed_bytes(hview(s.genesis_header_hash), 32);
-      Bytes t = s.tip.encode();
-      w.write_bytes(bview(t));
-    });
-    w.write_u64(h.child_chain_id);
+    Bytes e = h.encode();
+    w.write_bytes(bview(e));
   });
   Bytes sp = state_proof.encode();
   w.write_bytes(bview(sp));
@@ -249,17 +272,8 @@ SubchainProof SubchainProof::decode_all(crypto::ByteView bytes) {
   codec::CodecReader r(bytes);
   SubchainProof p;
   p.hops = r.read_list<Hop>([](codec::CodecReader& r) {
-    Hop h;
-    h.summaries = r.read_list<ChildSummary>([](codec::CodecReader& r) {
-      ChildSummary s;
-      s.chain_id = r.read_u64();
-      s.genesis_header_hash = to_hash(r.read_fixed_bytes(32));
-      Bytes t = r.read_bytes();
-      s.tip = BlockHeader::decode_all(bview(t));
-      return s;
-    });
-    h.child_chain_id = r.read_u64();
-    return h;
+    Bytes e = r.read_bytes();
+    return Hop::decode_all(bview(e));
   });
   Bytes sp = r.read_bytes();
   p.state_proof = StateProof::decode_all(bview(sp));

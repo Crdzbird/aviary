@@ -84,6 +84,8 @@ struct SubchainProof {
   struct Hop {
     std::vector<ChildSummary> summaries;  ///< the parent's whole registry at that height
     std::uint64_t child_chain_id = 0;     ///< which child this hop descends into
+    Bytes encode() const;
+    static Hop decode_all(crypto::ByteView bytes);
     bool operator==(const Hop&) const = default;
   };
   std::vector<Hop> hops;

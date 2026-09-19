@@ -17,6 +17,9 @@
 #include "blockchainer/chain_assembler.hpp"
 #include "blockchainer/chain_blueprint.hpp"
 #include "blockchainer/foreign_engine.hpp"
+#include "blockchainer/account_state.hpp"
+#include "blockchainer/bft_engine.hpp"
+#include "blockchainer/subchain.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/pos_engine.hpp"
 #include "blockchainer/pow_engine.hpp"
@@ -190,8 +193,26 @@ cg::PseudonymousCredential decode_pseudonymous_credential(const std::uint8_t* p,
 }
 
 
-blockchainer::node::AssembledChain* as_chain(BlockchainerChain c) {
-  return static_cast<blockchainer::node::AssembledChain*>(c);
+// The chain handle: the assembled chain plus what this validator needs to
+// certify its own BFT blocks (its index + BLS key).
+struct ChainBox {
+  blockchainer::node::AssembledChain chain;
+  std::uint32_t me;
+  blockchainer::crypto::KeyPair key;
+};
+ChainBox* as_box(BlockchainerChain c) { return static_cast<ChainBox*>(c); }
+blockchainer::node::AssembledChain* as_chain(BlockchainerChain c) { return &as_box(c)->chain; }
+// [count u32]([len u32][bytes])× → the items.
+std::vector<blockchainer::crypto::Bytes> decode_blob_list(blockchainer::codec::ByteView v) {
+  blockchainer::codec::CodecReader r(v);
+  auto items = r.read_list<blockchainer::crypto::Bytes>([](blockchainer::codec::CodecReader& rr) { return rr.read_bytes(); });
+  r.assert_fully_consumed();
+  return items;
+}
+std::vector<blockchainer::Anchor> decode_anchors(blockchainer::codec::ByteView v) {
+  std::vector<blockchainer::Anchor> out;
+  for (const auto& b : decode_blob_list(v)) out.push_back(blockchainer::Anchor::decode_all(cbv(b.data(), b.size())));
+  return out;
 }
 // [count u32]([len u32][id])×
 std::vector<std::uint8_t> encode_ids(const std::vector<std::string>& ids) {
@@ -1221,8 +1242,8 @@ BlockchainerChain blockchainer_chain_assemble(const uint8_t* genesis, size_t gen
     blockchainer::GenesisSpec g = blockchainer::GenesisSpec::decode_all(cbv(genesis, genesis_len));
     blockchainer::crypto::KeyPair key{blockchainer::crypto::Bytes(bls_pub, bls_pub + pub_len),
                                       blockchainer::crypto::Bytes(bls_sec, bls_sec + sec_len)};
-    return new blockchainer::node::AssembledChain(
-        blockchainer::node::ChainAssembler::assemble(g, me, std::move(key)));
+    auto chain = blockchainer::node::ChainAssembler::assemble(g, me, key);
+    return new ChainBox{std::move(chain), me, std::move(key)};
   } catch (...) {
     return nullptr;  // fail-closed: unknown id / forbidden mix / bad genesis
   }
@@ -1287,7 +1308,170 @@ int blockchainer_chain_submit(BlockchainerChain c, const uint8_t* block, size_t 
   }
 }
 
-void blockchainer_chain_free(BlockchainerChain c) { delete as_chain(c); }
+void blockchainer_chain_free(BlockchainerChain c) { delete as_box(c); }
+
+// ── Subchains ─────────────────────────────────────────────────────────────────
+
+BlockchainerBufferResult blockchainer_genesis_header(const uint8_t* genesis, size_t genesis_len) {
+  try {
+    blockchainer::GenesisSpec g = blockchainer::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    return bytes_result(blockchainer::ledger_from_genesis(g)->tip().encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_child_registration_encode(
+    uint64_t chain_id, const uint8_t* genesis_header, size_t header_len, const uint8_t* validator_pks,
+    const uint64_t* validator_powers, size_t validator_count, uint8_t child_max_depth) {
+  try {
+    if (validator_count > 0 && (!validator_pks || !validator_powers)) return error_result("registration: null validators");
+    blockchainer::ChildRegistration c;
+    c.chain_id = chain_id;
+    c.genesis_header = blockchainer::BlockHeader::decode_all(cbv(genesis_header, header_len));
+    for (size_t i = 0; i < validator_count; ++i)
+      c.validators.push_back(blockchainer::consensus::Validator{
+          blockchainer::crypto::Bytes(validator_pks + 48 * i, validator_pks + 48 * (i + 1)), validator_powers[i]});
+    c.child_max_depth = child_max_depth;
+    return bytes_result(c.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_subchain_policy_encode(
+    uint16_t max_children, uint8_t max_depth, uint16_t max_anchors_per_block, uint16_t max_headers_per_anchor,
+    const uint8_t* registrations, size_t registrations_len) {
+  try {
+    blockchainer::SubchainPolicy p;
+    p.max_children = max_children; p.max_depth = max_depth;
+    p.max_anchors_per_block = max_anchors_per_block; p.max_headers_per_anchor = max_headers_per_anchor;
+    for (const auto& b : decode_blob_list(cbv(registrations, registrations_len))) {
+      blockchainer::codec::CodecReader r(cbv(b.data(), b.size()));
+      p.children.push_back(blockchainer::ChildRegistration::decode(r));
+      r.assert_fully_consumed();
+    }
+    return bytes_result(p.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_genesis_commit_subchain_policy(const uint8_t* genesis, size_t genesis_len,
+                                                                     const uint8_t* policy, size_t policy_len) {
+  try {
+    blockchainer::GenesisSpec g = blockchainer::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    blockchainer::SubchainPolicy p = blockchainer::SubchainPolicy::decode_all(cbv(policy, policy_len));
+    if (std::string e = p.validate(g.chain_id); !e.empty()) return error_result(e.c_str());
+    p.commit_to(g);
+    return bytes_result(g.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_genesis_commit_parent_binding(const uint8_t* genesis, size_t genesis_len,
+                                                                    uint64_t parent_chain_id,
+                                                                    const uint8_t* parent_genesis_hash) {
+  try {
+    if (!parent_genesis_hash) return error_result("binding: null parent genesis hash");
+    blockchainer::GenesisSpec g = blockchainer::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    blockchainer::ParentBinding{parent_chain_id, to_hash32(parent_genesis_hash)}.commit_to(g);
+    return bytes_result(g.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_block_header(const uint8_t* block, size_t block_len) {
+  try { return bytes_result(blockchainer::Block::decode_all(cbv(block, block_len)).header.encode()); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_header_subchain_root(const uint8_t* header, size_t header_len) {
+  try {
+    blockchainer::BlockHeader h = blockchainer::BlockHeader::decode_all(cbv(header, header_len));
+    return bytes_result(h.subchain_root.data(), h.subchain_root.size());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_certified_header_encode(const uint8_t* header, size_t header_len,
+                                                              const uint8_t* certificate, size_t certificate_len) {
+  try {
+    blockchainer::CertifiedHeader c{blockchainer::BlockHeader::decode_all(cbv(header, header_len)),
+                                    blockchainer::crypto::Bytes(certificate, certificate + certificate_len)};
+    return bytes_result(c.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_anchor_encode(uint64_t child_chain_id, const uint8_t* certified_headers,
+                                                    size_t certified_headers_len) {
+  try {
+    blockchainer::Anchor a;
+    a.child_chain_id = child_chain_id;
+    for (const auto& b : decode_blob_list(cbv(certified_headers, certified_headers_len)))
+      a.headers.push_back(blockchainer::CertifiedHeader::decode_all(cbv(b.data(), b.size())));
+    return bytes_result(a.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_chain_propose_anchored(BlockchainerChain c, uint64_t timestamp,
+                                                             const uint8_t* anchors, size_t anchors_len) {
+  if (!c) return error_result("null chain");
+  try {
+    return bytes_result(as_chain(c)->engine->propose_anchored({}, timestamp, decode_anchors(cbv(anchors, anchors_len))).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_chain_certify(BlockchainerChain c, const uint8_t* block, size_t block_len) {
+  if (!c) return error_result("null chain");
+  try {
+    auto* bft = dynamic_cast<blockchainer::consensus::BftEngine*>(as_chain(c)->engine.get());
+    if (!bft) return error_result("chain: engine is not BFT (only BFT blocks carry commit certificates)");
+    blockchainer::Block b = blockchainer::Block::decode_all(cbv(block, block_len));
+    ChainBox* box = as_box(c);
+    blockchainer::consensus::Vote vote = bft->precommit(b, box->me, box->key);
+    auto cert = bft->try_commit(b, {vote});
+    if (!cert) return error_result("chain: this validator alone does not reach quorum; gather the other precommits");
+    return bytes_result(cert->encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_chain_child_tip(BlockchainerChain c, uint64_t child_chain_id) {
+  if (!c) return error_result("null chain");
+  const blockchainer::SubchainRegistry* reg = as_chain(c)->engine->ledger().subchains();
+  if (!reg) return error_result("chain: not a parent (no subchain policy)");
+  const blockchainer::BlockHeader* tip = reg->tip_of(child_chain_id);
+  if (!tip) return error_result("chain: child not registered");
+  return bytes_result(tip->encode());
+}
+
+BlockchainerBufferResult blockchainer_chain_subchain_hop(BlockchainerChain c, uint64_t child_chain_id) {
+  if (!c) return error_result("null chain");
+  try {
+    const blockchainer::SubchainRegistry* reg = as_chain(c)->engine->ledger().subchains();
+    if (!reg) return error_result("chain: not a parent (no subchain policy)");
+    return bytes_result(reg->hop(child_chain_id).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_chain_prove_account(BlockchainerChain c, const uint8_t* address) {
+  if (!c) return error_result("null chain");
+  try {
+    auto* acc = dynamic_cast<const blockchainer::AccountStateMachine*>(&as_chain(c)->engine->ledger().state());
+    if (!acc) return error_result("chain: not an account-model chain");
+    return bytes_result(acc->prove_account(to_hash32(address)).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_subchain_proof_encode(const uint8_t* hops, size_t hops_len,
+                                                            const uint8_t* state_proof, size_t state_proof_len) {
+  try {
+    blockchainer::SubchainProof p;
+    for (const auto& b : decode_blob_list(cbv(hops, hops_len)))
+      p.hops.push_back(blockchainer::SubchainProof::Hop::decode_all(cbv(b.data(), b.size())));
+    p.state_proof = blockchainer::StateProof::decode_all(cbv(state_proof, state_proof_len));
+    return bytes_result(p.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int blockchainer_subchain_proof_verify(const uint8_t* parent_subchain_root, const uint8_t* proof, size_t proof_len) {
+  if (!parent_subchain_root || !proof) return 0;
+  try {
+    return blockchainer::verify_subchain_proof(to_hash32(parent_subchain_root),
+                                               blockchainer::SubchainProof::decode_all(cbv(proof, proof_len))) ? 1 : 0;
+  } catch (...) { return 0; }
+}
 
 // ── Foreign components (C callbacks → registry) ───────────────────────────────
 
