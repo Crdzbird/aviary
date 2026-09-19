@@ -53,6 +53,10 @@ class BftEngine : public ConsensusEngine {
     b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
     return b;
   }
+  Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                         std::vector<Anchor> anchors) override {
+    return propose(std::move(txs), timestamp, std::move(anchors));
+  }
 
   /// ConsensusEngine seam: the justification is an encoded CommitCertificate.
   /// Decodes it and finalizes the block (verify certificate → apply).

@@ -48,6 +48,8 @@ class PowEngine : public ConsensusEngine {
 
   /// Assemble an UNSOLVED candidate block (nonce 0); call mine() to solve it.
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override;
+  Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                         std::vector<Anchor> anchors) override;
 
   /// Verify the block's embedded proof of work, then apply it. The justification
   /// argument is unused (the proof is intrinsic to the block).

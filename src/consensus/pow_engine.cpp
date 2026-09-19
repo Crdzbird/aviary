@@ -95,7 +95,11 @@ PowData PowData::decode_all(codec::ByteView bytes) {
 }
 
 Block PowEngine::propose(std::vector<Transaction> txs, std::uint64_t timestamp) {
-  Block b = ledger_->build_block(std::move(txs), timestamp);
+  return propose_anchored(std::move(txs), timestamp, {});
+}
+Block PowEngine::propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                  std::vector<Anchor> anchors) {
+  Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
   b.header.consensus_data = PowData{target_, 0}.encode();  // unsolved candidate
   return b;
 }

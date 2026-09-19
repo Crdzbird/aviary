@@ -33,7 +33,7 @@ RoundDriver::RoundDriver(std::uint64_t chain_id, ValidatorSet vset, std::uint32_
 Hash RoundDriver::get_value() {
   // Build an empty block extending the tip; stamp consensus_data with the
   // validator-set hash and the LastCommit (absent for the first block).
-  Block b = ledger_->build_block({}, timestamp_);
+  Block b = ledger_->build_block({}, timestamp_, anchors_);
   b.header.consensus_data = ConsensusData{vset_.hash(), last_commit_}.encode();
   const Hash id = b.header.hash();
   blocks_[id] = std::move(b);
@@ -46,7 +46,11 @@ bool RoundDriver::valid(const Hash& block_id) {
   const BlockHeader& h = it->second.header;
   if (h.height != height_) return false;
   if (h.parent_hash != ledger_->tip().hash()) return false;
-  return validate_consensus_data(chain_id_, vset_, h, ledger_->tip().hash()).ok;
+  if (!validate_consensus_data(chain_id_, vset_, h, ledger_->tip().hash()).ok) return false;
+  // Never vote for a block the ledger would refuse at commit (txs, roots,
+  // subchain anchors): a certified-but-unapplicable block would strand the
+  // height. Full dry run, no state change.
+  return ledger_->validate_block(it->second).ok;
 }
 
 RoundDriver::Output RoundDriver::run(const std::vector<Action>& actions) {

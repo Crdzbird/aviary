@@ -1,6 +1,6 @@
 # Subchains — a block that anchors a whole blockchain — Design Doc
 
-Status: **ACCEPTED (recommendations approved 2026-09-19) — stages 1–3 built.** This document exists because the feature
+Status: **ACCEPTED (recommendations approved 2026-09-19) — stages 1–4 built.** This document exists because the feature
 is delicate: it changes what a block commits to, adds a second trust level, and
 touches consensus-critical code. Every question in §9 must be answered before a
 line of implementation is written; every invariant in §5 must have a test in
@@ -288,12 +288,17 @@ the child's own registry list — the same function applied twice. No new crypto
   `LightClient` has no validator-set-change rule yet (it is an open [H] item in
   `IMPROVEMENTS.md`). A child that rotates validators cannot be anchored until
   that lands — and it must land *in `LightClient`*, so anchoring inherits it.
-- **Only certificate-bearing children** can be anchored in v1: bft / pos /
-  vrf-pos, whose finality is a BLS `CommitCertificate`. PoW children have
-  probabilistic finality (a confirmation-depth rule would be a different anchor
-  kind); foreign engines have opaque justifications the parent can only check if
-  the same foreign verifier is registered in the parent's process (possible —
-  §9 Q3 — but not v1).
+- **Only BFT children can be anchored in v1.** Correction found while building:
+  in this codebase the PoS and VRF-PoS engines justify a block with a single
+  *leader signature* and carry `PosData`/`VrfPosData` in `consensus_data`, not
+  a quorum `CommitCertificate` + `ConsensusData{vset_hash, last_commit}` — so
+  the light-client rule (`LightClient::accept`) cannot verify them. They need a
+  certificate-producing finality gadget before they can be children. PoW
+  children have probabilistic finality (a confirmation-depth rule would be a
+  different anchor kind); foreign engines have opaque justifications the parent
+  can only check if the same foreign verifier is registered in its process.
+  Any engine can be the PARENT (every built-in engine implements
+  `propose_anchored`).
 - **The parent does not execute children.** A child supermajority can anchor a
   false state root. Documented in §3.
 - **Registration is static (genesis) in v1.** Adding a child later means a new
@@ -307,7 +312,7 @@ the child's own registry list — the same function applied twice. No new crypto
 |---|---|---|
 | Q1 | Anchoring (§2.2) or containment (§2.1)? | **Anchoring.** Containment breaks bounds and coupling. |
 | Q2 | Child registration: static at parent genesis, or dynamic via a governance tx? | **Static in v1.** Dynamic registration needs a signed registration tx type, an authority rule (who may register?), and a registry that grows — all deferrable, none reversible once shipped. |
-| Q3 | Which child engines may be anchored? | **Cert-bearing only (bft/pos/vrf-pos)** in v1. PoW (depth rule) and foreign (registered verifier) as follow-ups behind the policy. |
+| Q3 | Which child engines may be anchored? | **BFT only** in v1 (see §8 — PoS/VRF here are leader-signed, not certificate-finalized). PoW (depth rule), PoS/VRF (finality gadget) and foreign (registered verifier) as follow-ups behind the policy. |
 | Q4 | One anchor per child per parent block, or many? | **One anchor per child**, carrying a bounded consecutive *segment* of child headers (§4.1) — the registry verifies each in order. |
 | Q5 | Should the child genesis bind to its parent (`parent_binding`, §4.7)? | **Yes, in v1** — it is a genesis-encoding change on the child, cheapest done now. |
 | Q6 | Who moves anchors from child to parent? | **In-process `SubchainRelay`** for v1 (child `Chain` → parent `build_block(..., anchors)`); a networked relay is transport work, not consensus work, and can come later. |

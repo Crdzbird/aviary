@@ -105,7 +105,7 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
   return block;
 }
 
-BlockError Ledger::process_block(const Block& block) {
+BlockError Ledger::run_block(const Block& block, Worked& out) const {
   // 2. Header checks (1. decode happened to construct the Block).
   if (BlockError he = check_header(block.header); !he.ok) return he;
 
@@ -124,21 +124,21 @@ BlockError Ledger::process_block(const Block& block) {
   // order first, then the per-header light-client verification — all on a
   // working copy of the registry, BEFORE any transaction work.
   if (!block.anchors.empty() && !registry_) return BlockError::failure("anchors on a chain with no subchain policy");
-  std::optional<SubchainRegistry> reg = registry_;
-  if (reg) {
+  out.registry = registry_;
+  if (out.registry) {
     if (compute_anchor_root(block.anchors) != block.header.anchor_root) {
       return BlockError::failure("anchor_root mismatch");
     }
-    if (std::string e = reg->apply_anchors(block.anchors); !e.empty()) {
+    if (std::string e = out.registry->apply_anchors(block.anchors); !e.empty()) {
       return BlockError::failure("invalid anchor: " + e);
     }
   }
 
   // 4. Per-tx: signature verify → state validate → apply, on a working copy so
   // the commit is all-or-nothing.
-  auto working = state_->clone();
+  out.state = state_->clone();
   const bool with_receipts = block.header.version >= 2;
-  std::vector<Receipt> receipts;
+  out.receipts.clear();
   for (const auto& tx : block.transactions) {
     if (tx.chain_id != spec_.chain_id) {
       return BlockError::failure("tx chain_id mismatch");
@@ -149,32 +149,42 @@ BlockError Ledger::process_block(const Block& block) {
     if (!verify_transaction_signature(tx)) {
       return BlockError::failure("invalid tx signature");
     }
-    const ValidationResult vr = working->validate(tx);
+    const ValidationResult vr = out.state->validate(tx);
     if (!vr.ok) return BlockError::failure("invalid tx: " + vr.error);
-    if (with_receipts) receipts.push_back(Receipt{1, working->tx_fee(tx)});  // pre-apply
-    working->apply(tx);
+    if (with_receipts) out.receipts.push_back(Receipt{1, out.state->tx_fee(tx)});  // pre-apply
+    out.state->apply(tx);
   }
 
   // 5. Recompute and compare the post-state root.
-  if (working->state_root() != block.header.state_root) {
+  if (out.state->state_root() != block.header.state_root) {
     return BlockError::failure("state_root mismatch");
   }
 
   // 5a. Recompute and compare the execution receipt root (version-2 headers).
-  if (with_receipts && compute_receipt_root(receipts) != block.header.receipt_root) {
+  if (with_receipts && compute_receipt_root(out.receipts) != block.header.receipt_root) {
     return BlockError::failure("receipt_root mismatch");
   }
 
   // 5b. The post-anchor registry commitment.
-  if (reg && reg->root() != block.header.subchain_root) {
+  if (out.registry && out.registry->root() != block.header.subchain_root) {
     return BlockError::failure("subchain_root mismatch");
   }
+  return BlockError::success();
+}
 
-  // 6. (consensus verification — M2)
+BlockError Ledger::validate_block(const Block& block) const {
+  Worked scratch;
+  return run_block(block, scratch);  // scratch is dropped: no state change
+}
+
+BlockError Ledger::process_block(const Block& block) {
+  Worked w;
+  if (BlockError e = run_block(block, w); !e.ok) return e;
+  // 6. (consensus verification — the engine's job)
   // 7. Commit atomically.
-  state_ = std::move(working);
-  last_receipts_ = std::move(receipts);
-  if (reg) registry_ = std::move(reg);
+  state_ = std::move(w.state);
+  last_receipts_ = std::move(w.receipts);
+  if (w.registry) registry_ = std::move(w.registry);
   tip_ = block.header;
   return BlockError::success();
 }

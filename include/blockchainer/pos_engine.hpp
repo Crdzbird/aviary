@@ -73,6 +73,8 @@ class PosEngine : public ConsensusEngine {
   /// Stamps consensus_data with our proposer index; call seal() for the
   /// justifying signature.
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override;
+  Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                         std::vector<Anchor> anchors) override;
 
   /// The leader's signature over [block]'s id — the block's justification.
   Bytes seal(const Block& block) const;

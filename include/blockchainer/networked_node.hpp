@@ -45,6 +45,8 @@ class NetworkedNode {
         gossip_(me) {}
 
   std::uint32_t id() const { return gossip_.self(); }
+  /// Parent chains: anchors to include when this node proposes (see RoundDriver).
+  void set_anchors(std::vector<Anchor> anchors) { driver_.set_anchors(std::move(anchors)); }
   void add_peer(std::uint32_t peer) { gossip_.add_peer(peer); }
 
   /// Begin consensus (StartRound(0)); consensus broadcasts are gossiped.

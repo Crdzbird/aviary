@@ -60,12 +60,16 @@ Bytes pos_signing_bytes(std::uint64_t chain_id, std::uint64_t height, const Hash
 }
 
 Block PosEngine::propose(std::vector<Transaction> txs, std::uint64_t timestamp) {
+  return propose_anchored(std::move(txs), timestamp, {});
+}
+Block PosEngine::propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                  std::vector<Anchor> anchors) {
   const std::uint64_t next = ledger_->tip().height + 1;
   if (proposer_for(next) != me_) {
     throw std::runtime_error("pos: this validator is not the leader for height " +
                              std::to_string(next));
   }
-  Block b = ledger_->build_block(std::move(txs), timestamp);
+  Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
   b.header.consensus_data = PosData{me_}.encode();
   return b;
 }

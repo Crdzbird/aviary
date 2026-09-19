@@ -70,6 +70,8 @@ class VrfPosEngine : public ConsensusEngine {
   /// which this validator is eligible, and stamps consensus_data with the
   /// proof. Throws if not eligible at any attempt.
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override;
+  Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                         std::vector<Anchor> anchors) override;
 
   /// The leader's BLS signature over the block id — the block's justification
   /// (same sealing rule as the reference PoS engine).

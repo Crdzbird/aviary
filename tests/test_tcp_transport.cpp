@@ -13,6 +13,9 @@
 #include "blockchainer/assurance.hpp"
 #include "blockchainer/ledger.hpp"
 #include "blockchainer/networked_node.hpp"
+#include "blockchainer/bft_engine.hpp"
+#include "blockchainer/genesis.hpp"
+#include "blockchainer/subchain.hpp"
 #include "blockchainer/tcp_transport.hpp"
 #include "blockchainer/version.hpp"
 #include "check.hpp"
@@ -190,6 +193,49 @@ int main() {
     for (std::uint32_t i = 0; i < 3; ++i)
       CHECK_MSG(committed[i] == 1, "allow-listed Noise XX validator committed");
     CHECK_MSG(committed[3] == 0, "the unlisted node never joined the Noise XX mesh");
+  }
+
+  std::printf("== SUBCHAINS over TCP: a 4-validator PARENT anchors a BFT child; all four commit the same block ==\n");
+  {
+    // The child: a 3-validator BFT chain finalizing two blocks in-process.
+    GenesisSpec cg;
+    cg.chain_id = 900; cg.timestamp = 1;
+    std::vector<crypto::KeyPair> ck;
+    for (std::uint8_t i = 0; i < 3; ++i) { ck.push_back(bls(static_cast<std::uint8_t>(0x90 + i))); cg.validators.push_back(Validator{ck.back().public_key, 1}); }
+    ChildRegistration reg;
+    reg.chain_id = 900; reg.genesis_header = ledger_from_genesis(cg)->tip(); reg.validators = cg.validators;
+    consensus::BftEngine child(cg.validator_set(), ledger_from_genesis(cg));
+    Anchor anchor; anchor.child_chain_id = 900;
+    for (std::uint64_t t = 2; t <= 3; ++t) {
+      Block b = child.propose({}, t);
+      std::vector<consensus::Vote> votes;
+      for (std::uint32_t i = 0; i < 3; ++i) votes.push_back(child.precommit(b, i, ck[i]));
+      auto cert = child.try_commit(b, votes);
+      CHECK(cert && child.finalize(b, *cert).ok);
+      anchor.headers.push_back(CertifiedHeader{b.header, cert->encode()});
+    }
+    // The parent: same genesis (with the child registered) on every validator.
+    GenesisSpec pg;
+    pg.chain_id = 901; pg.timestamp = 1;
+    for (std::uint32_t i = 0; i < n; ++i) pg.validators.push_back(Validator{bls(static_cast<std::uint8_t>(0x60 + i)).public_key, 1});
+    SubchainPolicy pp; pp.max_children = 1; pp.max_depth = 1; pp.children = {reg};
+    pp.commit_to(pg);
+    std::vector<std::unique_ptr<NetworkedNode>> nodes;
+    for (std::uint32_t i = 0; i < n; ++i) {
+      nodes.push_back(std::make_unique<NetworkedNode>(901, pg.validator_set(), i, bls(static_cast<std::uint8_t>(0x60 + i)),
+                                                      ledger_from_genesis(pg), /*timestamp=*/1));
+      nodes[i]->set_anchors({anchor});  // whoever proposes anchors the same segment
+      for (std::uint32_t j = 0; j < n; ++j) if (j != i) nodes[i]->add_peer(j);
+    }
+    auto committed = run_mesh(nodes, 47750, /*secure=*/nullptr);
+    for (std::uint32_t i = 0; i < n; ++i) {
+      CHECK_MSG(committed[i] == 1, "parent validator committed the anchoring block");
+      CHECK(nodes[i]->ledger().tip().version == 3);
+      CHECK_MSG(nodes[i]->ledger().subchains()->tip_of(900)->height == 2, "every validator recorded the child's tip");
+    }
+    const Hash tip = nodes[0]->ledger().tip().hash();
+    for (std::uint32_t i = 1; i < n; ++i)
+      CHECK_MSG(nodes[i]->ledger().tip().hash() == tip, "non-proposers validated the anchors identically");
   }
 
   std::printf("== boot wiring: a profile's transport tier builds the config from records ==\n");

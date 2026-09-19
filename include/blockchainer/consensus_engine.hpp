@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <stdexcept>
 #include <vector>
 
 #include "blockchainer/codec.hpp"
@@ -32,6 +33,16 @@ class ConsensusEngine {
 
   /// Proposer / miner step: assemble the next candidate block from [txs].
   virtual Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) = 0;
+
+  /// The same, on a PARENT chain also anchoring [anchors] (its children's
+  /// finalized headers — docs/design/SUBCHAINS.md). Every built-in engine
+  /// implements it; a custom engine that does not override it can only
+  /// propose anchor-free blocks (throws on non-empty anchors, never drops them).
+  virtual Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                 std::vector<Anchor> anchors) {
+    if (!anchors.empty()) throw std::runtime_error("this consensus engine does not anchor subchains");
+    return propose(std::move(txs), timestamp);
+  }
 
   /// Verify [block]'s [justification] and, if valid, apply it atomically —
   /// advancing the chain on success, leaving it unchanged on failure. The

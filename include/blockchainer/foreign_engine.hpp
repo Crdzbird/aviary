@@ -32,6 +32,8 @@ class ForeignEngine : public consensus::ConsensusEngine {
   std::uint64_t height() const override { return ledger_->tip().height; }
   const BlockHeader& tip() const override { return ledger_->tip(); }
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override;
+  Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                         std::vector<Anchor> anchors) override;
   /// verify(block, justification) via the foreign policy, then apply atomically.
   BlockError submit(const Block& block, codec::ByteView justification) override;
   /// The foreign justification for a block this node proposed (its "seal").

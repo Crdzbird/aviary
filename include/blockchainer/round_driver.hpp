@@ -43,6 +43,11 @@ class RoundDriver {
               crypto::KeyPair bls_key, Ledger* ledger, std::uint64_t timestamp);
 
   /// Begin consensus for this height (StartRound(0)).
+  /// Parent chains: the subchain anchors this node includes when IT proposes
+  /// (docs/design/SUBCHAINS.md). Validated by every validator on receipt like
+  /// any other block content. Replaced wholesale; empty = anchor nothing.
+  void set_anchors(std::vector<Anchor> anchors) { anchors_ = std::move(anchors); }
+
   Output start();
   /// Ingest a peer's consensus message (verifies signatures; drops bad ones).
   Output deliver(const wire::ConsensusMsg& msg);
@@ -80,6 +85,7 @@ class RoundDriver {
   // LastCommit. Absent for the first block after genesis.
   std::optional<CommitCertificate> last_commit_;
   std::map<Hash, Block> blocks_;  // block id → block (self-produced or from a proposal)
+  std::vector<Anchor> anchors_;   // subchain anchors to include in our next proposal (parent chains)
   // Precommit signatures collected for cert building: round → value → validator → sig.
   // A nil precommit uses the zero-hash sentinel value.
   std::map<std::uint32_t, std::map<Hash, std::map<std::uint32_t, Bytes>>> precommit_sigs_;

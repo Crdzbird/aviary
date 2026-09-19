@@ -15,6 +15,10 @@ ForeignEngine::ForeignEngine(std::unique_ptr<Ledger> ledger, JustifyFn justify, 
 Block ForeignEngine::propose(std::vector<Transaction> txs, std::uint64_t timestamp) {
   return ledger_->build_block(std::move(txs), timestamp);
 }
+Block ForeignEngine::propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                      std::vector<Anchor> anchors) {
+  return ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
+}
 
 BlockError ForeignEngine::submit(const Block& block, codec::ByteView justification) {
   bool ok = false;

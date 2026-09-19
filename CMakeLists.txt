@@ -137,6 +137,7 @@ add_library(blockchainer_core STATIC
   src/node/profiled_validator.cpp
   src/node/chain_assembler.cpp
   src/node/foreign_engine.cpp
+  src/node/subchain_relay.cpp
   src/node/remote_guard.cpp
   src/node/demo_node.cpp)
 target_include_directories(blockchainer_core

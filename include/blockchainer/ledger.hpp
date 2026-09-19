@@ -93,6 +93,12 @@ class Ledger {
   /// failure it is left completely unchanged.
   BlockError process_block(const Block& block);
 
+  /// Dry run of exactly the checks process_block applies (header, limits,
+  /// roots, every tx, every subchain anchor) with NO state change. A consensus
+  /// driver uses it before voting on a proposal, so a block the ledger would
+  /// refuse can never be certified (docs/design/SUBCHAINS.md §6).
+  BlockError validate_block(const Block& block) const;
+
   /// Serialize the chain tip + full committed state to a self-describing blob a
   /// node can persist and reload (foundation for storage + fast sync).
   Bytes snapshot() const;
@@ -103,6 +109,14 @@ class Ledger {
 
  private:
   BlockError check_header(const BlockHeader& h) const;
+  // Shared body of validate_block / process_block: runs the full pipeline on a
+  // working copy and hands back the post-state for the caller to commit or drop.
+  struct Worked {
+    std::unique_ptr<StateMachine> state;
+    std::vector<Receipt> receipts;
+    std::optional<SubchainRegistry> registry;
+  };
+  BlockError run_block(const Block& block, Worked& out) const;
 
   ChainSpec spec_;
   std::unique_ptr<StateMachine> state_;

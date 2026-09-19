@@ -3,7 +3,13 @@
 #include <cstdio>
 
 #include "blockchainer/account_state.hpp"
+#include "blockchainer/assurance.hpp"
 #include "blockchainer/bft_engine.hpp"
+#include "blockchainer/block_store.hpp"
+#include "blockchainer/chain_assembler.hpp"
+#include "blockchainer/chain_blueprint.hpp"
+#include "blockchainer/pos_engine.hpp"
+#include "blockchainer/subchain_relay.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/ledger.hpp"
 #include "blockchainer/subchain.hpp"
@@ -339,6 +345,21 @@ int main() {
     }
   }
 
+  std::printf("== validate_block: the driver's pre-vote dry run matches process_block, no side effects ==\n");
+  {
+    auto p = fresh_parent();
+    const Hash h0 = p->tip().hash();
+    CHECK(p->validate_block(good).ok);
+    CHECK(p->tip().hash() == h0 && tip_h(*p, 42) == 0);                 // nothing moved
+    Block bad = good; bad.anchors[0].headers[1].certificate.back() ^= 1; bad.header.anchor_root = compute_anchor_root(bad.anchors);
+    CHECK(!p->validate_block(bad).ok && p->validate_block(bad).error == p->process_block(bad).error);
+    Block bad2 = good; bad2.header.subchain_root = fill(0x77);
+    CHECK(!p->validate_block(bad2).ok);
+    CHECK(p->tip().hash() == h0);
+    CHECK(p->process_block(good).ok);                                   // and the real thing still commits
+    CHECK(!p->validate_block(good).ok);                                 // now stale (height/parent)
+  }
+
   std::printf("== equivocation: a competing certified header at an anchored height is inert ==\n");
   {
     // Child B's validators certify TWO different blocks at height 2 (they
@@ -488,6 +509,79 @@ int main() {
     fresh.state_proof = dynamic_cast<const AccountStateMachine&>(G.engine->ledger().state()).prove_account(alice_addr);
     CHECK(verify_subchain_proof(R->tip().subchain_root, fresh));
     CHECK(verify_subchain_proof(r1.header.subchain_root, proof));     // and still verifies at the OLD root (history is immutable)
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────────────
+  std::printf("== STAGE 4: relay from a child's archive; any engine as parent ==\n");
+  {
+    // A fresh BFT child with an archive of finalized (block, cert) pairs.
+    ChildChain K(77, 0x50);
+    BlockStore archive;
+    for (std::uint64_t t = 2; t <= 4; ++t) {
+      Block b;
+      CertifiedHeader ch = K.certify(t, &b);
+      auto cert = consensus::CommitCertificate::decode_all(v(ch.certificate));
+      CHECK(K.engine->finalize(b, cert).ok);
+      CHECK(archive.put(b, cert));
+    }
+    GenesisSpec pg;
+    pg.chain_id = 2; pg.timestamp = 1;
+    pg.validators = {consensus::Validator{bls_key(0x01).public_key, 1}};
+    SubchainPolicy pp; pp.max_children = 1; pp.max_depth = 1; pp.max_headers_per_anchor = 2;
+    pp.children = {K.registration()};
+    pp.commit_to(pg);
+    auto P = ledger_from_genesis(pg);
+    // Bounded to the policy: [1..2] first, then [3], then nothing.
+    auto a = node::pending_anchor(*P->subchains(), 77, archive);
+    CHECK(a && a->headers.size() == 2 && a->headers[0].header.height == 1 && a->headers[1].header.height == 2);
+    CHECK(P->process_block(P->build_block({}, 2, {*a})).ok && P->subchains()->tip_of(77)->height == 2);
+    auto b = node::pending_anchor(*P->subchains(), 77, archive);
+    CHECK(b && b->headers.size() == 1 && b->headers[0].header.height == 3);
+    CHECK(node::pending_anchor(*P->subchains(), 77, archive, /*limit=*/1)->headers.size() == 1);
+    CHECK(P->process_block(P->build_block({}, 3, {*b})).ok && P->subchains()->tip_of(77)->height == 3);
+    CHECK(!node::pending_anchor(*P->subchains(), 77, archive));       // nothing newer
+    CHECK(!node::pending_anchor(*P->subchains(), 99, archive));       // unknown child
+    auto all = node::pending_anchors(*P->subchains(), {{77, &archive}, {99, &archive}});
+    CHECK(all.empty());
+
+    // Any engine may be the parent: a PoS parent (assembled from a blueprint)
+    // anchors the BFT child through the generic propose_anchored seam.
+    GenesisSpec posg = pg;
+    posg.chain_id = 3;
+    AssuranceProfile::standard().apply_to(posg);  // the assembler needs a declared posture
+    posg.validators = {consensus::Validator{bls_key(0x05).public_key, 1}};
+    ChainBlueprint{"pos", "account", "round-robin", {}}.commit_to(posg);
+    node::AssembledChain pos_parent = node::ChainAssembler::assemble(posg, 0, bls_key(0x05));
+    CHECK(pos_parent.engine != nullptr);
+    auto& eng = *pos_parent.engine;
+    CHECK(eng.tip().version == 3);
+    auto first = node::pending_anchor(*eng.ledger().subchains(), 77, archive);
+    CHECK(first && first->headers.size() == 2);
+    Block pb = eng.propose_anchored({}, 2, {*first});
+    CHECK(pb.header.version == 3 && pb.anchors.size() == 1);
+    Bytes just = dynamic_cast<consensus::PosEngine&>(eng).seal(pb);
+    BlockError e = eng.submit(pb, v(just));
+    CHECK_MSG(e.ok, e.error.c_str());
+    CHECK(eng.ledger().subchains()->tip_of(77)->height == 2);
+    // A tampered anchor in a PoS block is refused by the ledger inside submit.
+    Block bad = eng.propose_anchored({}, 3, {*node::pending_anchor(*eng.ledger().subchains(), 77, archive)});
+    bad.anchors[0].headers[0].certificate.back() ^= 1;
+    bad.header.anchor_root = compute_anchor_root(bad.anchors);
+    Bytes bj = dynamic_cast<consensus::PosEngine&>(eng).seal(bad);
+    CHECK(!eng.submit(bad, v(bj)).ok && eng.ledger().subchains()->tip_of(77)->height == 2);
+    // A custom engine that never overrode propose_anchored refuses anchors loudly.
+    struct Plain : consensus::ConsensusEngine {
+      std::unique_ptr<Ledger> l;
+      explicit Plain(std::unique_ptr<Ledger> x) : l(std::move(x)) {}
+      const Ledger& ledger() const override { return *l; }
+      std::uint64_t height() const override { return l->tip().height; }
+      const BlockHeader& tip() const override { return l->tip(); }
+      Block propose(std::vector<Transaction> t, std::uint64_t ts) override { return l->build_block(std::move(t), ts); }
+      BlockError submit(const Block& b, codec::ByteView) override { return l->process_block(b); }
+    } plain(ledger_from_genesis(pg));
+    CHECK_THROWS(plain.propose_anchored({}, 2, {*first}));
+    CHECK(plain.propose_anchored({}, 2, {}).header.version == 3);
   }
 
   return bctest::summary();
