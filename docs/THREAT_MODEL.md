@@ -85,6 +85,17 @@ quorum (≥1/3 power) of colluding validators; physical key extraction.
 | Forged inclusion proof | Domain-separated Merkle leaf hashing; proof recomputes the trusted root; tampered proof / wrong root rejected. | ✅ |
 | Proving non-membership | Only presence proofs supported; absence proofs not yet verifiable. | *(deferred)* |
 
+### 4.4b Subchains (anchoring — docs/design/SUBCHAINS.md)
+| Threat | Mitigation | Status |
+|---|---|---|
+| Parent accepts a child header its validators never finalized | Each anchored header runs the light-client rule (height +1, parent hash, embedded last commit, quorum certificate) under the child's genesis-registered validator set; segments must be consecutive. | ✅ |
+| Proposer slips an invalid anchor into a certified block | `Ledger::validate_block` dry run before every prevote; anchors validated before any tx work; a bad anchor invalidates the whole block, all-or-nothing. | ✅ |
+| Child equivocation (two certified headers at one height) | Registry only advances by strictly increasing height; the second header can never be anchored, the parent's view cannot flip. Evidence wire type reserved, not emitted. | ✅ (evidence *deferred*) |
+| Child re-parented / parent swapped | `ParentBinding` committed in the child's genesis hash; registration by the child's genesis header (no hash cycle). | ✅ |
+| Forged cross-chain proof | Every hop recomputes `subchain_root` from a canonical (ascending, unique) list; descends only through the committed child tip; final state proof verified under that tip's root. | ✅ |
+| Child validator supermajority anchors a false state root | **Undetectable by the parent** (it never executes children) — the same limit as any light client. Documented, not mitigated. | *(accepted)* |
+| Child rotates validators | Not supported in v1 (registration is a fixed set); needs validator-set changes in `LightClient` first. | *(deferred)* |
+
 ### 4.5 Interop & bridge (highest-loss-history component)
 | Threat | Mitigation | Status |
 |---|---|---|
@@ -135,6 +146,8 @@ X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
 - P2P lacks **peer-identity authentication**, discovery, and a gossip overlay
   with anti-eclipse/DoS controls.
 - No **persistence/storage** layer yet (in-memory state).
+- **Subchains** trust each child's registered validator set for the child's
+  state (§4.4b); only BFT children can be anchored in v1.
 - No external **security audit** or FIPS validation of the original
   constructions; the primitives come from cryptolib's vetted upstreams.
 

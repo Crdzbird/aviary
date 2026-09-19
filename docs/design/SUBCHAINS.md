@@ -1,6 +1,6 @@
 # Subchains — a block that anchors a whole blockchain — Design Doc
 
-Status: **ACCEPTED (recommendations approved 2026-09-19) — stages 1–4 built.** This document exists because the feature
+Status: **v1 BUILT (all six stages, 2026-09-19).** Recommendations approved as proposed; two findings changed the design while building — registration by genesis header (§4.4 note) and BFT-only children (§8). This document exists because the feature
 is delicate: it changes what a block commits to, adds a second trust level, and
 touches consensus-critical code. Every question in §9 must be answered before a
 line of implementation is written; every invariant in §5 must have a test in

@@ -333,6 +333,40 @@
   4-validator BFT commits over Noise XX, an unlisted identity is excluded while
   the quorum commits. 64 suites; ASan/UBSan + TSan clean. Not on the C ABI
   (no transport tier is — bindings stay 1-1).
+- **[x] Subchains — a block that anchors a whole blockchain — v1 DONE**
+  (design `docs/design/SUBCHAINS.md`, accepted with recommendations; commits
+  2b892c6, daeb86f, 5c94d93, f6f11de, 98fe683, 54cd82d). A parent block
+  carries ANCHORS: a child chain's consecutive finalized headers + commit
+  certificates; every parent validator verifies each with the light-client
+  rule (`LightClient::accept`, unchanged) under the child's FIXED validator set
+  registered at the parent's genesis; the child's tip is committed in header v3's
+  `subchain_root` (beside `anchor_root`), version-gated so v1/v2 encodings and
+  golden vectors are byte-identical. `SubchainPolicy` (genesis-committed, parent)
+  + `ParentBinding` (genesis-committed, child; a child cannot be re-parented) —
+  registration by the child's genesis HEADER, because the genesis hash would be
+  circular with the binding. `SubchainRegistry` lives in the Ledger (state model
+  stays pluggable); §6 order validates anchors before any tx work on a working
+  copy, all-or-nothing; snapshot/restore carry child tips and refuse a registry
+  that mismatches the tip. `SubchainProof` descends hop by hop (any depth, one
+  verifier, no new crypto) to `verify_state_proof`. `ConsensusEngine::
+  propose_anchored` on every built-in engine (any engine may be a PARENT);
+  in-process relay `node::pending_anchor(s)` from a child's BlockStore;
+  `RoundDriver/NetworkedNode::set_anchors`. **Pre-existing gap closed while
+  building:** `Ledger::validate_block` is a side-effect-free dry run of the
+  commit pipeline and `RoundDriver::valid` now runs it before voting — a
+  proposal with an invalid tx or anchor can no longer be certified and then
+  refused at commit (stranding the height). C ABI (15 calls incl.
+  `blockchainer_chain_certify` for single-validator BFT chains) + Go / npm /
+  JVM / Swift / Dart parity, each proving the same scenario. Tests: 3-level
+  tree with real BFT chains, cross-chain proof of a grandchild balance from the
+  root header, 12 tamper-each-link rejects, 17-row anchor rejection matrix,
+  child equivocation inert, 4-validator TCP parent commits the same anchoring
+  block on all nodes. **v1 limits (§8 of the design):** BFT children only
+  (PoS/VRF here are leader-signed, not certificate-finalized), child validator
+  sets fixed at registration (needs validator-set changes in `LightClient`
+  first), static registration, the parent never executes children (a child
+  supermajority can anchor a false state root — same limit as any light
+  client). 65 suites; ASan/UBSan + TSan clean.
 - **[H] Validator-set changes.** No staking, bonding/unbonding, epoch
   transitions, governance, or anti-downgrade overlap rule. The set is fixed at
   construction.
