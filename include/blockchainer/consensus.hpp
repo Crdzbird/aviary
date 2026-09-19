@@ -24,6 +24,7 @@ using crypto::Hash;
 struct Validator {
   Bytes bls_pubkey;          ///< 48-byte BLS public key
   std::uint64_t power = 0;   ///< voting power
+  bool operator==(const Validator&) const = default;
 };
 
 /// An ordered validator set; a validator's index is its position here.

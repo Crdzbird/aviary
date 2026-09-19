@@ -53,6 +53,8 @@ Bytes GenesisSpec::encode() const {
   // clearly an orthogonal, later-added posture field.
   w.write_bytes(view(membership_policy));
   w.write_bytes(view(chain_blueprint));
+  w.write_bytes(view(subchain_policy));
+  w.write_bytes(view(parent_binding));
   return w.take();
 }
 
@@ -87,6 +89,8 @@ GenesisSpec GenesisSpec::decode_all(codec::ByteView bytes) {
   });
   g.membership_policy = r.read_bytes();
   g.chain_blueprint = r.read_bytes();
+  g.subchain_policy = r.read_bytes();
+  g.parent_binding = r.read_bytes();
   r.assert_fully_consumed();
   return g;
 }

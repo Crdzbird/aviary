@@ -32,6 +32,10 @@ enum class Domain : std::uint8_t {
   kCredentialPresentation = 0x09,  ///< binds a credential presentation to its context
   kChainBlueprint = 0x0A,          ///< commitment to a chain's component mixture
   kNoiseBinding = 0x0B,            ///< PQ identity binding over a Noise XX handshake hash
+  kAnchor = 0x0C,                  ///< a subchain anchor (child finalized headers) in a parent block
+  kSubchainRegistry = 0x0D,        ///< commitment to a parent's registry of child tips
+  kSubchainPolicy = 0x0E,          ///< commitment to a parent's subchain policy (genesis)
+  kParentBinding = 0x0F,           ///< a child's genesis binding to its parent chain
 };
 
 /// BLAKE3-256 over [data, data+len). The chain's primary hash primitive.

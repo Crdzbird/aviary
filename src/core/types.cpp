@@ -2,6 +2,8 @@
 
 #include "blockchainer/merkle.hpp"
 
+#include <stdexcept>
+
 namespace blockchainer {
 
 namespace {
@@ -82,6 +84,10 @@ Bytes BlockHeader::encode() const {
   w.write_fixed_bytes(view(tx_root), 32);
   w.write_fixed_bytes(view(state_root), 32);
   if (version >= 2) w.write_fixed_bytes(view(receipt_root), 32);  // execution commitment
+  if (version >= 3) {
+    w.write_fixed_bytes(view(anchor_root), 32);    // this block's subchain anchors
+    w.write_fixed_bytes(view(subchain_root), 32);  // post-block child-tip registry
+  }
   w.write_bytes(view(consensus_data));
   return w.take();
 }
@@ -96,8 +102,74 @@ BlockHeader BlockHeader::decode(codec::CodecReader& r) {
   h.tx_root = to_hash(r.read_fixed_bytes(32));
   h.state_root = to_hash(r.read_fixed_bytes(32));
   if (h.version >= 2) h.receipt_root = to_hash(r.read_fixed_bytes(32));
+  if (h.version >= 3) {
+    h.anchor_root = to_hash(r.read_fixed_bytes(32));
+    h.subchain_root = to_hash(r.read_fixed_bytes(32));
+  }
   h.consensus_data = r.read_bytes();
   return h;
+}
+
+// ── CertifiedHeader / Anchor ─────────────────────────────────────────────────
+
+Bytes CertifiedHeader::encode() const {
+  codec::CodecWriter w;
+  Bytes hdr = header.encode();
+  w.write_bytes(view(hdr));
+  w.write_bytes(view(certificate));
+  return w.take();
+}
+
+CertifiedHeader CertifiedHeader::decode(codec::CodecReader& r) {
+  CertifiedHeader c;
+  Bytes hdr = r.read_bytes();
+  c.header = BlockHeader::decode_all(view(hdr));
+  c.certificate = r.read_bytes();
+  return c;
+}
+
+CertifiedHeader CertifiedHeader::decode_all(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  CertifiedHeader c = decode(r);
+  r.assert_fully_consumed();
+  return c;
+}
+
+Bytes Anchor::encode() const {
+  codec::CodecWriter w;
+  w.write_u64(child_chain_id);
+  w.write_list(headers, [](codec::CodecWriter& w, const CertifiedHeader& c) {
+    Bytes e = c.encode();
+    w.write_bytes(codec::ByteView(e.data(), e.size()));
+  });
+  return w.take();
+}
+
+Anchor Anchor::decode(codec::CodecReader& r) {
+  Anchor a;
+  a.child_chain_id = r.read_u64();
+  a.headers = r.read_list<CertifiedHeader>([](codec::CodecReader& r) {
+    Bytes e = r.read_bytes();
+    return CertifiedHeader::decode_all(codec::ByteView(e.data(), e.size()));
+  });
+  return a;
+}
+
+Anchor Anchor::decode_all(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  Anchor a = decode(r);
+  r.assert_fully_consumed();
+  return a;
+}
+
+Hash Anchor::hash() const { return crypto::hash_tagged(crypto::Domain::kAnchor, encode()); }
+
+Hash compute_anchor_root(const std::vector<Anchor>& anchors) {
+  if (anchors.empty()) return crypto::zero_hash();
+  std::vector<Hash> leaves;
+  leaves.reserve(anchors.size());
+  for (const auto& a : anchors) leaves.push_back(a.hash());
+  return merkle::compute_root(leaves);
 }
 
 BlockHeader BlockHeader::decode_all(codec::ByteView bytes) {
@@ -114,6 +186,9 @@ Hash BlockHeader::hash() const {
 // ── Block ────────────────────────────────────────────────────────────────────
 
 Bytes Block::encode() const {
+  if (header.version < 3 && !anchors.empty()) {
+    throw std::invalid_argument("Block::encode: anchors require a version-3 header");
+  }
   codec::CodecWriter w;
   Bytes hdr = header.encode();
   w.write_bytes(view(hdr));
@@ -122,6 +197,12 @@ Bytes Block::encode() const {
                  Bytes e = tx.encode();
                  w.write_bytes(codec::ByteView(e.data(), e.size()));
                });
+  if (header.version >= 3) {
+    w.write_list(anchors, [](codec::CodecWriter& w, const Anchor& a) {
+      Bytes e = a.encode();
+      w.write_bytes(codec::ByteView(e.data(), e.size()));
+    });
+  }
   return w.take();
 }
 
@@ -134,6 +215,12 @@ Block Block::decode_all(codec::ByteView bytes) {
     Bytes e = r.read_bytes();
     return Transaction::decode_all(codec::ByteView(e.data(), e.size()));
   });
+  if (b.header.version >= 3) {
+    b.anchors = r.read_list<Anchor>([](codec::CodecReader& r) {
+      Bytes e = r.read_bytes();
+      return Anchor::decode_all(codec::ByteView(e.data(), e.size()));
+    });
+  }
   r.assert_fully_consumed();
   return b;
 }

@@ -10,6 +10,7 @@
 #include "blockchainer/account_state.hpp"
 #include "blockchainer/block_store.hpp"
 #include "blockchainer/chain_blueprint.hpp"
+#include "blockchainer/subchain.hpp"
 #include "blockchainer/consensus.hpp"
 #include "blockchainer/credential_gate.hpp"
 #include "blockchainer/genesis.hpp"
@@ -96,6 +97,10 @@ int main() {
     totality_ok &= total([&] { (void)p2p::SealedTx::decode(v); });
     totality_ok &= total([&] { (void)GenesisSpec::decode_all(v); });
     totality_ok &= total([&] { (void)ChainBlueprint::decode_all(v); });
+    totality_ok &= total([&] { (void)CertifiedHeader::decode_all(v); });
+    totality_ok &= total([&] { (void)Anchor::decode_all(v); });
+    totality_ok &= total([&] { (void)SubchainPolicy::decode_all(v); });
+    totality_ok &= total([&] { (void)ParentBinding::decode_all(v); });
     totality_ok &= total([&] { (void)p2p::AddressBook::decode(v); });
     totality_ok &= total([&] { (void)custody::ShareCard::decode(v); });
     totality_ok &= total([&] { (void)consensus::CredentialPolicy::decode_all(v); });

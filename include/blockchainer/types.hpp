@@ -72,9 +72,10 @@ struct Transaction {
 };
 
 struct BlockHeader {
-  /// 1 = base header; 2 = also commits [receipt_root]. Bumping the version — not
-  /// adding an unconditional field — keeps every version-1 encoding (and its
-  /// golden vectors) byte-identical.
+  /// 1 = base header; 2 = also commits [receipt_root]; 3 = also commits
+  /// [anchor_root] + [subchain_root] (docs/design/SUBCHAINS.md). Bumping the
+  /// version — not adding an unconditional field — keeps every version-1/2
+  /// encoding (and its golden vectors) byte-identical.
   std::uint8_t version = 1;
   std::uint64_t chain_id = 0;
   std::uint64_t height = 0;
@@ -83,6 +84,8 @@ struct BlockHeader {
   Hash tx_root{};
   Hash state_root{};
   Hash receipt_root{};   ///< only serialized when version >= 2
+  Hash anchor_root{};    ///< version >= 3: Merkle root of this block's subchain anchors
+  Hash subchain_root{};  ///< version >= 3: commitment to the post-block subchain registry
   Bytes consensus_data;  ///< opaque to the ledger; owned by the consensus engine
 
   Bytes encode() const;
@@ -91,15 +94,54 @@ struct BlockHeader {
 
   /// Header hash: BLAKE3-256( 0x02 ‖ encode() ).
   Hash hash() const;
+  bool operator==(const BlockHeader&) const = default;
+};
+
+/// A child chain's finalized header with the certificate that finalized it
+/// (the child's canonical `consensus::CommitCertificate` bytes — kept opaque
+/// here so types.hpp stays free of the consensus layer; the subchain registry
+/// decodes and verifies it). See docs/design/SUBCHAINS.md.
+struct CertifiedHeader {
+  BlockHeader header;
+  Bytes certificate;
+
+  Bytes encode() const;
+  static CertifiedHeader decode(codec::CodecReader& r);
+  static CertifiedHeader decode_all(codec::ByteView bytes);
+  bool operator==(const CertifiedHeader&) const = default;
+};
+
+/// A subchain ANCHOR: one child chain's finalized progress, carried in a parent
+/// block. [headers] is a CONSECUTIVE segment (child tip+1 … tip+k, each with its
+/// certificate), so the parent verifies every child header exactly as a light
+/// client would — no gaps, no new verification rule. Bounded by the parent's
+/// SubchainPolicy. Anchors in a block are ordered by ascending child_chain_id,
+/// one per child.
+struct Anchor {
+  std::uint64_t child_chain_id = 0;
+  std::vector<CertifiedHeader> headers;
+
+  Bytes encode() const;
+  static Anchor decode(codec::CodecReader& r);
+  static Anchor decode_all(codec::ByteView bytes);
+  /// BLAKE3-256( kAnchor ‖ encode() ) — the Merkle leaf under anchor_root.
+  Hash hash() const;
+  bool operator==(const Anchor&) const = default;
 };
 
 struct Block {
   BlockHeader header;
   std::vector<Transaction> transactions;
+  std::vector<Anchor> anchors;  ///< only serialized when header.version >= 3
 
+  /// Throws std::invalid_argument if [anchors] is non-empty on a header whose
+  /// version cannot carry them — never silently drops a commitment.
   Bytes encode() const;
   static Block decode_all(codec::ByteView bytes);
 };
+
+/// Merkle root over anchors (leaf = anchor.hash()); zero_hash for none.
+Hash compute_anchor_root(const std::vector<Anchor>& anchors);
 
 /// A transaction's execution result, committed via a block's receipt_root
 /// (version-2 headers). `status` is 1 for success; `fee` is what the tx paid.

@@ -66,6 +66,17 @@ struct GenesisSpec {
   // Reconstruct with `ChainBlueprint::from_genesis`; assemble with ChainAssembler.
   Bytes chain_blueprint{};
 
+  // Subchains (docs/design/SUBCHAINS.md). Both empty by default:
+  //  - `subchain_policy`: canonical `SubchainPolicy` bytes — this chain is a
+  //    PARENT that anchors the registered children. Empty = anchors nothing,
+  //    and any version-3 (anchor-carrying) header is rejected.
+  //  - `parent_binding`: canonical `ParentBinding` bytes — this chain is a
+  //    CHILD of exactly that parent (id + genesis hash). Committed into the
+  //    genesis hash, so a child cannot be re-parented.
+  // Orthogonal to posture, membership and blueprint; appended last.
+  Bytes subchain_policy{};
+  Bytes parent_binding{};
+
   // Initial state. Use `accounts` for the account model, `utxos` for the UTXO
   // model (the other stays empty).
   std::vector<GenesisAccount> accounts;

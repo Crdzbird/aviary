@@ -1,6 +1,6 @@
 # Subchains — a block that anchors a whole blockchain — Design Doc
 
-Status: **PROPOSAL — nothing built.** This document exists because the feature
+Status: **ACCEPTED (recommendations approved 2026-09-19) — stage 1 built.** This document exists because the feature
 is delicate: it changes what a block commits to, adds a second trust level, and
 touches consensus-critical code. Every question in §9 must be answered before a
 line of implementation is written; every invariant in §5 must have a test in
@@ -98,17 +98,26 @@ Consequences:
 
 ### 4.1 `Anchor` (new, `types.hpp`)
 ```
+struct CertifiedHeader { BlockHeader header; Bytes certificate; };  // certificate = canonical CommitCertificate bytes
 struct Anchor {
   std::uint64_t child_chain_id;
-  BlockHeader   child_header;              // the child's finalized header
-  consensus::CommitCertificate child_cert; // over child_header.hash()
+  std::vector<CertifiedHeader> headers;    // a CONSECUTIVE segment: child tip+1 … tip+k
   Bytes encode() const; static Anchor decode(CodecReader&); static Anchor decode_all(ByteView);
   Hash hash() const;                       // BLAKE3( kAnchor ‖ encode() )
 };
 ```
+**Why a segment, not a single header.** `LightClient::accept` verifies a header
+only as the *next* one (height +1, parent hash, and the embedded last-commit for
+the current tip). Reusing it unchanged means every child header must be seen —
+so an anchor carries the consecutive run of child headers finalized since the
+last anchor, each with its certificate, bounded by `max_headers_per_anchor`.
+A child can therefore advance many blocks per parent block, and the parent
+still verifies ancestor finality, not just the newest certificate.
+The certificate is kept as opaque canonical bytes in `types.hpp` (decoded and
+verified by the registry) so the core types stay free of the consensus layer.
+
 Anchors inside one block are **canonically ordered**: ascending
-`(child_chain_id, child_header.height)`, no duplicates of `child_chain_id`
-(one anchor per child per parent block — simplest invariant; §9 Q4).
+`child_chain_id`, no duplicates (one anchor per child per parent block; §9 Q4).
 
 ### 4.2 Header version 3 (`BlockHeader`)
 Exactly the pattern used for `receipt_root` (v2): **bump the version, never add
@@ -289,7 +298,7 @@ the child's own registry list — the same function applied twice. No new crypto
 | Q1 | Anchoring (§2.2) or containment (§2.1)? | **Anchoring.** Containment breaks bounds and coupling. |
 | Q2 | Child registration: static at parent genesis, or dynamic via a governance tx? | **Static in v1.** Dynamic registration needs a signed registration tx type, an authority rule (who may register?), and a registry that grows — all deferrable, none reversible once shipped. |
 | Q3 | Which child engines may be anchored? | **Cert-bearing only (bft/pos/vrf-pos)** in v1. PoW (depth rule) and foreign (registered verifier) as follow-ups behind the policy. |
-| Q4 | One anchor per child per parent block, or many (a batch of consecutive child tips)? | **One.** The registry only needs the latest finalized tip; batching adds nothing but validation cost. |
+| Q4 | One anchor per child per parent block, or many? | **One anchor per child**, carrying a bounded consecutive *segment* of child headers (§4.1) — the registry verifies each in order. |
 | Q5 | Should the child genesis bind to its parent (`parent_binding`, §4.7)? | **Yes, in v1** — it is a genesis-encoding change on the child, cheapest done now. |
 | Q6 | Who moves anchors from child to parent? | **In-process `SubchainRelay`** for v1 (child `Chain` → parent `build_block(..., anchors)`); a networked relay is transport work, not consensus work, and can come later. |
 | Q7 | Header layout: two roots (`anchor_root`, `subchain_root`) or fold the registry into the state machine? | **Two roots, registry in the Ledger.** Keeps the state model pluggable and the anchoring model-agnostic. |

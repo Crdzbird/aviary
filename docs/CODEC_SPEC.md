@@ -48,6 +48,25 @@ with an internal node or a header:
 | `0x01` | Merkle node:    `H(0x01 ‖ left ‖ right)` |
 | `0x02` | Block header:   `H(0x02 ‖ canonical(header))` |
 | `0x03` | Transaction id: `H(0x03 ‖ canonical(tx))` |
+| `0x0C` | Subchain anchor leaf: `H(0x0C ‖ canonical(anchor))` |
+| `0x0D` | Subchain registry commitment (`subchain_root`) |
+| `0x0E` | Subchain policy (parent genesis) |
+| `0x0F` | Parent binding (child genesis) |
+
+### Subchain layouts (header version 3; docs/design/SUBCHAINS.md)
+
+- `BlockHeader` v3 = v2 layout ‖ `anchor_root[32]` ‖ `subchain_root[32]`, before
+  `consensus_data`. v1/v2 encodings are unchanged.
+- `Block` v3 = `bytes(header) ‖ list(bytes(tx)) ‖ list(bytes(anchor))`; the anchor
+  list is present only when the header version is ≥ 3.
+- `CertifiedHeader` = `bytes(header) ‖ bytes(certificate)` (certificate = canonical
+  `CommitCertificate`).
+- `Anchor` = `u64 child_chain_id ‖ list(bytes(CertifiedHeader))` (consecutive heights).
+- `ChildRegistration` = `u64 chain_id ‖ genesis_hash[32] ‖ bytes(genesis_header) ‖ list(bytes(bls_pubkey) ‖ u64 power)`.
+- `SubchainPolicy` = `u16 max_children ‖ u8 max_depth ‖ u16 max_anchors_per_block ‖ u16 max_headers_per_anchor ‖ list(bytes(ChildRegistration))`.
+- `ParentBinding` = `u64 parent_chain_id ‖ parent_genesis_hash[32]`.
+- `GenesisSpec` gains `bytes(subchain_policy) ‖ bytes(parent_binding)` appended last
+  (empty when unused).
 
 (Tags are provisional; finalized when the block/tx model lands in M1.)
 

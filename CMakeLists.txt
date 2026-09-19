@@ -95,6 +95,7 @@ add_library(blockchainer_core STATIC
   src/core/genesis.cpp
   src/core/assurance.cpp
   src/core/chain_blueprint.cpp
+  src/core/subchain.cpp
   src/core/block_store.cpp
   src/core/fork_choice.cpp
   src/storage/file_store.cpp
@@ -248,6 +249,7 @@ blockchainer_add_test(test_assurance tests/test_assurance.cpp)
 blockchainer_add_test(test_sealed_mempool tests/test_sealed_mempool.cpp)
 blockchainer_add_test(test_profiled_validator tests/test_profiled_validator.cpp)
 blockchainer_add_test(test_chain_blueprint tests/test_chain_blueprint.cpp)
+blockchainer_add_test(test_subchains tests/test_subchains.cpp)
 blockchainer_add_test(test_remote_guard tests/test_remote_guard.cpp)
 blockchainer_add_test(test_bbs tests/test_bbs.cpp)
 blockchainer_add_test(test_bbs_pseudonym tests/test_bbs_pseudonym.cpp)

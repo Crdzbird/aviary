@@ -38,6 +38,9 @@ Ledger::Ledger(ChainSpec spec, std::unique_ptr<StateMachine> genesis_state,
 
 BlockError Ledger::check_header(const BlockHeader& h) const {
   if (h.chain_id != spec_.chain_id) return BlockError::failure("chain_id mismatch");
+  // Anchor-carrying headers are refused until subchain validation lands (a
+  // header this ledger cannot fully validate must never be accepted).
+  if (h.version >= 3) return BlockError::failure("version-3 headers (subchain anchors) not enabled");
   if (h.height != tip_.height + 1) return BlockError::failure("non-sequential height");
   if (h.parent_hash != tip_.hash()) return BlockError::failure("parent hash mismatch");
   if (h.timestamp < tip_.timestamp) return BlockError::failure("non-monotonic timestamp");
