@@ -1295,3 +1295,98 @@ func TestLightClientSkipping(t *testing.T) {
 		t.Fatal("empty set must be refused")
 	}
 }
+
+
+// ChainTree over the Go binding: declare root ← child ← grandchild (+ a sibling),
+// build once, produce upward, prove a grandchild account from the root, observe
+// finalizations from Go, and confirm structural / registry rejects.
+func TestChainTree(t *testing.T) {
+	must := func(b []byte, err error) []byte {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	val := func(seed byte, power uint64) bc.ChainTreeValidator {
+		v, _ := bc.NewBLSValidator(bytes.Repeat([]byte{seed}, 32))
+		return bc.ChainTreeValidator{PublicKey: v.Public, Secret: v.Secret, Power: power}
+	}
+	alice := bytes.Repeat([]byte{0xA1}, 32)
+	pos, _ := bc.NewBlueprint("pos", "account", "round-robin", nil)
+	root := bc.ChainTreeNode{ChainID: 1, Blueprint: pos, Validators: []bc.ChainTreeValidator{val(0x01, 1)},
+		Children: []bc.ChainTreeNode{
+			{ChainID: 42, Validators: []bc.ChainTreeValidator{val(0x10, 1), val(0x11, 1), val(0x12, 1)}, MaxHeadersPerAnchor: 4,
+				Children: []bc.ChainTreeNode{{ChainID: 420, Validators: []bc.ChainTreeValidator{val(0x20, 1), val(0x21, 1)},
+					Accounts: []bc.GenesisAccount{{Address: alice, Balance: 1000}}}}},
+			{ChainID: 43, Validators: []bc.ChainTreeValidator{val(0x30, 1)}},
+		}}
+	// Structural rejects carry a reason; registry rejects are generic.
+	dup := root
+	dup.Children = []bc.ChainTreeNode{root.Children[0], {ChainID: 42, Validators: []bc.ChainTreeValidator{val(0x30, 1)}}}
+	if _, err := bc.BuildChainTree(dup); err == nil {
+		t.Fatal("duplicate id must be refused")
+	}
+	posChild := root
+	posChild.Children = []bc.ChainTreeNode{{ChainID: 42, Blueprint: pos, Validators: []bc.ChainTreeValidator{val(0x10, 1)}}}
+	if _, err := bc.BuildChainTree(posChild); err == nil {
+		t.Fatal("PoS child must be refused (only BFT children anchor)")
+	}
+	unknown := root
+	unknown.Blueprint, _ = bc.NewBlueprint("no-such-engine", "account", "", nil)
+	if _, err := bc.BuildChainTree(unknown); err == nil {
+		t.Fatal("unknown engine must be refused")
+	}
+
+	tree, err := bc.BuildChainTree(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tree.Free()
+	ids, _ := tree.ChainIDs()
+	if len(ids) != 4 || ids[0] != 1 || ids[1] != 42 || ids[2] != 420 || ids[3] != 43 {
+		t.Fatalf("ids %v", ids)
+	}
+	finalized := map[uint64]int{}
+	tree.OnFinalized = func(chainID uint64, block []byte) { finalized[chainID]++ }
+	// Blocks flow upward.
+	must(tree.Produce(420, 2))
+	must(tree.Produce(420, 3))
+	if tree.PendingAnchors(42) != 1 || tree.PendingAnchors(1) != 0 {
+		t.Fatalf("pending %d/%d", tree.PendingAnchors(42), tree.PendingAnchors(1))
+	}
+	must(tree.Produce(42, 2))
+	must(tree.Produce(43, 2))
+	rootBlk := must(tree.Produce(1, 2))
+	if tree.Height(1) != 1 || tree.Height(42) != 1 || tree.Height(420) != 2 || tree.PendingAnchors(1) != 0 {
+		t.Fatal("heights / anchors")
+	}
+	if finalized[420] != 2 || finalized[42] != 1 || finalized[1] != 1 || finalized[43] != 1 {
+		t.Fatalf("finalized hook: %v", finalized)
+	}
+	if _, err := tree.Produce(7, 3); err == nil {
+		t.Fatal("unknown chain must error")
+	}
+	// Proof from the root header.
+	proof := must(tree.ProveAccount(420, alice))
+	rootHdr := must(bc.BlockHeader(rootBlk))
+	if !tree.Verify(proof) || !bc.VerifySubchainProof(must(bc.HeaderSubchainRoot(rootHdr)), proof) {
+		t.Fatal("grandchild account must be provable from the root")
+	}
+	bad := append([]byte(nil), proof...)
+	bad[len(bad)-1] ^= 1
+	if tree.Verify(bad) {
+		t.Fatal("tampered proof must fail")
+	}
+	// Genesis + tip are exposed; the child's genesis is bound to the root.
+	if g := must(tree.Genesis(42)); !bytes.Equal(must(bc.GenesisHeader(g)), must(bc.GenesisHeader(g))) || len(must(tree.Tip(420))) == 0 {
+		t.Fatal("genesis/tip")
+	}
+	// A tx source from Go: none here (no signed txs), but the hook is exercised.
+	calls := 0
+	tree.TxSource = func(chainID, ts uint64) [][]byte { calls++; return nil }
+	must(tree.Produce(420, 4))
+	if calls != 1 {
+		t.Fatalf("tx source calls %d", calls)
+	}
+}

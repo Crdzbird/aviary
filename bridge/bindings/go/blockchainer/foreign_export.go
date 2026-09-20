@@ -10,6 +10,30 @@ import (
 	"unsafe"
 )
 
+//export blockchainerGoTxSource
+func blockchainerGoTxSource(ctx unsafe.Pointer, chainID C.uint64_t, ts C.uint64_t, out *C.uint8_t, cap C.size_t, outLen *C.size_t) C.int {
+	t, ok := cgo.Handle(uintptr(ctx)).Value().(*ChainTree)
+	if !ok || t.TxSource == nil {
+		return 0
+	}
+	blob := encodeBlobList(t.TxSource(uint64(chainID), uint64(ts)))
+	if len(blob) > int(cap) {
+		return 0
+	}
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(out)), int(cap)), blob)
+	*outLen = C.size_t(len(blob))
+	return 1
+}
+
+//export blockchainerGoFinalized
+func blockchainerGoFinalized(ctx unsafe.Pointer, chainID C.uint64_t, block *C.uint8_t, n C.size_t) {
+	t, ok := cgo.Handle(uintptr(ctx)).Value().(*ChainTree)
+	if !ok || t.OnFinalized == nil {
+		return
+	}
+	t.OnFinalized(uint64(chainID), C.GoBytes(unsafe.Pointer(block), C.int(n)))
+}
+
 //export blockchainerGoJustify
 func blockchainerGoJustify(ctx unsafe.Pointer, block *C.uint8_t, blockLen C.size_t,
 	out *C.uint8_t, outCap C.size_t, outLen *C.size_t) C.int {

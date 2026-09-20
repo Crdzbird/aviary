@@ -693,6 +693,63 @@ BLOCKCHAINER_API BlockchainerBufferResult blockchainer_subchain_proof_encode(
 BLOCKCHAINER_API int blockchainer_subchain_proof_verify(
     const uint8_t* parent_subchain_root, const uint8_t* proof, size_t proof_len);
 
+/* ── Chain tree: declare a FAMILY of chains and build / drive it together ────
+ *  A recursive spec — each node a chain with its own mixture, accounts,
+ *  validators and children (subchains). build() resolves genesis bottom-up,
+ *  bindings top-down and assembles every node (NULL on any reject — see
+ *  blockchainer_chain_tree_spec_error for the reason). produce() proposes
+ *  with the node's pending child anchors, justifies in-process (BFT: the
+ *  locally held validator secrets must reach quorum; PoS/VRF seal; PoW mine),
+ *  submits and archives — blocks flow upward automatically. prove_account
+ *  yields a SubchainProof from the ROOT header. Hooks let ANY language extend
+ *  the tree (transactions to include; finalization observer). Not thread-safe. */
+typedef void* BlockchainerChainTree;
+
+/** Encode one spec node. children = a LIST of encoded child nodes (encode
+ *  bottom-up). validator_secrets: 32 B each, or NULL / all-zero for validators
+ *  this process does not hold. blueprint = blockchainer_blueprint_encode output.
+ *  balances are u64 per account. 0 for unlimited anchor bounds. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_tree_node_encode(
+    uint64_t chain_id, const uint8_t* blueprint, size_t blueprint_len, uint16_t assurance_level,
+    const uint8_t* account_addrs, const uint64_t* account_balances, size_t account_count,
+    const uint8_t* validator_pks, const uint8_t* validator_secrets, const uint64_t* validator_powers,
+    size_t validator_count, uint16_t max_anchors_per_block, uint16_t max_headers_per_anchor,
+    const uint8_t* children, size_t children_len);
+/** Why a spec is invalid (empty buffer = valid). Structural only; a mixture the
+ *  registry / posture rejects is only discovered by build. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_tree_spec_error(
+    const uint8_t* spec, size_t spec_len);
+/** Build the whole family from an encoded ROOT node. NULL on any reject. */
+BLOCKCHAINER_API BlockchainerChainTree blockchainer_chain_tree_build(const uint8_t* spec, size_t spec_len);
+/** Chain ids in pre-order (parents first): [count u32][u64]×. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_tree_chain_ids(BlockchainerChainTree t);
+BLOCKCHAINER_API uint64_t blockchainer_chain_tree_height(BlockchainerChainTree t, uint64_t chain_id);
+/** The node's final genesis blob (policy + binding committed). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_tree_genesis(BlockchainerChainTree t, uint64_t chain_id);
+/** The node's current tip header. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_tree_tip(BlockchainerChainTree t, uint64_t chain_id);
+/** How many anchors produce() would include on [chain_id] right now. */
+BLOCKCHAINER_API uint32_t blockchainer_chain_tree_pending_anchors(BlockchainerChainTree t, uint64_t chain_id);
+/** Produce + finalize the next block on [chain_id] → the encoded Block. Errors with the reason. */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_tree_produce(
+    BlockchainerChainTree t, uint64_t chain_id, uint64_t timestamp);
+/** Cross-chain proof of a 32-byte address on [chain_id] from the ROOT header (no hops for the root). */
+BLOCKCHAINER_API BlockchainerBufferResult blockchainer_chain_tree_prove_account(
+    BlockchainerChainTree t, uint64_t chain_id, const uint8_t* address);
+/** 1 iff [proof] is committed by the root's CURRENT header. */
+BLOCKCHAINER_API int blockchainer_chain_tree_verify(BlockchainerChainTree t, const uint8_t* proof, size_t proof_len);
+/** Transactions to include when [chain_id] produces at [timestamp]: write a
+ *  LIST of encoded transactions into [out] (≤ out_cap), set *out_len; return
+ *  1, or 0 to include none. Runs synchronously inside produce(). */
+typedef int (*BlockchainerTxSourceFn)(void* ctx, uint64_t chain_id, uint64_t timestamp,
+                                      uint8_t* out, size_t out_cap, size_t* out_len);
+/** Observer: a block was finalized on [chain_id]. */
+typedef void (*BlockchainerFinalizedFn)(void* ctx, uint64_t chain_id, const uint8_t* block, size_t block_len);
+#define BLOCKCHAINER_MAX_TX_LIST (1u << 20)
+BLOCKCHAINER_API void blockchainer_chain_tree_set_tx_source(BlockchainerChainTree t, BlockchainerTxSourceFn fn, void* ctx);
+BLOCKCHAINER_API void blockchainer_chain_tree_set_finalized_hook(BlockchainerChainTree t, BlockchainerFinalizedFn fn, void* ctx);
+BLOCKCHAINER_API void blockchainer_chain_tree_free(BlockchainerChainTree t);
+
 /* ── Foreign components: implement engines / proposers in ANY language ────────
  *  The consensus pipeline stays in C++ (a foreign engine proposes and applies
  *  via the Ledger); the foreign code supplies the JUSTIFICATION policy through

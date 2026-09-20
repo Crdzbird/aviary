@@ -21,6 +21,7 @@
 #include "blockchainer/bft_engine.hpp"
 #include "blockchainer/subchain.hpp"
 #include "blockchainer/light_client.hpp"
+#include "blockchainer/chain_tree.hpp"
 #include "blockchainer/genesis.hpp"
 #include "blockchainer/pos_engine.hpp"
 #include "blockchainer/pow_engine.hpp"
@@ -1561,6 +1562,143 @@ int blockchainer_subchain_proof_verify(const uint8_t* parent_subchain_root, cons
                                                blockchainer::SubchainProof::decode_all(cbv(proof, proof_len))) ? 1 : 0;
   } catch (...) { return 0; }
 }
+
+// ── Chain tree ────────────────────────────────────────────────────────────────
+
+namespace {
+// The tree as seen from the C ABI: the hooks are C callbacks with a ctx.
+class CallbackTree : public blockchainer::node::ChainTree {
+ public:
+  static std::unique_ptr<CallbackTree> build(const blockchainer::node::ChainTreeSpec& spec) {
+    auto base = blockchainer::node::ChainTree::build(spec);
+    auto t = std::unique_ptr<CallbackTree>(new CallbackTree());
+    static_cast<blockchainer::node::ChainTree&>(*t) = std::move(*base);
+    return t;
+  }
+  BlockchainerTxSourceFn tx_fn = nullptr; void* tx_ctx = nullptr;
+  BlockchainerFinalizedFn fin_fn = nullptr; void* fin_ctx = nullptr;
+
+ protected:
+  std::vector<blockchainer::Transaction> select_txs(const Built& n, std::uint64_t ts) override {
+    if (!tx_fn) return {};
+    std::vector<std::uint8_t> buf(BLOCKCHAINER_MAX_TX_LIST);
+    size_t len = 0;
+    if (tx_fn(tx_ctx, n.chain_id, ts, buf.data(), buf.size(), &len) != 1) return {};
+    if (len > buf.size()) throw std::runtime_error("tx source overflowed its buffer");
+    std::vector<blockchainer::Transaction> out;
+    for (const auto& b : decode_blob_list(cbv(buf.data(), len)))
+      out.push_back(blockchainer::Transaction::decode_all(cbv(b.data(), b.size())));
+    return out;
+  }
+  void on_finalized(const Built& n, const blockchainer::Block& b) override {
+    if (!fin_fn) return;
+    blockchainer::crypto::Bytes e = b.encode();
+    fin_fn(fin_ctx, n.chain_id, e.data(), e.size());
+  }
+ private:
+  CallbackTree() = default;
+};
+CallbackTree* as_tree(BlockchainerChainTree t) { return static_cast<CallbackTree*>(t); }
+}  // namespace
+
+BlockchainerBufferResult blockchainer_chain_tree_node_encode(
+    uint64_t chain_id, const uint8_t* blueprint, size_t blueprint_len, uint16_t assurance_level,
+    const uint8_t* account_addrs, const uint64_t* account_balances, size_t account_count,
+    const uint8_t* validator_pks, const uint8_t* validator_secrets, const uint64_t* validator_powers,
+    size_t validator_count, uint16_t max_anchors_per_block, uint16_t max_headers_per_anchor,
+    const uint8_t* children, size_t children_len) {
+  try {
+    blockchainer::node::ChainTreeSpec::Node n;
+    n.chain_id = chain_id;
+    n.blueprint = blockchainer::ChainBlueprint::decode_all(cbv(blueprint, blueprint_len));
+    n.assurance_level = assurance_level;
+    if (account_count > 0 && (!account_addrs || !account_balances)) return error_result("tree node: null accounts");
+    for (size_t i = 0; i < account_count; ++i)
+      n.accounts.push_back(blockchainer::GenesisAccount{to_hash32(account_addrs + 32 * i),
+                                                        static_cast<blockchainer::codec::u128>(account_balances[i])});
+    if (validator_count > 0 && (!validator_pks || !validator_powers)) return error_result("tree node: null validators");
+    for (size_t i = 0; i < validator_count; ++i) {
+      blockchainer::node::ChainTreeSpec::Validator v;
+      v.bls_public = blockchainer::crypto::Bytes(validator_pks + 48 * i, validator_pks + 48 * (i + 1));
+      if (validator_secrets) {
+        blockchainer::crypto::Bytes s(validator_secrets + 32 * i, validator_secrets + 32 * (i + 1));
+        bool zero = true; for (auto b : s) zero &= (b == 0);
+        if (!zero) v.bls_secret = std::move(s);
+      }
+      v.power = validator_powers[i];
+      n.validators.push_back(std::move(v));
+    }
+    n.max_anchors_per_block = max_anchors_per_block;
+    n.max_headers_per_anchor = max_headers_per_anchor;
+    if (children_len > 0) {
+      for (const auto& b : decode_blob_list(cbv(children, children_len))) {
+        blockchainer::codec::CodecReader r(cbv(b.data(), b.size()));
+        n.children.push_back(blockchainer::node::ChainTreeSpec::Node::decode(r));
+        r.assert_fully_consumed();
+      }
+    }
+    return bytes_result(n.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+BlockchainerBufferResult blockchainer_chain_tree_spec_error(const uint8_t* spec, size_t spec_len) {
+  try {
+    std::string e = blockchainer::node::ChainTreeSpec::decode_all(cbv(spec, spec_len)).validate();
+    return bytes_result(reinterpret_cast<const std::uint8_t*>(e.data()), e.size());
+  } catch (const std::exception& e) {
+    std::string m = std::string("malformed spec: ") + e.what();
+    return bytes_result(reinterpret_cast<const std::uint8_t*>(m.data()), m.size());
+  }
+}
+
+BlockchainerChainTree blockchainer_chain_tree_build(const uint8_t* spec, size_t spec_len) {
+  try {
+    return CallbackTree::build(blockchainer::node::ChainTreeSpec::decode_all(cbv(spec, spec_len))).release();
+  } catch (...) { return nullptr; }
+}
+
+BlockchainerBufferResult blockchainer_chain_tree_chain_ids(BlockchainerChainTree t) {
+  if (!t) return error_result("null tree");
+  blockchainer::codec::CodecWriter w;
+  w.write_list(as_tree(t)->chain_ids(), [](blockchainer::codec::CodecWriter& ww, std::uint64_t id) { ww.write_u64(id); });
+  return bytes_result(w.take());
+}
+uint64_t blockchainer_chain_tree_height(BlockchainerChainTree t, uint64_t chain_id) {
+  if (!t || !as_tree(t)->has(chain_id)) return 0;
+  return as_tree(t)->height(chain_id);
+}
+BlockchainerBufferResult blockchainer_chain_tree_genesis(BlockchainerChainTree t, uint64_t chain_id) {
+  if (!t) return error_result("null tree");
+  try { return bytes_result(as_tree(t)->node(chain_id).genesis.encode()); } catch (const std::exception& e) { return error_result(e.what()); }
+}
+BlockchainerBufferResult blockchainer_chain_tree_tip(BlockchainerChainTree t, uint64_t chain_id) {
+  if (!t) return error_result("null tree");
+  try { return bytes_result(as_tree(t)->node(chain_id).chain.engine->tip().encode()); } catch (const std::exception& e) { return error_result(e.what()); }
+}
+uint32_t blockchainer_chain_tree_pending_anchors(BlockchainerChainTree t, uint64_t chain_id) {
+  if (!t || !as_tree(t)->has(chain_id)) return 0;
+  return static_cast<uint32_t>(as_tree(t)->pending_anchors_for(chain_id).size());
+}
+BlockchainerBufferResult blockchainer_chain_tree_produce(BlockchainerChainTree t, uint64_t chain_id, uint64_t timestamp) {
+  if (!t) return error_result("null tree");
+  try { return bytes_result(as_tree(t)->produce(chain_id, timestamp).encode()); } catch (const std::exception& e) { return error_result(e.what()); }
+}
+BlockchainerBufferResult blockchainer_chain_tree_prove_account(BlockchainerChainTree t, uint64_t chain_id, const uint8_t* address) {
+  if (!t) return error_result("null tree");
+  if (!address) return error_result("null address");
+  try { return bytes_result(as_tree(t)->prove_account(chain_id, to_hash32(address)).encode()); } catch (const std::exception& e) { return error_result(e.what()); }
+}
+int blockchainer_chain_tree_verify(BlockchainerChainTree t, const uint8_t* proof, size_t proof_len) {
+  if (!t || !proof) return 0;
+  try { return as_tree(t)->verify(blockchainer::SubchainProof::decode_all(cbv(proof, proof_len))) ? 1 : 0; } catch (...) { return 0; }
+}
+void blockchainer_chain_tree_set_tx_source(BlockchainerChainTree t, BlockchainerTxSourceFn fn, void* ctx) {
+  if (t) { as_tree(t)->tx_fn = fn; as_tree(t)->tx_ctx = ctx; }
+}
+void blockchainer_chain_tree_set_finalized_hook(BlockchainerChainTree t, BlockchainerFinalizedFn fn, void* ctx) {
+  if (t) { as_tree(t)->fin_fn = fn; as_tree(t)->fin_ctx = ctx; }
+}
+void blockchainer_chain_tree_free(BlockchainerChainTree t) { delete as_tree(t); }
 
 // ── Foreign components (C callbacks → registry) ───────────────────────────────
 
