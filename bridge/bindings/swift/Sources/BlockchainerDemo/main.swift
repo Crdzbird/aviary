@@ -332,5 +332,46 @@ do {
 }
 print("light-client-skip OK")
 
+// ChainTree: root ← child ← grandchild (+ sibling) built together, produced upward, proven from the root, hooks from Swift.
+do {
+    func tv(_ seed: UInt8, _ power: UInt64 = 1) throws -> Blockchainer.TreeValidator {
+        let v = try Blockchainer.newBLSValidator(keyMaterial: Data(repeating: seed, count: 32)); return .init(publicKey: v.publicKey, secret: v.secret, power: power) }
+    let aliceT = Data(repeating: 0xA1, count: 32)
+    let pos = try Blockchainer.Blueprint(consensus: "pos", stateModel: "account", proposer: "round-robin")
+    let gc = Blockchainer.TreeNode(chainID: 420, accounts: [.init(address: aliceT, balance: 1000)], validators: [try tv(0x20), try tv(0x21)])
+    let ch = Blockchainer.TreeNode(chainID: 42, validators: [try tv(0x10), try tv(0x11), try tv(0x12)], maxHeadersPerAnchor: 4, children: [gc])
+    let sib = Blockchainer.TreeNode(chainID: 43, validators: [try tv(0x30)])
+    let root = Blockchainer.TreeNode(chainID: 1, blueprint: pos, validators: [try tv(0x01)], children: [ch, sib])
+    var dup = root; dup.children[1].chainID = 42
+    precondition((try? Blockchainer.buildChainTree(dup)) == nil, "duplicate id refused")
+    var posChild = root; posChild.children[0].blueprint = pos
+    precondition((try? Blockchainer.buildChainTree(posChild)) == nil, "PoS child refused")
+    var unknown = root; unknown.blueprint = try Blockchainer.Blueprint(consensus: "no-such-engine", stateModel: "account")
+    precondition((try? Blockchainer.buildChainTree(unknown)) == nil, "unknown engine refused")
+    let tree = try Blockchainer.buildChainTree(root)
+    let ids = try tree.chainIDs()
+    precondition(ids == [1, 42, 420, 43], "pre-order ids")
+    var finalized: [UInt64: Int] = [:]
+    tree.onFinalized = { id, _ in finalized[id, default: 0] += 1 }
+    _ = try tree.produce(420, timestamp: 2); _ = try tree.produce(420, timestamp: 3)
+    precondition(tree.pendingAnchors(42) == 1 && tree.pendingAnchors(1) == 0, "pending anchors")
+    _ = try tree.produce(42, timestamp: 2); _ = try tree.produce(43, timestamp: 2)
+    let rootBlk = try tree.produce(1, timestamp: 2)
+    precondition(tree.height(1) == 1 && tree.height(42) == 1 && tree.height(420) == 2 && tree.pendingAnchors(1) == 0, "heights")
+    precondition(finalized[420] == 2 && finalized[42] == 1 && finalized[1] == 1 && finalized[43] == 1, "finalized hook from Swift")
+    precondition((try? tree.produce(7, timestamp: 3)) == nil, "unknown chain")
+    let proof = try tree.proveAccount(420, address: aliceT)
+    let rootHdr = try Blockchainer.blockHeader(rootBlk), rootRoot = try Blockchainer.headerSubchainRoot(rootHdr)
+    precondition(tree.verify(proof) && Blockchainer.verifySubchainProof(parentSubchainRoot: rootRoot, proof: proof), "grandchild proven from the root")
+    var bad = proof; bad[bad.count - 1] ^= 1
+    precondition(!tree.verify(bad), "tampered proof fails")
+    let g42 = try tree.genesis(42), gh42 = try Blockchainer.genesisHeader(g42), tip420 = try tree.tip(420)
+    precondition(!gh42.isEmpty && !tip420.isEmpty, "genesis/tip")
+    var calls = 0; tree.txSource = { _, _ in calls += 1; return [] }
+    _ = try tree.produce(420, timestamp: 4)
+    precondition(calls == 1, "tx source from Swift")
+}
+print("chain-tree OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

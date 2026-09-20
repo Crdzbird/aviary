@@ -39,7 +39,9 @@ public final class Blockchainer implements AutoCloseable {
             blockHeaderH, headerSubchainRootH, certifiedHeaderEncode, anchorEncode, chainProposeAnchored, chainCertify,
             chainChildTip, chainSubchainHop, chainProveAccount, subchainProofEncode, subchainProofVerify,
             chainScheduleValidators, chainValidatorsH,
-            lcNew, lcAccept, lcAcceptSkipping, lcHeight, lcTip, lcValidators, lcSetTrust, lcSetMaxSkip, lcFree;
+            lcNew, lcAccept, lcAcceptSkipping, lcHeight, lcTip, lcValidators, lcSetTrust, lcSetMaxSkip, lcFree,
+            treeNodeEncode, treeSpecError, treeBuild, treeChainIds, treeHeight, treeGenesis, treeTip, treePending, treeProduce,
+            treeProve, treeVerify, treeSetTxSource, treeSetFinalized, treeFree;
 
     public Blockchainer() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -164,6 +166,20 @@ public final class Blockchainer implements AutoCloseable {
         lcSetTrust = h("blockchainer_light_client_set_trust_level", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, JAVA_INT));
         lcSetMaxSkip = h("blockchainer_light_client_set_max_skip", FunctionDescriptor.ofVoid(ADDRESS, JAVA_LONG));
         lcFree = h("blockchainer_light_client_free", FunctionDescriptor.ofVoid(ADDRESS));
+        treeNodeEncode = h("blockchainer_chain_tree_node_encode", FunctionDescriptor.of(RES, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_SHORT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, JAVA_SHORT, JAVA_SHORT, ADDRESS, JAVA_LONG));
+        treeSpecError = h("blockchainer_chain_tree_spec_error", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        treeBuild = h("blockchainer_chain_tree_build", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG));
+        treeChainIds = h("blockchainer_chain_tree_chain_ids", FunctionDescriptor.of(RES, ADDRESS));
+        treeHeight = h("blockchainer_chain_tree_height", FunctionDescriptor.of(JAVA_LONG, ADDRESS, JAVA_LONG));
+        treeGenesis = h("blockchainer_chain_tree_genesis", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        treeTip = h("blockchainer_chain_tree_tip", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        treePending = h("blockchainer_chain_tree_pending_anchors", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG));
+        treeProduce = h("blockchainer_chain_tree_produce", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, JAVA_LONG));
+        treeProve = h("blockchainer_chain_tree_prove_account", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS));
+        treeVerify = h("blockchainer_chain_tree_verify", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        treeSetTxSource = h("blockchainer_chain_tree_set_tx_source", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
+        treeSetFinalized = h("blockchainer_chain_tree_set_finalized_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
+        treeFree = h("blockchainer_chain_tree_free", FunctionDescriptor.ofVoid(ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -657,6 +673,75 @@ public final class Blockchainer implements AutoCloseable {
         @Override public void close() { try { lcFree.invoke(h); } catch (Throwable ignored) {} }
     }
     public LightClient newLightClient(long chainId, java.util.List<ValidatorEntry> validators, byte[] trustedHeader) { return new LightClient(chainId, validators, trustedHeader); }
+
+    // ── Chain tree: declare a FAMILY of chains and drive it together ──────────
+    /** One chain of a family; children are subchains (must be BFT). secret = null for a validator this process does not hold. */
+    public static final class TreeNode {
+        public long chainId; public Blueprint blueprint; public int assuranceLevel = 1;
+        public byte[][] accountAddrs = new byte[0][]; public long[] balances = new long[0];
+        public byte[][] validatorPks = new byte[0][]; public byte[][] validatorSecrets = null; public long[] powers = new long[0];
+        public int maxAnchorsPerBlock = 0, maxHeadersPerAnchor = 0;
+        public java.util.List<TreeNode> children = new java.util.ArrayList<>();
+        public TreeNode(long chainId) { this.chainId = chainId; }
+        public TreeNode validators(byte[][] pks, byte[][] secrets, long[] pw) { validatorPks = pks; validatorSecrets = secrets; powers = pw; return this; }
+        public TreeNode accounts(byte[][] addrs, long[] bal) { accountAddrs = addrs; balances = bal; return this; }
+        public TreeNode child(TreeNode c) { children.add(c); return this; }
+    }
+    public byte[] encodeTreeNode(TreeNode n) {
+        byte[] bp = (n.blueprint == null ? new Blueprint("bft", "account", "", null) : n.blueprint).encoded();
+        byte[] addrs = new byte[32 * n.accountAddrs.length]; for (int i = 0; i < n.accountAddrs.length; i++) System.arraycopy(n.accountAddrs[i], 0, addrs, 32 * i, 32);
+        byte[] pks = new byte[48 * n.validatorPks.length]; for (int i = 0; i < n.validatorPks.length; i++) System.arraycopy(n.validatorPks[i], 0, pks, 48 * i, 48);
+        byte[] secrets = new byte[32 * n.validatorPks.length];
+        if (n.validatorSecrets != null) for (int i = 0; i < n.validatorPks.length; i++) if (n.validatorSecrets[i] != null) System.arraycopy(n.validatorSecrets[i], 0, secrets, 32 * i, 32);
+        byte[][] kids = new byte[n.children.size()][]; for (int i = 0; i < kids.length; i++) kids[i] = encodeTreeNode(n.children.get(i));
+        byte[] blob = blobList(kids);
+        return call(treeNodeEncode, n.chainId, seg(bp), (long) bp.length, (short) n.assuranceLevel, seg(addrs), arena.allocateFrom(JAVA_LONG, n.balances), (long) n.accountAddrs.length,
+                seg(pks), seg(secrets), arena.allocateFrom(JAVA_LONG, n.powers), (long) n.validatorPks.length, (short) n.maxAnchorsPerBlock, (short) n.maxHeadersPerAnchor, seg(blob), (long) blob.length);
+    }
+    /** Why a spec is structurally invalid ("" = valid). */
+    public String chainTreeSpecError(byte[] spec) { return new String(call(treeSpecError, seg(spec), (long) spec.length)); }
+
+    private static final java.util.Map<Long, ChainTree> TREES = new java.util.concurrent.ConcurrentHashMap<>();
+    @SuppressWarnings("unused")
+    private static void treeFinalizedUpcall(MemorySegment ctx, long chainId, MemorySegment block, long len) {
+        ChainTree t = TREES.get(ctx.address()); if (t != null && t.onFinalized != null) t.onFinalized.accept(chainId, block.reinterpret(len).toArray(JAVA_BYTE));
+    }
+    @SuppressWarnings("unused")
+    private static int treeTxSourceUpcall(MemorySegment ctx, long chainId, long ts, MemorySegment out, long cap, MemorySegment outLen) {
+        ChainTree t = TREES.get(ctx.address()); if (t == null || t.txSource == null) return 0;
+        byte[][] txs = t.txSource.apply(chainId, ts); byte[] blob = blobList(txs == null ? new byte[0][] : txs);
+        if (blob.length > cap) return 0;
+        MemorySegment.copy(blob, 0, out.reinterpret(cap), JAVA_BYTE, 0, blob.length); outLen.reinterpret(8).set(JAVA_LONG, 0, (long) blob.length); return 1;
+    }
+    /** A built family driven in-process: produce() anchors children upward; proveAccount() proves any descendant from the root. */
+    public final class ChainTree implements AutoCloseable {
+        private final MemorySegment h; private final long handle;
+        public java.util.function.BiConsumer<Long, byte[]> onFinalized;
+        public java.util.function.BiFunction<Long, Long, byte[][]> txSource;
+        ChainTree(TreeNode root) {
+            byte[] spec = encodeTreeNode(root);
+            String err = chainTreeSpecError(spec);
+            if (!err.isEmpty()) throw new IllegalArgumentException("chain tree: " + err);
+            try { h = (MemorySegment) treeBuild.invoke(seg(spec), (long) spec.length); } catch (Throwable e) { throw new RuntimeException(e); }
+            if (h.address() == 0) throw new IllegalArgumentException("chain tree: build rejected (unknown mixture or posture-forbidden engine)");
+            handle = NEXT_HANDLE.getAndIncrement(); TREES.put(handle, this);
+            MemorySegment fin = upcall("treeFinalizedUpcall", java.lang.invoke.MethodType.methodType(void.class, MemorySegment.class, long.class, MemorySegment.class, long.class),
+                    FunctionDescriptor.ofVoid(ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+            MemorySegment tx = upcall("treeTxSourceUpcall", java.lang.invoke.MethodType.methodType(int.class, MemorySegment.class, long.class, long.class, MemorySegment.class, long.class, MemorySegment.class),
+                    FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS));
+            try { treeSetFinalized.invoke(h, fin, MemorySegment.ofAddress(handle)); treeSetTxSource.invoke(h, tx, MemorySegment.ofAddress(handle)); } catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        public long[] chainIds() { byte[] b = call(treeChainIds, h); java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b); int n = bb.getInt(); long[] out = new long[n]; for (int i = 0; i < n; i++) out[i] = bb.getLong(); return out; }
+        public long height(long chainId) { try { return (long) treeHeight.invoke(h, chainId); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public byte[] genesis(long chainId) { return call(treeGenesis, h, chainId); }
+        public byte[] tip(long chainId) { return call(treeTip, h, chainId); }
+        public int pendingAnchors(long chainId) { try { return (int) treePending.invoke(h, chainId); } catch (Throwable e) { throw new RuntimeException(e); } }
+        public byte[] produce(long chainId, long timestamp) { return call(treeProduce, h, chainId, timestamp); }
+        public byte[] proveAccount(long chainId, byte[] address) { return call(treeProve, h, chainId, seg(address)); }
+        public boolean verify(byte[] proof) { try { return (int) treeVerify.invoke(h, seg(proof), (long) proof.length) == 1; } catch (Throwable e) { throw new RuntimeException(e); } }
+        @Override public void close() { try { treeFree.invoke(h); } catch (Throwable ignored) {} TREES.remove(handle); }
+    }
+    public ChainTree buildChainTree(TreeNode root) { return new ChainTree(root); }
 
     // ── Subchains: a parent block anchors a child chain's finalized headers ────
     // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its

@@ -270,6 +270,50 @@ typedef _ScChainAddrD = _BufResult Function(Pointer<Void>, Pointer<Uint8>);
 typedef _ScVerifyC = Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Size);
 typedef _ScSchedC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Pointer<Uint64>, Size);
 typedef _LcNewC = Pointer<Void> Function(Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
+typedef _TreeNodeC = _BufResult Function(Uint64, Pointer<Uint8>, Size, Uint16, Pointer<Uint8>, Pointer<Uint64>, Size, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint64>, Size, Uint16, Uint16, Pointer<Uint8>, Size);
+typedef _TreeNodeD = _BufResult Function(int, Pointer<Uint8>, int, int, Pointer<Uint8>, Pointer<Uint64>, int, Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint64>, int, int, int, Pointer<Uint8>, int);
+typedef _TreeBuildC = Pointer<Void> Function(Pointer<Uint8>, Size);
+typedef _TreeVerifyC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size);
+typedef _TreeVerifyD = int Function(Pointer<Void>, Pointer<Uint8>, int);
+typedef _TreeBuildD = Pointer<Void> Function(Pointer<Uint8>, int);
+typedef _TreeU32IdC = Uint32 Function(Pointer<Void>, Uint64);
+typedef _TreeU32IdD = int Function(Pointer<Void>, int);
+typedef _TreeU64IdC = Uint64 Function(Pointer<Void>, Uint64);
+typedef _TreeU64IdD = int Function(Pointer<Void>, int);
+typedef _TreeProduceC = _BufResult Function(Pointer<Void>, Uint64, Uint64);
+typedef _TreeProduceD = _BufResult Function(Pointer<Void>, int, int);
+typedef _TreeProveC = _BufResult Function(Pointer<Void>, Uint64, Pointer<Uint8>);
+typedef _TreeProveD = _BufResult Function(Pointer<Void>, int, Pointer<Uint8>);
+typedef _TreeFinC = Void Function(Pointer<Void>, Uint64, Pointer<Uint8>, Size);
+typedef _TreeTxC = Int32 Function(Pointer<Void>, Uint64, Uint64, Pointer<Uint8>, Size, Pointer<Size>);
+typedef _TreeSetFinC = Void Function(Pointer<Void>, Pointer<NativeFunction<_TreeFinC>>, Pointer<Void>);
+typedef _TreeSetFinD = void Function(Pointer<Void>, Pointer<NativeFunction<_TreeFinC>>, Pointer<Void>);
+typedef _TreeSetTxC = Void Function(Pointer<Void>, Pointer<NativeFunction<_TreeTxC>>, Pointer<Void>);
+typedef _TreeSetTxD = void Function(Pointer<Void>, Pointer<NativeFunction<_TreeTxC>>, Pointer<Void>);
+
+/// One chain of a family; [children] are subchains (must be BFT). A validator's secret is null when
+/// this process does not hold it.
+class TreeNode {
+  TreeNode({required this.chainId, this.blueprint, this.assuranceLevel = 1, this.accounts = const [], required this.validators,
+      this.maxAnchorsPerBlock = 0, this.maxHeadersPerAnchor = 0, this.children = const []});
+  int chainId; Blueprint? blueprint; int assuranceLevel;
+  List<({Uint8List address, int balance})> accounts;
+  List<({Uint8List publicKey, Uint8List? secret, int power})> validators;
+  int maxAnchorsPerBlock, maxHeadersPerAnchor;
+  List<TreeNode> children;
+}
+final Map<int, ChainTree> _trees = {};
+void _treeFinTrampoline(Pointer<Void> ctx, int chainId, Pointer<Uint8> block, int len) {
+  final t = _trees[ctx.address]; final cb = t?.onFinalized;
+  if (cb != null) cb(chainId, Uint8List.fromList(block.asTypedList(len)));
+}
+int _treeTxTrampoline(Pointer<Void> ctx, int chainId, int ts, Pointer<Uint8> out, int cap, Pointer<Size> outLen) {
+  final t = _trees[ctx.address]; final src = t?.txSource;
+  if (src == null) return 0;
+  final blob = _blobList(src(chainId, ts));
+  if (blob.length > cap) return 0;
+  out.asTypedList(cap).setAll(0, blob); outLen.value = blob.length; return 1;
+}
 typedef _LcNewD = Pointer<Void> Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int);
 typedef _LcAcceptC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size);
 typedef _LcAcceptD = int Function(Pointer<Void>, Pointer<Uint8>, int, Pointer<Uint8>, int);
@@ -1136,6 +1180,38 @@ class Blockchainer {
       calloc.free(ap); calloc.free(kp); calloc.free(bal); calloc.free(pow);
     }
   }
+  /// Canonically encode one [TreeNode] (children first).
+  Uint8List encodeTreeNode(TreeNode n) {
+    final bp = (n.blueprint ?? makeBlueprint(consensus: 'bft', stateModel: 'account')).encoded;
+    final addrs = Uint8List.fromList(n.accounts.expand((a) => a.address).toList());
+    final pks = Uint8List.fromList(n.validators.expand((v) => v.publicKey).toList());
+    final secrets = Uint8List.fromList(n.validators.expand((v) => v.secret ?? Uint8List(32)).toList());
+    final kids = _blobList(n.children.map(encodeTreeNode).toList());
+    final bpp = _alloc(bp), ap = _alloc(addrs), kp = _alloc(pks), sp = _alloc(secrets), cp = _alloc(kids);
+    final bal = calloc<Uint64>(n.accounts.isEmpty ? 1 : n.accounts.length), pw = calloc<Uint64>(n.validators.isEmpty ? 1 : n.validators.length);
+    for (var i = 0; i < n.accounts.length; i++) bal[i] = n.accounts[i].balance;
+    for (var i = 0; i < n.validators.length; i++) pw[i] = n.validators[i].power;
+    try {
+      return _take(lib.lookupFunction<_TreeNodeC, _TreeNodeD>('blockchainer_chain_tree_node_encode')(
+          n.chainId, bpp, bp.length, n.assuranceLevel, ap, bal, n.accounts.length, kp, sp, pw, n.validators.length,
+          n.maxAnchorsPerBlock, n.maxHeadersPerAnchor, cp, kids.length), 'chain_tree_node_encode');
+    } finally { calloc.free(bpp); calloc.free(ap); calloc.free(kp); calloc.free(sp); calloc.free(cp); calloc.free(bal); calloc.free(pw); }
+  }
+  /// Why a spec is structurally invalid ('' = valid).
+  String chainTreeSpecError(Uint8List spec) => String.fromCharCodes(_bufOp('blockchainer_chain_tree_spec_error', spec));
+  /// Build a family of chains from [root]; throws with the structural reason or a generic reject.
+  ChainTree buildChainTree(TreeNode root) {
+    final spec = encodeTreeNode(root);
+    final err = chainTreeSpecError(spec);
+    if (err.isNotEmpty) throw StateError('chain tree: $err');
+    final sp = _alloc(spec);
+    try {
+      final h = lib.lookupFunction<_TreeBuildC, _TreeBuildD>('blockchainer_chain_tree_build')(sp, spec.length);
+      if (h == nullptr) throw StateError('chain tree: build rejected (unknown mixture or posture-forbidden engine)');
+      return ChainTree._(this, h);
+    } finally { calloc.free(sp); }
+  }
+
   /// A light client trusting [trustedHeader] and the set in force for the next header; null if malformed.
   LightClient? newLightClient(int chainId, List<({Uint8List publicKey, int power})> validators, Uint8List trustedHeader) {
     final vs = _encodeValidatorSet(validators);
@@ -2034,4 +2110,43 @@ class LightClient {
     }
   }
   void free() => _bc.lib.lookupFunction<_ChainFreeC, _ChainFreeD>('blockchainer_light_client_free')(_h);
+}
+
+/// A built family of chains driven in-process: [produce] anchors children upward automatically;
+/// [proveAccount] proves any descendant from the root header. Hooks: [onFinalized], [txSource].
+class ChainTree {
+  ChainTree._(this._bc, this._h) {
+    _handle = _trees.length + 1;
+    _trees[_handle] = this;
+    _fin = NativeCallable<_TreeFinC>.isolateLocal(_treeFinTrampoline)..keepIsolateAlive = false;
+    _tx = NativeCallable<_TreeTxC>.isolateLocal(_treeTxTrampoline, exceptionalReturn: 0)..keepIsolateAlive = false;
+    _bc.lib.lookupFunction<_TreeSetFinC, _TreeSetFinD>('blockchainer_chain_tree_set_finalized_hook')(_h, _fin.nativeFunction, Pointer<Void>.fromAddress(_handle));
+    _bc.lib.lookupFunction<_TreeSetTxC, _TreeSetTxD>('blockchainer_chain_tree_set_tx_source')(_h, _tx.nativeFunction, Pointer<Void>.fromAddress(_handle));
+  }
+  final Blockchainer _bc;
+  final Pointer<Void> _h;
+  late final int _handle;
+  late final NativeCallable<_TreeFinC> _fin;
+  late final NativeCallable<_TreeTxC> _tx;
+  void Function(int chainId, Uint8List block)? onFinalized;
+  List<Uint8List> Function(int chainId, int timestamp)? txSource;
+  List<int> chainIds() {
+    final b = _bc._take(_bc.lib.lookupFunction<_ChainBufC, _ChainBufD>('blockchainer_chain_tree_chain_ids')(_h), 'chain_tree_chain_ids');
+    final bd = ByteData.sublistView(b); final n = bd.getUint32(0);
+    return List.generate(n, (i) => bd.getUint64(4 + 8 * i));
+  }
+  int height(int chainId) => _bc.lib.lookupFunction<_TreeU64IdC, _TreeU64IdD>('blockchainer_chain_tree_height')(_h, chainId);
+  Uint8List genesis(int chainId) => _bc._take(_bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>('blockchainer_chain_tree_genesis')(_h, chainId), 'chain_tree_genesis');
+  Uint8List tip(int chainId) => _bc._take(_bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>('blockchainer_chain_tree_tip')(_h, chainId), 'chain_tree_tip');
+  int pendingAnchors(int chainId) => _bc.lib.lookupFunction<_TreeU32IdC, _TreeU32IdD>('blockchainer_chain_tree_pending_anchors')(_h, chainId);
+  Uint8List produce(int chainId, int timestamp) => _bc._take(_bc.lib.lookupFunction<_TreeProduceC, _TreeProduceD>('blockchainer_chain_tree_produce')(_h, chainId, timestamp), 'chain_tree_produce');
+  Uint8List proveAccount(int chainId, Uint8List address) {
+    final p = _bc._alloc(address);
+    try { return _bc._take(_bc.lib.lookupFunction<_TreeProveC, _TreeProveD>('blockchainer_chain_tree_prove_account')(_h, chainId, p), 'chain_tree_prove_account'); } finally { calloc.free(p); }
+  }
+  bool verify(Uint8List proof) {
+    final p = _bc._alloc(proof);
+    try { return _bc.lib.lookupFunction<_TreeVerifyC, _TreeVerifyD>('blockchainer_chain_tree_verify')(_h, p, proof.length) == 1; } finally { calloc.free(p); }
+  }
+  void free() { _bc.lib.lookupFunction<_ChainFreeC, _ChainFreeD>('blockchainer_chain_tree_free')(_h); _trees.remove(_handle); _fin.close(); _tx.close(); }
 }

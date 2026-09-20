@@ -335,6 +335,42 @@ public final class Main {
             }
             System.out.println("light-client-skip OK");
 
+            // ChainTree: root ← child ← grandchild (+ sibling) built together, produced upward, proven from the root, hooks from Java.
+            {
+                java.util.function.Function<Integer, byte[][]> kp = seed -> { var v = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{seed.byteValue()}, 32)); return new byte[][]{v.publicKey(), v.secret()}; };
+                byte[] aliceT = new byte[32]; java.util.Arrays.fill(aliceT, (byte) 0xA1);
+                var pos = bc.new Blueprint("pos", "account", "round-robin", null);
+                byte[][] k1 = kp.apply(0x01), k10 = kp.apply(0x10), k11 = kp.apply(0x11), k12 = kp.apply(0x12), k20 = kp.apply(0x20), k21 = kp.apply(0x21), k30 = kp.apply(0x30);
+                java.util.function.Supplier<Blockchainer.TreeNode> mkRoot = () -> {
+                    var gc = new Blockchainer.TreeNode(420).validators(new byte[][]{k20[0], k21[0]}, new byte[][]{k20[1], k21[1]}, new long[]{1, 1}).accounts(new byte[][]{aliceT}, new long[]{1000});
+                    var ch = new Blockchainer.TreeNode(42).validators(new byte[][]{k10[0], k11[0], k12[0]}, new byte[][]{k10[1], k11[1], k12[1]}, new long[]{1, 1, 1}).child(gc); ch.maxHeadersPerAnchor = 4;
+                    var sib = new Blockchainer.TreeNode(43).validators(new byte[][]{k30[0]}, new byte[][]{k30[1]}, new long[]{1});
+                    var r = new Blockchainer.TreeNode(1).validators(new byte[][]{k1[0]}, new byte[][]{k1[1]}, new long[]{1}).child(ch).child(sib); r.blueprint = pos; return r;
+                };
+                try { var d = mkRoot.get(); d.children.get(1).chainId = 42; bc.buildChainTree(d); throw new IllegalStateException("duplicate id must be refused"); } catch (IllegalArgumentException expected) {}
+                try { var d = mkRoot.get(); d.children.get(0).blueprint = pos; bc.buildChainTree(d); throw new IllegalStateException("PoS child must be refused"); } catch (IllegalArgumentException expected) {}
+                try { var d = mkRoot.get(); d.blueprint = bc.new Blueprint("no-such-engine", "account", "", null); bc.buildChainTree(d); throw new IllegalStateException("unknown engine must be refused"); } catch (IllegalArgumentException expected) {}
+                try (var tree = bc.buildChainTree(mkRoot.get())) {
+                    if (!java.util.Arrays.equals(tree.chainIds(), new long[]{1, 42, 420, 43})) throw new IllegalStateException("pre-order ids");
+                    var finalized = new java.util.HashMap<Long, Integer>();
+                    tree.onFinalized = (id, blk) -> finalized.merge(id, 1, Integer::sum);
+                    tree.produce(420, 2); tree.produce(420, 3);
+                    if (tree.pendingAnchors(42) != 1 || tree.pendingAnchors(1) != 0) throw new IllegalStateException("pending anchors");
+                    tree.produce(42, 2); tree.produce(43, 2);
+                    byte[] rootBlk = tree.produce(1, 2);
+                    if (tree.height(1) != 1 || tree.height(42) != 1 || tree.height(420) != 2 || tree.pendingAnchors(1) != 0) throw new IllegalStateException("heights");
+                    if (finalized.get(420L) != 2 || finalized.get(42L) != 1 || finalized.get(1L) != 1 || finalized.get(43L) != 1) throw new IllegalStateException("finalized hook: " + finalized);
+                    try { tree.produce(7, 3); throw new IllegalStateException("unknown chain must fail"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                    byte[] tproof = tree.proveAccount(420, aliceT);
+                    if (!tree.verify(tproof) || !bc.verifySubchainProof(bc.headerSubchainRoot(bc.blockHeader(rootBlk)), tproof)) throw new IllegalStateException("grandchild proven from the root");
+                    byte[] bad = tproof.clone(); bad[bad.length - 1] ^= 1; if (tree.verify(bad)) throw new IllegalStateException("tampered proof must fail");
+                    if (bc.genesisHeader(tree.genesis(42)).length == 0 || tree.tip(420).length == 0) throw new IllegalStateException("genesis/tip");
+                    final int[] tcalls = {0}; tree.txSource = (id, ts) -> { tcalls[0]++; return new byte[0][]; };
+                    tree.produce(420, 4); if (tcalls[0] != 1) throw new IllegalStateException("tx source from Java");
+                }
+            }
+            System.out.println("chain-tree OK");
+
             System.out.println("\nALL GOOD");
         }
     }

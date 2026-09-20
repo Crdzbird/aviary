@@ -630,6 +630,85 @@ public enum Blockchainer {
         ensureReady(); return LightClient(chainID: chainID, validators: validators, trustedHeader: trustedHeader)
     }
 
+    // ── Chain tree: declare a FAMILY of chains and drive it together ──────────
+    /// A validator with the secret this process holds (nil = not held).
+    public struct TreeValidator { public var publicKey: Data; public var secret: Data?; public var power: UInt64
+        public init(publicKey: Data, secret: Data?, power: UInt64 = 1) { self.publicKey = publicKey; self.secret = secret; self.power = power } }
+    /// One chain of a family; children are subchains (must be BFT).
+    public struct TreeNode {
+        public var chainID: UInt64; public var blueprint: Blueprint?; public var assuranceLevel: UInt16
+        public var accounts: [GenesisAccount]; public var validators: [TreeValidator]
+        public var maxAnchorsPerBlock: UInt16; public var maxHeadersPerAnchor: UInt16; public var children: [TreeNode]
+        public init(chainID: UInt64, blueprint: Blueprint? = nil, assuranceLevel: UInt16 = 1, accounts: [GenesisAccount] = [],
+                    validators: [TreeValidator], maxAnchorsPerBlock: UInt16 = 0, maxHeadersPerAnchor: UInt16 = 0, children: [TreeNode] = []) {
+            self.chainID = chainID; self.blueprint = blueprint; self.assuranceLevel = assuranceLevel; self.accounts = accounts
+            self.validators = validators; self.maxAnchorsPerBlock = maxAnchorsPerBlock; self.maxHeadersPerAnchor = maxHeadersPerAnchor; self.children = children
+        }
+        public func encode() throws -> Data {
+            ensureReady()
+            let bp = try (blueprint ?? Blueprint(consensus: "bft", stateModel: "account")).encoded
+            var addrs = Data(); for a in accounts { addrs.append(a.address) }
+            var pks = Data(), secrets = Data(); for v in validators { pks.append(v.publicKey); secrets.append(v.secret ?? Data(count: 32)) }
+            let balances = accounts.map { $0.balance }, powers = validators.map { $0.power }
+            let kids = blobList(try children.map { try $0.encode() })
+            let res = bp.withC { bpp, bpl in addrs.withC { ap, _ in pks.withC { kp, _ in secrets.withC { sp, _ in kids.withC { cp, cl in
+                balances.withUnsafeBufferPointer { bb in powers.withUnsafeBufferPointer { pb in
+                    blockchainer_chain_tree_node_encode(chainID, bpp, bpl, assuranceLevel, ap, bb.baseAddress, accounts.count,
+                                                        kp, validators.isEmpty ? nil : sp, pb.baseAddress, validators.count,
+                                                        maxAnchorsPerBlock, maxHeadersPerAnchor, cp, cl) } } } } } } }
+            return try consume(res, "chain_tree_node_encode")
+        }
+    }
+    /// Why a spec is structurally invalid ("" = valid).
+    public static func chainTreeSpecError(_ spec: Data) throws -> String {
+        ensureReady(); return String(decoding: try consume(spec.withC { sp, sl in blockchainer_chain_tree_spec_error(sp, sl) }, "chain_tree_spec_error"), as: UTF8.self)
+    }
+    /// A built family driven in-process: produce() anchors children upward; proveAccount() proves any descendant from the root.
+    public final class ChainTree {
+        private let h: OpaquePointer
+        public var onFinalized: ((UInt64, Data) -> Void)?
+        public var txSource: ((UInt64, UInt64) -> [Data])?
+        init(root: TreeNode) throws {
+            let spec = try root.encode()
+            let err = try Blockchainer.chainTreeSpecError(spec)
+            if !err.isEmpty { throw BlockchainerError(message: "chain tree: " + err) }
+            guard let raw = spec.withC({ sp, sl in blockchainer_chain_tree_build(sp, sl) }) else {
+                throw BlockchainerError(message: "chain tree: build rejected (unknown mixture or posture-forbidden engine)") }
+            h = OpaquePointer(raw)
+            let ctx = Unmanaged.passUnretained(self).toOpaque()
+            let fin: BlockchainerFinalizedFn = { ctx, id, block, len in
+                guard let ctx, let block else { return }
+                let t = Unmanaged<ChainTree>.fromOpaque(ctx).takeUnretainedValue()
+                t.onFinalized?(id, Data(bytes: block, count: len))
+            }
+            let tx: BlockchainerTxSourceFn = { ctx, id, ts, out, cap, outLen in
+                guard let ctx, let out, let outLen else { return 0 }
+                let t = Unmanaged<ChainTree>.fromOpaque(ctx).takeUnretainedValue()
+                guard let src = t.txSource else { return 0 }
+                let blob = Blockchainer.blobList(src(id, ts)); if blob.count > cap { return 0 }
+                blob.copyBytes(to: out, count: blob.count); outLen.pointee = blob.count; return 1
+            }
+            blockchainer_chain_tree_set_finalized_hook(UnsafeMutableRawPointer(h), fin, ctx)
+            blockchainer_chain_tree_set_tx_source(UnsafeMutableRawPointer(h), tx, ctx)
+        }
+        deinit { blockchainer_chain_tree_free(UnsafeMutableRawPointer(h)) }
+        public func chainIDs() throws -> [UInt64] {
+            let b = try consume(blockchainer_chain_tree_chain_ids(UnsafeMutableRawPointer(h)), "chain_tree_chain_ids")
+            let n = Int(UInt32(bigEndian: b.subdata(in: 0..<4).withUnsafeBytes { $0.load(as: UInt32.self) }))
+            return (0..<n).map { i in UInt64(bigEndian: b.subdata(in: 4 + 8*i..<12 + 8*i).withUnsafeBytes { $0.load(as: UInt64.self) }) }
+        }
+        public func height(_ chainID: UInt64) -> UInt64 { blockchainer_chain_tree_height(UnsafeMutableRawPointer(h), chainID) }
+        public func genesis(_ chainID: UInt64) throws -> Data { try consume(blockchainer_chain_tree_genesis(UnsafeMutableRawPointer(h), chainID), "chain_tree_genesis") }
+        public func tip(_ chainID: UInt64) throws -> Data { try consume(blockchainer_chain_tree_tip(UnsafeMutableRawPointer(h), chainID), "chain_tree_tip") }
+        public func pendingAnchors(_ chainID: UInt64) -> UInt32 { blockchainer_chain_tree_pending_anchors(UnsafeMutableRawPointer(h), chainID) }
+        public func produce(_ chainID: UInt64, timestamp: UInt64) throws -> Data { try consume(blockchainer_chain_tree_produce(UnsafeMutableRawPointer(h), chainID, timestamp), "chain_tree_produce") }
+        public func proveAccount(_ chainID: UInt64, address: Data) throws -> Data {
+            try consume(address.withC { ap, _ in blockchainer_chain_tree_prove_account(UnsafeMutableRawPointer(h), chainID, ap) }, "chain_tree_prove_account")
+        }
+        public func verify(_ proof: Data) -> Bool { proof.withC { pp, pl in blockchainer_chain_tree_verify(UnsafeMutableRawPointer(h), pp, pl) == 1 } }
+    }
+    public static func buildChainTree(_ root: TreeNode) throws -> ChainTree { ensureReady(); return try ChainTree(root: root) }
+
     // ── Subchains: a parent block anchors a child chain's finalized headers ────
     // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
     // genesis HEADER + fixed validator set; anchor its certified headers; prove a

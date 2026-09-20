@@ -22,6 +22,8 @@ const koffi = require('koffi');
 koffi.proto('int BlockchainerJustifyFn(void* ctx, const uint8_t* block, size_t block_len, uint8_t* out, size_t out_cap, size_t* out_len)');
 koffi.proto('int BlockchainerVerifyFn(void* ctx, const uint8_t* block, size_t block_len, const uint8_t* justification, size_t just_len)');
 koffi.proto('uint32_t BlockchainerProposerFn(void* ctx, uint64_t height, uint32_t validator_count)');
+koffi.proto('int BlockchainerTxSourceFn(void* ctx, uint64_t chain_id, uint64_t ts, uint8_t* out, size_t out_cap, size_t* out_len)');
+koffi.proto('void BlockchainerFinalizedFn(void* ctx, uint64_t chain_id, const uint8_t* block, size_t block_len)');
 
 // ── Resolve the bundled native libraries for this platform/arch ──────────────
 function ext() {
@@ -162,6 +164,20 @@ function ensureLoaded() {
     lcSetTrust: f('void blockchainer_light_client_set_trust_level(void*, uint32_t, uint32_t)'),
     lcSetMaxSkip: f('void blockchainer_light_client_set_max_skip(void*, uint64_t)'),
     lcFree: f('void blockchainer_light_client_free(void*)'),
+    treeNodeEncode: f('BlockchainerBufferResult blockchainer_chain_tree_node_encode(uint64_t, uint8_t*, size_t, uint16_t, uint8_t*, uint64_t*, size_t, uint8_t*, uint8_t*, uint64_t*, size_t, uint16_t, uint16_t, uint8_t*, size_t)'),
+    treeSpecError: f('BlockchainerBufferResult blockchainer_chain_tree_spec_error(uint8_t*, size_t)'),
+    treeBuild: f('void *blockchainer_chain_tree_build(uint8_t*, size_t)'),
+    treeChainIds: f('BlockchainerBufferResult blockchainer_chain_tree_chain_ids(void*)'),
+    treeHeight: f('uint64_t blockchainer_chain_tree_height(void*, uint64_t)'),
+    treeGenesis: f('BlockchainerBufferResult blockchainer_chain_tree_genesis(void*, uint64_t)'),
+    treeTip: f('BlockchainerBufferResult blockchainer_chain_tree_tip(void*, uint64_t)'),
+    treePending: f('uint32_t blockchainer_chain_tree_pending_anchors(void*, uint64_t)'),
+    treeProduce: f('BlockchainerBufferResult blockchainer_chain_tree_produce(void*, uint64_t, uint64_t)'),
+    treeProve: f('BlockchainerBufferResult blockchainer_chain_tree_prove_account(void*, uint64_t, uint8_t*)'),
+    treeVerify: f('int blockchainer_chain_tree_verify(void*, uint8_t*, size_t)'),
+    treeSetTxSource: f('void blockchainer_chain_tree_set_tx_source(void*, BlockchainerTxSourceFn*, void*)'),
+    treeSetFinalized: f('void blockchainer_chain_tree_set_finalized_hook(void*, BlockchainerFinalizedFn*, void*)'),
+    treeFree: f('void blockchainer_chain_tree_free(void*)'),
     chainValidators: f('BlockchainerBufferResult blockchainer_chain_validators(void*)'),
     chainSubchainHop: f('BlockchainerBufferResult blockchainer_chain_subchain_hop(void*, uint64_t)'),
     chainProveAccount: f('BlockchainerBufferResult blockchainer_chain_prove_account(void*, uint8_t*)'),
@@ -567,6 +583,57 @@ class LightClient {
   free() { if (this._h) { fn.lcFree(this._h); this._h = null; } }
 }
 
+// ── Chain tree: declare a FAMILY of chains (root, subchains, custom mixtures) and drive it ──
+// node = { chainId, blueprint?: Blueprint (default bft/account), assuranceLevel?: 1, accounts?: [{address, balance}],
+//          validators: [{publicKey, secret?, power}], maxAnchorsPerBlock?, maxHeadersPerAnchor?, children?: [node] }
+function encodeTreeNode(node) {
+  const bpEnc = (node.blueprint || new Blueprint('bft', 'account')).encoded;
+  const accounts = node.accounts || [], validators = node.validators || [], children = node.children || [];
+  const addrs = Buffer.concat(accounts.map((a) => u8(a.address)));
+  const pks = Buffer.concat(validators.map((v) => u8(v.publicKey)));
+  const secrets = Buffer.concat(validators.map((v) => (v.secret ? u8(v.secret) : Buffer.alloc(32))));
+  const kids = blobList(children.map(encodeTreeNode));
+  return consume(fn.treeNodeEncode(BigInt(node.chainId), bpEnc, bpEnc.length, node.assuranceLevel || 1,
+    addrs, u64arr(accounts.map((a) => a.balance)), accounts.length,
+    pks, validators.length ? secrets : null, u64arr(validators.map((v) => v.power)), validators.length,
+    node.maxAnchorsPerBlock || 0, node.maxHeadersPerAnchor || 0, kids, kids.length), 'chain_tree_node_encode');
+}
+/** Why a spec is structurally invalid ('' = valid). */
+function chainTreeSpecError(spec) { return consume(fn.treeSpecError(u8(spec), u8(spec).length), 'chain_tree_spec_error').toString(); }
+const treeKeep = [];
+/** A built family of chains driven in-process: produce() anchors children upward automatically;
+ *  proveAccount() proves any descendant from the root header. Hooks: onFinalized(fn), txSource(fn). */
+class ChainTree {
+  constructor(rootNode) {
+    const spec = encodeTreeNode(rootNode);
+    const err = chainTreeSpecError(spec);
+    if (err) throw new Error('chain tree: ' + err);
+    this._h = fn.treeBuild(spec, spec.length);
+    if (!this._h) throw new Error('chain tree: build rejected (unknown mixture or posture-forbidden engine)');
+  }
+  chainIds() { const b = consume(fn.treeChainIds(this._h), 'chain_tree_chain_ids'); const n = b.readUInt32BE(0); const out = []; for (let i = 0; i < n; i++) out.push(Number(b.readBigUInt64BE(4 + 8 * i))); return out; }
+  height(chainId) { return Number(fn.treeHeight(this._h, BigInt(chainId))); }
+  genesis(chainId) { return consume(fn.treeGenesis(this._h, BigInt(chainId)), 'chain_tree_genesis'); }
+  tip(chainId) { return consume(fn.treeTip(this._h, BigInt(chainId)), 'chain_tree_tip'); }
+  pendingAnchors(chainId) { return fn.treePending(this._h, BigInt(chainId)); }
+  produce(chainId, timestamp) { return consume(fn.treeProduce(this._h, BigInt(chainId), BigInt(timestamp)), 'chain_tree_produce'); }
+  proveAccount(chainId, address) { return consume(fn.treeProve(this._h, BigInt(chainId), u8(address)), 'chain_tree_prove_account'); }
+  verify(proof) { return fn.treeVerify(this._h, u8(proof), u8(proof).length) === 1; }
+  /** fn(chainId, block: Buffer) for every finalized block. */
+  onFinalized(cb) {
+    const reg = koffi.register((_ctx, chainId, block, len) => { try { cb(Number(chainId), Buffer.from(koffi.decode(block, 'uint8_t', Number(len)))); } catch (_) {} }, koffi.pointer('BlockchainerFinalizedFn'));
+    treeKeep.push(reg); fn.treeSetFinalized(this._h, reg, null);
+  }
+  /** fn(chainId, timestamp) → [encodedTx] to include when that chain produces. */
+  txSource(cb) {
+    const reg = koffi.register((_ctx, chainId, ts, out, cap, outLen) => {
+      try { const blob = blobList(cb(Number(chainId), Number(ts)) || []); if (blob.length > cap) return 0; koffi.encode(out, 'uint8_t', blob, blob.length); koffi.encode(outLen, 'size_t', blob.length); return 1; } catch (_) { return 0; }
+    }, koffi.pointer('BlockchainerTxSourceFn'));
+    treeKeep.push(reg); fn.treeSetTxSource(this._h, reg, null);
+  }
+  free() { if (this._h) { fn.treeFree(this._h); this._h = null; } }
+}
+
 // [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
 function blobList(items) {
   const parts = [Buffer.alloc(4)];
@@ -739,6 +806,8 @@ module.exports = {
   MAX_JUSTIFICATION,
   // Light client.
   LightClient, SkipRefused, SkipAccepted, SkipInsufficientOverlap,
+  // Chain tree.
+  ChainTree, encodeTreeNode, chainTreeSpecError,
   // Subchains.
   genesisHeader, encodeChildRegistration, encodeSubchainPolicy, commitSubchainPolicy, commitParentBinding,
   blockHeader, headerSubchainRoot, certifiedHeader, encodeAnchor, encodeSubchainProof, verifySubchainProof,
