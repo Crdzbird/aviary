@@ -56,3 +56,13 @@ re-hashes the original bytes and checks the proof against the chain root.
 
 The server listens on `:50052`. The Flutter client is a thin gRPC client (no native
 blockchain code), so it runs anywhere grpc-dart does; all ledger work is server-side.
+
+## Fleet tab (chain tree: a fleet root anchoring one subchain per device)
+
+`BuildFleet(labels)` declares the whole fleet at once — a root chain plus a BFT
+**subchain per device** whose genesis funds an identity account at
+`BLAKE3(label)` — and builds it in one go (genesis bottom-up, bindings top-down).
+`FleetProduce(chain)` finalizes a block on a device chain or on the root; a root
+block **anchors** every device's finalized headers. `FleetProveDevice(chain)` is
+a cross-chain proof of the device's identity **from the fleet root header**,
+verified against its `subchain_root`. The app's **Fleet** tab drives it.

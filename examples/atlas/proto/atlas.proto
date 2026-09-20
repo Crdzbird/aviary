@@ -36,6 +36,11 @@ service Atlas {
 
   // Live ledger feed (server-streaming): admissions, finalizations, removals.
   rpc StreamEvents(ChainRef) returns (stream Event);
+
+  // ── Governance: a validator council (coordinated rotation) + an auditor
+  // light client that syncs with the OVERLAP rule (bisection through rotations).
+  rpc GetCouncil(ChainRef) returns (Council);
+  rpc CouncilAction(CouncilRequest) returns (Council);
 }
 
 message Empty {}
@@ -139,3 +144,17 @@ message Event {
   string state_root = 7;
   int64 unix_millis = 8;
 }
+
+// ── Governance ────────────────────────────────────────────────────────────────
+message CouncilValidator { string public_key = 1; uint64 power = 2; bool operator = 3; }
+message CouncilStep { string label = 1; bool ok = 2; string detail = 3; }
+message Council {
+  uint64 chain_id = 1;
+  uint64 height = 2;
+  repeated CouncilValidator validators = 3;  // the set in force for the next block
+  uint64 auditor_height = 4;                 // the light client's trusted tip
+  uint32 rotations = 5;
+  repeated CouncilStep log = 6;
+}
+enum CouncilOp { COUNCIL_PRODUCE = 0; COUNCIL_ADD_VALIDATOR = 1; COUNCIL_AUDITOR_SYNC = 2; }
+message CouncilRequest { uint64 chain_id = 1; CouncilOp op = 2; }

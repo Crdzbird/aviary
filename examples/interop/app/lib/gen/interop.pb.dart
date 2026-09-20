@@ -694,6 +694,258 @@ class VerifyResult extends $pb.GeneratedMessage {
   void clearOk() => $_clearField(1);
 }
 
+/// ── Chain tree ─────────────────────────────────────────────────────────────────
+class TreeScenario extends $pb.GeneratedMessage {
+  factory TreeScenario({
+    $core.List<$core.int>? seed,
+    $core.List<$core.int>? aliceAddress,
+    $fixnum.Int64? aliceCredit,
+  }) {
+    final result = create();
+    if (seed != null) result.seed = seed;
+    if (aliceAddress != null) result.aliceAddress = aliceAddress;
+    if (aliceCredit != null) result.aliceCredit = aliceCredit;
+    return result;
+  }
+
+  TreeScenario._();
+
+  factory TreeScenario.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeScenario.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeScenario',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'interop.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'seed', $pb.PbFieldType.OY)
+    ..a<$core.List<$core.int>>(
+        2, _omitFieldNames ? '' : 'aliceAddress', $pb.PbFieldType.OY)
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'aliceCredit', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeScenario clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeScenario copyWith(void Function(TreeScenario) updates) =>
+      super.copyWith((message) => updates(message as TreeScenario))
+          as TreeScenario;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeScenario create() => TreeScenario._();
+  @$core.override
+  TreeScenario createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeScenario getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeScenario>(create);
+  static TreeScenario? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get seed => $_getN(0);
+  @$pb.TagNumber(1)
+  set seed($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSeed() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeed() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<$core.int> get aliceAddress => $_getN(1);
+  @$pb.TagNumber(2)
+  set aliceAddress($core.List<$core.int> value) => $_setBytes(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAliceAddress() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAliceAddress() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get aliceCredit => $_getI64(2);
+  @$pb.TagNumber(3)
+  set aliceCredit($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAliceCredit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAliceCredit() => $_clearField(3);
+}
+
+class TreeResult extends $pb.GeneratedMessage {
+  factory TreeResult({
+    $core.Iterable<$fixnum.Int64>? chainIds,
+    $core.List<$core.int>? rootSubchainRoot,
+    $core.List<$core.int>? rootTipHeader,
+    $core.List<$core.int>? proof,
+    $fixnum.Int64? rootHeight,
+  }) {
+    final result = create();
+    if (chainIds != null) result.chainIds.addAll(chainIds);
+    if (rootSubchainRoot != null) result.rootSubchainRoot = rootSubchainRoot;
+    if (rootTipHeader != null) result.rootTipHeader = rootTipHeader;
+    if (proof != null) result.proof = proof;
+    if (rootHeight != null) result.rootHeight = rootHeight;
+    return result;
+  }
+
+  TreeResult._();
+
+  factory TreeResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'interop.v1'),
+      createEmptyInstance: create)
+    ..p<$fixnum.Int64>(
+        1, _omitFieldNames ? '' : 'chainIds', $pb.PbFieldType.KU6)
+    ..a<$core.List<$core.int>>(
+        2, _omitFieldNames ? '' : 'rootSubchainRoot', $pb.PbFieldType.OY)
+    ..a<$core.List<$core.int>>(
+        3, _omitFieldNames ? '' : 'rootTipHeader', $pb.PbFieldType.OY)
+    ..a<$core.List<$core.int>>(
+        4, _omitFieldNames ? '' : 'proof', $pb.PbFieldType.OY)
+    ..a<$fixnum.Int64>(
+        5, _omitFieldNames ? '' : 'rootHeight', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeResult copyWith(void Function(TreeResult) updates) =>
+      super.copyWith((message) => updates(message as TreeResult)) as TreeResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeResult create() => TreeResult._();
+  @$core.override
+  TreeResult createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeResult>(create);
+  static TreeResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$fixnum.Int64> get chainIds => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.List<$core.int> get rootSubchainRoot => $_getN(1);
+  @$pb.TagNumber(2)
+  set rootSubchainRoot($core.List<$core.int> value) => $_setBytes(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRootSubchainRoot() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRootSubchainRoot() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.List<$core.int> get rootTipHeader => $_getN(2);
+  @$pb.TagNumber(3)
+  set rootTipHeader($core.List<$core.int> value) => $_setBytes(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRootTipHeader() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRootTipHeader() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.List<$core.int> get proof => $_getN(3);
+  @$pb.TagNumber(4)
+  set proof($core.List<$core.int> value) => $_setBytes(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProof() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProof() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get rootHeight => $_getI64(4);
+  @$pb.TagNumber(5)
+  set rootHeight($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRootHeight() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRootHeight() => $_clearField(5);
+}
+
+class TreeProofBundle extends $pb.GeneratedMessage {
+  factory TreeProofBundle({
+    $core.List<$core.int>? rootSubchainRoot,
+    $core.List<$core.int>? proof,
+  }) {
+    final result = create();
+    if (rootSubchainRoot != null) result.rootSubchainRoot = rootSubchainRoot;
+    if (proof != null) result.proof = proof;
+    return result;
+  }
+
+  TreeProofBundle._();
+
+  factory TreeProofBundle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeProofBundle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeProofBundle',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'interop.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'rootSubchainRoot', $pb.PbFieldType.OY)
+    ..a<$core.List<$core.int>>(
+        2, _omitFieldNames ? '' : 'proof', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeProofBundle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeProofBundle copyWith(void Function(TreeProofBundle) updates) =>
+      super.copyWith((message) => updates(message as TreeProofBundle))
+          as TreeProofBundle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeProofBundle create() => TreeProofBundle._();
+  @$core.override
+  TreeProofBundle createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeProofBundle getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeProofBundle>(create);
+  static TreeProofBundle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get rootSubchainRoot => $_getN(0);
+  @$pb.TagNumber(1)
+  set rootSubchainRoot($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRootSubchainRoot() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRootSubchainRoot() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<$core.int> get proof => $_getN(1);
+  @$pb.TagNumber(2)
+  set proof($core.List<$core.int> value) => $_setBytes(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProof() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProof() => $_clearField(2);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

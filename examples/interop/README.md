@@ -34,3 +34,12 @@ The Flutter client connects to `127.0.0.1:50053`, runs all three direction
 checks natively, and shows a green panel ("Ledger is byte-identical across Go and
 Flutter") when every check passes. `server/cmd/probe` runs the same checks
 Go-only.
+
+## Chain tree tab (Go ↔ Flutter, cross-chain proofs)
+
+Both sides build the **same family** — root ← child subchain ← grandchild, with
+validator keys derived from one seed — run the same production schedule, and
+compare: chain ids and the root's `subchain_root` must be byte-identical
+(**go ↔ flutter**); the client verifies Go's cross-chain proof natively
+(**go → flutter**, `BuildTree`); Go verifies the client's proof
+(**flutter → go**, `VerifyTreeProof`). Shown on the **Chain tree** tab.

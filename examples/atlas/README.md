@@ -47,3 +47,16 @@ Or separately: `( cd server && go run . )` then `( cd app && flutter run )`.
 Settle, ProduceBlock, GetBalanceProof, BuildErc20Transfer, FunctionSelector,
 GetMetrics, and `StreamEvents` (server-streaming). The server (`server/`) uses the
 Blockchainer Go binding; the client (`app/`) uses generated grpc-dart stubs.
+
+## Governance tab (validator rotation + auditor light client)
+
+The settlement rail is governed by a **validator council** — a BFT chain whose
+validator set the operator rotates: `CouncilAction(COUNCIL_ADD_VALIDATOR)`
+schedules the next set, the next block **announces** it and is certified by the
+*current* set, so the change is itself finalized and the new set rules from the
+following block. `COUNCIL_AUDITOR_SYNC` runs an **auditor light client** that
+only ever trusted the genesis set: it accepts a far header when that header's
+own set certifies it *and* the signers hold more than 1/3 of the set the auditor
+trusts (the overlap rule), bisecting through rotation headers when the overlap is
+too thin — no header replay. `GetCouncil` returns the set in force, the auditor's
+trusted height and a step log; the app shows it all on the **Governance** tab.

@@ -43,6 +43,7 @@ type server struct {
 	pb.UnimplementedSentinelServer
 	mu      sync.Mutex
 	devices map[uint64]*device
+	fleet   *fleet // the chain tree (fleet.go)
 }
 
 func newServer() *server { return &server{devices: map[uint64]*device{}} }

@@ -1753,6 +1753,339 @@ class Event extends $pb.GeneratedMessage {
   void clearUnixMillis() => $_clearField(8);
 }
 
+/// ── Governance ────────────────────────────────────────────────────────────────
+class CouncilValidator extends $pb.GeneratedMessage {
+  factory CouncilValidator({
+    $core.String? publicKey,
+    $fixnum.Int64? power,
+    $core.bool? operator,
+  }) {
+    final result = create();
+    if (publicKey != null) result.publicKey = publicKey;
+    if (power != null) result.power = power;
+    if (operator != null) result.operator = operator;
+    return result;
+  }
+
+  CouncilValidator._();
+
+  factory CouncilValidator.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CouncilValidator.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CouncilValidator',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'atlas.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'publicKey')
+    ..a<$fixnum.Int64>(2, _omitFieldNames ? '' : 'power', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(3, _omitFieldNames ? '' : 'operator')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CouncilValidator clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CouncilValidator copyWith(void Function(CouncilValidator) updates) =>
+      super.copyWith((message) => updates(message as CouncilValidator))
+          as CouncilValidator;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CouncilValidator create() => CouncilValidator._();
+  @$core.override
+  CouncilValidator createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CouncilValidator getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CouncilValidator>(create);
+  static CouncilValidator? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get publicKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set publicKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPublicKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPublicKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get power => $_getI64(1);
+  @$pb.TagNumber(2)
+  set power($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPower() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPower() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get operator => $_getBF(2);
+  @$pb.TagNumber(3)
+  set operator($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOperator() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOperator() => $_clearField(3);
+}
+
+class CouncilStep extends $pb.GeneratedMessage {
+  factory CouncilStep({
+    $core.String? label,
+    $core.bool? ok,
+    $core.String? detail,
+  }) {
+    final result = create();
+    if (label != null) result.label = label;
+    if (ok != null) result.ok = ok;
+    if (detail != null) result.detail = detail;
+    return result;
+  }
+
+  CouncilStep._();
+
+  factory CouncilStep.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CouncilStep.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CouncilStep',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'atlas.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'label')
+    ..aOB(2, _omitFieldNames ? '' : 'ok')
+    ..aOS(3, _omitFieldNames ? '' : 'detail')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CouncilStep clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CouncilStep copyWith(void Function(CouncilStep) updates) =>
+      super.copyWith((message) => updates(message as CouncilStep))
+          as CouncilStep;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CouncilStep create() => CouncilStep._();
+  @$core.override
+  CouncilStep createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CouncilStep getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CouncilStep>(create);
+  static CouncilStep? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get label => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set label($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLabel() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLabel() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get ok => $_getBF(1);
+  @$pb.TagNumber(2)
+  set ok($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOk() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOk() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get detail => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set detail($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDetail() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDetail() => $_clearField(3);
+}
+
+class Council extends $pb.GeneratedMessage {
+  factory Council({
+    $fixnum.Int64? chainId,
+    $fixnum.Int64? height,
+    $core.Iterable<CouncilValidator>? validators,
+    $fixnum.Int64? auditorHeight,
+    $core.int? rotations,
+    $core.Iterable<CouncilStep>? log,
+  }) {
+    final result = create();
+    if (chainId != null) result.chainId = chainId;
+    if (height != null) result.height = height;
+    if (validators != null) result.validators.addAll(validators);
+    if (auditorHeight != null) result.auditorHeight = auditorHeight;
+    if (rotations != null) result.rotations = rotations;
+    if (log != null) result.log.addAll(log);
+    return result;
+  }
+
+  Council._();
+
+  factory Council.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Council.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Council',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'atlas.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'chainId', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(2, _omitFieldNames ? '' : 'height', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..pPM<CouncilValidator>(3, _omitFieldNames ? '' : 'validators',
+        subBuilder: CouncilValidator.create)
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'auditorHeight', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aI(5, _omitFieldNames ? '' : 'rotations', fieldType: $pb.PbFieldType.OU3)
+    ..pPM<CouncilStep>(6, _omitFieldNames ? '' : 'log',
+        subBuilder: CouncilStep.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Council clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Council copyWith(void Function(Council) updates) =>
+      super.copyWith((message) => updates(message as Council)) as Council;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Council create() => Council._();
+  @$core.override
+  Council createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Council getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Council>(create);
+  static Council? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get chainId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set chainId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChainId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChainId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get height => $_getI64(1);
+  @$pb.TagNumber(2)
+  set height($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasHeight() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearHeight() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<CouncilValidator> get validators => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get auditorHeight => $_getI64(3);
+  @$pb.TagNumber(4)
+  set auditorHeight($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAuditorHeight() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAuditorHeight() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get rotations => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set rotations($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRotations() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRotations() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<CouncilStep> get log => $_getList(5);
+}
+
+class CouncilRequest extends $pb.GeneratedMessage {
+  factory CouncilRequest({
+    $fixnum.Int64? chainId,
+    CouncilOp? op,
+  }) {
+    final result = create();
+    if (chainId != null) result.chainId = chainId;
+    if (op != null) result.op = op;
+    return result;
+  }
+
+  CouncilRequest._();
+
+  factory CouncilRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CouncilRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CouncilRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'atlas.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'chainId', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aE<CouncilOp>(2, _omitFieldNames ? '' : 'op',
+        enumValues: CouncilOp.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CouncilRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CouncilRequest copyWith(void Function(CouncilRequest) updates) =>
+      super.copyWith((message) => updates(message as CouncilRequest))
+          as CouncilRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CouncilRequest create() => CouncilRequest._();
+  @$core.override
+  CouncilRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CouncilRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CouncilRequest>(create);
+  static CouncilRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get chainId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set chainId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChainId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChainId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  CouncilOp get op => $_getN(1);
+  @$pb.TagNumber(2)
+  set op(CouncilOp value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOp() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOp() => $_clearField(2);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

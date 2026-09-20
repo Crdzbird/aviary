@@ -264,3 +264,102 @@ final $typed_data.Uint8List ledgerStatusDescriptor = $convert.base64Decode(
     'CVIJc3RhdGVSb290EkoKC2tpbmRfY291bnRzGAggAygLMikuc2VudGluZWwudjEuTGVkZ2VyU3'
     'RhdHVzLktpbmRDb3VudHNFbnRyeVIKa2luZENvdW50cxo9Cg9LaW5kQ291bnRzRW50cnkSEAoD'
     'a2V5GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKARSBXZhbHVlOgI4AQ==');
+
+@$core.Deprecated('Use fleetSpecDescriptor instead')
+const FleetSpec$json = {
+  '1': 'FleetSpec',
+  '2': [
+    {'1': 'device_labels', '3': 1, '4': 3, '5': 9, '10': 'deviceLabels'},
+  ],
+};
+
+/// Descriptor for `FleetSpec`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fleetSpecDescriptor = $convert.base64Decode(
+    'CglGbGVldFNwZWMSIwoNZGV2aWNlX2xhYmVscxgBIAMoCVIMZGV2aWNlTGFiZWxz');
+
+@$core.Deprecated('Use fleetRefDescriptor instead')
+const FleetRef$json = {
+  '1': 'FleetRef',
+  '2': [
+    {'1': 'chain_id', '3': 1, '4': 1, '5': 4, '10': 'chainId'},
+  ],
+};
+
+/// Descriptor for `FleetRef`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fleetRefDescriptor = $convert
+    .base64Decode('CghGbGVldFJlZhIZCghjaGFpbl9pZBgBIAEoBFIHY2hhaW5JZA==');
+
+@$core.Deprecated('Use fleetNodeDescriptor instead')
+const FleetNode$json = {
+  '1': 'FleetNode',
+  '2': [
+    {'1': 'chain_id', '3': 1, '4': 1, '5': 4, '10': 'chainId'},
+    {'1': 'label', '3': 2, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'height', '3': 3, '4': 1, '5': 4, '10': 'height'},
+    {'1': 'pending_anchors', '3': 4, '4': 1, '5': 13, '10': 'pendingAnchors'},
+    {'1': 'identity_address', '3': 5, '4': 1, '5': 9, '10': 'identityAddress'},
+    {'1': 'root', '3': 6, '4': 1, '5': 8, '10': 'root'},
+  ],
+};
+
+/// Descriptor for `FleetNode`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fleetNodeDescriptor = $convert.base64Decode(
+    'CglGbGVldE5vZGUSGQoIY2hhaW5faWQYASABKARSB2NoYWluSWQSFAoFbGFiZWwYAiABKAlSBW'
+    'xhYmVsEhYKBmhlaWdodBgDIAEoBFIGaGVpZ2h0EicKD3BlbmRpbmdfYW5jaG9ycxgEIAEoDVIO'
+    'cGVuZGluZ0FuY2hvcnMSKQoQaWRlbnRpdHlfYWRkcmVzcxgFIAEoCVIPaWRlbnRpdHlBZGRyZX'
+    'NzEhIKBHJvb3QYBiABKAhSBHJvb3Q=');
+
+@$core.Deprecated('Use fleetDescriptor instead')
+const Fleet$json = {
+  '1': 'Fleet',
+  '2': [
+    {'1': 'built', '3': 1, '4': 1, '5': 8, '10': 'built'},
+    {
+      '1': 'nodes',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.sentinel.v1.FleetNode',
+      '10': 'nodes'
+    },
+    {'1': 'log', '3': 3, '4': 3, '5': 9, '10': 'log'},
+    {
+      '1': 'root_subchain_root',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '10': 'rootSubchainRoot'
+    },
+  ],
+};
+
+/// Descriptor for `Fleet`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fleetDescriptor = $convert.base64Decode(
+    'CgVGbGVldBIUCgVidWlsdBgBIAEoCFIFYnVpbHQSLAoFbm9kZXMYAiADKAsyFi5zZW50aW5lbC'
+    '52MS5GbGVldE5vZGVSBW5vZGVzEhAKA2xvZxgDIAMoCVIDbG9nEiwKEnJvb3Rfc3ViY2hhaW5f'
+    'cm9vdBgEIAEoCVIQcm9vdFN1YmNoYWluUm9vdA==');
+
+@$core.Deprecated('Use fleetProofDescriptor instead')
+const FleetProof$json = {
+  '1': 'FleetProof',
+  '2': [
+    {'1': 'chain_id', '3': 1, '4': 1, '5': 4, '10': 'chainId'},
+    {'1': 'verified', '3': 2, '4': 1, '5': 8, '10': 'verified'},
+    {'1': 'proof_bytes', '3': 3, '4': 1, '5': 13, '10': 'proofBytes'},
+    {
+      '1': 'root_subchain_root',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '10': 'rootSubchainRoot'
+    },
+    {'1': 'identity_address', '3': 5, '4': 1, '5': 9, '10': 'identityAddress'},
+  ],
+};
+
+/// Descriptor for `FleetProof`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fleetProofDescriptor = $convert.base64Decode(
+    'CgpGbGVldFByb29mEhkKCGNoYWluX2lkGAEgASgEUgdjaGFpbklkEhoKCHZlcmlmaWVkGAIgAS'
+    'gIUgh2ZXJpZmllZBIfCgtwcm9vZl9ieXRlcxgDIAEoDVIKcHJvb2ZCeXRlcxIsChJyb290X3N1'
+    'YmNoYWluX3Jvb3QYBCABKAlSEHJvb3RTdWJjaGFpblJvb3QSKQoQaWRlbnRpdHlfYWRkcmVzcx'
+    'gFIAEoCVIPaWRlbnRpdHlBZGRyZXNz');

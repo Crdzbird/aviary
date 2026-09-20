@@ -46,6 +46,8 @@ class _ConsoleState extends State<Console> {
   String _lastSigned = '';
   String _lastProof = '';
   final _amountCtrl = TextEditingController(text: '500000');
+  pb.Council? _council;
+  bool _councilBusy = false;
 
   @override
   void initState() {
@@ -218,23 +220,113 @@ class _ConsoleState extends State<Console> {
       );
     }
     final c = _chain!;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Atlas · ${c.name}'),
-        actions: [
-          Center(child: Text('${c.nativeSymbol}  ', style: const TextStyle(fontWeight: FontWeight.bold))),
-          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
-        ],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Atlas · ${c.name}'),
+          actions: [
+            Center(child: Text('${c.nativeSymbol}  ', style: const TextStyle(fontWeight: FontWeight.bold))),
+            IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
+          ],
+          bottom: const TabBar(tabs: [
+            Tab(icon: Icon(Icons.account_balance), text: 'Settlement'),
+            Tab(icon: Icon(Icons.how_to_vote), text: 'Governance'),
+          ]),
+        ),
+        body: TabBarView(children: [
+          ListView(padding: const EdgeInsets.all(16), children: [
+            _chainCard(c),
+            _walletsCard(),
+            _settleCard(),
+            _metricsCard(),
+            _eventsCard(),
+            _contractCard(),
+          ]),
+          _governanceTab(),
+        ]),
       ),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
-        _chainCard(c),
-        _walletsCard(),
-        _settleCard(),
-        _metricsCard(),
-        _eventsCard(),
-        _contractCard(),
-      ]),
     );
+  }
+
+  // ── Governance tab: validator council rotation + auditor light client ──────
+  Future<void> _councilOp(pb.CouncilOp? op) async {
+    setState(() => _councilBusy = true);
+    try {
+      final ref = pb.ChainRef()..chainId = Int64(kChainId);
+      final c = op == null
+          ? await _client!.getCouncil(ref)
+          : await _client!.councilAction(pb.CouncilRequest()..chainId = Int64(kChainId)..op = op);
+      if (mounted) setState(() => _council = c);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _councilBusy = false);
+    }
+  }
+
+  Widget _governanceTab() {
+    final c = _council;
+    if (c == null && !_councilBusy) _councilOp(null);
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      _section('Validator council', Icons.how_to_vote, [
+        const Text(
+            'The settlement rail is governed by a BFT validator council. A block may '
+            'ANNOUNCE the next set; it is certified by the current set, so the change is '
+            'itself finalized. The operator schedules a rotation, the next block carries it, '
+            'and from then on the new set rules.',
+            style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 10),
+        if (c != null)
+          Wrap(spacing: 28, runSpacing: 10, children: [
+            _stat('Council height', '${c.height}'),
+            _stat('Validators', '${c.validators.length}'),
+            _stat('Rotations', '${c.rotations}'),
+          ]),
+        const SizedBox(height: 8),
+        if (c != null)
+          for (final v in c.validators)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(children: [
+                Icon(v.operator ? Icons.star : Icons.person, size: 16, color: v.operator ? Colors.amberAccent : Colors.white54),
+                const SizedBox(width: 6),
+                Expanded(child: Text('${v.publicKey.substring(0, 16)}…  power ${v.power}${v.operator ? "  (operator)" : ""}',
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
+              ]),
+            ),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          FilledButton.icon(onPressed: _councilBusy ? null : () => _councilOp(pb.CouncilOp.COUNCIL_PRODUCE), icon: const Icon(Icons.layers), label: const Text('Produce block')),
+          FilledButton.icon(onPressed: _councilBusy ? null : () => _councilOp(pb.CouncilOp.COUNCIL_ADD_VALIDATOR), icon: const Icon(Icons.person_add), label: const Text('Add validator (rotate)')),
+        ]),
+      ]),
+      _section('Auditor (light client with the overlap rule)', Icons.travel_explore, [
+        const Text(
+            'An auditor that only ever trusted the GENESIS set catches up without replaying '
+            'every header: a far header is accepted when its own set certifies it and the '
+            'signers hold more than 1/3 of the set the auditor trusts. Across rotations the '
+            'overlap is too thin, so it bisects through the rotation headers.',
+            style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 10),
+        if (c != null) _stat('Auditor trusted height', '${c.auditorHeight} / ${c.height}'),
+        const SizedBox(height: 10),
+        FilledButton.icon(onPressed: _councilBusy ? null : () => _councilOp(pb.CouncilOp.COUNCIL_AUDITOR_SYNC), icon: const Icon(Icons.sync), label: const Text('Sync auditor from genesis')),
+      ]),
+      _section('Governance log', Icons.receipt_long, [
+        if (c == null || c.log.isEmpty)
+          const Text('No governance activity yet.', style: TextStyle(color: Colors.white54))
+        else
+          for (final s in c.log.reversed)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(s.ok ? Icons.check_circle : Icons.error, color: s.ok ? Colors.lightGreenAccent : Colors.redAccent, size: 18),
+              title: Text(s.label, style: const TextStyle(fontSize: 13)),
+              subtitle: Text(s.detail, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+            ),
+      ]),
+    ]);
   }
 
   Widget _section(String title, IconData icon, List<Widget> children) => Card(

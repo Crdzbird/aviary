@@ -35,6 +35,13 @@ service Sentinel {
 
   // Ledger status + Prometheus-style metrics for the device chain.
   rpc GetLedger(DeviceRef) returns (LedgerStatus);
+
+  // ── Fleet: a CHAIN TREE — one fleet root anchoring a subchain per device;
+  // a device's on-chain identity is provable from the fleet root header.
+  rpc BuildFleet(FleetSpec) returns (Fleet);
+  rpc GetFleet(FleetRef) returns (Fleet);
+  rpc FleetProduce(FleetRef) returns (Fleet);
+  rpc FleetProveDevice(FleetRef) returns (FleetProof);
 }
 
 message DeviceInfo {
@@ -111,4 +118,24 @@ message LedgerStatus {
   uint64 mempool = 6;          // pending (not yet finalized)
   string state_root = 7;
   map<string, uint64> kind_counts = 8; // anchored counts by kind name
+}
+
+// ── Fleet (chain tree) ─────────────────────────────────────────────────────────
+message FleetSpec { repeated string device_labels = 1; }
+message FleetRef { uint64 chain_id = 1; }   // 0 = the fleet itself
+message FleetNode {
+  uint64 chain_id = 1;
+  string label = 2;
+  uint64 height = 3;
+  uint32 pending_anchors = 4;   // what the node would anchor on its next block
+  string identity_address = 5;  // BLAKE3(label): the device's genesis-funded identity
+  bool root = 6;
+}
+message Fleet { bool built = 1; repeated FleetNode nodes = 2; repeated string log = 3; string root_subchain_root = 4; }
+message FleetProof {
+  uint64 chain_id = 1;
+  bool verified = 2;
+  uint32 proof_bytes = 3;
+  string root_subchain_root = 4;  // the fleet root header field the proof is verified against
+  string identity_address = 5;
 }

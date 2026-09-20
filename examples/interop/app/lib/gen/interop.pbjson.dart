@@ -128,3 +128,63 @@ const VerifyResult$json = {
 /// Descriptor for `VerifyResult`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List verifyResultDescriptor =
     $convert.base64Decode('CgxWZXJpZnlSZXN1bHQSDgoCb2sYASABKAhSAm9r');
+
+@$core.Deprecated('Use treeScenarioDescriptor instead')
+const TreeScenario$json = {
+  '1': 'TreeScenario',
+  '2': [
+    {'1': 'seed', '3': 1, '4': 1, '5': 12, '10': 'seed'},
+    {'1': 'alice_address', '3': 2, '4': 1, '5': 12, '10': 'aliceAddress'},
+    {'1': 'alice_credit', '3': 3, '4': 1, '5': 4, '10': 'aliceCredit'},
+  ],
+};
+
+/// Descriptor for `TreeScenario`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List treeScenarioDescriptor = $convert.base64Decode(
+    'CgxUcmVlU2NlbmFyaW8SEgoEc2VlZBgBIAEoDFIEc2VlZBIjCg1hbGljZV9hZGRyZXNzGAIgAS'
+    'gMUgxhbGljZUFkZHJlc3MSIQoMYWxpY2VfY3JlZGl0GAMgASgEUgthbGljZUNyZWRpdA==');
+
+@$core.Deprecated('Use treeResultDescriptor instead')
+const TreeResult$json = {
+  '1': 'TreeResult',
+  '2': [
+    {'1': 'chain_ids', '3': 1, '4': 3, '5': 4, '10': 'chainIds'},
+    {
+      '1': 'root_subchain_root',
+      '3': 2,
+      '4': 1,
+      '5': 12,
+      '10': 'rootSubchainRoot'
+    },
+    {'1': 'root_tip_header', '3': 3, '4': 1, '5': 12, '10': 'rootTipHeader'},
+    {'1': 'proof', '3': 4, '4': 1, '5': 12, '10': 'proof'},
+    {'1': 'root_height', '3': 5, '4': 1, '5': 4, '10': 'rootHeight'},
+  ],
+};
+
+/// Descriptor for `TreeResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List treeResultDescriptor = $convert.base64Decode(
+    'CgpUcmVlUmVzdWx0EhsKCWNoYWluX2lkcxgBIAMoBFIIY2hhaW5JZHMSLAoScm9vdF9zdWJjaG'
+    'Fpbl9yb290GAIgASgMUhByb290U3ViY2hhaW5Sb290EiYKD3Jvb3RfdGlwX2hlYWRlchgDIAEo'
+    'DFINcm9vdFRpcEhlYWRlchIUCgVwcm9vZhgEIAEoDFIFcHJvb2YSHwoLcm9vdF9oZWlnaHQYBS'
+    'ABKARSCnJvb3RIZWlnaHQ=');
+
+@$core.Deprecated('Use treeProofBundleDescriptor instead')
+const TreeProofBundle$json = {
+  '1': 'TreeProofBundle',
+  '2': [
+    {
+      '1': 'root_subchain_root',
+      '3': 1,
+      '4': 1,
+      '5': 12,
+      '10': 'rootSubchainRoot'
+    },
+    {'1': 'proof', '3': 2, '4': 1, '5': 12, '10': 'proof'},
+  ],
+};
+
+/// Descriptor for `TreeProofBundle`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List treeProofBundleDescriptor = $convert.base64Decode(
+    'Cg9UcmVlUHJvb2ZCdW5kbGUSLAoScm9vdF9zdWJjaGFpbl9yb290GAEgASgMUhByb290U3ViY2'
+    'hhaW5Sb290EhQKBXByb29mGAIgASgMUgVwcm9vZg==');

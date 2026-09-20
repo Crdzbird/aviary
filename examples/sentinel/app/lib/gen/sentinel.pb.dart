@@ -912,6 +912,404 @@ class LedgerStatus extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $fixnum.Int64> get kindCounts => $_getMap(7);
 }
 
+/// ── Fleet (chain tree) ─────────────────────────────────────────────────────────
+class FleetSpec extends $pb.GeneratedMessage {
+  factory FleetSpec({
+    $core.Iterable<$core.String>? deviceLabels,
+  }) {
+    final result = create();
+    if (deviceLabels != null) result.deviceLabels.addAll(deviceLabels);
+    return result;
+  }
+
+  FleetSpec._();
+
+  factory FleetSpec.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FleetSpec.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FleetSpec',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'sentinel.v1'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'deviceLabels')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetSpec clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetSpec copyWith(void Function(FleetSpec) updates) =>
+      super.copyWith((message) => updates(message as FleetSpec)) as FleetSpec;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FleetSpec create() => FleetSpec._();
+  @$core.override
+  FleetSpec createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FleetSpec getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FleetSpec>(create);
+  static FleetSpec? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get deviceLabels => $_getList(0);
+}
+
+class FleetRef extends $pb.GeneratedMessage {
+  factory FleetRef({
+    $fixnum.Int64? chainId,
+  }) {
+    final result = create();
+    if (chainId != null) result.chainId = chainId;
+    return result;
+  }
+
+  FleetRef._();
+
+  factory FleetRef.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FleetRef.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FleetRef',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'sentinel.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'chainId', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetRef clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetRef copyWith(void Function(FleetRef) updates) =>
+      super.copyWith((message) => updates(message as FleetRef)) as FleetRef;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FleetRef create() => FleetRef._();
+  @$core.override
+  FleetRef createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FleetRef getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FleetRef>(create);
+  static FleetRef? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get chainId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set chainId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChainId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChainId() => $_clearField(1);
+}
+
+class FleetNode extends $pb.GeneratedMessage {
+  factory FleetNode({
+    $fixnum.Int64? chainId,
+    $core.String? label,
+    $fixnum.Int64? height,
+    $core.int? pendingAnchors,
+    $core.String? identityAddress,
+    $core.bool? root,
+  }) {
+    final result = create();
+    if (chainId != null) result.chainId = chainId;
+    if (label != null) result.label = label;
+    if (height != null) result.height = height;
+    if (pendingAnchors != null) result.pendingAnchors = pendingAnchors;
+    if (identityAddress != null) result.identityAddress = identityAddress;
+    if (root != null) result.root = root;
+    return result;
+  }
+
+  FleetNode._();
+
+  factory FleetNode.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FleetNode.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FleetNode',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'sentinel.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'chainId', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(2, _omitFieldNames ? '' : 'label')
+    ..a<$fixnum.Int64>(3, _omitFieldNames ? '' : 'height', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aI(4, _omitFieldNames ? '' : 'pendingAnchors',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(5, _omitFieldNames ? '' : 'identityAddress')
+    ..aOB(6, _omitFieldNames ? '' : 'root')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetNode clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetNode copyWith(void Function(FleetNode) updates) =>
+      super.copyWith((message) => updates(message as FleetNode)) as FleetNode;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FleetNode create() => FleetNode._();
+  @$core.override
+  FleetNode createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FleetNode getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FleetNode>(create);
+  static FleetNode? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get chainId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set chainId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChainId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChainId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get label => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set label($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLabel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLabel() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get height => $_getI64(2);
+  @$pb.TagNumber(3)
+  set height($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHeight() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHeight() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get pendingAnchors => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set pendingAnchors($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPendingAnchors() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPendingAnchors() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get identityAddress => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set identityAddress($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasIdentityAddress() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIdentityAddress() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get root => $_getBF(5);
+  @$pb.TagNumber(6)
+  set root($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRoot() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRoot() => $_clearField(6);
+}
+
+class Fleet extends $pb.GeneratedMessage {
+  factory Fleet({
+    $core.bool? built,
+    $core.Iterable<FleetNode>? nodes,
+    $core.Iterable<$core.String>? log,
+    $core.String? rootSubchainRoot,
+  }) {
+    final result = create();
+    if (built != null) result.built = built;
+    if (nodes != null) result.nodes.addAll(nodes);
+    if (log != null) result.log.addAll(log);
+    if (rootSubchainRoot != null) result.rootSubchainRoot = rootSubchainRoot;
+    return result;
+  }
+
+  Fleet._();
+
+  factory Fleet.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Fleet.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Fleet',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'sentinel.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'built')
+    ..pPM<FleetNode>(2, _omitFieldNames ? '' : 'nodes',
+        subBuilder: FleetNode.create)
+    ..pPS(3, _omitFieldNames ? '' : 'log')
+    ..aOS(4, _omitFieldNames ? '' : 'rootSubchainRoot')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Fleet clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Fleet copyWith(void Function(Fleet) updates) =>
+      super.copyWith((message) => updates(message as Fleet)) as Fleet;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Fleet create() => Fleet._();
+  @$core.override
+  Fleet createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Fleet getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Fleet>(create);
+  static Fleet? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get built => $_getBF(0);
+  @$pb.TagNumber(1)
+  set built($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuilt() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuilt() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<FleetNode> get nodes => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get log => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.String get rootSubchainRoot => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set rootSubchainRoot($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRootSubchainRoot() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRootSubchainRoot() => $_clearField(4);
+}
+
+class FleetProof extends $pb.GeneratedMessage {
+  factory FleetProof({
+    $fixnum.Int64? chainId,
+    $core.bool? verified,
+    $core.int? proofBytes,
+    $core.String? rootSubchainRoot,
+    $core.String? identityAddress,
+  }) {
+    final result = create();
+    if (chainId != null) result.chainId = chainId;
+    if (verified != null) result.verified = verified;
+    if (proofBytes != null) result.proofBytes = proofBytes;
+    if (rootSubchainRoot != null) result.rootSubchainRoot = rootSubchainRoot;
+    if (identityAddress != null) result.identityAddress = identityAddress;
+    return result;
+  }
+
+  FleetProof._();
+
+  factory FleetProof.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FleetProof.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FleetProof',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'sentinel.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'chainId', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(2, _omitFieldNames ? '' : 'verified')
+    ..aI(3, _omitFieldNames ? '' : 'proofBytes', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(4, _omitFieldNames ? '' : 'rootSubchainRoot')
+    ..aOS(5, _omitFieldNames ? '' : 'identityAddress')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetProof clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FleetProof copyWith(void Function(FleetProof) updates) =>
+      super.copyWith((message) => updates(message as FleetProof)) as FleetProof;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FleetProof create() => FleetProof._();
+  @$core.override
+  FleetProof createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FleetProof getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FleetProof>(create);
+  static FleetProof? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get chainId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set chainId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChainId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChainId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get verified => $_getBF(1);
+  @$pb.TagNumber(2)
+  set verified($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasVerified() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearVerified() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get proofBytes => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set proofBytes($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasProofBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProofBytes() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get rootSubchainRoot => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set rootSubchainRoot($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRootSubchainRoot() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRootSubchainRoot() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get identityAddress => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set identityAddress($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasIdentityAddress() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIdentityAddress() => $_clearField(5);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

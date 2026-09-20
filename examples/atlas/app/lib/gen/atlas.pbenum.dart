@@ -39,5 +39,27 @@ class EventType extends $pb.ProtobufEnum {
   const EventType._(super.value, super.name);
 }
 
+class CouncilOp extends $pb.ProtobufEnum {
+  static const CouncilOp COUNCIL_PRODUCE =
+      CouncilOp._(0, _omitEnumNames ? '' : 'COUNCIL_PRODUCE');
+  static const CouncilOp COUNCIL_ADD_VALIDATOR =
+      CouncilOp._(1, _omitEnumNames ? '' : 'COUNCIL_ADD_VALIDATOR');
+  static const CouncilOp COUNCIL_AUDITOR_SYNC =
+      CouncilOp._(2, _omitEnumNames ? '' : 'COUNCIL_AUDITOR_SYNC');
+
+  static const $core.List<CouncilOp> values = <CouncilOp>[
+    COUNCIL_PRODUCE,
+    COUNCIL_ADD_VALIDATOR,
+    COUNCIL_AUDITOR_SYNC,
+  ];
+
+  static final $core.List<CouncilOp?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static CouncilOp? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CouncilOp._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

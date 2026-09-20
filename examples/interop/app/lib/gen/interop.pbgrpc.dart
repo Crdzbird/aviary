@@ -56,6 +56,23 @@ class InteropClient extends $grpc.Client {
     return $createUnaryCall(_$verifyProof, request, options: options);
   }
 
+  /// ── Chain tree: Go builds a deterministic family (root ← child ← grandchild)
+  /// from shared seeds; Flutter builds the SAME tree natively. Roots must match,
+  /// and each side verifies the other's cross-chain proof.
+  $grpc.ResponseFuture<$0.TreeResult> buildTree(
+    $0.TreeScenario request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$buildTree, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.VerifyResult> verifyTreeProof(
+    $0.TreeProofBundle request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$verifyTreeProof, request, options: options);
+  }
+
   // method descriptors
 
   static final _$computeCanonical =
@@ -72,6 +89,15 @@ class InteropClient extends $grpc.Client {
       $grpc.ClientMethod<$0.ProofBundle, $0.VerifyResult>(
           '/interop.v1.Interop/VerifyProof',
           ($0.ProofBundle value) => value.writeToBuffer(),
+          $0.VerifyResult.fromBuffer);
+  static final _$buildTree = $grpc.ClientMethod<$0.TreeScenario, $0.TreeResult>(
+      '/interop.v1.Interop/BuildTree',
+      ($0.TreeScenario value) => value.writeToBuffer(),
+      $0.TreeResult.fromBuffer);
+  static final _$verifyTreeProof =
+      $grpc.ClientMethod<$0.TreeProofBundle, $0.VerifyResult>(
+          '/interop.v1.Interop/VerifyTreeProof',
+          ($0.TreeProofBundle value) => value.writeToBuffer(),
           $0.VerifyResult.fromBuffer);
 }
 
@@ -101,6 +127,20 @@ abstract class InteropServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.ProofBundle.fromBuffer(value),
         ($0.VerifyResult value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.TreeScenario, $0.TreeResult>(
+        'BuildTree',
+        buildTree_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.TreeScenario.fromBuffer(value),
+        ($0.TreeResult value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.TreeProofBundle, $0.VerifyResult>(
+        'VerifyTreeProof',
+        verifyTreeProof_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.TreeProofBundle.fromBuffer(value),
+        ($0.VerifyResult value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.CanonicalOutput> computeCanonical_Pre(
@@ -127,4 +167,20 @@ abstract class InteropServiceBase extends $grpc.Service {
 
   $async.Future<$0.VerifyResult> verifyProof(
       $grpc.ServiceCall call, $0.ProofBundle request);
+
+  $async.Future<$0.TreeResult> buildTree_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.TreeScenario> $request) async {
+    return buildTree($call, await $request);
+  }
+
+  $async.Future<$0.TreeResult> buildTree(
+      $grpc.ServiceCall call, $0.TreeScenario request);
+
+  $async.Future<$0.VerifyResult> verifyTreeProof_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.TreeProofBundle> $request) async {
+    return verifyTreeProof($call, await $request);
+  }
+
+  $async.Future<$0.VerifyResult> verifyTreeProof(
+      $grpc.ServiceCall call, $0.TreeProofBundle request);
 }

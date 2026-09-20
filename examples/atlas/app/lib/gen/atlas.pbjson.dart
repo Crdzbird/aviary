@@ -31,6 +31,21 @@ final $typed_data.Uint8List eventTypeDescriptor = $convert.base64Decode(
     'CglFdmVudFR5cGUSFQoRRVZFTlRfVU5TUEVDSUZJRUQQABIPCgtUWF9BRE1JVFRFRBABEhMKD0'
     'JMT0NLX0ZJTkFMSVpFRBACEg4KClRYX1JFTU9WRUQQAw==');
 
+@$core.Deprecated('Use councilOpDescriptor instead')
+const CouncilOp$json = {
+  '1': 'CouncilOp',
+  '2': [
+    {'1': 'COUNCIL_PRODUCE', '2': 0},
+    {'1': 'COUNCIL_ADD_VALIDATOR', '2': 1},
+    {'1': 'COUNCIL_AUDITOR_SYNC', '2': 2},
+  ],
+};
+
+/// Descriptor for `CouncilOp`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List councilOpDescriptor = $convert.base64Decode(
+    'CglDb3VuY2lsT3ASEwoPQ09VTkNJTF9QUk9EVUNFEAASGQoVQ09VTkNJTF9BRERfVkFMSURBVE'
+    '9SEAESGAoUQ09VTkNJTF9BVURJVE9SX1NZTkMQAg==');
+
 @$core.Deprecated('Use emptyDescriptor instead')
 const Empty$json = {
   '1': 'Empty',
@@ -374,3 +389,89 @@ final $typed_data.Uint8List eventDescriptor = $convert.base64Decode(
     'GAQgASgEUgd0eENvdW50EhIKBHR4aWQYBSABKAlSBHR4aWQSIQoMbWVtcG9vbF9zaXplGAYgAS'
     'gEUgttZW1wb29sU2l6ZRIdCgpzdGF0ZV9yb290GAcgASgJUglzdGF0ZVJvb3QSHwoLdW5peF9t'
     'aWxsaXMYCCABKANSCnVuaXhNaWxsaXM=');
+
+@$core.Deprecated('Use councilValidatorDescriptor instead')
+const CouncilValidator$json = {
+  '1': 'CouncilValidator',
+  '2': [
+    {'1': 'public_key', '3': 1, '4': 1, '5': 9, '10': 'publicKey'},
+    {'1': 'power', '3': 2, '4': 1, '5': 4, '10': 'power'},
+    {'1': 'operator', '3': 3, '4': 1, '5': 8, '10': 'operator'},
+  ],
+};
+
+/// Descriptor for `CouncilValidator`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List councilValidatorDescriptor = $convert.base64Decode(
+    'ChBDb3VuY2lsVmFsaWRhdG9yEh0KCnB1YmxpY19rZXkYASABKAlSCXB1YmxpY0tleRIUCgVwb3'
+    'dlchgCIAEoBFIFcG93ZXISGgoIb3BlcmF0b3IYAyABKAhSCG9wZXJhdG9y');
+
+@$core.Deprecated('Use councilStepDescriptor instead')
+const CouncilStep$json = {
+  '1': 'CouncilStep',
+  '2': [
+    {'1': 'label', '3': 1, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'ok', '3': 2, '4': 1, '5': 8, '10': 'ok'},
+    {'1': 'detail', '3': 3, '4': 1, '5': 9, '10': 'detail'},
+  ],
+};
+
+/// Descriptor for `CouncilStep`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List councilStepDescriptor = $convert.base64Decode(
+    'CgtDb3VuY2lsU3RlcBIUCgVsYWJlbBgBIAEoCVIFbGFiZWwSDgoCb2sYAiABKAhSAm9rEhYKBm'
+    'RldGFpbBgDIAEoCVIGZGV0YWls');
+
+@$core.Deprecated('Use councilDescriptor instead')
+const Council$json = {
+  '1': 'Council',
+  '2': [
+    {'1': 'chain_id', '3': 1, '4': 1, '5': 4, '10': 'chainId'},
+    {'1': 'height', '3': 2, '4': 1, '5': 4, '10': 'height'},
+    {
+      '1': 'validators',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.atlas.v1.CouncilValidator',
+      '10': 'validators'
+    },
+    {'1': 'auditor_height', '3': 4, '4': 1, '5': 4, '10': 'auditorHeight'},
+    {'1': 'rotations', '3': 5, '4': 1, '5': 13, '10': 'rotations'},
+    {
+      '1': 'log',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.atlas.v1.CouncilStep',
+      '10': 'log'
+    },
+  ],
+};
+
+/// Descriptor for `Council`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List councilDescriptor = $convert.base64Decode(
+    'CgdDb3VuY2lsEhkKCGNoYWluX2lkGAEgASgEUgdjaGFpbklkEhYKBmhlaWdodBgCIAEoBFIGaG'
+    'VpZ2h0EjoKCnZhbGlkYXRvcnMYAyADKAsyGi5hdGxhcy52MS5Db3VuY2lsVmFsaWRhdG9yUgp2'
+    'YWxpZGF0b3JzEiUKDmF1ZGl0b3JfaGVpZ2h0GAQgASgEUg1hdWRpdG9ySGVpZ2h0EhwKCXJvdG'
+    'F0aW9ucxgFIAEoDVIJcm90YXRpb25zEicKA2xvZxgGIAMoCzIVLmF0bGFzLnYxLkNvdW5jaWxT'
+    'dGVwUgNsb2c=');
+
+@$core.Deprecated('Use councilRequestDescriptor instead')
+const CouncilRequest$json = {
+  '1': 'CouncilRequest',
+  '2': [
+    {'1': 'chain_id', '3': 1, '4': 1, '5': 4, '10': 'chainId'},
+    {
+      '1': 'op',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.atlas.v1.CouncilOp',
+      '10': 'op'
+    },
+  ],
+};
+
+/// Descriptor for `CouncilRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List councilRequestDescriptor = $convert.base64Decode(
+    'Cg5Db3VuY2lsUmVxdWVzdBIZCghjaGFpbl9pZBgBIAEoBFIHY2hhaW5JZBIjCgJvcBgCIAEoDj'
+    'ITLmF0bGFzLnYxLkNvdW5jaWxPcFICb3A=');

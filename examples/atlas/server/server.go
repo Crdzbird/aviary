@@ -47,8 +47,9 @@ type chain struct {
 
 type server struct {
 	pb.UnimplementedAtlasServer
-	mu     sync.Mutex
-	chains map[uint64]*chain
+	mu       sync.Mutex
+	chains   map[uint64]*chain
+	councils map[uint64]*council // governance rail per settlement chain (council.go)
 }
 
 func newServer() *server { return &server{chains: map[uint64]*chain{}} }

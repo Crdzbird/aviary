@@ -76,6 +76,19 @@ class _InteropScreenState extends State<InteropScreen> {
       _Check('Go verifies client proof'),
     ]),
   ];
+  // The chain-tree tab: the same deterministic family built on both sides.
+  late final List<_Direction> _treeDirs = [
+    _Direction('go <-> flutter', 'Same tree spec → same family, byte-identical roots', Icons.park, [
+      _Check('chain ids match (pre-order)'),
+      _Check('root subchain_root matches after producing upward'),
+    ]),
+    _Direction('go -> flutter', "Client verifies Go's cross-chain proof natively", Icons.south_west, [
+      _Check('grandchild account proven from the Go root, verified in Flutter'),
+    ]),
+    _Direction('flutter -> go', "Go verifies the client's cross-chain proof", Icons.north_east, [
+      _Check('Flutter proof verified by Go against its own root'),
+    ]),
+  ];
 
   @override
   void initState() {
@@ -124,9 +137,16 @@ class _InteropScreenState extends State<InteropScreen> {
         }
       }
     });
+    for (final d in _treeDirs) {
+      for (final c in d.checks) {
+        c.pass = null;
+        c.detail = '';
+      }
+    }
     try {
       await _runCanonical();
       await _runLedger();
+      await _runTree();
     } catch (e) {
       setState(() => _error = '$e');
     } finally {
@@ -208,6 +228,44 @@ class _InteropScreenState extends State<InteropScreen> {
     node.dispose();
   }
 
+  // Chain tree: Go and Flutter each build root ← child ← grandchild from the
+  // same seed (validator keys derive from seed ‖ role), run the same production
+  // schedule, and cross-verify proofs. Identical specs ⇒ identical headers.
+  Future<void> _runTree() async {
+    final bc = Blockchainer.instance;
+    final seed = Uint8List.fromList(List.generate(32, (i) => (i * 17 + 3) & 0xff));
+    final alice = Uint8List.fromList(List.generate(32, (i) => (i * 5 + 1) & 0xff));
+    ({Uint8List publicKey, Uint8List? secret, int power}) val(String role) {
+      final v = bc.newBLSValidator(bc.hash(Uint8List.fromList([...seed, ...role.codeUnits])));
+      return (publicKey: v.public, secret: v.secret, power: 1);
+    }
+    final local = bc.buildChainTree(TreeNode(chainId: 1, validators: [val('root')], children: [
+      TreeNode(chainId: 42, validators: [val('child')], children: [
+        TreeNode(chainId: 420, validators: [val('grandchild')], accounts: [(address: alice, balance: 1000)]),
+      ]),
+    ]));
+    try {
+      for (final step in [(420, 2), (420, 3), (42, 2), (1, 2)]) {
+        local.produce(step.$1, step.$2);
+      }
+      final localRoot = bc.headerSubchainRoot(local.tip(1));
+      final localProof = local.proveAccount(420, alice);
+      final go = await _client!.buildTree(pb.TreeScenario()..seed = seed..aliceAddress = alice..aliceCredit = Int64(1000));
+      final d0 = _treeDirs[0];
+      final idsOk = go.chainIds.map((e) => e.toInt()).join(',') == local.chainIds().join(',');
+      _set(d0.checks[0], idsOk, 'Go ${go.chainIds.join(",")} · Flutter ${local.chainIds().join(",")}');
+      final goRoot = Uint8List.fromList(go.rootSubchainRoot);
+      final rootsOk = _eq(goRoot, localRoot);
+      _set(d0.checks[1], rootsOk, rootsOk ? '${_hex(localRoot).substring(0, 24)}… on both sides' : 'Go ${_hex(goRoot).substring(0, 16)}… ≠ Flutter ${_hex(localRoot).substring(0, 16)}…');
+      final goProof = Uint8List.fromList(go.proof);
+      _set(_treeDirs[1].checks[0], bc.verifySubchainProof(goRoot, goProof), '${goProof.length}-byte proof (2 hops) from Go verified natively');
+      final vr = await _client!.verifyTreeProof(pb.TreeProofBundle()..rootSubchainRoot = localRoot..proof = localProof);
+      _set(_treeDirs[2].checks[0], vr.ok, '${localProof.length}-byte proof from Flutter verified by Go');
+    } finally {
+      local.free();
+    }
+  }
+
   void _set(_Check c, bool pass, String detail) {
     setState(() {
       c.pass = pass;
@@ -226,14 +284,18 @@ class _InteropScreenState extends State<InteropScreen> {
   Widget build(BuildContext context) {
     final allDone = _dirs.every((d) => d.done);
     final allOk = allDone && _dirs.every((d) => d.ok);
-    return Scaffold(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Blockchainer · Go <-> Flutter'),
+        bottom: const TabBar(tabs: [Tab(icon: Icon(Icons.account_balance_wallet), text: 'Ledger'), Tab(icon: Icon(Icons.park), text: 'Chain tree')]),
         actions: [
           IconButton(onPressed: _running ? null : _runAll, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      body: TabBarView(children: [
+        ListView(padding: const EdgeInsets.all(16), children: [
         Card(
           color: !allDone
               ? null
@@ -286,6 +348,12 @@ class _InteropScreenState extends State<InteropScreen> {
           ),
         ..._dirs.map(_directionCard),
       ]),
+        ListView(padding: const EdgeInsets.all(16), children: [
+          const Padding(padding: EdgeInsets.only(bottom: 4), child: Text('Both sides build the same family — a root, a child subchain and a grandchild — from one seed, produce blocks upward, and exchange cross-chain proofs.', style: TextStyle(color: Colors.white70, fontSize: 13))),
+          ..._treeDirs.map(_directionCard),
+        ]),
+      ]),
+      ),
     );
   }
 

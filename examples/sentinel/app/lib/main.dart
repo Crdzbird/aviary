@@ -57,6 +57,9 @@ class _RecorderState extends State<Recorder> {
   pb.DeviceInfo? _info;
   pb.Provenance? _prov;
   pb.LedgerStatus? _ledger;
+  pb.Fleet? _fleet;
+  pb.FleetProof? _fleetProof;
+  bool _fleetBusy = false;
 
   StreamController<pb.DataRecord>? _out;
   StreamSubscription<pb.AnchorReceipt>? _sub;
@@ -249,15 +252,115 @@ class _RecorderState extends State<Recorder> {
     if (_prov == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sentinel · Device Provenance')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
-        _identityCard(),
-        _captureCard(),
-        _ledgerCard(),
-        _feedCard(),
-      ]),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Sentinel · Device Provenance'),
+          bottom: const TabBar(tabs: [
+            Tab(icon: Icon(Icons.videocam), text: 'Recorder'),
+            Tab(icon: Icon(Icons.device_hub), text: 'Fleet'),
+          ]),
+        ),
+        body: TabBarView(children: [
+          ListView(padding: const EdgeInsets.all(16), children: [
+            _identityCard(),
+            _captureCard(),
+            _ledgerCard(),
+            _feedCard(),
+          ]),
+          _fleetTab(),
+        ]),
+      ),
     );
+  }
+
+  // ── Fleet tab: a chain tree — the fleet root anchors one subchain per device ──
+  Future<void> _fleetCall(Future<void> Function() f) async {
+    setState(() => _fleetBusy = true);
+    try {
+      await f();
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _fleetBusy = false);
+    }
+  }
+
+  Future<void> _fleetBuild() => _fleetCall(() async {
+        final me = _info?.model.isNotEmpty == true ? _info!.model : 'this device';
+        final f = await _client!.buildFleet(pb.FleetSpec()..deviceLabels.addAll([me, 'bodycam-07', 'dashcam-12']));
+        if (mounted) setState(() { _fleet = f; _fleetProof = null; });
+      });
+  Future<void> _fleetRefresh() => _fleetCall(() async {
+        final f = await _client!.getFleet(pb.FleetRef());
+        if (mounted) setState(() => _fleet = f);
+      });
+  Future<void> _fleetProduce(int chainId) => _fleetCall(() async {
+        final f = await _client!.fleetProduce(pb.FleetRef()..chainId = Int64(chainId));
+        if (mounted) setState(() => _fleet = f);
+      });
+  Future<void> _fleetProve(int chainId) => _fleetCall(() async {
+        final p = await _client!.fleetProveDevice(pb.FleetRef()..chainId = Int64(chainId));
+        final f = await _client!.getFleet(pb.FleetRef());
+        if (mounted) setState(() { _fleetProof = p; _fleet = f; });
+      });
+
+  Widget _fleetTab() {
+    final f = _fleet;
+    if (f == null && !_fleetBusy) _fleetRefresh();
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      _section('Fleet chain tree', Icons.device_hub, [
+        const Text(
+            'One declaration builds the whole fleet: a root chain and a BFT subchain per '
+            'device (genesis bottom-up, bindings top-down). Producing on the root anchors '
+            'every device\'s finalized headers; a device\'s on-chain identity is then '
+            'provable from the fleet root header alone.',
+            style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 10),
+        if (f == null || !f.built)
+          FilledButton.icon(onPressed: _fleetBusy ? null : _fleetBuild, icon: const Icon(Icons.build), label: const Text('Build fleet (this device + 2 more)'))
+        else ...[
+          for (final n in f.nodes)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(n.root ? Icons.hub : Icons.smartphone, size: 18, color: n.root ? Colors.amberAccent : Colors.tealAccent),
+              title: Text('${n.label} · chain ${n.chainId}', style: const TextStyle(fontSize: 13)),
+              subtitle: Text('height ${n.height}${n.root ? " · pending anchors ${n.pendingAnchors}" : " · identity ${n.identityAddress.substring(0, 12)}…"}',
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+              trailing: Wrap(spacing: 4, children: [
+                IconButton(tooltip: n.root ? 'Produce root block (anchor devices)' : 'Produce device block', onPressed: _fleetBusy ? null : () => _fleetProduce(n.chainId.toInt()), icon: const Icon(Icons.layers, size: 18)),
+                if (!n.root) IconButton(tooltip: 'Prove identity from the fleet root', onPressed: _fleetBusy ? null : () => _fleetProve(n.chainId.toInt()), icon: const Icon(Icons.verified_user, size: 18)),
+              ]),
+            ),
+          if (f.rootSubchainRoot.isNotEmpty)
+            Padding(padding: const EdgeInsets.only(top: 6), child: Text('root subchain_root ${f.rootSubchainRoot.substring(0, 24)}…', style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.white54))),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(onPressed: _fleetBusy ? null : _fleetBuild, icon: const Icon(Icons.refresh), label: const Text('Rebuild fleet')),
+        ],
+      ]),
+      if (_fleetProof != null)
+        _section('Cross-chain proof', Icons.verified_user, [
+          Row(children: [
+            Icon(_fleetProof!.verified ? Icons.check_circle : Icons.error, color: _fleetProof!.verified ? Colors.lightGreenAccent : Colors.redAccent),
+            const SizedBox(width: 8),
+            Expanded(child: Text(_fleetProof!.verified
+                ? 'Device ${_fleetProof!.chainId} identity verified from the fleet root header (${_fleetProof!.proofBytes} B proof)'
+                : 'Not verifiable from the current root — produce a device block, then a root block, then prove again.')),
+          ]),
+          const SizedBox(height: 6),
+          Text('identity ${_fleetProof!.identityAddress}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+          Text('against subchain_root ${_fleetProof!.rootSubchainRoot}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+        ]),
+      _section('Fleet log', Icons.receipt_long, [
+        if (f == null || f.log.isEmpty)
+          const Text('No fleet activity yet.', style: TextStyle(color: Colors.white54))
+        else
+          for (final l in f.log.reversed)
+            Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
+      ]),
+    ]);
   }
 
   Widget _section(String title, IconData icon, List<Widget> children, {Widget? trailing}) => Card(

@@ -26,6 +26,12 @@ service Interop {
 
   // flutter → go: the server verifies a proof the client produced.
   rpc VerifyProof(ProofBundle) returns (VerifyResult);
+
+  // ── Chain tree: Go builds a deterministic family (root ← child ← grandchild)
+  // from shared seeds; Flutter builds the SAME tree natively. Roots must match,
+  // and each side verifies the other's cross-chain proof.
+  rpc BuildTree(TreeScenario) returns (TreeResult);
+  rpc VerifyTreeProof(TreeProofBundle) returns (VerifyResult);
 }
 
 // Inputs for the canonical-bytes handshake.
@@ -80,3 +86,14 @@ message ProofBundle {
   bytes proof = 2;
 }
 message VerifyResult { bool ok = 1; }
+
+// ── Chain tree ─────────────────────────────────────────────────────────────────
+message TreeScenario { bytes seed = 1; bytes alice_address = 2; uint64 alice_credit = 3; }
+message TreeResult {
+  repeated uint64 chain_ids = 1;
+  bytes root_subchain_root = 2;   // the root tip header's subchain_root after producing upward
+  bytes root_tip_header = 3;      // the encoded root tip header
+  bytes proof = 4;                // SubchainProof of alice on the grandchild, from the root
+  uint64 root_height = 5;
+}
+message TreeProofBundle { bytes root_subchain_root = 1; bytes proof = 2; }

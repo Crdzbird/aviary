@@ -67,6 +67,36 @@ class SentinelClient extends $grpc.Client {
     return $createUnaryCall(_$getLedger, request, options: options);
   }
 
+  /// ── Fleet: a CHAIN TREE — one fleet root anchoring a subchain per device;
+  /// a device's on-chain identity is provable from the fleet root header.
+  $grpc.ResponseFuture<$0.Fleet> buildFleet(
+    $0.FleetSpec request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$buildFleet, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.Fleet> getFleet(
+    $0.FleetRef request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getFleet, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.Fleet> fleetProduce(
+    $0.FleetRef request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$fleetProduce, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.FleetProof> fleetProveDevice(
+    $0.FleetRef request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$fleetProveDevice, request, options: options);
+  }
+
   // method descriptors
 
   static final _$provisionDevice =
@@ -88,6 +118,23 @@ class SentinelClient extends $grpc.Client {
       '/sentinel.v1.Sentinel/GetLedger',
       ($0.DeviceRef value) => value.writeToBuffer(),
       $0.LedgerStatus.fromBuffer);
+  static final _$buildFleet = $grpc.ClientMethod<$0.FleetSpec, $0.Fleet>(
+      '/sentinel.v1.Sentinel/BuildFleet',
+      ($0.FleetSpec value) => value.writeToBuffer(),
+      $0.Fleet.fromBuffer);
+  static final _$getFleet = $grpc.ClientMethod<$0.FleetRef, $0.Fleet>(
+      '/sentinel.v1.Sentinel/GetFleet',
+      ($0.FleetRef value) => value.writeToBuffer(),
+      $0.Fleet.fromBuffer);
+  static final _$fleetProduce = $grpc.ClientMethod<$0.FleetRef, $0.Fleet>(
+      '/sentinel.v1.Sentinel/FleetProduce',
+      ($0.FleetRef value) => value.writeToBuffer(),
+      $0.Fleet.fromBuffer);
+  static final _$fleetProveDevice =
+      $grpc.ClientMethod<$0.FleetRef, $0.FleetProof>(
+          '/sentinel.v1.Sentinel/FleetProveDevice',
+          ($0.FleetRef value) => value.writeToBuffer(),
+          $0.FleetProof.fromBuffer);
 }
 
 @$pb.GrpcServiceName('sentinel.v1.Sentinel')
@@ -123,6 +170,34 @@ abstract class SentinelServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.DeviceRef.fromBuffer(value),
         ($0.LedgerStatus value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.FleetSpec, $0.Fleet>(
+        'BuildFleet',
+        buildFleet_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.FleetSpec.fromBuffer(value),
+        ($0.Fleet value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.FleetRef, $0.Fleet>(
+        'GetFleet',
+        getFleet_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.FleetRef.fromBuffer(value),
+        ($0.Fleet value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.FleetRef, $0.Fleet>(
+        'FleetProduce',
+        fleetProduce_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.FleetRef.fromBuffer(value),
+        ($0.Fleet value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.FleetRef, $0.FleetProof>(
+        'FleetProveDevice',
+        fleetProveDevice_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.FleetRef.fromBuffer(value),
+        ($0.FleetProof value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.Provenance> provisionDevice_Pre(
@@ -151,4 +226,35 @@ abstract class SentinelServiceBase extends $grpc.Service {
 
   $async.Future<$0.LedgerStatus> getLedger(
       $grpc.ServiceCall call, $0.DeviceRef request);
+
+  $async.Future<$0.Fleet> buildFleet_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.FleetSpec> $request) async {
+    return buildFleet($call, await $request);
+  }
+
+  $async.Future<$0.Fleet> buildFleet(
+      $grpc.ServiceCall call, $0.FleetSpec request);
+
+  $async.Future<$0.Fleet> getFleet_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.FleetRef> $request) async {
+    return getFleet($call, await $request);
+  }
+
+  $async.Future<$0.Fleet> getFleet($grpc.ServiceCall call, $0.FleetRef request);
+
+  $async.Future<$0.Fleet> fleetProduce_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.FleetRef> $request) async {
+    return fleetProduce($call, await $request);
+  }
+
+  $async.Future<$0.Fleet> fleetProduce(
+      $grpc.ServiceCall call, $0.FleetRef request);
+
+  $async.Future<$0.FleetProof> fleetProveDevice_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.FleetRef> $request) async {
+    return fleetProveDevice($call, await $request);
+  }
+
+  $async.Future<$0.FleetProof> fleetProveDevice(
+      $grpc.ServiceCall call, $0.FleetRef request);
 }

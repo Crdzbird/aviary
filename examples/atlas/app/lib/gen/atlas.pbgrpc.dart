@@ -131,6 +131,22 @@ class AtlasClient extends $grpc.Client {
         options: options);
   }
 
+  /// ── Governance: a validator council (coordinated rotation) + an auditor
+  /// light client that syncs with the OVERLAP rule (bisection through rotations).
+  $grpc.ResponseFuture<$0.Council> getCouncil(
+    $0.ChainRef request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getCouncil, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.Council> councilAction(
+    $0.CouncilRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$councilAction, request, options: options);
+  }
+
   // method descriptors
 
   static final _$createChain =
@@ -191,6 +207,15 @@ class AtlasClient extends $grpc.Client {
       '/atlas.v1.Atlas/StreamEvents',
       ($0.ChainRef value) => value.writeToBuffer(),
       $0.Event.fromBuffer);
+  static final _$getCouncil = $grpc.ClientMethod<$0.ChainRef, $0.Council>(
+      '/atlas.v1.Atlas/GetCouncil',
+      ($0.ChainRef value) => value.writeToBuffer(),
+      $0.Council.fromBuffer);
+  static final _$councilAction =
+      $grpc.ClientMethod<$0.CouncilRequest, $0.Council>(
+          '/atlas.v1.Atlas/CouncilAction',
+          ($0.CouncilRequest value) => value.writeToBuffer(),
+          $0.Council.fromBuffer);
 }
 
 @$pb.GrpcServiceName('atlas.v1.Atlas')
@@ -291,6 +316,20 @@ abstract class AtlasServiceBase extends $grpc.Service {
         true,
         ($core.List<$core.int> value) => $0.ChainRef.fromBuffer(value),
         ($0.Event value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ChainRef, $0.Council>(
+        'GetCouncil',
+        getCouncil_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ChainRef.fromBuffer(value),
+        ($0.Council value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.CouncilRequest, $0.Council>(
+        'CouncilAction',
+        councilAction_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.CouncilRequest.fromBuffer(value),
+        ($0.Council value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.Chain> createChain_Pre($grpc.ServiceCall $call,
@@ -396,4 +435,20 @@ abstract class AtlasServiceBase extends $grpc.Service {
 
   $async.Stream<$0.Event> streamEvents(
       $grpc.ServiceCall call, $0.ChainRef request);
+
+  $async.Future<$0.Council> getCouncil_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.ChainRef> $request) async {
+    return getCouncil($call, await $request);
+  }
+
+  $async.Future<$0.Council> getCouncil(
+      $grpc.ServiceCall call, $0.ChainRef request);
+
+  $async.Future<$0.Council> councilAction_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.CouncilRequest> $request) async {
+    return councilAction($call, await $request);
+  }
+
+  $async.Future<$0.Council> councilAction(
+      $grpc.ServiceCall call, $0.CouncilRequest request);
 }
