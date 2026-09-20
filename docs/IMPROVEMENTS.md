@@ -407,6 +407,32 @@
   `blockchainer_light_client_*` handle + five-binding parity, each proving a
   no-overlap jump is "thin" (never a refusal), bisection through the rotation
   header, and continuation under the new set. 67 suites, ASan-clean.
+- **[x] ChainTree — declare a FAMILY of chains and build / drive it together —
+  DONE** (commits 30c7c4e core, ff35221 C ABI + Go, + bindings). The capstone
+  over composable chains + subchains: `ChainTreeSpec` is a recursive node spec
+  (chain id, mixture blueprint — built-in or registered custom / foreign
+  components — assurance level, funded accounts, validators with the secrets
+  this process holds, anchoring bounds, children); canonical codec (fuzz-
+  total) + `validate()` (unique ids, validators, children must be BFT, depth
+  ≤ 8). `ChainTree::build` resolves the ordering nobody should do by hand:
+  genesis bottom-up (a parent registers each child by its genesis HEADER, with
+  the child's subtree depth), bindings top-down (each child commits its
+  parent's FINAL hash), assembly through the registry (fail-closed: an unknown
+  mixture or a posture-forbidden engine throws and nothing is built).
+  `produce(chain, ts)` proposes with the node's pending child anchors,
+  justifies in-process (BFT certificate from the locally held validators —
+  refuses if they lack quorum; PoS/VRF seal; PoW mine), submits and archives,
+  so blocks flow upward automatically; `prove_account` walks root → … → chain
+  into a `SubchainProof`; `verify` checks it against the root's current header.
+  Extension: subclass hooks `select_txs` / `on_finalized`, or name custom
+  components in a node's blueprint. C ABI `blockchainer_chain_tree_*` (node
+  encoder, spec error, build, ids/height/genesis/tip/pending, produce, prove,
+  verify) with the hooks as C callbacks; Go / npm / JVM / Swift / Dart each
+  declare the same family (PoS root ← 3-validator BFT child ← funded
+  grandchild + sibling), get structural reasons for bad specs, produce upward,
+  observe finalizations and supply transactions from the host language, and
+  prove the grandchild's account from the root. Flutter example gained a
+  chain-tree card; Apple xcframework + Android jniLibs regenerated. 68 suites.
 - **[~] Equivocation evidence & slashing — DETECTION DONE.** `Evidence` +
   `detect_equivocation` (scan precommits at one height/round for a validator that
   signed two different block ids) + `verify_equivocation` (both signatures valid

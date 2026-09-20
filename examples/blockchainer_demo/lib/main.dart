@@ -82,6 +82,7 @@ class _DashboardState extends State<Dashboard> {
   final List<String> _membership = [];
   final List<String> _mixture = [];
   final List<String> _subchain = [];
+  final List<String> _tree = [];
 
   @override
   void initState() {
@@ -222,6 +223,7 @@ class _DashboardState extends State<Dashboard> {
           _membershipCard(),
           _mixtureCard(),
           _subchainCard(),
+          _treeCard(),
           _verifyCard(),
           _interopCard(),
         ],
@@ -512,6 +514,65 @@ class _DashboardState extends State<Dashboard> {
       setState(() => _subchain..clear()..add('error: $e'));
     }
   }
+
+  void _runTreeDemo() {
+    try {
+      final bc = _bc!;
+      final log = <String>[];
+      ({Uint8List publicKey, Uint8List? secret, int power}) val(int seed) {
+        final v = bc.newBLSValidator(Uint8List(32)..fillRange(0, 32, seed));
+        return (publicKey: v.public, secret: v.secret, power: 1);
+      }
+      final alice = Uint8List(32)..fillRange(0, 32, 0xA1);
+      // One declaration for the whole family: a PoS root, a 3-validator BFT
+      // child, a funded BFT grandchild, and a sibling leaf.
+      final root = TreeNode(chainId: 1, blueprint: bc.makeBlueprint(consensus: 'pos', stateModel: 'account', proposer: 'round-robin'),
+          validators: [val(0x01)], children: [
+        TreeNode(chainId: 42, validators: [val(0x10), val(0x11), val(0x12)], maxHeadersPerAnchor: 4, children: [
+          TreeNode(chainId: 420, validators: [val(0x20), val(0x21)], accounts: [(address: alice, balance: 1000)]),
+        ]),
+        TreeNode(chainId: 43, validators: [val(0x30)]),
+      ]);
+      final tree = bc.buildChainTree(root);
+      log.add('built ${tree.chainIds().length} chains in one go: ${tree.chainIds().join(" → ")} (genesis bottom-up, bindings top-down)');
+      final finalized = <int, int>{};
+      tree.onFinalized = (id, _) => finalized[id] = (finalized[id] ?? 0) + 1;
+      tree.produce(420, 2); tree.produce(420, 3);
+      log.add('grandchild 420 finalized 2 blocks → child 42 has ${tree.pendingAnchors(42)} pending anchor');
+      tree.produce(42, 2); tree.produce(43, 2); tree.produce(1, 2);
+      log.add('produced on 42, 43 and the root → heights root ${tree.height(1)}, 42: ${tree.height(42)}, 420: ${tree.height(420)}; anchors flowed upward ✓');
+      log.add('finalization hook (Dart) saw: ${finalized.entries.map((e) => "${e.key}×${e.value}").join(", ")}');
+      final proof = tree.proveAccount(420, alice);
+      final ok = tree.verify(proof);
+      final bad = Uint8List.fromList(proof)..[proof.length - 1] ^= 1;
+      log.add("alice on grandchild 420 proven from the ROOT header: ${ok ? "verified ✓" : "FAILED"}; tampered: ${tree.verify(bad) ? "accepted ✗" : "rejected ✓"}");
+      var refused = false;
+      try { final d = root; d.children[0].blueprint = d.blueprint; bc.buildChainTree(d); } catch (_) { refused = true; }
+      log.add(refused ? 'a PoS child in the spec → refused (only BFT children can be anchored) ✓' : 'unexpected');
+      tree.free();
+      setState(() => _tree..clear()..addAll(log));
+    } catch (e) {
+      setState(() => _tree..clear()..add('error: $e'));
+    }
+  }
+
+  Widget _treeCard() => _section('Chain tree (declare a family of chains)', Icons.park, [
+        const Text(
+            'Declare a root chain, its subchains and their subchains — each with its '
+            'own mixture, accounts and validators — and build them all at once. '
+            'Producing on any chain anchors its children upward; anything on any '
+            'descendant is provable from the root header. Hooks let Dart supply '
+            'transactions and observe finalization.',
+            style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 10),
+        FilledButton.icon(onPressed: _runTreeDemo, icon: const Icon(Icons.account_tree), label: const Text('Run chain-tree demo')),
+        if (_tree.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ..._tree.map((l) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)))),
+        ],
+      ]);
 
   Widget _subchainCard() => _section('Subchains (a block anchors a blockchain)', Icons.account_tree_outlined, [
         const Text(
