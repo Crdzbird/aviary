@@ -22,6 +22,7 @@ namespace blockchainer {
 struct GenesisAccount {
   Hash address{};
   codec::u128 balance = 0;
+  bool operator==(const GenesisAccount&) const = default;
 };
 
 /// An unspent output created at genesis (UTXO model). Order is significant — each
