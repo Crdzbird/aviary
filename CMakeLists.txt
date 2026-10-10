@@ -75,7 +75,8 @@ if(NOT BLOCKCHAINER_STATIC)
   if(NOT CRYPTOLIB_C_LIBRARY)
     message(FATAL_ERROR "cryptolib_c library not found — build it or pass -DCRYPTOLIB_C_LIBRARY=<path>.")
   endif()
-  get_filename_component(CRYPTOLIB_C_LIBDIR "${CRYPTOLIB_C_LIBRARY}" DIRECTORY)
+  list(GET CRYPTOLIB_C_LIBRARY 0 _cryptolib_first)
+  get_filename_component(CRYPTOLIB_C_LIBDIR "${_cryptolib_first}" DIRECTORY)
   message(STATUS "blockchainer: cryptolib_c library = ${CRYPTOLIB_C_LIBRARY}")
 endif()
 
@@ -146,7 +147,7 @@ target_include_directories(blockchainer_core
   PRIVATE "${CRYPTOLIB_C_INCLUDE_DIR}")
 set_target_properties(blockchainer_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(NOT BLOCKCHAINER_STATIC)
-  target_link_libraries(blockchainer_core PRIVATE "${CRYPTOLIB_C_LIBRARY}")
+  target_link_libraries(blockchainer_core PRIVATE ${CRYPTOLIB_C_LIBRARY})
 endif()
 
 # The TCP transport reactor drives one node per thread; the multi-validator test

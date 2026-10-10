@@ -2,7 +2,7 @@
 
 Proves the Blockchainer ledger is **byte-identical across language bindings**.
 A **Go** server (blockchainer Go binding, full node) and a **Flutter** client
-(`blockchainer_flutter`, native) each run the ledger independently and cross-check
+(`blockchainer`, native) each run the ledger independently and cross-check
 three directions:
 
 | Direction | Check |

@@ -31,7 +31,7 @@ load order is cryptolib → blockchainer (blockchainer_c links cryptolib_c).
 
 Android's ART has no Project-Panama FFM, so the callable `blockchainer_*` C ABI
 is reached through a thin JNI shim compiled with the NDK (one `JNIEXPORT`
-wrapper per function), or — most commonly — through the **`blockchainer_flutter`**
+wrapper per function), or — most commonly — through the **`blockchainer`** or **`blockchainer_lite`**
 plugin if the app is Flutter. This module owns the **packaging + isolated
 preload**; the JNI surface is the documented integration point and extends one
 function at a time against `bridge/blockchainer_c.h`.

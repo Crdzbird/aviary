@@ -1,0 +1,38 @@
+name: blockchainer
+description: "Blockchainer for Flutter: a ledger with BFT finality, composable chains, subchains, validator rotation, light clients and chain trees over dart:ffi, sharing the CipherBird crypto engine with the cipherbird package."
+version: 0.1.0
+homepage: https://github.com/Crdzbird/blockchainer
+repository: https://github.com/Crdzbird/blockchainer
+documentation: https://github.com/Crdzbird/blockchainer/blob/main/bridge/bindings/blockchainer/README.md
+topics:
+  - blockchain
+  - ffi
+  - consensus
+  - ledger
+  - web3
+
+environment:
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.3
+  blockchainer_dart: ^0.1.0
+  cipherbird: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      ios:
+        ffiPlugin: true
+      macos:
+        ffiPlugin: true

@@ -1034,3 +1034,53 @@ selectors — validated against real-world vectors). Deferred:
   reveals them all with the proposer's KEM secret, and confirms a **non-proposer
   key opens nothing** — the confidentiality guarantee. Go/npm/JVM/Swift/Dart all
   green; 56/56 C++ suite still passes.
+
+## pub.dev release structure: three Dart packages over CipherBird - DONE (2026-10-10)
+- **[x] cryptolib is now CipherBird.** The dependency repo is still checked out
+  at `../cryptolib` (remote Crdzbird/CipherBird); the C header and `cryptolib_*`
+  symbol prefix are unchanged. Its Flutter plugin is the `cipherbird` pub package
+  (1.1.0) shipping `CipherBird.xcframework` and `libcipherbird.so` (SONAME still
+  `libcryptolib_c.so`), and its pure Dart package is `cipherbird_dart`. Build
+  scripts accept `CIPHERBIRD_ROOT` (falls back to `CRYPTOLIB_ROOT`, then the
+  sibling checkout).
+- **[x] `blockchainer_dart` restructured for publishing.** The 2152-line
+  `blockchainer_ffi.dart` became one library (`lib/blockchainer.dart`) with 71
+  part files under `src/{ffi,core,types,api,handles}`: feature surfaces as
+  extensions on `final class Blockchainer`, value types as
+  `abstract final class` with `const factory` redirects to private
+  implementations, handle classes with private constructors, immutable
+  `TreeNode` with `copyWith`. Every file is under 100 lines after `dart format`,
+  no `else`, no inline comments. Bundles `native/darwin-arm64/
+  {libblockchainer_c,libcipherbird}.dylib` resolved through the package root in
+  `package_config.json`. 12 smoke tests pass on the bundled engine.
+- **[x] Two Flutter variants with the same API.** `blockchainer_lite` is self
+  contained: static merged `Blockchainer.xcframework` (blockchainer archives +
+  CipherBird per-slice `libcryptolib_c_merged.a`, iOS device + simulator, macOS)
+  and a self-contained stripped `libblockchainer_c.so` (arm64-v8a, x86_64) whose
+  only NEEDED entries are libm/libdl/libc. `blockchainer` (renamed from
+  `blockchainer_flutter`) depends on and re-exports `cipherbird`: dynamic
+  `BlockchainerC.xcframework` linked with `-undefined dynamic_lookup` and a thin
+  `.so`; the Dart loader and the Kotlin startup provider open `libcipherbird.so`
+  before `libblockchainer_c.so` because of the SONAME mismatch. Both plugins are
+  SPM-only ffiPlugins (`ios|macos/<name>/Package.swift`, binary target + a Swift
+  target that imports `BlockchainerC`).
+- **[x] Packaging rules learned.** pub only ships git-tracked files and honors
+  the root `.gitignore`, so binaries are force-added and each package carries a
+  `.pubignore` with `!` re-includes; path dependencies are not publishable, so
+  `pubspec_overrides.yaml` (excluded from the archive) points `blockchainer_dart`
+  at `../dart` for local work; archives are 5 MB (dart), 5 MB (full), 26 MB
+  (lite, after per-platform slices and `llvm-strip`). pub flattens symlinks, so a
+  versioned macOS framework arrives with `Versions/Current` as a real directory;
+  Xcode warns "Couldn't resolve framework symlink" and builds anyway. Android
+  plugin modules must set the Kotlin `jvmTarget` to 17 to match
+  `compileOptions`. `flutter create --platforms=ios,android,macos .` scaffolds
+  the example apps; their scaffolded widget tests were dropped.
+- **[x] Verified.** Both example apps build for macOS and Android (lite APK ships
+  only `libblockchainer_c.so`; full APK ships it plus `libcipherbird.so`); the
+  full macOS app embeds `BlockchainerC.framework` and `CipherBird.framework` and
+  runs. `examples/blockchainer_demo` and `examples/interop/app` now depend on
+  `blockchainer`. `dart analyze` is clean for all three packages and both
+  examples; `flutter test` passes for both plugins; `dart pub publish --dry-run`
+  succeeds for all three with only the expected gitignore and overrides notes.
+- Publish order: `blockchainer_dart`, then `blockchainer_lite`, then
+  `blockchainer` (the Flutter packages pin `blockchainer_dart: ^0.1.0`).

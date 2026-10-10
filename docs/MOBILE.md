@@ -1,68 +1,96 @@
 # Native multi-platform builds (iOS / Android / macOS / Swift / JVM)
 
 Blockchainer's C ABI (`libblockchainer_c`) compiles to every platform and is
-consumed by language bindings exactly as cryptolib's is. blockchainer_c **links
-cryptolib_c**, so each platform needs cryptolib's native binary for that platform.
+consumed by the language bindings. The C ABI calls the CipherBird C ABI
+(`cryptolib_*` symbols, header `bridge/cryptolib_c.h` in the CipherBird repo),
+so every platform build needs CipherBird's native artifact for that platform.
 
-## ⚠️ Prerequisite: cryptolib mobile binaries must be current
+CipherBird lives at `../cryptolib` (git remote Crdzbird/CipherBird). Set
+`CIPHERBIRD_ROOT` if it is not a sibling checkout.
 
-The interop primitives (`keccak256`, `ripemd160`, `secp256k1_*`) were added to
-cryptolib's C ABI. cryptolib's **host** dylib has them, but its prebuilt
-**iOS xcframework** and **Android `.so`** were built earlier and **do not**.
-Until they're regenerated, blockchainer's iOS/Android builds fail to link with
-`undefined symbol: cryptolib_keccak256` (and friends).
+## Prerequisite: CipherBird native artifacts
 
-**Rebuild cryptolib's mobile binaries first** (in the cryptolib repo):
+In the CipherBird repo:
 
 ```bash
 cd ../cryptolib
-# iOS + macOS xcframework (rebuilds deps + slices + assembles CryptoLib.xcframework)
 bash scripts/ios/build_all.sh
 bash scripts/ios/assemble_xcframework.sh
-# Android .so per ABI → updates cryptolib_flutter/android/src/main/jniLibs/
 bash scripts/android/build_all.sh
 ```
 
-Verify the symbols landed:
+That produces the per-slice static archives (`libcryptolib_c_merged.a`) used by
+the lite packaging, the dynamic `CipherBird.xcframework` shipped by the
+`cipherbird` pub package, and `libcipherbird.so` per Android ABI.
+
+The lite Android build additionally needs CipherBird's static Android archives:
+
 ```bash
-nm -arch arm64 CryptoLib.xcframework/ios-arm64/libcryptolib_c_merged.a | grep keccak256   # expect a hit
+cd ../cryptolib
+for abi in arm64-v8a x86_64; do
+  cmake -S . -B build-android-static/$abi \
+    -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
+    -DANDROID_ABI=$abi -DANDROID_PLATFORM=android-24 \
+    -DCRYPTOLIB_STATIC=ON -DCRYPTOLIB_DEPS_ROOT=third_party/android/$abi \
+    -DCRYPTOLIB_BUILD_EXAMPLE=OFF -DCRYPTOLIB_BUILD_TESTS=OFF
+  cmake --build build-android-static/$abi --target cryptolib_c
+done
 ```
+
+## The two Flutter packages
+
+| Package | Native packaging | CipherBird |
+|---|---|---|
+| `blockchainer_lite` | Static merged `Blockchainer.xcframework` (iOS + macOS) and a self-contained `libblockchainer_c.so` per Android ABI. | Linked inside the binary. No pub dependency. |
+| `blockchainer` | Dynamic `BlockchainerC.xcframework` built with `-undefined dynamic_lookup`, and a thin `libblockchainer_c.so`. | Depends on and re-exports the `cipherbird` pub package, which ships the engine. |
+
+Both expose the same Dart API through `blockchainer_dart`.
 
 ## Build blockchainer's native artifacts
 
-Once cryptolib's mobile binaries are current:
-
 ```bash
-bash scripts/build_mobile.sh
+# lite: static xcframework into bridge/bindings/blockchainer_lite/{ios,macos}
+bash scripts/apple/build_xcframework.sh
+
+# full: dynamic xcframework into bridge/bindings/blockchainer/{ios,macos}
+bash scripts/apple/build_dynamic_xcframework.sh
+
+# Android, one of:
+bash scripts/android/build_so.sh lite   # self-contained .so
+bash scripts/android/build_so.sh full   # links libcipherbird.so from the cipherbird package
 ```
 
-This produces:
-- `bridge/bindings/blockchainer_flutter/ios/Blockchainer.xcframework`
-- `bridge/bindings/blockchainer_flutter/macos/Blockchainer.xcframework`
-- `bridge/bindings/blockchainer_flutter/android/src/main/jniLibs/<abi>/libblockchainer_c.so`
-  (+ the cryptolib `.so` it depends on)
+The Android script strips the output with `llvm-strip --strip-unneeded`. The
+lite `.so` is 8 to 9 MB per ABI; the full one is about 1 MB.
 
 ## How each binding loads it
 
 | Binding | Native loading |
 |---|---|
-| **Flutter** (`bridge/bindings/blockchainer_flutter`) | ffiPlugin. iOS/macOS: the xcframework is `-force_load`ed into the app; Dart uses `DynamicLibrary.process()`. Android: bundled `.so` via `DynamicLibrary.open`. Depends on `cryptolib_flutter` for cryptolib's native. |
-| **Swift** (`bridge/bindings/swift`) | SPM package with `binaryTarget` xcframeworks (Blockchainer + CryptoLib). |
-| **JVM (Java/Kotlin)** | Foreign Function & Memory API loading `libblockchainer_c` (desktop uses the host dylib, which is already current). |
+| Flutter `blockchainer_lite` | ffiPlugin. iOS/macOS: SPM binary target, the static archive is linked into the app and Dart uses `DynamicLibrary.process()`. Android: `DynamicLibrary.open('libblockchainer_c.so')`. |
+| Flutter `blockchainer` | ffiPlugin. iOS/macOS: SPM binary target, `BlockchainerC.framework` and `CipherBird.framework` are both embedded. Android: the loader opens `libcipherbird.so` first, then `libblockchainer_c.so`. |
+| Pure Dart `blockchainer_dart` | Bundles `native/darwin-arm64/{libblockchainer_c,libcipherbird}.dylib`, resolved through the package root in `package_config.json`; `BLOCKCHAINER_DYLIB` overrides. |
+| Swift (`bridge/bindings/swift`) | SPM package with binary target xcframeworks (BlockchainerC + CipherBird). |
+| JVM | Foreign Function and Memory API loading `libblockchainer_c` (desktop uses the host dylib). |
 
-## iOS gotchas (already handled in the example)
+## Publishing notes
 
-Two things are required for the iOS build, both wired into `examples/blockchainer_demo`:
-
-1. **Disable Flutter's Swift Package Manager integration** — the plugin ships CocoaPods podspecs only:
-   `flutter config --no-enable-swift-package-manager` (then regenerate `ios/` if it was created with SPM on).
-2. **Exclude x86_64 for the simulator** — `flutter build ios --simulator` makes a fat (arm64+x86_64) build, but the xcframework slices are **arm64-only** (so is cryptolib's). The example's `ios/Podfile` `post_install` sets `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64 i386` on every pod and Runner target. Apple-Silicon simulators are arm64, so this is correct.
-
-With both in place, `flutter run -d <sim>` embeds the native (`-force_load`) and resolves it via `DynamicLibrary.process()`.
+- pub only ships git-tracked files and honors the root `.gitignore`, so the
+  binaries are force-added and each package has a `.pubignore` that re-includes
+  them with `!` patterns.
+- `pubspec_overrides.yaml` points `blockchainer_dart` at `../dart` for local
+  development; it is excluded from the archive and the published packages
+  resolve `blockchainer_dart` from pub.
+- pub flattens symlinks in the archive. The macOS slice of a versioned
+  framework therefore arrives with `Versions/Current` as a real directory. Xcode
+  logs "Couldn't resolve framework symlink" as a warning and the build still
+  succeeds; the install name points at `Versions/A`, which is unaffected.
+- Android plugins must pin the Kotlin JVM target to 17 to match `compileOptions`,
+  otherwise Gradle fails with "Inconsistent JVM-target compatibility".
 
 ## Why the build is simple
 
-`blockchainer_c` is pure C++ that only needs cryptolib's **header** to compile —
-its `cryptolib_*` calls resolve when the final app links (iOS/macOS) or at load
-time from the sibling `.so` (Android). So the per-platform build just compiles
-blockchainer's sources; no dependency rebuilding (cryptolib already ships those).
+`blockchainer_c` is pure C++ that only needs CipherBird's header to compile.
+Its `cryptolib_*` calls resolve when the final app links (iOS/macOS, or inside
+the merged lite archive) or at load time from `libcipherbird.so` (full
+Android). The per-platform build compiles blockchainer's sources only.

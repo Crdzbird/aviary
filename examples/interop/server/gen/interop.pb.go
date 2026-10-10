@@ -6,7 +6,7 @@
 
 // Interop — proves the Blockchainer ledger is byte-identical across language
 // bindings. A Go server (blockchainer Go binding, full node) and a Flutter
-// client (blockchainer_flutter, native) each run the ledger independently and
+// client (blockchainer, native) each run the ledger independently and
 // cross-check three directions:
 //
 //   • go → flutter : the server builds a chain and returns a light-client proof;

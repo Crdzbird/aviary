@@ -1,5 +1,5 @@
 // Interop client (Flutter side). Runs the Blockchainer ledger NATIVELY via
-// blockchainer_flutter and cross-checks it against the Go server over gRPC, in
+// blockchainer and cross-checks it against the Go server over gRPC, in
 // three directions:
 //   • go ↔ flutter : identical canonical bytes (BLAKE3 / txid / header hash)
 //   • go → flutter : the client verifies a proof the GO node produced
@@ -8,7 +8,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:blockchainer_flutter/blockchainer_flutter.dart';
+import 'package:blockchainer/blockchainer.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:grpc/grpc.dart';

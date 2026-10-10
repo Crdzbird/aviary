@@ -5,7 +5,7 @@ DynamicLibrary _openPlatformLibrary(String? path) {
   if (explicit != null && explicit.isNotEmpty) {
     return DynamicLibrary.open(explicit);
   }
-  if (Platform.isAndroid) return DynamicLibrary.open('libblockchainer_c.so');
+  if (Platform.isAndroid) return _openAndroid();
   final process = DynamicLibrary.process();
   if (process.providesSymbol('blockchainer_init')) return process;
   final bundled = _bundledLibraryPath();
@@ -13,4 +13,13 @@ DynamicLibrary _openPlatformLibrary(String? path) {
   if (Platform.isWindows) return DynamicLibrary.open('blockchainer_c.dll');
   if (Platform.isLinux) return DynamicLibrary.open('libblockchainer_c.so');
   return process;
+}
+
+DynamicLibrary _openAndroid() {
+  try {
+    DynamicLibrary.open('libcipherbird.so');
+  } on ArgumentError catch (_) {
+    return DynamicLibrary.open('libblockchainer_c.so');
+  }
+  return DynamicLibrary.open('libblockchainer_c.so');
 }

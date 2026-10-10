@@ -1,0 +1,28 @@
+# pub uses this file instead of .gitignore. The prebuilt native library must
+# ship, so it is deliberately not excluded here. Exclude only dev cruft.
+.dart_tool/
+build/
+*.log
+*.iml
+.idea/
+.swiftpm/
+.build/
+pubspec_overrides.yaml
+example/build/
+example/.dart_tool/
+example/ios/Pods/
+example/macos/Pods/
+example/android/.gradle/
+android/.gradle/
+*.dSYM/
+
+# The root .gitignore drops native binaries for every directory; re-include
+# the prebuilt library this package ships.
+!android/src/main/jniLibs/
+!android/src/main/jniLibs/**
+!ios/**
+!macos/**
+!**/*.so
+!**/*.a
+!**/*.xcframework/
+!**/*.xcframework/**

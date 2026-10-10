@@ -7,9 +7,9 @@
 # Output: bridge/bindings/blockchainer_flutter/{ios,macos}/Blockchainer.xcframework
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CRYPTOLIB_ROOT="${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}"
+CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
 TOOLCHAIN="$CRYPTOLIB_ROOT/cmake/ios.toolchain.cmake"
-PLUGIN="$ROOT/bridge/bindings/blockchainer_flutter"
+PLUGIN="$ROOT/bridge/bindings/blockchainer_lite"
 BUILD="$ROOT/build-apple"
 
 [[ -f "$TOOLCHAIN" ]] || { echo "missing $TOOLCHAIN"; exit 1; }
@@ -17,7 +17,7 @@ mkdir -p "$BUILD"
 
 build_slice() {  # <slice> <IOS_PLATFORM> <cryptolib-slice>
   local slice="$1" platform="$2" cryptoslice="$3"
-  echo "── building slice $slice ($platform) ──"
+  echo "== building slice $slice ($platform) =="
   cmake -B "$BUILD/$slice" -S "$ROOT" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DIOS_PLATFORM="$platform" \
     -DCMAKE_BUILD_TYPE=Release \
@@ -29,11 +29,11 @@ build_slice() {  # <slice> <IOS_PLATFORM> <cryptolib-slice>
   # the xcframework needs no companion pod (avoids cross-plugin OTHER_LDFLAGS
   # conflicts). cryptolib's merged.a already bundles its own deps.
   # cryptolib >= 3.x keeps the per-slice merged archive in build/ios/<slice>/
-  # (its xcframework now wraps slices as static *frameworks* — no bare .a
+  # (its xcframework now wraps slices as static *frameworks* - no bare .a
   # inside). Fall back to the pre-3.x in-xcframework location.
   local crypto_a="$CRYPTOLIB_ROOT/build/ios/$slice/libcryptolib_c_merged.a"
   [[ -f "$crypto_a" ]] || crypto_a="$CRYPTOLIB_ROOT/CryptoLib.xcframework/$cryptoslice/libcryptolib_c_merged.a"
-  [[ -f "$crypto_a" ]] || { echo "missing $crypto_a — run cryptolib's scripts/ios/build_all.sh"; exit 1; }
+  [[ -f "$crypto_a" ]] || { echo "missing $crypto_a - run cryptolib's scripts/ios/build_all.sh"; exit 1; }
   libtool -static -o "$BUILD/$slice/libblockchainer_c_merged.a" \
     "$BUILD/$slice/libblockchainer_core.a" "$BUILD/$slice/libblockchainer_c.a" "$crypto_a"
   echo "   $(du -h "$BUILD/$slice/libblockchainer_c_merged.a" | awk '{print $1}')  libblockchainer_c_merged.a (incl. cryptolib)"
@@ -63,9 +63,9 @@ assemble() {  # <out-dir> <slice...>
   mkdir -p "$out"
   rm -rf "$out/Blockchainer.xcframework"
   xcodebuild -create-xcframework "${args[@]}" -output "$out/Blockchainer.xcframework" >/dev/null
-  echo "✓ $out/Blockchainer.xcframework"
+  echo "ok: $out/Blockchainer.xcframework"
 }
 
-assemble "$PLUGIN/ios"   iphoneos iphonesimulator macosx
-assemble "$PLUGIN/macos" iphoneos iphonesimulator macosx
+assemble "$PLUGIN/ios/blockchainer_lite"   iphoneos iphonesimulator
+assemble "$PLUGIN/macos/blockchainer_lite" macosx
 echo "done."

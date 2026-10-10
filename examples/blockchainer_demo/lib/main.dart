@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:blockchainer_flutter/blockchainer_flutter.dart';
+import 'package:blockchainer/blockchainer.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -547,7 +547,11 @@ class _DashboardState extends State<Dashboard> {
       final bad = Uint8List.fromList(proof)..[proof.length - 1] ^= 1;
       log.add("alice on grandchild 420 proven from the ROOT header: ${ok ? "verified ✓" : "FAILED"}; tampered: ${tree.verify(bad) ? "accepted ✗" : "rejected ✓"}");
       var refused = false;
-      try { final d = root; d.children[0].blueprint = d.blueprint; bc.buildChainTree(d); } catch (_) { refused = true; }
+      try {
+        bc.buildChainTree(root.copyWith(children: [root.children[0].copyWith(blueprint: root.blueprint), root.children[1]]));
+      } catch (_) {
+        refused = true;
+      }
       log.add(refused ? 'a PoS child in the spec → refused (only BFT children can be anchored) ✓' : 'unexpected');
       tree.free();
       setState(() => _tree..clear()..addAll(log));

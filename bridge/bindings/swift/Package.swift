@@ -36,7 +36,7 @@ let package = Package(
         // The Blockchainer C ABI as a dynamic-framework binary target.
         .binaryTarget(
             name: "BlockchainerC",
-            path: "../blockchainer_flutter/ios/blockchainer_flutter/BlockchainerC.xcframework"
+            path: "../blockchainer/ios/blockchainer/BlockchainerC.xcframework"
         ),
         // cryptolib's dynamic framework — vendored as a binary target so
         // Blockchainer's runtime cryptolib_* lookups resolve. (Referenced

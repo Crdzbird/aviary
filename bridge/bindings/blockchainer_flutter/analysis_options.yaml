@@ -1,8 +1,0 @@
-# Standard Flutter lints for the plugin's public Dart surface. The raw FFI
-# binding lives in the blockchainer_dart package (analyzed there); this package
-# is the thin Flutter entry point + preload API.
-include: package:flutter_lints/flutter.yaml
-
-analyzer:
-  exclude:
-    - example/**

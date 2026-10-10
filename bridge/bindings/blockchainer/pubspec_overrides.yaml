@@ -1,0 +1,3 @@
+dependency_overrides:
+  blockchainer_dart:
+    path: ../dart

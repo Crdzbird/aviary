@@ -35,8 +35,8 @@ dependencies:
   ffi: ^2.1.0
   # The Blockchainer Flutter plugin: bundles the native library per platform
   # (iOS/macOS xcframework, Android jniLibs) and re-exports the high-level API.
-  blockchainer_flutter:
-    path: ../../bridge/bindings/blockchainer_flutter
+  blockchainer:
+    path: ../../bridge/bindings/blockchainer
 
 dev_dependencies:
   flutter_test:

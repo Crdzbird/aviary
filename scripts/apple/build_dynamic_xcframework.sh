@@ -6,7 +6,7 @@
 # left UNDEFINED (-undefined dynamic_lookup) and resolve at runtime against the
 # CryptoLibC framework that cryptolib_flutter embeds. So this build:
 #   1. compiles blockchainer_core.a + blockchainer_c.a per slice (no cryptolib),
-#   2. wraps them in a dynamic BlockchainerC.framework (force-load → all C-ABI
+#   2. wraps them in a dynamic BlockchainerC.framework (force-load -> all C-ABI
 #      symbols exported for DynamicLibrary.process()),
 #   3. assembles ios-arm64 + ios-arm64-simulator + macos-arm64 into one
 #      xcframework, copied into the plugin's ios/ and macos/ SPM trees.
@@ -14,9 +14,9 @@
 # Usage: ./build_dynamic_xcframework.sh [slice ...]   (default: all three)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CRYPTOLIB_ROOT="${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}"
+CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
 TOOLCHAIN="$CRYPTOLIB_ROOT/cmake/ios.toolchain.cmake"
-PLUGIN="$ROOT/bridge/bindings/blockchainer_flutter"
+PLUGIN="$ROOT/bridge/bindings/blockchainer"
 BUILD="$ROOT/build-apple"
 FW_NAME="BlockchainerC"
 VERSION="0.0.1"
@@ -24,7 +24,7 @@ VERSION="0.0.1"
 [[ -f "$TOOLCHAIN" ]] || { echo "missing $TOOLCHAIN"; exit 1; }
 mkdir -p "$BUILD"
 
-# slice → (IOS_PLATFORM for the cmake toolchain, xcrun sdk, min-version flag)
+# slice -> (IOS_PLATFORM for the cmake toolchain, xcrun sdk, min-version flag)
 slice_ios_platform() { case "$1" in iphoneos) echo OS;; iphonesimulator) echo SIMULATOR;; macosx) echo MAC;; esac; }
 slice_sdk()          { case "$1" in iphoneos) echo iphoneos;; iphonesimulator) echo iphonesimulator;; macosx) echo macosx;; esac; }
 slice_minflag()      { case "$1" in
@@ -35,7 +35,7 @@ slice_platform_name(){ case "$1" in iphoneos) echo iPhoneOS;; iphonesimulator) e
 
 build_archives() {  # <slice>
   local slice="$1" platform; platform="$(slice_ios_platform "$slice")"
-  echo "── compiling blockchainer archives: $slice ($platform) ──"
+  echo "== compiling blockchainer archives: $slice ($platform) =="
   cmake -B "$BUILD/$slice" -S "$ROOT" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DIOS_PLATFORM="$platform" \
     -DCMAKE_BUILD_TYPE=Release \
@@ -70,7 +70,7 @@ info_plist() {  # <slice> <out>
 EOF
 }
 
-make_framework() {  # <slice> → echoes .framework path
+make_framework() {  # <slice> -> echoes .framework path
   local slice="$1" sdk minflag archive fwdir cc modulemap sysroot
   sdk="$(slice_sdk "$slice")"; minflag="$(slice_minflag "$slice")"
   archive="$BUILD/$slice/libblockchainer_only.a"
@@ -116,19 +116,19 @@ for slice in "${SLICES[@]}"; do
   build_archives "$slice"
   fw="$(make_framework "$slice")"
   ARGS+=(-framework "$fw")
-  echo "   ✓ $slice → ${FW_NAME}.framework ($(du -h "$BUILD/$slice/${FW_NAME}.framework"/*/"${FW_NAME}" 2>/dev/null | tail -1 | awk '{print $1}'))"
+  echo "   ok: $slice -> ${FW_NAME}.framework ($(du -h "$BUILD/$slice/${FW_NAME}.framework"/*/"${FW_NAME}" 2>/dev/null | tail -1 | awk '{print $1}'))"
 done
 
 OUT="$BUILD/${FW_NAME}.xcframework"
 rm -rf "$OUT"
 xcodebuild -create-xcframework "${ARGS[@]}" -output "$OUT" >/dev/null
-echo "✓ assembled $OUT"
+echo "ok: assembled $OUT"
 
 # Stage into the plugin's SPM trees (ios + macos each get the full xcframework).
-for dest in "$PLUGIN/ios/blockchainer_flutter" "$PLUGIN/macos/blockchainer_flutter"; do
+for dest in "$PLUGIN/ios/blockchainer" "$PLUGIN/macos/blockchainer"; do
   mkdir -p "$dest"
   rm -rf "$dest/${FW_NAME}.xcframework"
   cp -R "$OUT" "$dest/${FW_NAME}.xcframework"
-  echo "   staged → $dest/${FW_NAME}.xcframework"
+  echo "   staged -> $dest/${FW_NAME}.xcframework"
 done
 echo "done."
