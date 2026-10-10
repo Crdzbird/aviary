@@ -172,6 +172,13 @@ else()
   add_library(aviary_c SHARED bridge/aviary_c.cpp)
   target_compile_definitions(aviary_c PRIVATE AVIARY_BUILD_SHARED)
   set_target_properties(aviary_c PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+  # On ELF targets keep the engine's internals (CipherBird and its statically
+  # linked dependencies) out of the export table. This also lets the linker
+  # resolve their relocations locally, which a shared object otherwise refuses
+  # for objects that were not built position independent.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(aviary_c PRIVATE -Wl,--exclude-libs,ALL)
+  endif()
 endif()
 target_include_directories(aviary_c
   PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/bridge"
