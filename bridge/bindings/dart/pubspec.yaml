@@ -1,5 +1,5 @@
 name: blockchainer_dart
-description: "Blockchainer for Dart over dart:ffi: a ledger with BFT finality, composable chains, subchains, validator rotation, light clients and chain trees, with the CipherBird engine bundled for macOS."
+description: "Dart API of the Blockchainer ledger over dart:ffi: BFT finality, composable chains, subchains, light clients and chain trees."
 version: 0.1.0
 homepage: https://github.com/Crdzbird/blockchainer
 repository: https://github.com/Crdzbird/blockchainer

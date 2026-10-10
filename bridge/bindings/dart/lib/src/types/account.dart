@@ -2,6 +2,7 @@ part of '../../blockchainer.dart';
 
 /// A generated account: the signing secret, public key and chain address.
 abstract final class Account {
+  /// Wraps the three byte strings of an account.
   const factory Account(
     Uint8List secret,
     Uint8List publicKey,

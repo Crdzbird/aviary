@@ -2,6 +2,7 @@ part of '../../blockchainer.dart';
 
 /// One participant's share of a threshold account. Persist [bytes] sealed.
 abstract final class ThresholdShare {
+  /// Wraps a share card and the facts read from it.
   const factory ThresholdShare(
     Uint8List bytes,
     int index,

@@ -5,6 +5,9 @@ part of '../../blockchainer.dart';
 /// methods run synchronously inside consensus, must be deterministic, and
 /// must not call back into the chain.
 abstract class ForeignEngine {
+  /// Allows subclasses to be const.
+  const ForeignEngine();
+
   /// The justification for a block this node proposed, at most 4096 bytes,
   /// or null to refuse.
   Uint8List? justify(Uint8List block);

@@ -6,3 +6,5 @@
   subchains, validator rotation, light clients, chain trees, custody and
   anonymous membership credentials for Flutter over dart:ffi.
 - Self contained: the CipherBird engine is merged into the native library.
+- `BlockchainerLite` entry point (`ensureInitialized`, `instance`) and the
+  shortcut extensions of blockchainer_dart.

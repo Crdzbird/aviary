@@ -1,12 +1,15 @@
 /// Blockchainer for Dart: the ledger, consensus, mixtures, subchains, light
 /// clients and chain trees of the Blockchainer C ABI, plus the custody and
-/// anonymous-membership surfaces, over dart:ffi.
+/// anonymous membership surfaces, over dart:ffi. The extensions under
+/// src/extensions add the one call shortcuts: funded accounts, auto nonce
+/// transfers, hex helpers, single validator chains and whole ceremonies.
 library;
 
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -81,3 +84,15 @@ part 'src/handles/light_client.dart';
 part 'src/handles/light_client_sync.dart';
 part 'src/handles/chain_tree.dart';
 part 'src/handles/chain_tree_queries.dart';
+part 'src/extensions/hex_bytes.dart';
+part 'src/extensions/hex_string.dart';
+part 'src/extensions/account_tools.dart';
+part 'src/extensions/node_funding.dart';
+part 'src/extensions/node_sending.dart';
+part 'src/extensions/node_views.dart';
+part 'src/extensions/chain_blocks.dart';
+part 'src/extensions/validator_key_pair.dart';
+part 'src/extensions/blockchainer_quick.dart';
+part 'src/extensions/threshold_signing.dart';
+part 'src/extensions/tree_node_building.dart';
+part 'src/extensions/chain_tree_rounds.dart';

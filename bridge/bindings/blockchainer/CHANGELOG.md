@@ -6,3 +6,5 @@
   subchains, validator rotation, light clients, chain trees, custody and
   anonymous membership credentials for Flutter over dart:ffi.
 - Shares the native engine with the cipherbird package and re-exports its Dart API.
+- `BlockchainerShared` entry point (`ensureInitialized`, `instance`) and the
+  shortcut extensions of blockchainer_dart.

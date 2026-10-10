@@ -47,8 +47,9 @@ final class KeyStore {
   void unlock(String passphrase) => _withUtf8(passphrase, (cp) {
         final rc = _lib.lookupFunction<_KsUnlockC, _KsUnlockD>(
             'blockchainer_keystore_unlock')(_h, cp);
-        if (rc != 0)
+        if (rc != 0) {
           throw const BlockchainerException('keystore unlock failed');
+        }
       });
 
   /// Whether secrets can currently be revealed.

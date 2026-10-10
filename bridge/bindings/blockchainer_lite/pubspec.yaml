@@ -1,5 +1,5 @@
 name: blockchainer_lite
-description: "Blockchainer for Flutter, self contained: a ledger with BFT finality, composable chains, subchains, validator rotation, light clients and chain trees over dart:ffi, with the crypto engine bundled."
+description: "Blockchainer ledger for Flutter with the CipherBird crypto engine bundled: BFT finality, composable chains, subchains, light clients and chain trees."
 version: 0.1.0
 homepage: https://github.com/Crdzbird/blockchainer
 repository: https://github.com/Crdzbird/blockchainer

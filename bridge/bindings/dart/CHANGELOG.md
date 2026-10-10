@@ -9,5 +9,8 @@
   light clients with the overlap rule and bisection, chain trees, custody
   (key stores, portable accounts, threshold accounts), assurance postures,
   sealed mempools and anonymous membership credentials.
+- Shortcut extensions: hex helpers on Uint8List and String, funded
+  accounts, auto nonce transfers and one call blocks on Node, single
+  validator chain assembly, whole threshold ceremonies, fluent chain trees.
 - The CipherBird engine is bundled for macOS arm64; other hosts load the
   library from BLOCKCHAINER_DYLIB.

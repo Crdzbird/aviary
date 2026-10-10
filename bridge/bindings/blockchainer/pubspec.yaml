@@ -1,5 +1,5 @@
 name: blockchainer
-description: "Blockchainer for Flutter: a ledger with BFT finality, composable chains, subchains, validator rotation, light clients and chain trees over dart:ffi, sharing the CipherBird crypto engine with the cipherbird package."
+description: "Blockchainer ledger for Flutter sharing the CipherBird engine with the cipherbird package: BFT finality, composable chains, subchains and light clients."
 version: 0.1.0
 homepage: https://github.com/Crdzbird/blockchainer
 repository: https://github.com/Crdzbird/blockchainer

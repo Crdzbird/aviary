@@ -2,6 +2,7 @@ part of '../../blockchainer.dart';
 
 /// One chain of a family; [children] are subchains and must be BFT.
 abstract final class TreeNode {
+  /// Declares one chain and its subchains.
   const factory TreeNode({
     required int chainId,
     required List<TreeValidator> validators,

@@ -3,6 +3,7 @@ part of '../../blockchainer.dart';
 /// The security posture a chain commits to at genesis. Higher tiers only
 /// ever tighten the tier below them.
 abstract final class AssuranceProfile {
+  /// Describes a posture from its tiers and admitted algorithms.
   const factory AssuranceProfile({
     required bool ratcheted,
     required bool vrf,

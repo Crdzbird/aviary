@@ -4,3 +4,5 @@ library;
 
 export 'package:blockchainer_dart/blockchainer.dart';
 export 'package:cipherbird/cipherbird.dart';
+
+export 'src/blockchainer_shared.dart';

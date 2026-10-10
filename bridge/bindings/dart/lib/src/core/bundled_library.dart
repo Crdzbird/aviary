@@ -6,7 +6,7 @@ const _bundledPackages = [
   'blockchainer_lite'
 ];
 
-/// The engine shipped inside the package under native/<os>-<arch>/, if any.
+/// The engine shipped inside the package under the native directory, if any.
 String? _bundledLibraryPath() {
   final slot = _nativeSlot();
   if (slot == null) return null;

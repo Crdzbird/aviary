@@ -27,16 +27,23 @@ import 'package:blockchainer/blockchainer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Blockchainer.ensureInitialized();
-  final bc = Blockchainer.instance;
-  final node = bc.createNode(7);
-  final alice = node.newAccount();
-  node.credit(alice.address, 1000);
-  node.produceBlock(1);
-  node.dispose();
+  await BlockchainerShared.ensureInitialized();
+  runApp(const MyApp());
 }
 ```
 
-See the `blockchainer_dart` package for the full API: nodes, mixtures,
-foreign components, subchains, rotation, light clients, chain trees,
-custody, assurance, sealed mempools and membership credentials.
+Then anywhere in the app:
+
+```dart
+final node = BlockchainerShared.instance.createNode(7);
+final alice = node.fundAccount(1000);
+final bob = node.fundAccount(0);
+node.sendTo(alice, bob, 250);
+node.commit();
+final ok = node.verifyAccountProof(node.proveAccount(bob.address));
+```
+
+`BlockchainerShared` is a thin front for `Blockchainer`; the whole `blockchainer_dart`
+API is re-exported, including its shortcut extensions (`fundAccount`,
+`sendTo`, `commit`, `hex`, `assembleSingleValidator`, `signWithShares`,
+`produceRound`). See that package for the full surface.

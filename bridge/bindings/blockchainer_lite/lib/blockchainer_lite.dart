@@ -3,3 +3,5 @@
 library;
 
 export 'package:blockchainer_dart/blockchainer.dart';
+
+export 'src/blockchainer_lite.dart';

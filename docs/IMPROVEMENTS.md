@@ -1084,3 +1084,36 @@ selectors — validated against real-world vectors). Deferred:
   succeeds for all three with only the expected gitignore and overrides notes.
 - Publish order: `blockchainer_dart`, then `blockchainer_lite`, then
   `blockchainer` (the Flutter packages pin `blockchainer_dart: ^0.1.0`).
+
+## pub.dev polish: 160/160 pana score and the shortcut extensions - DONE (2026-10-10)
+- **[x] pana 160/160 for `blockchainer_dart`** (`dart pub global activate pana`,
+  `pana --no-warning .`). Fixes: descriptions trimmed to 60 to 180 characters,
+  `example/blockchainer_dart_example.dart`, doc comments on every const factory
+  redirect and a documented `const ForeignEngine()`, no angle brackets in doc
+  comments, braces around every multi line `if` body (pana runs newer lints
+  than the package's `lints` pin). `blockchainer_lite` and `blockchainer`
+  score 140 locally only because the local run has to use a path dependency on
+  `blockchainer_dart`; the published `^0.1.0` removes that warning. Each
+  Flutter package exposes a documented entry point (`BlockchainerLite`,
+  `BlockchainerShared`: `ensureInitialized`, `instance`, `isInitialized`) so
+  dartdoc has API elements of its own to count.
+- **[x] Shortcut extensions** under `lib/src/extensions/` (one per file):
+  `HexBytes` (`hex`, `shortHex`, `equalsBytes`), `HexString` (`hexBytes`,
+  `utf8Bytes`), `AccountTools` (`addressHex`, `isHybrid`), `NodeFunding`
+  (`fundAccount`, `fundHybridAccount`), `NodeSending` (`send`, `sendTo` with
+  the nonce read from the chain and the scheme following the account,
+  `commit`), `NodeViews` (`events` decoded, `metricValues`,
+  `verifyAccountProof`), `ChainBlocks` (`produceBlock` = propose, justify,
+  submit), `ValidatorKeyPair` (`entry`, `treeValidator`), `BlockchainerQuick`
+  (`newValidator`, `assembleSingleValidator` defaulting to bft over account),
+  `ThresholdSigning` (`signWithShares` runs the whole ceremony),
+  `TreeNodeBuilding` (`withChild`, `find`, `chainIds`), `ChainTreeRounds`
+  (`produceRound`, children first). Covered by `test/extensions_smoke.dart`.
+- GOTCHA: a genesis assembled without a committed blueprint is not a BFT
+  chain (`certify` fails with "engine is not BFT"); commit
+  `makeBlueprint(consensus: 'bft', stateModel: 'account')` explicitly.
+- OPEN: `https://github.com/Crdzbird/blockchainer` answers 404 anonymously
+  (private repository). pub.dev verifies the homepage, repository and
+  documentation URLs with HEAD requests and withholds 10 points while they
+  fail, so the repository must be public (or the URLs changed) before the
+  packages can reach 160 on pub.dev.
