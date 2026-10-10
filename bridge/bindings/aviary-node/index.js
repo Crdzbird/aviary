@@ -24,6 +24,7 @@ koffi.proto('int AviaryVerifyFn(void* ctx, const uint8_t* block, size_t block_le
 koffi.proto('uint32_t AviaryProposerFn(void* ctx, uint64_t height, uint32_t validator_count)');
 koffi.proto('int AviaryTxSourceFn(void* ctx, uint64_t chain_id, uint64_t ts, uint8_t* out, size_t out_cap, size_t* out_len)');
 koffi.proto('void AviaryFinalizedFn(void* ctx, uint64_t chain_id, const uint8_t* block, size_t block_len)');
+koffi.proto('void AviaryEventFn(void* ctx, const uint8_t* json, size_t len)');
 
 // ── Resolve the bundled native libraries for this platform/arch ──────────────
 function ext() {
@@ -204,6 +205,45 @@ function ensureLoaded() {
     erc20: f('AviaryBufferResult aviary_eth_erc20_transfer(uint8_t*, uint64_t)'),
     selector: f('AviaryBufferResult aviary_eth_selector(const char*)'),
     signLegacy: f('AviaryBufferResult aviary_eth_sign_legacy(uint64_t, uint64_t, uint64_t, uint8_t*, int, uint64_t, uint8_t*, size_t, uint64_t, uint8_t*)'),
+    // Events (push), persistence, custody signing
+    nodeSetEventHook: f('void aviary_node_set_event_hook(void*, AviaryEventFn*, void*)'),
+    nodeSnapshot: f('AviaryBufferResult aviary_node_snapshot(void*)'),
+    nodeRestore: f('void *aviary_node_restore(uint8_t*, size_t)'),
+    nodeBlockAt: f('AviaryBufferResult aviary_node_block_at(void*, uint64_t)'),
+    nodeSubmitTx: f('AviaryBufferResult aviary_node_submit_tx(void*, uint8_t*, size_t)'),
+    nodeSubmitKs: f('AviaryBufferResult aviary_node_submit_transfer_keystore(void*, void*, uint8_t*, uint8_t*, uint64_t, uint64_t, uint64_t)'),
+    ksSign: f('AviaryBufferResult aviary_keystore_sign_transfer(void*, uint64_t, uint8_t*, uint8_t*, uint64_t, uint64_t, uint64_t)'),
+    ksPublicKey: f('AviaryBufferResult aviary_keystore_public_key(void*, uint8_t*)'),
+    ksHas: f('int aviary_keystore_has(void*, uint8_t*)'),
+    ksAddresses: f('AviaryBufferResult aviary_keystore_addresses(void*)'),
+    ksLock: f('void aviary_keystore_lock(void*)'),
+    // Networking: NetNode (consensus over gossip, app owned sockets) + SecureSession
+    netNew: f('void *aviary_net_node_new(uint8_t*, size_t, uint32_t, uint8_t*, size_t, uint8_t*, size_t, uint64_t)'),
+    netAddPeer: f('void aviary_net_node_add_peer(void*, uint32_t)'),
+    netSetTxs: f('int aviary_net_node_set_transactions(void*, uint8_t*, size_t)'),
+    netStart: f('AviaryBufferResult aviary_net_node_start(void*)'),
+    netOnGossip: f('AviaryBufferResult aviary_net_node_on_gossip(void*, uint32_t, uint8_t*, size_t)'),
+    netOnTimeout: f('AviaryBufferResult aviary_net_node_on_timeout(void*, uint8_t, uint32_t)'),
+    netAdvance: f('AviaryBufferResult aviary_net_node_advance(void*)'),
+    netCommitted: f('int aviary_net_node_committed(void*)'),
+    netHeight: f('uint64_t aviary_net_node_height(void*)'),
+    netPeerBanned: f('int aviary_net_node_peer_banned(void*, uint32_t)'),
+    netReplayLog: f('AviaryBufferResult aviary_net_node_replay_log(void*)'),
+    netTip: f('AviaryBufferResult aviary_net_node_tip(void*)'),
+    netStateRoot: f('AviaryBufferResult aviary_net_node_state_root(void*)'),
+    netBalance: f('uint64_t aviary_net_node_balance(void*, uint8_t*)'),
+    netProve: f('AviaryBufferResult aviary_net_node_prove_account(void*, uint8_t*)'),
+    netFree: f('void aviary_net_node_free(void*)'),
+    secIdentity: f('AviaryBufferResult aviary_secure_identity_generate()'),
+    secInitiate: f('void *aviary_secure_initiate(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    secAccept: f('void *aviary_secure_accept(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    secHandshake: f('AviaryBufferResult aviary_secure_handshake_message(void*)'),
+    secComplete: f('int aviary_secure_complete(void*, uint8_t*, size_t)'),
+    secOpen: f('int aviary_secure_open(void*)'),
+    secPeer: f('AviaryBufferResult aviary_secure_peer_identity(void*)'),
+    secEncrypt: f('AviaryBufferResult aviary_secure_encrypt(void*, uint8_t*, size_t)'),
+    secDecrypt: f('AviaryBufferResult aviary_secure_decrypt(void*, uint8_t*, size_t)'),
+    secFree: f('void aviary_secure_free(void*)'),
     // Frees
     bufFree: f('void aviary_buffer_free(AviaryBuffer*)'),
     strFree: f('void aviary_str_free(void*)'),
@@ -274,7 +314,26 @@ class Node {
     this._h = fn.nodeNew(BigInt(chainId));
     if (!this._h) throw new Error('node creation failed');
   }
-  free() { if (this._h) { fn.nodeFree(this._h); this._h = null; } }
+  free() {
+    if (this._h) { if (this._event) { fn.nodeSetEventHook(this._h, null, null); this._event = null; } fn.nodeFree(this._h); this._h = null; }
+  }
+  static _wrap(h) { const n = Object.create(Node.prototype); n._h = h; return n; }
+  /** The whole chain as one blob: chain id, genesis credits, every finalized block with its certificate. Pending txs excluded. */
+  snapshot() { return consume(fn.nodeSnapshot(this._h), 'node_snapshot'); }
+  /** The encoded finalized block at height (1 based). */
+  blockAt(height) { return consume(fn.nodeBlockAt(this._h, BigInt(height)), 'node_block_at'); }
+  /** Admit an already signed, encoded transaction; returns its txid. */
+  submitTx(encoded) { return consume(fn.nodeSubmitTx(this._h, u8(encoded), u8(encoded).length), 'node_submit_tx'); }
+  /** Sign a transfer from the key store account at from and admit it; the secret never leaves the engine. */
+  submitTransferFromStore(store, from, to, amount, nonce, fee = 0) {
+    return consume(fn.nodeSubmitKs(this._h, store._h, u8(from), u8(to), BigInt(amount), BigInt(nonce), BigInt(fee)), 'node_submit_transfer_keystore');
+  }
+  /** cb(json) for every chain event, synchronously from the node call that caused it; null removes the hook. While set, drainEvents() is empty. */
+  onEvent(cb) {
+    if (!cb) { fn.nodeSetEventHook(this._h, null, null); this._event = null; return; }
+    const reg = koffi.register((_ctx, json, len) => { try { cb(Buffer.from(koffi.decode(json, 'uint8_t', Number(len))).toString('utf8')); } catch (_) {} }, koffi.pointer('AviaryEventFn'));
+    this._event = reg; fn.nodeSetEventHook(this._h, reg, null);
+  }
 
   // Fresh Ed25519 account: 64-byte secret (public = secret[32:64]), 32-byte addr.
   newAccount() {
@@ -354,6 +413,15 @@ class KeyStore {
   serialise() { return consume(fn.ksSerialise(this._h), 'keystore_serialise'); }
   unlock(passphrase) { if (fn.ksUnlock(this._h, passphrase) !== 0) throw new Error('keystore unlock failed'); }
   get unlocked() { return fn.ksUnlocked(this._h) === 1; }
+  /** Sign a transfer from the stored account without revealing its secret. Returns the encoded transaction. */
+  signTransfer({ chainId, from, to, amount, nonce, fee = 0 }) {
+    return consume(fn.ksSign(this._h, BigInt(chainId), u8(from), u8(to), BigInt(amount), BigInt(nonce), BigInt(fee)), 'keystore_sign_transfer');
+  }
+  publicKey(address) { return consume(fn.ksPublicKey(this._h, u8(address)), 'keystore_public_key'); }
+  has(address) { return fn.ksHas(this._h, u8(address)) === 1; }
+  addresses() { return splitBlobList(consume(fn.ksAddresses(this._h), 'keystore_addresses')); }
+  /** Forget the master key until the next unlock(). */
+  lock() { fn.ksLock(this._h); }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -634,6 +702,12 @@ class ChainTree {
   free() { if (this._h) { fn.treeFree(this._h); this._h = null; } }
 }
 
+// [count u32]([len u32][bytes]) repeated, decoded back into Buffers.
+function splitBlobList(b) {
+  const n = b.readUInt32BE(0); const out = []; let off = 4;
+  for (let i = 0; i < n; i++) { const l = b.readUInt32BE(off); off += 4; out.push(Buffer.from(b.subarray(off, off + l))); off += l; }
+  return out;
+}
 // [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
 function blobList(items) {
   const parts = [Buffer.alloc(4)];
@@ -726,6 +800,85 @@ function shareInfo(card) {
   return { index: (b[0] << 8) | b[1], groupPublicKey: b.subarray(2, 34), publicShare: b.subarray(34, 66) };
 }
 
+// -- Networking: consensus over a network the app owns --
+// A NetNode is a validator (or observer) running BFT consensus over a gossip
+// mesh with no socket and no clock. Every input returns { relays, timeouts }:
+// send each relay to that peer over your transport, arm each timeout for a
+// duration you choose, and feed what arrives back through onGossip/onTimeout.
+const NET_OBSERVER = 0xFFFFFFFF;
+const StepPropose = 0, StepPrevote = 1, StepPrecommit = 2;
+function decodeOutbound(b) {
+  let off = 0; const relays = []; const timeouts = [];
+  const rc = b.readUInt32BE(off); off += 4;
+  for (let i = 0; i < rc; i++) { const to = b.readUInt32BE(off); const l = b.readUInt32BE(off + 4); off += 8; relays.push({ to, message: Buffer.from(b.subarray(off, off + l)) }); off += l; }
+  const tc = b.readUInt32BE(off); off += 4;
+  for (let i = 0; i < tc; i++) { timeouts.push({ step: b[off], round: b.readUInt32BE(off + 1) }); off += 5; }
+  return { relays, timeouts };
+}
+class NetNode {
+  /** { genesis, me, blsKey?: {public, secret}, timestamp?: 1, peers?: [] }; me = NET_OBSERVER follows without voting. */
+  constructor({ genesis, me, blsKey = null, timestamp = 1, peers = [] }) {
+    const g = u8(genesis), pk = blsKey ? u8(blsKey.public) : Buffer.alloc(0), sk = blsKey ? u8(blsKey.secret) : Buffer.alloc(0);
+    this._h = fn.netNew(g, g.length, me, pk, pk.length, sk, sk.length, BigInt(timestamp));
+    if (!this._h) throw new Error('net node: malformed genesis or key');
+    for (const p of peers) this.addPeer(p);
+  }
+  addPeer(peer) { fn.netAddPeer(this._h, peer); }
+  /** Encoded transactions this node proposes at the current height; cleared by advance(). */
+  setTransactions(encodedTxs) { const blob = blobList(encodedTxs); if (fn.netSetTxs(this._h, blob, blob.length) !== 1) throw new Error('net node: malformed transaction'); }
+  start() { return decodeOutbound(consume(fn.netStart(this._h), 'net_node_start')); }
+  onGossip(from, payload) { return decodeOutbound(consume(fn.netOnGossip(this._h, from, u8(payload), u8(payload).length), 'net_node_on_gossip')); }
+  onTimeout({ step, round }) { return decodeOutbound(consume(fn.netOnTimeout(this._h, step, round), 'net_node_on_timeout')); }
+  advance() { return decodeOutbound(consume(fn.netAdvance(this._h), 'net_node_advance')); }
+  get committed() { return fn.netCommitted(this._h) === 1; }
+  get height() { return Number(fn.netHeight(this._h)); }
+  peerBanned(peer) { return fn.netPeerBanned(this._h, peer) === 1; }
+  replayLog() { return splitBlobList(consume(fn.netReplayLog(this._h), 'net_node_replay_log')); }
+  tip() { return consume(fn.netTip(this._h), 'net_node_tip'); }
+  stateRoot() { return consume(fn.netStateRoot(this._h), 'net_node_state_root'); }
+  balance(address) { return Number(fn.netBalance(this._h, u8(address))); }
+  proveAccount(address) { return consume(fn.netProve(this._h, u8(address)), 'net_node_prove_account'); }
+  free() { if (this._h) { fn.netFree(this._h); this._h = null; } }
+}
+/** A fresh long term identity: { kem: {public, secret}, sig: {public, secret} }. */
+function generateSecureIdentity() {
+  const p = splitBlobList(consume(fn.secIdentity(), 'secure_identity_generate'));
+  return { kem: { public: p[0], secret: p[1] }, sig: { public: p[2], secret: p[3] } };
+}
+/** A confidential, mutually authenticated, post quantum hybrid link. Pin peerIdentity against the key you expect. */
+class SecureSession {
+  static _wrap(h) { const s = Object.create(SecureSession.prototype); s._h = h; return s; }
+  /** Dialing side: encapsulate to the responder's KEM public key, authenticate with sig {public, secret}. */
+  static initiate(responderKemPublic, sig) {
+    const rk = u8(responderKemPublic), sp = u8(sig.public), ss = u8(sig.secret);
+    const h = fn.secInitiate(rk, rk.length, sp, sp.length, ss, ss.length);
+    if (!h) throw new Error('secure session: initiate failed');
+    return SecureSession._wrap(h);
+  }
+  /** Accepting side: consume the initiator's first message under identity; open at once. */
+  static accept(identity, firstMessage) {
+    const kp = u8(identity.kem.public), ks = u8(identity.kem.secret), sp = u8(identity.sig.public), ss = u8(identity.sig.secret), m = u8(firstMessage);
+    const h = fn.secAccept(kp, kp.length, ks, ks.length, sp, sp.length, ss, ss.length, m, m.length);
+    if (!h) throw new Error('secure session: initiator refused');
+    return SecureSession._wrap(h);
+  }
+  /** The handshake message this side must send: msg1 for an initiator, the reply for a responder. */
+  get handshakeMessage() { return consume(fn.secHandshake(this._h), 'secure_handshake_message'); }
+  /** Initiator only: consume the responder's reply. Throws when the responder does not verify. */
+  complete(reply) { if (fn.secComplete(this._h, u8(reply), u8(reply).length) !== 1) throw new Error('secure session: responder refused'); }
+  get open() { return fn.secOpen(this._h) === 1; }
+  get peerIdentity() { return consume(fn.secPeer(this._h), 'secure_peer_identity'); }
+  encrypt(plaintext) { return consume(fn.secEncrypt(this._h, u8(plaintext), u8(plaintext).length), 'secure_encrypt'); }
+  decrypt(frame) { return consume(fn.secDecrypt(this._h, u8(frame), u8(frame).length), 'secure_decrypt'); }
+  free() { if (this._h) { fn.secFree(this._h); this._h = null; } }
+}
+/** Rebuild a node from Node#snapshot(); every block is replayed through consensus. Throws on a malformed blob. */
+function restoreNode(snapshot) {
+  const b = u8(snapshot); const h = fn.nodeRestore(b, b.length);
+  if (!h) throw new Error('node restore refused (malformed snapshot)');
+  return Node._wrap(h);
+}
+
 module.exports = {
   preload,
   _warm,
@@ -744,6 +897,17 @@ module.exports = {
   newKeyStore: (passphrase) => new KeyStore(passphrase),
   loadKeyStore: (blob) => KeyStore.load(blob),
   KeyStore,
+  restoreNode,
+
+  // Networking
+  NetNode,
+  newNetNode: (opts) => new NetNode(opts),
+  NET_OBSERVER,
+  StepPropose, StepPrevote, StepPrecommit,
+  SecureSession,
+  generateSecureIdentity,
+  initiateSecureSession: SecureSession.initiate,
+  acceptSecureSession: SecureSession.accept,
 
   // Threshold (FROST t-of-n) accounts. Cards, commit, ceremony, aggregate.
   createThresholdAccount(n, t) {

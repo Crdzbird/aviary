@@ -1361,3 +1361,29 @@ selectors — validated against real-world vectors). Deferred:
   xcframework script embeds it in each `AviaryC.framework` slice (iOS root,
   macOS `Versions/A/Resources`). The static lite xcframework cannot carry a
   manifest, so its plugin target's resource is the one that ships.
+
+## Go, npm, JVM and Swift wrappers for events, persistence, custody and networking - DONE (2026-10-10)
+- **[x] Go** (`events.go` + `events_export.go` with the cgo export pattern,
+  `persistence.go`, `custody.go`, `net.go` with `splitBlobList`,
+  `decodeOutbound`, `NetNode`, `SecureSession`, `SecureIdentity`); `Node`
+  gained `handle`/`onEvent` fields and an unhooking `Free`. Tests in
+  `extras_test.go` (persistence, custody, event hook, four node line mesh with
+  observer plus secure session).
+- **[x] npm** (`AviaryEventFn` proto with a `const uint8_t*` payload because
+  koffi hands `const char*` to JS as a decoded string, `Node.onEvent`,
+  `snapshot`/`blockAt`/`submitTx`/`submitTransferFromStore`, `restoreNode`,
+  `KeyStore.signTransfer`/`publicKey`/`has`/`addresses`/`lock`, `NetNode`,
+  `SecureSession`, `generateSecureIdentity`, `splitBlobList`; typings in
+  `index.d.ts`). Tests `persistence`, `custody`, `events`, `network`.
+- **[x] JVM** (handles for all new symbols, `Node.setEventHook` through a
+  static upcall stub and `NODE_EVENTS` map, `snapshot`/`blockAt`/
+  `submitTx`/`submitTransferFromStore`, `restoreNode`, KeyStore methods,
+  records `Relay`/`TimeoutRequest`/`Outbound`/`SecureIdentity`, inner
+  classes `NetNode` and `SecureSession`). `Main.java` exercises all of it.
+- **[x] Swift** (extensions on `Node` and `KeyStore`, `Aviary.restoreNode`,
+  `splitBlobList`, `NetNode`, `SecureSession`, `SecureIdentity`,
+  `ConsensusStep`, `Relay`, `TimeoutRequest`, `Outbound`; the event hook
+  keeps closures in a file private dictionary keyed by the node handle and
+  `Node.deinit` unhooks). `main.swift` exercises all of it; `precondition`
+  cannot take `try` in its autoclosure, hence the `ensure` helper.
+- Every binding now wraps the entire C ABI again.

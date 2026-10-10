@@ -33,3 +33,22 @@ automatically; a packaged JAR should ship both natives side by side.
 `ethAddress`/`btcAddress`/`solAddress`, `verifyStateProof`. `Aviary.Node`
 → `newAccount`, `credit`, `submitTransfer`, `produceBlock`, `height`/`balance`/
 `nonce`/`mempoolSize`, `stateRoot`, `drainEvents`, `metrics`, `proveAccount`.
+
+## Events, persistence, custody signing and networking
+
+- Push events: `node.SetEventHook(func(json string))` (Go), `node.onEvent(cb)`
+  (npm), `node.setEventHook(Consumer<String>)` (JVM), `node.setEventHook { }`
+  (Swift) receive each chain event as one JSON object; a nil hook restores
+  buffering for the drain call.
+- Persistence: `Snapshot` / `RestoreNode` / `BlockAt` rebuild a node from one
+  blob by replaying its blocks through consensus.
+- Custody signing: `KeyStore.SignTransfer`, `Node.SubmitTransferFromStore` and
+  `Node.SubmitTx` sign from the sealed store without the secret ever leaving
+  the engine; `PublicKey`, `Has`, `Addresses`, `Lock` round out the store.
+- Networking: `NetNode` runs BFT consensus over a gossip mesh with no socket
+  and no clock; every input returns the relays to send and the timeouts to
+  arm (`Start`, `OnGossip`, `OnTimeout`, `Advance`, `SetTransactions`,
+  `ReplayLog`). `SecureSession` protects each link with the mutually
+  authenticated post quantum hybrid handshake (`GenerateSecureIdentity`,
+  `InitiateSecureSession`, `AcceptSecureSession`, `Encrypt`, `Decrypt`).
+  Names follow each language's casing.

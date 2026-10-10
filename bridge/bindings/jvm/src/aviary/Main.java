@@ -371,6 +371,112 @@ public final class Main {
             }
             System.out.println("chain-tree OK");
 
+            // Persistence: snapshot, restore, keep producing.
+            {
+                Aviary.Node src = bc.createNode(0x7701);
+                Aviary.Account a = src.newAccount(), b = src.newAccount();
+                src.credit(a.address(), 500);
+                src.submitTransfer(a.secret(), b.address(), 120, 0); src.produceBlock(1);
+                src.submitTransfer(a.secret(), b.address(), 30, 1); src.produceBlock(2);
+                try (Aviary.Node back = bc.restoreNode(src.snapshot())) {
+                    if (back.height() != 2 || back.balance(b.address()) != 150 || back.nonce(a.address()) != 2) throw new IllegalStateException("restored state");
+                    if (!java.util.Arrays.equals(back.stateRoot(), src.stateRoot()) || !java.util.Arrays.equals(back.blockAt(1), src.blockAt(1))) throw new IllegalStateException("restored roots");
+                    back.submitTransfer(a.secret(), b.address(), 1, 2);
+                    if (back.produceBlock(3) != 3) throw new IllegalStateException("restored node keeps producing");
+                }
+                try { bc.restoreNode(new byte[]{1, 2, 3}); throw new IllegalStateException("garbage snapshot accepted"); } catch (IllegalArgumentException expected) {}
+                src.close();
+            }
+            System.out.println("persistence OK");
+
+            // Custody signing: the secret never leaves the engine.
+            {
+                Aviary.Node n = bc.createNode(0x7702);
+                Aviary.Account a = n.newAccount(), b = n.newAccount();
+                Aviary.KeyStore ks = bc.createKeyStore("hunter2");
+                if (!java.util.Arrays.equals(ks.addAccount(a.publicKey(), a.secret()), a.address()) || !ks.has(a.address()) || ks.has(b.address())) throw new IllegalStateException("store inventory");
+                if (!java.util.Arrays.equals(ks.publicKey(a.address()), a.publicKey()) || ks.addresses().length != 1) throw new IllegalStateException("public key");
+                n.credit(a.address(), 1000);
+                n.submitTransferFromStore(ks, a.address(), b.address(), 100, 0, 0);
+                n.submitTx(ks.signTransfer(0x7702, a.address(), b.address(), 1, 1, 3));
+                n.produceBlock(1);
+                if (n.balance(b.address()) != 101 || n.balance(a.address()) != 1000 - 100 - 1 - 3) throw new IllegalStateException("custody transfers");
+                ks.lock();
+                try { n.submitTransferFromStore(ks, a.address(), b.address(), 1, 2, 0); throw new IllegalStateException("locked store signed"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                ks.unlock("hunter2");
+                try { ks.signTransfer(0x7702, b.address(), a.address(), 1, 0, 0); throw new IllegalStateException("unknown account signed"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                ks.close(); n.close();
+            }
+            System.out.println("custody signing OK");
+
+            // Push events through the native hook.
+            {
+                Aviary.Node n = bc.createNode(0x7703);
+                var seen = new java.util.ArrayList<String>();
+                n.setEventHook(seen::add);
+                Aviary.Account a = n.newAccount(), b = n.newAccount();
+                n.credit(a.address(), 10);
+                n.submitTransfer(a.secret(), b.address(), 1, 0); n.produceBlock(1);
+                if (seen.size() != 3 || !seen.get(0).contains("tx_admitted") || !seen.get(1).contains("block_finalized")) throw new IllegalStateException("hook events " + seen);
+                if (!n.drainEvents().equals("[]")) throw new IllegalStateException("buffer while hooked");
+                n.setEventHook(null);
+                n.submitTransfer(a.secret(), b.address(), 1, 1);
+                if (!n.drainEvents().contains("tx_admitted")) throw new IllegalStateException("buffering after unhook");
+                n.close();
+            }
+            System.out.println("event hook OK");
+
+            // A deterministic four validator line mesh with an observer, then a secure session.
+            {
+                Aviary.PortableAccount[] keys = new Aviary.PortableAccount[4];
+                byte[][] pks = new byte[4][]; long[] powers = {1, 1, 1, 1};
+                for (int i = 0; i < 4; i++) { byte[] ikm = new byte[32]; java.util.Arrays.fill(ikm, (byte) (0x60 + i)); keys[i] = bc.newBLSValidator(ikm); pks[i] = keys[i].publicKey(); }
+                byte[] aliceM = new byte[32]; java.util.Arrays.fill(aliceM, (byte) 0x11);
+                byte[] genesis = bc.buildGenesis(42, 1, 1, 0, new byte[][]{aliceM}, new long[]{1000}, pks, powers);
+                var nodes = new java.util.ArrayList<Aviary.NetNode>();
+                for (int i = 0; i < 4; i++) nodes.add(bc.newNetNode(genesis, i, keys[i], 1));
+                nodes.add(bc.newNetNode(genesis, Aviary.NET_OBSERVER, null, 1));
+                int[][] edges = {{0, 1}, {1, 2}, {2, 3}, {3, 4}};
+                for (int[] e : edges) { nodes.get(e[0]).addPeer(e[1]); nodes.get(e[1]).addPeer(e[0]); }
+                var queue = new java.util.ArrayDeque<Object[]>(); var timeouts = new java.util.ArrayList<int[]>();
+                java.util.function.BiConsumer<Integer, Aviary.Outbound> apply = (i, o) -> {
+                    for (var r : o.relays()) queue.add(new Object[]{i, r.to(), r.message()});
+                    for (var t : o.timeouts()) timeouts.add(new int[]{t.round(), t.step(), i});
+                };
+                java.util.function.Supplier<Boolean> committed = () -> nodes.subList(0, 4).stream().allMatch(Aviary.NetNode::committed);
+                Runnable drain = () -> {
+                    for (int step = 0; step < 20000; step++) {
+                        if (!queue.isEmpty()) { Object[] m = queue.poll(); int to = (int) m[1]; apply.accept(to, nodes.get(to).onGossip((int) m[0], (byte[]) m[2])); continue; }
+                        if (timeouts.isEmpty()) return;
+                        timeouts.sort((p, q) -> p[0] != q[0] ? Integer.compare(p[0], q[0]) : Integer.compare(p[1], q[1]));
+                        int[] t = timeouts.remove(0); apply.accept(t[2], nodes.get(t[2]).onTimeout(new Aviary.TimeoutRequest(t[1], t[0])));
+                    }
+                };
+                for (int i = 0; i < nodes.size(); i++) apply.accept(i, nodes.get(i).start());
+                drain.run();
+                if (!committed.get() || nodes.stream().anyMatch(nn -> nn.height() != 1)) throw new IllegalStateException("mesh height 1");
+                if (!java.util.Arrays.equals(nodes.get(0).tip(), nodes.get(4).tip()) || nodes.get(4).balance(aliceM) != 1000) throw new IllegalStateException("observer follows");
+                if (nodes.get(0).replayLog().length == 0) throw new IllegalStateException("replay log");
+                if (!bc.verifyStateProof(nodes.get(2).stateRoot(), nodes.get(2).proveAccount(aliceM))) throw new IllegalStateException("net proof");
+                for (int i = 0; i < nodes.size(); i++) apply.accept(i, nodes.get(i).advance());
+                drain.run();
+                if (nodes.stream().anyMatch(nn -> nn.height() != 2)) throw new IllegalStateException("mesh height 2");
+                try { nodes.get(0).setTransactions(new byte[][]{{1, 2}}); throw new IllegalStateException("malformed tx accepted"); } catch (IllegalArgumentException expected) {}
+                nodes.forEach(Aviary.NetNode::close);
+
+                Aviary.SecureIdentity ia = bc.generateSecureIdentity(), ib = bc.generateSecureIdentity();
+                try (Aviary.SecureSession init = bc.initiateSecureSession(ib.kem().publicKey(), ia.sig());
+                     Aviary.SecureSession resp = bc.acceptSecureSession(ib, init.handshakeMessage())) {
+                    init.complete(resp.handshakeMessage());
+                    if (!init.open() || !resp.open() || !java.util.Arrays.equals(init.peerIdentity(), ib.sig().publicKey()) || !java.util.Arrays.equals(resp.peerIdentity(), ia.sig().publicKey())) throw new IllegalStateException("session pinning");
+                    if (!new String(resp.decrypt(init.encrypt("hello".getBytes())), java.nio.charset.StandardCharsets.UTF_8).equals("hello")) throw new IllegalStateException("round trip");
+                    byte[] frame = init.encrypt(new byte[]{1}); frame[frame.length - 1] ^= 1;
+                    try { resp.decrypt(frame); throw new IllegalStateException("tampered frame accepted"); } catch (RuntimeException expected) { if (expected instanceof IllegalStateException) throw expected; }
+                    try { bc.acceptSecureSession(ia, init.handshakeMessage()); throw new IllegalStateException("wrong identity accepted"); } catch (IllegalArgumentException expected) {}
+                }
+            }
+            System.out.println("network + secure session OK");
+
             System.out.println("\nALL GOOD");
         }
     }

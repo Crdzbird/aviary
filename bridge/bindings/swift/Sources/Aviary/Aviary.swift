@@ -909,7 +909,13 @@ public final class KeyStore {
 public final class Node {
     private let handle: OpaquePointer
     init(handle: UnsafeMutableRawPointer) { self.handle = OpaquePointer(handle) }
-    deinit { aviary_node_free(UnsafeMutableRawPointer(handle)) }
+    deinit {
+        if nodeEventHooks[UnsafeMutableRawPointer(handle)] != nil {
+            aviary_node_set_event_hook(UnsafeMutableRawPointer(handle), nil, nil)
+            nodeEventHooks[UnsafeMutableRawPointer(handle)] = nil
+        }
+        aviary_node_free(UnsafeMutableRawPointer(handle))
+    }
 
     private var h: UnsafeMutableRawPointer { UnsafeMutableRawPointer(handle) }
 
@@ -1034,4 +1040,199 @@ private func consume(_ result: AviaryBufferResult, _ op: String) throws -> Data 
 
 private func consumeString(_ result: AviaryBufferResult, _ op: String) throws -> String {
     String(decoding: try consume(result, op), as: UTF8.self)
+}
+
+// -- Events, persistence, custody signing --
+private var nodeEventHooks: [UnsafeMutableRawPointer: (String) -> Void] = [:]
+
+extension Node {
+    /// Receives every chain event as one JSON object, synchronously from the node call that
+    /// caused it; nil removes the hook. While set, drainEvents() is empty.
+    public func setEventHook(_ hook: ((String) -> Void)?) {
+        guard let hook else {
+            aviary_node_set_event_hook(h, nil, nil); nodeEventHooks[h] = nil; return
+        }
+        nodeEventHooks[h] = hook
+        let cb: AviaryEventFn = { ctx, json, len in
+            guard let ctx, let json, let hook = nodeEventHooks[ctx] else { return }
+            hook(String(decoding: Data(bytes: json, count: len), as: UTF8.self))
+        }
+        aviary_node_set_event_hook(h, cb, h)
+    }
+    /// The whole chain as one blob: chain id, genesis credits and every finalized block with
+    /// its certificate. Pending transactions are not included.
+    public func snapshot() throws -> Data { try consume(aviary_node_snapshot(h), "node_snapshot") }
+    /// The encoded finalized block at height (1 based).
+    public func blockAt(_ height: UInt64) throws -> Data { try consume(aviary_node_block_at(h, height), "node_block_at") }
+    /// Admits an already signed, encoded transaction; returns its txid.
+    @discardableResult
+    public func submitTx(_ encoded: Data) throws -> Data {
+        try consume(encoded.withC { p, l in aviary_node_submit_tx(h, p, l) }, "node_submit_tx")
+    }
+    /// Signs a transfer from the key store account at `from` and admits it; the secret never
+    /// leaves the engine. Returns the txid.
+    @discardableResult
+    public func submitTransfer(fromStore store: KeyStore, from: Data, to: Data, amount: UInt64,
+                               nonce: UInt64, fee: UInt64 = 0) throws -> Data {
+        try consume(from.withC { fp, _ in to.withC { tp, _ in
+            aviary_node_submit_transfer_keystore(h, store.rawHandle, fp, tp, amount, nonce, fee) } }, "node_submit_transfer_keystore")
+    }
+}
+
+extension KeyStore {
+    var rawHandle: UnsafeMutableRawPointer { h }
+    /// Signs a transfer from the stored account at `from` without revealing its secret. The
+    /// scheme follows the stored key; a zero fee gives the version 1 envelope.
+    public func signTransfer(chainID: UInt64, from: Data, to: Data, amount: UInt64, nonce: UInt64,
+                             fee: UInt64 = 0) throws -> Data {
+        try consume(from.withC { fp, _ in to.withC { tp, _ in
+            aviary_keystore_sign_transfer(h, chainID, fp, tp, amount, nonce, fee) } }, "keystore_sign_transfer")
+    }
+    /// The stored public key for `address`.
+    public func publicKey(address: Data) throws -> Data {
+        try consume(address.withC { p, _ in aviary_keystore_public_key(h, p) }, "keystore_public_key")
+    }
+    /// Whether the store holds `address`.
+    public func has(address: Data) -> Bool { address.withC { p, _ in aviary_keystore_has(h, p) == 1 } }
+    /// Every stored address.
+    public func addresses() throws -> [Data] { Aviary.splitBlobList(try consume(aviary_keystore_addresses(h), "keystore_addresses")) }
+    /// Forgets the master key until the next unlock.
+    public func lock() { aviary_keystore_lock(h) }
+}
+
+extension Aviary {
+    /// Rebuilds a node from `Node.snapshot()`, replaying every block through consensus.
+    public static func restoreNode(_ snapshot: Data) throws -> Node {
+        ensureReady()
+        guard let raw = snapshot.withC({ p, l in aviary_node_restore(p, l) }) else {
+            throw AviaryError(message: "node restore refused (malformed snapshot)") }
+        return Node(handle: raw)
+    }
+    /// [count u32]([len u32][bytes]) repeated, decoded.
+    static func splitBlobList(_ b: Data) -> [Data] {
+        func u32(_ o: Int) -> Int { Int(UInt32(bigEndian: b.subdata(in: o..<o+4).withUnsafeBytes { $0.load(as: UInt32.self) })) }
+        var out: [Data] = []; var off = 4
+        for _ in 0..<u32(0) { let l = u32(off); off += 4; out.append(b.subdata(in: off..<off+l)); off += l }
+        return out
+    }
+
+    // -- Networking: consensus over a network the app owns --
+    /// The validator index that follows a chain without voting.
+    public static let netObserver: UInt32 = 0xFFFF_FFFF
+    /// The step of a consensus round a timeout belongs to.
+    public enum ConsensusStep: UInt8 { case propose = 0, prevote = 1, precommit = 2 }
+    /// A gossip message to send to one peer.
+    public struct Relay { public let to: UInt32; public let message: Data
+        public init(to: UInt32, message: Data) { self.to = to; self.message = message } }
+    /// A consensus timer to arm; when it fires, call `NetNode.onTimeout`.
+    public struct TimeoutRequest { public let step: ConsensusStep; public let round: UInt32
+        public init(step: ConsensusStep, round: UInt32) { self.step = step; self.round = round } }
+    /// What a `NetNode` wants done after an input: relays to send and timers to arm. Durations
+    /// are the caller's choice.
+    public struct Outbound { public let relays: [Relay]; public let timeouts: [TimeoutRequest]
+        public init(relays: [Relay], timeouts: [TimeoutRequest]) { self.relays = relays; self.timeouts = timeouts } }
+    /// A long term peer identity: a hybrid KEM pair and a hybrid signature pair.
+    public struct SecureIdentity { public let kem: PortableAccount; public let sig: PortableAccount
+        public init(kem: PortableAccount, sig: PortableAccount) { self.kem = kem; self.sig = sig } }
+
+    static func decodeOutbound(_ b: Data) -> Outbound {
+        func u32(_ o: Int) -> Int { Int(UInt32(bigEndian: b.subdata(in: o..<o+4).withUnsafeBytes { $0.load(as: UInt32.self) })) }
+        var off = 0; var relays: [Relay] = []; var timeouts: [TimeoutRequest] = []
+        let rc = u32(off); off += 4
+        for _ in 0..<rc { let to = UInt32(u32(off)); let l = u32(off + 4); off += 8; relays.append(Relay(to: to, message: b.subdata(in: off..<off+l))); off += l }
+        let tc = u32(off); off += 4
+        for _ in 0..<tc { timeouts.append(TimeoutRequest(step: ConsensusStep(rawValue: b[off]) ?? .propose, round: UInt32(u32(off + 1)))); off += 5 }
+        return Outbound(relays: relays, timeouts: timeouts)
+    }
+
+    /// A validator or observer running BFT consensus over a gossip mesh with no socket and no
+    /// clock of its own. Send each relay over your transport, arm each timeout, and feed what
+    /// arrives back through `onGossip` and `onTimeout`.
+    public final class NetNode {
+        private let h: UnsafeMutableRawPointer
+        init(handle: UnsafeMutableRawPointer) { h = handle }
+        deinit { aviary_net_node_free(h) }
+        public func addPeer(_ peer: UInt32) { aviary_net_node_add_peer(h, peer) }
+        /// Encoded transactions this node proposes at the current height; cleared by `advance`.
+        public func setTransactions(_ encodedTxs: [Data]) throws {
+            let blob = Aviary.blobList(encodedTxs)
+            if blob.withC({ p, l in aviary_net_node_set_transactions(h, p, l) }) != 1 {
+                throw AviaryError(message: "net node: malformed transaction") }
+        }
+        public func start() throws -> Outbound { decodeOutbound(try consume(aviary_net_node_start(h), "net_node_start")) }
+        public func onGossip(from: UInt32, payload: Data) throws -> Outbound {
+            decodeOutbound(try consume(payload.withC { p, l in aviary_net_node_on_gossip(h, from, p, l) }, "net_node_on_gossip"))
+        }
+        public func onTimeout(_ t: TimeoutRequest) throws -> Outbound {
+            decodeOutbound(try consume(aviary_net_node_on_timeout(h, t.step.rawValue, t.round), "net_node_on_timeout"))
+        }
+        /// Rolls into the next height after `committed`.
+        public func advance() throws -> Outbound { decodeOutbound(try consume(aviary_net_node_advance(h), "net_node_advance")) }
+        public var committed: Bool { aviary_net_node_committed(h) == 1 }
+        public var height: UInt64 { aviary_net_node_height(h) }
+        public func peerBanned(_ peer: UInt32) -> Bool { aviary_net_node_peer_banned(h, peer) == 1 }
+        /// Every unique consensus payload of the current height; replay it to a late peer.
+        public func replayLog() throws -> [Data] { Aviary.splitBlobList(try consume(aviary_net_node_replay_log(h), "net_node_replay_log")) }
+        public func tip() throws -> Data { try consume(aviary_net_node_tip(h), "net_node_tip") }
+        public func stateRoot() throws -> Data { try consume(aviary_net_node_state_root(h), "net_node_state_root") }
+        public func balance(address: Data) -> UInt64 { address.withC { p, _ in aviary_net_node_balance(h, p) } }
+        public func proveAccount(address: Data) throws -> Data {
+            try consume(address.withC { p, _ in aviary_net_node_prove_account(h, p) }, "net_node_prove_account")
+        }
+    }
+    /// A consensus node for validator `me` of `genesis`, or an observer when `me` is `netObserver`.
+    public static func newNetNode(genesis: Data, me: UInt32, blsKey: PortableAccount? = nil,
+                                  timestamp: UInt64 = 1, peers: [UInt32] = []) throws -> NetNode {
+        ensureReady()
+        let pk = blsKey?.publicKey ?? Data(), sk = blsKey?.secret ?? Data()
+        guard let raw = genesis.withC({ gp, gl in pk.withC { pp, pl in sk.withC { sp, sl in
+            aviary_net_node_new(gp, gl, me, pp, pl, sp, sl, timestamp) } } }) else {
+            throw AviaryError(message: "net node: malformed genesis or key") }
+        let node = NetNode(handle: raw)
+        peers.forEach(node.addPeer)
+        return node
+    }
+
+    /// A fresh long term identity.
+    public static func generateSecureIdentity() throws -> SecureIdentity {
+        ensureReady()
+        let parts = splitBlobList(try consume(aviary_secure_identity_generate(), "secure_identity_generate"))
+        return SecureIdentity(kem: PortableAccount(publicKey: parts[0], secret: parts[1]),
+                              sig: PortableAccount(publicKey: parts[2], secret: parts[3]))
+    }
+    /// A confidential, mutually authenticated, post quantum hybrid link. Pin `peerIdentity`
+    /// against the key you expect.
+    public final class SecureSession {
+        private let h: UnsafeMutableRawPointer
+        init(handle: UnsafeMutableRawPointer) { h = handle }
+        deinit { aviary_secure_free(h) }
+        /// The handshake message this side must send: the first message for an initiator, the
+        /// reply for a responder.
+        public func handshakeMessage() throws -> Data { try consume(aviary_secure_handshake_message(h), "secure_handshake_message") }
+        /// Initiator only: consumes the responder's reply. Throws when the responder does not verify.
+        public func complete(reply: Data) throws {
+            if reply.withC({ p, l in aviary_secure_complete(h, p, l) }) != 1 {
+                throw AviaryError(message: "secure session: responder refused") }
+        }
+        public var isOpen: Bool { aviary_secure_open(h) == 1 }
+        public func peerIdentity() throws -> Data { try consume(aviary_secure_peer_identity(h), "secure_peer_identity") }
+        public func encrypt(_ plaintext: Data) throws -> Data { try consume(plaintext.withC { p, l in aviary_secure_encrypt(h, p, l) }, "secure_encrypt") }
+        public func decrypt(_ frame: Data) throws -> Data { try consume(frame.withC { p, l in aviary_secure_decrypt(h, p, l) }, "secure_decrypt") }
+    }
+    /// Dialing side: encapsulates to the responder's KEM public key and authenticates with `sig`.
+    public static func initiateSecureSession(responderKemPublic: Data, sig: PortableAccount) throws -> SecureSession {
+        ensureReady()
+        guard let raw = responderKemPublic.withC({ rp, rl in sig.publicKey.withC { pp, pl in sig.secret.withC { sp, sl in
+            aviary_secure_initiate(rp, rl, pp, pl, sp, sl) } } }) else {
+            throw AviaryError(message: "secure session: initiate failed") }
+        return SecureSession(handle: raw)
+    }
+    /// Accepting side: consumes the initiator's first message under `me`; open at once.
+    public static func acceptSecureSession(me: SecureIdentity, firstMessage: Data) throws -> SecureSession {
+        ensureReady()
+        guard let raw = me.kem.publicKey.withC({ kp, kl in me.kem.secret.withC { ks, ksl in me.sig.publicKey.withC { sp, sl in me.sig.secret.withC { ss, ssl in firstMessage.withC { mp, ml in
+            aviary_secure_accept(kp, kl, ks, ksl, sp, sl, ss, ssl, mp, ml) } } } } }) else {
+            throw AviaryError(message: "secure session: initiator refused") }
+        return SecureSession(handle: raw)
+    }
 }

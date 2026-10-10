@@ -373,5 +373,106 @@ do {
 }
 print("chain-tree OK")
 
+// Checks a throwing expression; precondition's autoclosure cannot contain try.
+func ensure(_ msg: String, _ c: () throws -> Bool) throws { let v = try c(); precondition(v, msg) }
+
+// Persistence: snapshot, restore, keep producing.
+do {
+    let src = try Aviary.makeNode(chainID: 0x7701)
+    let a = try src.newAccount(), b = try src.newAccount()
+    try src.credit(address: a.address, amount: 500)
+    try src.submitTransfer(secret: a.secret, to: b.address, amount: 120, nonce: 0); _ = try src.produceBlock(timestamp: 1)
+    try src.submitTransfer(secret: a.secret, to: b.address, amount: 30, nonce: 1); _ = try src.produceBlock(timestamp: 2)
+    let back = try Aviary.restoreNode(try src.snapshot())
+    precondition(back.height == 2 && back.balance(address: b.address) == 150 && back.nonce(address: a.address) == 2, "restored state")
+    try ensure("restored roots") { try back.stateRoot() == src.stateRoot() && back.blockAt(1) == src.blockAt(1) }
+    try back.submitTransfer(secret: a.secret, to: b.address, amount: 1, nonce: 2)
+    try ensure("restored node keeps producing") { try back.produceBlock(timestamp: 3) == 3 }
+    precondition((try? Aviary.restoreNode(Data([1, 2, 3]))) == nil, "garbage snapshot refused")
+}
+print("persistence OK")
+
+// Custody signing: the secret never leaves the engine.
+do {
+    let n = try Aviary.makeNode(chainID: 0x7702)
+    let a = try n.newAccount(), b = try n.newAccount()
+    let ks = try Aviary.makeKeyStore(passphrase: "hunter2")
+    try ensure("store inventory") { try ks.addAccount(publicKey: a.publicKey, secret: a.secret) == a.address && ks.has(address: a.address) && !ks.has(address: b.address) }
+    try ensure("public key") { try ks.publicKey(address: a.address) == a.publicKey && ks.addresses().count == 1 }
+    try n.credit(address: a.address, amount: 1000)
+    try n.submitTransfer(fromStore: ks, from: a.address, to: b.address, amount: 100, nonce: 0)
+    try n.submitTx(try ks.signTransfer(chainID: 0x7702, from: a.address, to: b.address, amount: 1, nonce: 1, fee: 3))
+    _ = try n.produceBlock(timestamp: 1)
+    precondition(n.balance(address: b.address) == 101 && n.balance(address: a.address) == 1000 - 100 - 1 - 3, "custody transfers")
+    ks.lock()
+    precondition((try? n.submitTransfer(fromStore: ks, from: a.address, to: b.address, amount: 1, nonce: 2)) == nil, "locked store cannot sign")
+    try ks.unlock(passphrase: "hunter2")
+    precondition((try? ks.signTransfer(chainID: 0x7702, from: b.address, to: a.address, amount: 1, nonce: 0)) == nil, "unknown account")
+}
+print("custody signing OK")
+
+// Push events through the native hook.
+do {
+    let n = try Aviary.makeNode(chainID: 0x7703)
+    var seen: [String] = []
+    n.setEventHook { seen.append($0) }
+    let a = try n.newAccount(), b = try n.newAccount()
+    try n.credit(address: a.address, amount: 10)
+    try n.submitTransfer(secret: a.secret, to: b.address, amount: 1, nonce: 0); _ = try n.produceBlock(timestamp: 1)
+    precondition(seen.count == 3 && seen[0].contains("tx_admitted") && seen[1].contains("block_finalized"), "hook events \(seen)")
+    try ensure("buffer while hooked") { try n.drainEvents() == "[]" }
+    n.setEventHook(nil)
+    try n.submitTransfer(secret: a.secret, to: b.address, amount: 1, nonce: 1)
+    try ensure("buffering after unhook") { try n.drainEvents().contains("tx_admitted") }
+}
+print("event hook OK")
+
+// A deterministic four validator line mesh with an observer, then a secure session.
+do {
+    let keys = try (0..<4).map { try Aviary.newBLSValidator(keyMaterial: Data(repeating: UInt8(0x60 + $0), count: 32)) }
+    let aliceM = Data(repeating: 0x11, count: 32)
+    let genesis = try Aviary.buildGenesis(chainID: 42, accounts: [Aviary.GenesisAccount(address: aliceM, balance: 1000)],
+                                          validators: keys.map { Aviary.GenesisValidator(publicKey: $0.publicKey, power: 1) })
+    var nodes = try (0..<4).map { try Aviary.newNetNode(genesis: genesis, me: UInt32($0), blsKey: keys[$0]) }
+    nodes.append(try Aviary.newNetNode(genesis: genesis, me: Aviary.netObserver, peers: [3]))
+    for (x, y) in [(0, 1), (1, 2), (2, 3), (3, 4)] { nodes[x].addPeer(UInt32(y)); nodes[y].addPeer(UInt32(x)) }
+    var queue: [(Int, Int, Data)] = []; var timeouts: [(UInt32, UInt8, Int)] = []
+    func apply(_ i: Int, _ o: Aviary.Outbound) {
+        for r in o.relays { queue.append((i, Int(r.to), r.message)) }
+        for t in o.timeouts { timeouts.append((t.round, t.step.rawValue, i)) }
+    }
+    func run() throws {
+        for _ in 0..<20000 {
+            if !queue.isEmpty { let (from, to, p) = queue.removeFirst(); apply(to, try nodes[to].onGossip(from: UInt32(from), payload: p)); continue }
+            if timeouts.isEmpty { return }
+            timeouts.sort { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1 < $1.1 }
+            let (round, step, i) = timeouts.removeFirst()
+            apply(i, try nodes[i].onTimeout(Aviary.TimeoutRequest(step: Aviary.ConsensusStep(rawValue: step) ?? .propose, round: round)))
+        }
+    }
+    for (i, n) in nodes.enumerated() { apply(i, try n.start()) }
+    try run()
+    precondition(nodes.prefix(4).allSatisfy { $0.committed } && nodes.allSatisfy { $0.height == 1 }, "mesh height 1")
+    try ensure("observer follows") { try nodes[0].tip() == nodes[4].tip() && nodes[4].balance(address: aliceM) == 1000 }
+    try ensure("replay log") { try !nodes[0].replayLog().isEmpty }
+    try ensure("net proof") { Aviary.verifyStateProof(stateRoot: try nodes[2].stateRoot(), proof: try nodes[2].proveAccount(address: aliceM)) }
+    for (i, n) in nodes.enumerated() { apply(i, try n.advance()) }
+    try run()
+    precondition(nodes.allSatisfy { $0.height == 2 }, "mesh height 2")
+    precondition((try? nodes[0].setTransactions([Data([1, 2])])) == nil, "malformed tx refused")
+
+    let ia = try Aviary.generateSecureIdentity(), ib = try Aviary.generateSecureIdentity()
+    let initiator = try Aviary.initiateSecureSession(responderKemPublic: ib.kem.publicKey, sig: ia.sig)
+    let responder = try Aviary.acceptSecureSession(me: ib, firstMessage: try initiator.handshakeMessage())
+    try initiator.complete(reply: try responder.handshakeMessage())
+    precondition(initiator.isOpen && responder.isOpen, "sessions open")
+    try ensure("session pinning") { try initiator.peerIdentity() == ib.sig.publicKey && responder.peerIdentity() == ia.sig.publicKey }
+    try ensure("round trip") { try responder.decrypt(initiator.encrypt(Data("hello".utf8))) == Data("hello".utf8) }
+    var frame = try initiator.encrypt(Data([1])); frame[frame.count - 1] ^= 1
+    precondition((try? responder.decrypt(frame)) == nil, "tampered frame refused")
+    precondition((try? Aviary.acceptSecureSession(me: ia, firstMessage: try initiator.handshakeMessage())) == nil, "wrong identity refused")
+}
+print("network + secure session OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

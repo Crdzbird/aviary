@@ -42,6 +42,11 @@ public final class Aviary implements AutoCloseable {
             lcNew, lcAccept, lcAcceptSkipping, lcHeight, lcTip, lcValidators, lcSetTrust, lcSetMaxSkip, lcFree,
             treeNodeEncode, treeSpecError, treeBuild, treeChainIds, treeHeight, treeGenesis, treeTip, treePending, treeProduce,
             treeProve, treeVerify, treeSetTxSource, treeSetFinalized, treeFree;
+    private final MethodHandle nodeSetEventHook, nodeSnapshot, nodeRestore, nodeBlockAt, nodeSubmitTx, nodeSubmitKs,
+            ksSign, ksPublicKey, ksHas, ksAddresses, ksLock,
+            netNew, netAddPeer, netSetTxs, netStart, netOnGossip, netOnTimeout, netAdvance, netCommitted, netHeight,
+            netPeerBanned, netReplayLog, netTip, netStateRoot, netBalance, netProve, netFree,
+            secIdentity, secInitiate, secAccept, secHandshake, secComplete, secOpen, secPeer, secEncrypt, secDecrypt, secFree;
 
     public Aviary() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -180,6 +185,43 @@ public final class Aviary implements AutoCloseable {
         treeSetTxSource = h("aviary_chain_tree_set_tx_source", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
         treeSetFinalized = h("aviary_chain_tree_set_finalized_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
         treeFree = h("aviary_chain_tree_free", FunctionDescriptor.ofVoid(ADDRESS));
+        nodeSetEventHook = h("aviary_node_set_event_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
+        nodeSnapshot = h("aviary_node_snapshot", FunctionDescriptor.of(RES, ADDRESS));
+        nodeRestore = h("aviary_node_restore", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG));
+        nodeBlockAt = h("aviary_node_block_at", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        nodeSubmitTx = h("aviary_node_submit_tx", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        nodeSubmitKs = h("aviary_node_submit_transfer_keystore", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, JAVA_LONG, JAVA_LONG));
+        ksSign = h("aviary_keystore_sign_transfer", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, ADDRESS, JAVA_LONG, JAVA_LONG, JAVA_LONG));
+        ksPublicKey = h("aviary_keystore_public_key", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        ksHas = h("aviary_keystore_has", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
+        ksAddresses = h("aviary_keystore_addresses", FunctionDescriptor.of(RES, ADDRESS));
+        ksLock = h("aviary_keystore_lock", FunctionDescriptor.ofVoid(ADDRESS));
+        netNew = h("aviary_net_node_new", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
+        netAddPeer = h("aviary_net_node_add_peer", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT));
+        netSetTxs = h("aviary_net_node_set_transactions", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        netStart = h("aviary_net_node_start", FunctionDescriptor.of(RES, ADDRESS));
+        netOnGossip = h("aviary_net_node_on_gossip", FunctionDescriptor.of(RES, ADDRESS, JAVA_INT, ADDRESS, JAVA_LONG));
+        netOnTimeout = h("aviary_net_node_on_timeout", FunctionDescriptor.of(RES, ADDRESS, JAVA_BYTE, JAVA_INT));
+        netAdvance = h("aviary_net_node_advance", FunctionDescriptor.of(RES, ADDRESS));
+        netCommitted = h("aviary_net_node_committed", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+        netHeight = h("aviary_net_node_height", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        netPeerBanned = h("aviary_net_node_peer_banned", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT));
+        netReplayLog = h("aviary_net_node_replay_log", FunctionDescriptor.of(RES, ADDRESS));
+        netTip = h("aviary_net_node_tip", FunctionDescriptor.of(RES, ADDRESS));
+        netStateRoot = h("aviary_net_node_state_root", FunctionDescriptor.of(RES, ADDRESS));
+        netBalance = h("aviary_net_node_balance", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
+        netProve = h("aviary_net_node_prove_account", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        netFree = h("aviary_net_node_free", FunctionDescriptor.ofVoid(ADDRESS));
+        secIdentity = h("aviary_secure_identity_generate", FunctionDescriptor.of(RES));
+        secInitiate = h("aviary_secure_initiate", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        secAccept = h("aviary_secure_accept", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        secHandshake = h("aviary_secure_handshake_message", FunctionDescriptor.of(RES, ADDRESS));
+        secComplete = h("aviary_secure_complete", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        secOpen = h("aviary_secure_open", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+        secPeer = h("aviary_secure_peer_identity", FunctionDescriptor.of(RES, ADDRESS));
+        secEncrypt = h("aviary_secure_encrypt", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        secDecrypt = h("aviary_secure_decrypt", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        secFree = h("aviary_secure_free", FunctionDescriptor.ofVoid(ADDRESS));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -934,6 +976,18 @@ public final class Aviary implements AutoCloseable {
             } catch (Throwable t) { throw new RuntimeException(t); }
         }
 
+        /** Signs a transfer from the stored account at from without revealing its secret; the scheme follows the stored key and a zero fee gives the version 1 envelope. Returns the encoded transaction. */
+        public byte[] signTransfer(long chainId, byte[] from, byte[] to, long amount, long nonce, long fee) {
+            return call(ksSign, ks, chainId, seg(from), seg(to), amount, nonce, fee);
+        }
+        /** The stored public key for address. */
+        public byte[] publicKey(byte[] address) { return call(ksPublicKey, ks, seg(address)); }
+        /** Whether the store holds address. */
+        public boolean has(byte[] address) { try { return (int) ksHas.invoke(ks, seg(address)) == 1; } catch (Throwable t) { throw new RuntimeException(t); } }
+        /** Every stored address. */
+        public byte[][] addresses() { return splitBlobList(consume(invokeRes(ksAddresses, ks))); }
+        /** Forgets the master key until the next unlock. */
+        public void lock() { try { ksLock.invoke(ks); } catch (Throwable t) { throw new RuntimeException(t); } }
         /** Whether secrets can currently be revealed. */
         public boolean unlocked() {
             try { return (int) ksUnlocked.invoke(ks) == 1; } catch (Throwable t) { throw new RuntimeException(t); }
@@ -945,6 +999,7 @@ public final class Aviary implements AutoCloseable {
     /** A running chain node. */
     public final class Node implements AutoCloseable {
         private final MemorySegment node;
+        private long eventHandle;
         private Node(MemorySegment node) { this.node = node; }
 
         public Account newAccount() {
@@ -1009,9 +1064,158 @@ public final class Aviary implements AutoCloseable {
             try { return consume((MemorySegment) prove.invoke(arena.allocate(RES), node, seg(a))); }
             catch (Throwable t) { throw new RuntimeException(t); }
         }
+        /** The whole chain as one blob: chain id, genesis credits and every finalized block with its certificate. Pending transactions are not included. */
+        public byte[] snapshot() { return consume(invokeRes(nodeSnapshot, node)); }
+        /** The encoded finalized block at height (1 based). */
+        public byte[] blockAt(long height) { return call(nodeBlockAt, node, height); }
+        /** Admits an already signed, encoded transaction; returns its txid. */
+        public byte[] submitTx(byte[] encoded) { return call(nodeSubmitTx, node, seg(encoded), (long) encoded.length); }
+        /** Signs a transfer from the key store account at from and admits it; the secret never leaves the engine. */
+        public byte[] submitTransferFromStore(KeyStore store, byte[] from, byte[] to, long amount, long nonce, long fee) {
+            return call(nodeSubmitKs, node, store.ks, seg(from), seg(to), amount, nonce, fee);
+        }
+        /** Receives every chain event as one JSON object, synchronously from the node call that caused it; null removes the hook. While set, drainEvents is empty. */
+        public void setEventHook(java.util.function.Consumer<String> hook) {
+            try {
+                if (eventHandle != 0) { NODE_EVENTS.remove(eventHandle); eventHandle = 0; }
+                if (hook == null) { nodeSetEventHook.invoke(node, MemorySegment.NULL, MemorySegment.NULL); return; }
+                eventHandle = NEXT_HANDLE.getAndIncrement();
+                NODE_EVENTS.put(eventHandle, hook);
+                nodeSetEventHook.invoke(node, nodeEventStub, MemorySegment.ofAddress(eventHandle));
+            } catch (Throwable t) { throw new RuntimeException(t); }
+        }
         private long u64(MethodHandle mh) { try { return (long) mh.invoke(node); } catch (Throwable t) { throw new RuntimeException(t); } }
         private long u64a(MethodHandle mh, byte[] a) { try { return (long) mh.invoke(node, seg(a)); } catch (Throwable t) { throw new RuntimeException(t); } }
-        public void close() { try { nodeFree.invoke(node); } catch (Throwable ignored) {} }
+        public void close() {
+            try { if (eventHandle != 0) { nodeSetEventHook.invoke(node, MemorySegment.NULL, MemorySegment.NULL); NODE_EVENTS.remove(eventHandle); eventHandle = 0; } } catch (Throwable ignored) {}
+            try { nodeFree.invoke(node); } catch (Throwable ignored) {}
+        }
+    }
+
+    // -- Persistence, networking and secure sessions --
+    /** Rebuilds a node from Node#snapshot, replaying every block through consensus. Throws on a malformed blob. */
+    public Node restoreNode(byte[] snapshot) {
+        try {
+            MemorySegment h = (MemorySegment) nodeRestore.invoke(seg(snapshot), (long) snapshot.length);
+            if (h.address() == 0) throw new IllegalArgumentException("node restore refused (malformed snapshot)");
+            return new Node(h);
+        } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    private static final java.util.Map<Long, java.util.function.Consumer<String>> NODE_EVENTS = new java.util.concurrent.ConcurrentHashMap<>();
+    @SuppressWarnings("unused")
+    private static void nodeEventUpcall(MemorySegment ctx, MemorySegment json, long len) {
+        var c = NODE_EVENTS.get(ctx.address());
+        if (c != null) c.accept(new String(json.reinterpret(len).toArray(JAVA_BYTE), StandardCharsets.UTF_8));
+    }
+    private final MemorySegment nodeEventStub = upcall("nodeEventUpcall",
+            java.lang.invoke.MethodType.methodType(void.class, MemorySegment.class, MemorySegment.class, long.class),
+            FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_LONG));
+    static byte[][] splitBlobList(byte[] b) {
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
+        int n = bb.getInt(); byte[][] out = new byte[n][];
+        for (int i = 0; i < n; i++) { byte[] it = new byte[bb.getInt()]; bb.get(it); out[i] = it; }
+        return out;
+    }
+
+    /** The validator index that follows a chain without voting. */
+    public static final int NET_OBSERVER = 0xFFFFFFFF;
+    public static final int STEP_PROPOSE = 0, STEP_PREVOTE = 1, STEP_PRECOMMIT = 2;
+    /** A gossip message to send to one peer. */
+    public record Relay(int to, byte[] message) {}
+    /** A consensus timer to arm; when it fires, call NetNode#onTimeout. */
+    public record TimeoutRequest(int step, int round) {}
+    /** What a NetNode wants done after an input: relays to send and timers to arm (durations are the caller's choice). */
+    public record Outbound(java.util.List<Relay> relays, java.util.List<TimeoutRequest> timeouts) {}
+    /** A long term peer identity: hybrid KEM pair and hybrid signature pair. */
+    public record SecureIdentity(PortableAccount kem, PortableAccount sig) {}
+
+    static Outbound decodeOutbound(byte[] b) {
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
+        var relays = new java.util.ArrayList<Relay>(); var timeouts = new java.util.ArrayList<TimeoutRequest>();
+        int rc = bb.getInt();
+        for (int i = 0; i < rc; i++) { int to = bb.getInt(); byte[] m = new byte[bb.getInt()]; bb.get(m); relays.add(new Relay(to, m)); }
+        int tc = bb.getInt();
+        for (int i = 0; i < tc; i++) { int step = bb.get() & 0xFF; int round = bb.getInt(); timeouts.add(new TimeoutRequest(step, round)); }
+        return new Outbound(relays, timeouts);
+    }
+
+    /** A validator or observer running BFT consensus over a gossip mesh with no socket and no clock of its own: every input returns an Outbound the application acts on. */
+    public final class NetNode implements AutoCloseable {
+        private final MemorySegment h;
+        private NetNode(MemorySegment h) { this.h = h; }
+        public void addPeer(int peer) { try { netAddPeer.invoke(h, peer); } catch (Throwable t) { throw new RuntimeException(t); } }
+        /** Encoded transactions this node proposes at the current height; cleared by advance. */
+        public void setTransactions(byte[][] encodedTxs) {
+            byte[] blob = blobList(encodedTxs);
+            try { if ((int) netSetTxs.invoke(h, seg(blob), (long) blob.length) != 1) throw new IllegalArgumentException("net node: malformed transaction"); }
+            catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+        public Outbound start() { return decodeOutbound(consume(invokeRes(netStart, h))); }
+        public Outbound onGossip(int from, byte[] payload) { return decodeOutbound(call(netOnGossip, h, from, seg(payload), (long) payload.length)); }
+        public Outbound onTimeout(TimeoutRequest t) { return decodeOutbound(call(netOnTimeout, h, (byte) t.step(), t.round())); }
+        public Outbound advance() { return decodeOutbound(consume(invokeRes(netAdvance, h))); }
+        public boolean committed() { try { return (int) netCommitted.invoke(h) == 1; } catch (Throwable t) { throw new RuntimeException(t); } }
+        public long height() { try { return (long) netHeight.invoke(h); } catch (Throwable t) { throw new RuntimeException(t); } }
+        public boolean peerBanned(int peer) { try { return (int) netPeerBanned.invoke(h, peer) == 1; } catch (Throwable t) { throw new RuntimeException(t); } }
+        public byte[][] replayLog() { return splitBlobList(consume(invokeRes(netReplayLog, h))); }
+        public byte[] tip() { return consume(invokeRes(netTip, h)); }
+        public byte[] stateRoot() { return consume(invokeRes(netStateRoot, h)); }
+        public long balance(byte[] address) { try { return (long) netBalance.invoke(h, seg(address)); } catch (Throwable t) { throw new RuntimeException(t); } }
+        public byte[] proveAccount(byte[] address) { return call(netProve, h, seg(address)); }
+        public void close() { try { netFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    /** A consensus node for validator me of genesis, or an observer when me is NET_OBSERVER (bls key may then be null). */
+    public NetNode newNetNode(byte[] genesis, int me, PortableAccount blsKey, long timestamp) {
+        byte[] pk = blsKey == null ? new byte[0] : blsKey.publicKey(), sk = blsKey == null ? new byte[0] : blsKey.secret();
+        try {
+            MemorySegment h = (MemorySegment) netNew.invoke(seg(genesis), (long) genesis.length, me, seg(pk), (long) pk.length, seg(sk), (long) sk.length, timestamp);
+            if (h.address() == 0) throw new IllegalArgumentException("net node: malformed genesis or key");
+            return new NetNode(h);
+        } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+
+    /** A fresh long term identity. */
+    public SecureIdentity generateSecureIdentity() {
+        byte[][] p = splitBlobList(consume(invokePtrRes(secIdentity)));
+        return new SecureIdentity(new PortableAccount(p[0], p[1]), new PortableAccount(p[2], p[3]));
+    }
+    private MemorySegment invokePtrRes(MethodHandle mh) { try { return (MemorySegment) mh.invoke(arena.allocate(RES)); } catch (Throwable t) { throw new RuntimeException(t); } }
+    /** A confidential, mutually authenticated, post quantum hybrid link. Pin peerIdentity against the key you expect. */
+    public final class SecureSession implements AutoCloseable {
+        private final MemorySegment h;
+        private SecureSession(MemorySegment h) { this.h = h; }
+        /** The handshake message this side must send: the first message for an initiator, the reply for a responder. */
+        public byte[] handshakeMessage() { return consume(invokeRes(secHandshake, h)); }
+        /** Initiator only: consumes the responder's reply. Throws when the responder does not verify. */
+        public void complete(byte[] reply) {
+            try { if ((int) secComplete.invoke(h, seg(reply), (long) reply.length) != 1) throw new IllegalArgumentException("secure session: responder refused"); }
+            catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+        public boolean open() { try { return (int) secOpen.invoke(h) == 1; } catch (Throwable t) { throw new RuntimeException(t); } }
+        public byte[] peerIdentity() { return consume(invokeRes(secPeer, h)); }
+        public byte[] encrypt(byte[] plaintext) { return call(secEncrypt, h, seg(plaintext), (long) plaintext.length); }
+        public byte[] decrypt(byte[] frame) { return call(secDecrypt, h, seg(frame), (long) frame.length); }
+        public void close() { try { secFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    /** Dialing side: encapsulates to the responder's KEM public key and authenticates with sig. */
+    public SecureSession initiateSecureSession(byte[] responderKemPublic, PortableAccount sig) {
+        try {
+            MemorySegment h = (MemorySegment) secInitiate.invoke(seg(responderKemPublic), (long) responderKemPublic.length,
+                    seg(sig.publicKey()), (long) sig.publicKey().length, seg(sig.secret()), (long) sig.secret().length);
+            if (h.address() == 0) throw new IllegalArgumentException("secure session: initiate failed");
+            return new SecureSession(h);
+        } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    /** Accepting side: consumes the initiator's first message under me; open at once. */
+    public SecureSession acceptSecureSession(SecureIdentity me, byte[] firstMessage) {
+        try {
+            MemorySegment h = (MemorySegment) secAccept.invoke(
+                    seg(me.kem().publicKey()), (long) me.kem().publicKey().length, seg(me.kem().secret()), (long) me.kem().secret().length,
+                    seg(me.sig().publicKey()), (long) me.sig().publicKey().length, seg(me.sig().secret()), (long) me.sig().secret().length,
+                    seg(firstMessage), (long) firstMessage.length);
+            if (h.address() == 0) throw new IllegalArgumentException("secure session: initiator refused");
+            return new SecureSession(h);
+        } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
     }
 
     // ── FFM plumbing ─────────────────────────────────────────────────────────

@@ -8,12 +8,17 @@ import "C"
 
 import (
 	"errors"
+	"runtime/cgo"
 	"unsafe"
 )
 
 // Node is a running single-validator account chain (ledger + BFT + mempool +
 // observability), exposed over the C ABI.
-type Node struct{ h C.AviaryNode }
+type Node struct {
+	h       C.AviaryNode
+	handle  cgo.Handle
+	onEvent func(json string)
+}
 
 // NewNode creates a chain with the given id. Returns nil on failure. The native
 // backend self-initializes on first use, so no explicit Init is required.
@@ -23,10 +28,21 @@ func NewNode(chainID uint64) *Node {
 	if h == nil {
 		return nil
 	}
-	return &Node{h}
+	return &Node{h: h}
 }
 
-func (n *Node) Free() { C.aviary_node_free(n.h) }
+func (n *Node) Free() {
+	if n.h == nil {
+		return
+	}
+	if n.handle != 0 {
+		C.aviary_node_set_event_hook(n.h, nil, nil)
+		n.handle.Delete()
+		n.handle = 0
+	}
+	C.aviary_node_free(n.h)
+	n.h = nil
+}
 
 // NewAccount returns (secret64, public32, address32).
 func (n *Node) NewAccount() (secret, public, address []byte, err error) {
@@ -120,9 +136,12 @@ func (n *Node) Balance(a []byte) uint64 {
 	return uint64(C.aviary_node_balance(n.h, bp(a)))
 }
 func (n *Node) Nonce(a []byte) uint64 { return uint64(C.aviary_node_nonce(n.h, bp(a))) }
-func (n *Node) StateRoot() []byte    { b, _ := takeBuf(C.aviary_node_state_root(n.h)); return b }
-func (n *Node) DrainEvents() string  { b, _ := takeBuf(C.aviary_node_drain_events(n.h)); return string(b) }
-func (n *Node) Metrics() string      { b, _ := takeBuf(C.aviary_node_metrics(n.h)); return string(b) }
+func (n *Node) StateRoot() []byte     { b, _ := takeBuf(C.aviary_node_state_root(n.h)); return b }
+func (n *Node) DrainEvents() string {
+	b, _ := takeBuf(C.aviary_node_drain_events(n.h))
+	return string(b)
+}
+func (n *Node) Metrics() string { b, _ := takeBuf(C.aviary_node_metrics(n.h)); return string(b) }
 func (n *Node) ProveAccount(a []byte) []byte {
 	b, _ := takeBuf(C.aviary_node_prove_account(n.h, bp(a)))
 	return b

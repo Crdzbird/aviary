@@ -41,7 +41,80 @@ export class Node {
   drainEvents(): string;
   metrics(): string;
   proveAccount(address: Buffer | Uint8Array): Buffer;
+  /** The whole chain as one blob; pending transactions excluded. */
+  snapshot(): Buffer;
+  blockAt(height: number | bigint): Buffer;
+  submitTx(encoded: Buffer | Uint8Array): Buffer;
+  submitTransferFromStore(store: KeyStore, from: Buffer | Uint8Array, to: Buffer | Uint8Array, amount: number | bigint, nonce: number | bigint, fee?: number | bigint): Buffer;
+  /** cb(json) per chain event, synchronously; null removes the hook. */
+  onEvent(cb: ((json: string) => void) | null): void;
 }
+
+export class KeyStore {
+  constructor(passphrase: string);
+  static load(blob: Buffer | Uint8Array): KeyStore;
+  free(): void;
+  addAccount(publicKey: Buffer | Uint8Array, secret: Buffer | Uint8Array): Buffer;
+  reveal(address: Buffer | Uint8Array): Buffer;
+  serialise(): Buffer;
+  unlock(passphrase: string): void;
+  readonly unlocked: boolean;
+  signTransfer(args: { chainId: number | bigint; from: Buffer | Uint8Array; to: Buffer | Uint8Array; amount: number | bigint; nonce: number | bigint; fee?: number | bigint }): Buffer;
+  publicKey(address: Buffer | Uint8Array): Buffer;
+  has(address: Buffer | Uint8Array): boolean;
+  addresses(): Buffer[];
+  lock(): void;
+}
+
+export interface Relay { to: number; message: Buffer }
+export interface TimeoutRequest { step: number; round: number }
+export interface Outbound { relays: Relay[]; timeouts: TimeoutRequest[] }
+export interface KeyPair { public: Buffer; secret: Buffer }
+export interface SecureIdentity { kem: KeyPair; sig: KeyPair }
+export const NET_OBSERVER: number;
+export const StepPropose: number;
+export const StepPrevote: number;
+export const StepPrecommit: number;
+
+/** A validator or observer running BFT over a gossip mesh with no socket and no clock of its own. */
+export class NetNode {
+  constructor(opts: { genesis: Buffer | Uint8Array; me: number; blsKey?: KeyPair | null; timestamp?: number | bigint; peers?: number[] });
+  addPeer(peer: number): void;
+  setTransactions(encodedTxs: Array<Buffer | Uint8Array>): void;
+  start(): Outbound;
+  onGossip(from: number, payload: Buffer | Uint8Array): Outbound;
+  onTimeout(t: TimeoutRequest): Outbound;
+  advance(): Outbound;
+  readonly committed: boolean;
+  readonly height: number;
+  peerBanned(peer: number): boolean;
+  replayLog(): Buffer[];
+  tip(): Buffer;
+  stateRoot(): Buffer;
+  balance(address: Buffer | Uint8Array): number;
+  proveAccount(address: Buffer | Uint8Array): Buffer;
+  free(): void;
+}
+export function newNetNode(opts: ConstructorParameters<typeof NetNode>[0]): NetNode;
+
+/** A confidential, mutually authenticated, post quantum hybrid link between two peers. */
+export class SecureSession {
+  static initiate(responderKemPublic: Buffer | Uint8Array, sig: KeyPair): SecureSession;
+  static accept(identity: SecureIdentity, firstMessage: Buffer | Uint8Array): SecureSession;
+  readonly handshakeMessage: Buffer;
+  complete(reply: Buffer | Uint8Array): void;
+  readonly open: boolean;
+  readonly peerIdentity: Buffer;
+  encrypt(plaintext: Buffer | Uint8Array): Buffer;
+  decrypt(frame: Buffer | Uint8Array): Buffer;
+  free(): void;
+}
+export function generateSecureIdentity(): SecureIdentity;
+export function initiateSecureSession(responderKemPublic: Buffer | Uint8Array, sig: KeyPair): SecureSession;
+export function acceptSecureSession(identity: SecureIdentity, firstMessage: Buffer | Uint8Array): SecureSession;
+export function restoreNode(snapshot: Buffer | Uint8Array): Node;
+export function newKeyStore(passphrase: string): KeyStore;
+export function loadKeyStore(blob: Buffer | Uint8Array): KeyStore;
 
 /** Optionally warm the native library off the main thread (worker_thread). */
 export function preload(): Promise<boolean>;
