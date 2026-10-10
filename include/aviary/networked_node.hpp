@@ -47,6 +47,8 @@ class NetworkedNode {
   std::uint32_t id() const { return gossip_.self(); }
   /// Parent chains: anchors to include when this node proposes (see RoundDriver).
   void set_anchors(std::vector<Anchor> anchors) { driver_.set_anchors(std::move(anchors)); }
+  /// The transactions this node proposes at the current height (see RoundDriver).
+  void set_transactions(std::vector<Transaction> txs) { driver_.set_transactions(std::move(txs)); }
   /// Coordinated validator-set change (see RoundDriver::schedule_validator_set).
   void schedule_validator_set(consensus::ValidatorSet next) { driver_.schedule_validator_set(std::move(next)); }
   /// The validator set in force for the next height.
@@ -63,6 +65,10 @@ class NetworkedNode {
 
   /// Fire a previously-armed consensus timeout.
   Outbound on_timeout(consensus::Step step, std::uint32_t round);
+  /// After committing, roll into the next height (see RoundDriver::advance):
+  /// the catch-up log restarts and the new height's StartRound(0) actions are
+  /// gossiped. Precondition: committed().
+  Outbound advance();
 
   bool committed() const { return driver_.committed(); }
   std::uint64_t height() const { return driver_.height(); }

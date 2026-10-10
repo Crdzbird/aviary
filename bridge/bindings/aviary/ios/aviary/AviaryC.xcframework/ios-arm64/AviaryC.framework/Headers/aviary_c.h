@@ -763,6 +763,75 @@ AVIARY_API void aviary_chain_tree_set_tx_source(AviaryChainTree t, AviaryTxSourc
 AVIARY_API void aviary_chain_tree_set_finalized_hook(AviaryChainTree t, AviaryFinalizedFn fn, void* ctx);
 AVIARY_API void aviary_chain_tree_free(AviaryChainTree t);
 
+/* -- Networking: consensus over gossip without a socket or a clock ----------
+ *  A NetNode is a validator (or an observer) that runs BFT consensus over a
+ *  gossip mesh but owns no socket and no timer. Every input returns an
+ *  OUTBOUND blob telling the caller what to do:
+ *    [relays u32]([peer u32][len u32][gossip bytes])*
+ *    [timeouts u32]([step u8][round u32])*
+ *  The caller sends each relay to that peer over its own transport, arms each
+ *  timeout with a duration of its choosing, and feeds what arrives back in with
+ *  aviary_net_node_on_gossip / aviary_net_node_on_timeout. Steps: 0 propose,
+ *  1 prevote, 2 precommit. [me] is this node's validator index, or
+ *  AVIARY_NET_OBSERVER to follow the chain without voting (bls keys may then
+ *  be empty). Blocks carry the transactions set with
+ *  aviary_net_node_set_transactions when this node is the proposer. */
+typedef void* AviaryNetNode;
+#define AVIARY_NET_OBSERVER 0xFFFFFFFFu
+AVIARY_API AviaryNetNode aviary_net_node_new(const uint8_t* genesis, size_t genesis_len, uint32_t me,
+                                             const uint8_t* bls_public, size_t bls_public_len,
+                                             const uint8_t* bls_secret, size_t bls_secret_len,
+                                             uint64_t timestamp);
+AVIARY_API void aviary_net_node_add_peer(AviaryNetNode n, uint32_t peer);
+/** Encoded transactions as a blob list [count u32]([len u32][tx])*. 1 ok, 0 malformed. */
+AVIARY_API int aviary_net_node_set_transactions(AviaryNetNode n, const uint8_t* txs, size_t txs_len);
+AVIARY_API AviaryBufferResult aviary_net_node_start(AviaryNetNode n);
+AVIARY_API AviaryBufferResult aviary_net_node_on_gossip(AviaryNetNode n, uint32_t from,
+                                                        const uint8_t* payload, size_t payload_len);
+AVIARY_API AviaryBufferResult aviary_net_node_on_timeout(AviaryNetNode n, uint8_t step, uint32_t round);
+/** Precondition: committed. Rolls into the next height; an error otherwise. */
+AVIARY_API AviaryBufferResult aviary_net_node_advance(AviaryNetNode n);
+AVIARY_API int aviary_net_node_committed(AviaryNetNode n);
+AVIARY_API uint64_t aviary_net_node_height(AviaryNetNode n);
+AVIARY_API int aviary_net_node_peer_banned(AviaryNetNode n, uint32_t peer);
+/** Every unique consensus payload of the current height, as a blob list; replay
+ *  it to a peer whose link (re)connects after consensus started. */
+AVIARY_API AviaryBufferResult aviary_net_node_replay_log(AviaryNetNode n);
+AVIARY_API AviaryBufferResult aviary_net_node_tip(AviaryNetNode n);
+AVIARY_API AviaryBufferResult aviary_net_node_state_root(AviaryNetNode n);
+AVIARY_API uint64_t aviary_net_node_balance(AviaryNetNode n, const uint8_t* address);
+AVIARY_API AviaryBufferResult aviary_net_node_prove_account(AviaryNetNode n, const uint8_t* address);
+AVIARY_API void aviary_net_node_free(AviaryNetNode n);
+
+/* -- Secure session: the mutually authenticated, post-quantum hybrid link ----
+ *  Wrap each gossip relay in a SecureSession between the two peers. The
+ *  initiator needs the responder's KEM public key and its own signature key
+ *  pair; the responder needs its full identity. Handshake: the initiator's
+ *  first message goes to the responder, whose first message comes back and
+ *  completes the initiator. Both sides then encrypt and decrypt frames and
+ *  MUST pin peer_identity against their allow list. */
+typedef void* AviarySecureSession;
+/** A fresh identity as a blob list: [kem public][kem secret][sig public][sig secret]. */
+AVIARY_API AviaryBufferResult aviary_secure_identity_generate(void);
+AVIARY_API AviarySecureSession aviary_secure_initiate(const uint8_t* responder_kem_public, size_t rk_len,
+                                                      const uint8_t* sig_public, size_t sp_len,
+                                                      const uint8_t* sig_secret, size_t ss_len);
+AVIARY_API AviarySecureSession aviary_secure_accept(const uint8_t* kem_public, size_t kp_len,
+                                                    const uint8_t* kem_secret, size_t ks_len,
+                                                    const uint8_t* sig_public, size_t sp_len,
+                                                    const uint8_t* sig_secret, size_t ss_len,
+                                                    const uint8_t* first_message, size_t fm_len);
+/** The handshake message this side must send: msg1 for an initiator, msg2 for a responder. */
+AVIARY_API AviaryBufferResult aviary_secure_handshake_message(AviarySecureSession s);
+/** Initiator: consume the responder's message. 1 open, 0 refused. */
+AVIARY_API int aviary_secure_complete(AviarySecureSession s, const uint8_t* second_message, size_t sm_len);
+AVIARY_API int aviary_secure_open(AviarySecureSession s);
+/** The authenticated remote signing public key; empty until open. */
+AVIARY_API AviaryBufferResult aviary_secure_peer_identity(AviarySecureSession s);
+AVIARY_API AviaryBufferResult aviary_secure_encrypt(AviarySecureSession s, const uint8_t* plaintext, size_t len);
+AVIARY_API AviaryBufferResult aviary_secure_decrypt(AviarySecureSession s, const uint8_t* frame, size_t len);
+AVIARY_API void aviary_secure_free(AviarySecureSession s);
+
 /* ── Foreign components: implement engines / proposers in ANY language ────────
  *  The consensus pipeline stays in C++ (a foreign engine proposes and applies
  *  via the Ledger); the foreign code supplies the JUSTIFICATION policy through

@@ -47,6 +47,10 @@ class RoundDriver {
   /// (docs/design/SUBCHAINS.md). Validated by every validator on receipt like
   /// any other block content. Replaced wholesale; empty = anchor nothing.
   void set_anchors(std::vector<Anchor> anchors) { anchors_ = std::move(anchors); }
+  /// The transactions this node includes when IT proposes at this height.
+  /// Validated by every validator on receipt like any other block content.
+  /// Replaced wholesale; cleared by advance().
+  void set_transactions(std::vector<Transaction> txs) { txs_ = std::move(txs); }
 
   /// Coordinated validator-set change (see BftEngine): the set this node
   /// announces when it proposes and the only change it will vote for. A
@@ -84,6 +88,7 @@ class RoundDriver {
 
   std::uint64_t chain_id_;
   ValidatorSet vset_;
+  std::vector<Transaction> txs_;  // what we propose at this height
   std::uint32_t me_;
   crypto::KeyPair bls_;
   Ledger* ledger_;

@@ -1210,3 +1210,43 @@ selectors — validated against real-world vectors). Deferred:
   (FileStore + `Ledger::snapshot`) stay C++ only; the blob approach lets each
   app choose its storage. Go, npm, JVM and Swift do not wrap the new calls
   yet.
+
+## Networking surface: NetworkedNode and SecureSession over the C ABI - DONE (2026-10-10)
+- **[x] Core:** `RoundDriver::set_transactions(txs)` (proposed at this height,
+  validated by every validator, cleared by `advance()`) replaces the empty
+  block the driver used to build; `NetworkedNode::set_transactions` forwards
+  it and `NetworkedNode::advance()` rolls into the next height (clears the
+  catch-up log, gossips the new StartRound(0) actions). New
+  `test_networked_node` case: full mesh of 4, a transfer in block 1, advance,
+  block 2, identical tips.
+- **[x] C ABI:** `aviary_net_node_*` (`new` from genesis bytes + validator
+  index or `AVIARY_NET_OBSERVER`, `add_peer`, `set_transactions` blob list,
+  `start`/`on_gossip`/`on_timeout`/`advance` returning the OUTBOUND blob
+  `[relays u32]([peer u32][len u32][bytes])*[timeouts u32]([step u8][round u32])*`,
+  `committed`, `height`, `peer_banned`, `replay_log`, `tip`, `state_root`,
+  `balance`, `prove_account`, `free`) and `aviary_secure_*` (`identity_generate`
+  blob list [kem pub][kem sec][sig pub][sig sec], `initiate`, `accept`,
+  `handshake_message`, `complete`, `open`, `peer_identity`, `encrypt`,
+  `decrypt`, `free`; a `SecureBox{session, handshake}` holds the pending
+  handshake message).
+- **[x] Dart:** `AviaryNetwork` (`newNetNode`, `generateSecureIdentity`,
+  `initiateSecureSession`, `acceptSecureSession`, `observer`), `NetNode` +
+  `NetNodeQueries`, `SecureSession`, `ConsensusStep`, records `Relay`,
+  `TimeoutRequest`, `Outbound`, `SecureIdentity`. Tests:
+  `network_smoke.dart` (deterministic 4 validator line mesh plus an observer,
+  relays through hops, advance to height 2, garbage payload, proof from a
+  networked node, secure session handshake, both directions, tamper, wrong
+  identity) and `network_tcp_smoke.dart` (two validators over a real loopback
+  TCP socket with length prefixed frames encrypted by SecureSession, Dart
+  Timers for consensus timeouts, two heights).
+- Part budget: six small merges (proofs into canonical, node storage into
+  nodes, light client api into sync, foreign engine type into foreign api,
+  credentials sigs into tree sigs, pseudonymous gate into gate) kept
+  `lib/aviary.dart` at 98 lines.
+- GOTCHA: the proposer's `replay_log` is non empty right after `advance()`
+  because its new proposal is logged immediately; check a follower for the
+  "log restarts" property. A mesh harness must keep draining after the
+  validators commit so observers receive their queued relays.
+- Not done: Go, npm, JVM and Swift do not wrap the networking calls; the
+  ratcheted (`ArmoredChannel`) and Noise XX tiers are not exposed; address
+  book / PEX is not exposed.

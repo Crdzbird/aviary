@@ -67,6 +67,10 @@ NetworkedNode::Outbound NetworkedNode::on_gossip(std::uint32_t from, const Bytes
   return o;
 }
 
+NetworkedNode::Outbound NetworkedNode::advance() {
+  replay_.clear();
+  return emit(driver_.advance());
+}
 NetworkedNode::Outbound NetworkedNode::on_timeout(consensus::Step step, std::uint32_t round) {
   return emit(driver_.on_timeout(step, round));
 }

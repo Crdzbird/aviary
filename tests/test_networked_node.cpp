@@ -151,5 +151,36 @@ int main() {
     CHECK(all_committed());
   }
 
+  std::printf("== transactions + advance (full mesh of 4): two heights with a transfer ==\n");
+  {
+    Net net(4, {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}}, alice_addr);
+    const auto bob = ed(2);
+    const Hash bob_addr = crypto::address_of(view(bob.public_key));
+    Transaction tx;
+    tx.version = 1;
+    tx.chain_id = kChain;
+    tx.body = AccountStateMachine::encode_transfer({0, bob_addr, 250});
+    sign_transaction(tx, ed(1));
+    net.nodes[0]->set_transactions({tx});  // node 0 proposes at round 0
+    auto all_committed = [&] {
+      for (std::uint32_t i = 0; i < 4; ++i)
+        if (!net.nodes[i]->committed()) return false;
+      return true;
+    };
+    net.run(all_committed);
+    CHECK(all_committed());
+    for (std::uint32_t i = 0; i < 4; ++i) {
+      CHECK(net.nodes[i]->ledger().tip().height == 1);
+      const auto* acc = dynamic_cast<const AccountStateMachine*>(&net.nodes[i]->ledger().state());
+      CHECK(acc && acc->account(bob_addr).balance == 250);
+    }
+    for (std::uint32_t i = 0; i < 4; ++i) net.apply(i, net.nodes[i]->advance());
+    CHECK(!net.nodes[0]->committed());
+    net.run(all_committed);
+    CHECK(all_committed());
+    for (std::uint32_t i = 0; i < 4; ++i) CHECK(net.nodes[i]->ledger().tip().height == 2);
+    CHECK(net.nodes[1]->ledger().tip().encode() == net.nodes[3]->ledger().tip().encode());
+  }
+
   return bctest::summary();
 }

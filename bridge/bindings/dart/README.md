@@ -53,7 +53,7 @@ Extensions that collapse the common flows into one call:
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
 | `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
-| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
+| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `newNetNode`, `generateSecureIdentity`, `initiateSecureSession`, `acceptSecureSession`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
 | `Chain` | `produceBlock(timestamp, justify:)` |
 | `TreeNode` | `withChild`, `find`, `chainIds` |
@@ -81,6 +81,7 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 - Subchains: registrations, policies, anchors, `verifySubchainProof`.
 - Validator rotation: `Chain.scheduleValidators`, `Chain.validators`.
 - Light clients: `newLightClient`, `acceptSkipping`, `syncTo`.
+- Networking: `newNetNode`, `NetNode`, `SecureSession`, `generateSecureIdentity`.
 - Chain trees: `TreeNode`, `buildChainTree`, `ChainTree`.
 - Custody: `KeyStore`, portable accounts, threshold accounts, `Ceremony`.
 - Assurance and sealed mempools; anonymous membership credentials.
@@ -109,6 +110,38 @@ node.eventStream.listen((event) {
 
 Listeners run on the microtask after the node call that caused the event,
 so they may call the node again. Disposing the node closes the stream.
+
+## Networking
+
+Consensus runs over a network the app owns. A `NetNode` is a validator (or
+an observer) running BFT over a gossip mesh with no socket and no clock:
+every input returns an `Outbound` with the relays to send and the timeouts
+to arm, and the app feeds what arrives back in. Dart sockets, Flutter's
+connectivity rules and the app's own retry policy stay in Dart.
+
+```dart
+final node = bc.newNetNode(genesis: genesis, me: 0, blsKey: myKey, peers: [1, 2]);
+void apply(Outbound out) {
+  for (final relay in out.relays) {
+    sockets[relay.to].add(frame(sessions[relay.to].encrypt(relay.message)));
+  }
+  for (final t in out.timeouts) {
+    Timer(Duration(milliseconds: 500 * (t.round + 1)), () => apply(node.onTimeout(t)));
+  }
+}
+apply(node.start());
+// on a frame from peer p: apply(node.onGossip(p, sessions[p].decrypt(frame)));
+// once node.committed: apply(node.advance());
+```
+
+Each link is protected by a `SecureSession`: a mutually authenticated, post
+quantum hybrid channel. The dialer calls `initiateSecureSession` with the
+peer's KEM public key, the listener `acceptSecureSession` with its own
+`generateSecureIdentity()`, the two handshake messages cross, then `encrypt`
+and `decrypt` wrap every frame. Always compare `peerIdentity` with the key
+you expected. Blocks carry the encoded transactions passed to
+`setTransactions` when this node is the proposer; `replayLog` catches up a
+peer that connects after consensus started.
 
 ## Persistence
 

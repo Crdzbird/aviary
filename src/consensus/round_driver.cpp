@@ -35,7 +35,7 @@ RoundDriver::RoundDriver(std::uint64_t chain_id, ValidatorSet vset, std::uint32_
 Hash RoundDriver::get_value() {
   // Build an empty block extending the tip; stamp consensus_data with the
   // validator-set hash and the LastCommit (absent for the first block).
-  Block b = ledger_->build_block({}, timestamp_, anchors_);
+  Block b = ledger_->build_block(txs_, timestamp_, anchors_);
   ConsensusData cd{vset_.hash(), last_commit_};
   if (pending_) cd.next_validators = pending_->validators();
   b.header.consensus_data = cd.encode();
@@ -166,6 +166,7 @@ RoundDriver::Output RoundDriver::advance() {
   if (!committed_) return {};  // nothing finalized yet
   last_commit_ = cert_;        // certifies the block we just committed
   height_ = ledger_->tip().height + 1;
+  txs_.clear();
   sm_ = RoundStateMachine(make_config());
   blocks_.clear();
   precommit_sigs_.clear();

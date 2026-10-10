@@ -30,3 +30,17 @@ typedef TxSource = List<Uint8List> Function(int chainId, int timestamp);
 
 /// Observes a finalized block on a chain.
 typedef FinalizedHook = void Function(int chainId, Uint8List block);
+
+/// A gossip message to send to one peer.
+typedef Relay = ({int to, Uint8List message});
+
+/// A consensus timer to arm; when it fires, call [NetNode.onTimeout].
+typedef TimeoutRequest = ({ConsensusStep step, int round});
+
+/// What a [NetNode] wants done after an input: relays to send and timers to
+/// arm. The duration of a timer is the caller's choice.
+typedef Outbound = ({List<Relay> relays, List<TimeoutRequest> timeouts});
+
+/// A long term peer identity: a hybrid KEM pair to receive handshakes and a
+/// hybrid signature pair to authenticate.
+typedef SecureIdentity = ({KeyPairBytes kem, KeyPairBytes sig});

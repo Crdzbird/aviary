@@ -12,6 +12,9 @@
 - Shortcut extensions: hex helpers on Uint8List and String, funded
   accounts, auto nonce transfers and one call blocks on Node, single
   validator chain assembly, whole threshold ceremonies, fluent chain trees.
+- Networking: `NetNode` runs BFT consensus over a gossip mesh with the app
+  owning sockets and timers (`start`, `onGossip`, `onTimeout`, `advance`,
+  `setTransactions`, `replayLog`); `SecureSession` protects each link.
 - Persistence: `snapshot`, `restoreNode`, `saveTo`, `restoreNodeFrom` and
   `blockAt`. A restored node replays its blocks through consensus and keeps
   producing.
