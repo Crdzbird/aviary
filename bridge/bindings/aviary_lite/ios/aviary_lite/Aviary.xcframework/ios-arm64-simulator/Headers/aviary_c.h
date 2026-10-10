@@ -168,6 +168,14 @@ AVIARY_API uint64_t aviary_node_mempool_size(AviaryNode node);
 AVIARY_API AviaryBufferResult aviary_node_state_root(AviaryNode node);
 /** Drain collected chain events as a JSON array string (the streaming surface). */
 AVIARY_API AviaryBufferResult aviary_node_drain_events(AviaryNode node);
+/** Persistence: the whole chain (chain id, genesis credits, every finalized
+ *  block with its certificate) as one blob. The mempool is not included. */
+AVIARY_API AviaryBufferResult aviary_node_snapshot(AviaryNode node);
+/** Rebuilds a node from aviary_node_snapshot, replaying every block through
+ *  consensus so certificates are verified. NULL on a malformed blob. */
+AVIARY_API AviaryNode aviary_node_restore(const uint8_t* blob, size_t len);
+/** The encoded finalized block at [height] (1 based); an error when absent. */
+AVIARY_API AviaryBufferResult aviary_node_block_at(AviaryNode node, uint64_t height);
 /** Push observer: one JSON object per chain event, delivered synchronously from
  *  inside the node call that produced it. While a hook is set the events are
  *  not buffered for aviary_node_drain_events. A NULL fn removes the hook. */

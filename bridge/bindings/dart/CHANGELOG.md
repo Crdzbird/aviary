@@ -12,6 +12,9 @@
 - Shortcut extensions: hex helpers on Uint8List and String, funded
   accounts, auto nonce transfers and one call blocks on Node, single
   validator chain assembly, whole threshold ceremonies, fluent chain trees.
+- Persistence: `snapshot`, `restoreNode`, `saveTo`, `restoreNodeFrom` and
+  `blockAt`. A restored node replays its blocks through consensus and keeps
+  producing.
 - Typed chain events (`BlockFinalized`, `BlockRejected`, `TxAdmitted`,
   `TxRemoved`, `UnknownEvent`) from `events()` and the push based
   `eventStream`, fed by a native hook instead of polling.

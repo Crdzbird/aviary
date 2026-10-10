@@ -9,6 +9,7 @@
 
 #include "aviary/account_state.hpp"
 #include "aviary/bft_engine.hpp"
+#include "aviary/block_store.hpp"
 #include "aviary/mempool.hpp"
 #include "aviary/observability/event_bus.hpp"
 #include "aviary/observability/metrics.hpp"
@@ -82,6 +83,19 @@ class DemoNode {
   /// Prometheus-format metrics snapshot.
   std::string metrics_text();
 
+  // Persistence
+  /// The whole chain as one blob: chain id, genesis credits, and every
+  /// finalized block with its commit certificate. The mempool is not included.
+  Bytes snapshot() const;
+  /// Rebuilds a node from snapshot(): recreates the genesis credits, then
+  /// replays every block through consensus so each certificate is verified.
+  /// Throws std::runtime_error on a malformed blob or a block that fails.
+  static std::unique_ptr<DemoNode> restore(codec::ByteView bytes);
+  /// The finalized block at [height] (1 based). Throws std::out_of_range if
+  /// absent.
+  const Block& block_at(std::uint64_t height) const { return archive_.by_height(height).block; }
+  /// Finalized blocks held in the archive.
+  std::size_t archived_blocks() const { return archive_.size(); }
   // ── Verification (light client) ──────────────────────────────────────────────
   /// State-inclusion proof for [address], verifiable against state_root().
   StateProof prove_account(const Hash& address) const;
@@ -97,6 +111,8 @@ class DemoNode {
   std::unique_ptr<AccountStateMachine> genesis_;  // mutable until first start
   std::unique_ptr<consensus::BftEngine> engine_;  // built on first use
   Mempool mempool_;
+  BlockStore archive_;  // every finalized block with its certificate
+  std::vector<std::pair<Hash, codec::u128>> credits_;  // genesis credits, in order
   observe::EventBus bus_;
   observe::MetricsRegistry metrics_;
   void emit(std::string json);

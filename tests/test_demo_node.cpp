@@ -104,5 +104,35 @@ int main() {
     CHECK(sealed_node.balance(dave_addr) == 10);  // unchanged
   }
 
-  return bctest::summary();
+  return bctest::summary();  {
+    // Persistence: snapshot, restore, and keep producing on the restored node.
+    DemoNode src(77);
+    auto a = src.new_account();
+    auto b = src.new_account();
+    src.credit(addr_of(a), 500);
+    src.submit_transfer(view(a.secret_key), addr_of(b), 120, 0);
+    CHECK(src.produce_block(1) == 1);
+    src.submit_transfer(view(a.secret_key), addr_of(b), 30, 1);
+    CHECK(src.produce_block(2) == 2);
+    src.submit_transfer(view(a.secret_key), addr_of(b), 1, 2);  // pending, not persisted
+    const Bytes snap = src.snapshot();
+    auto back = DemoNode::restore(view(snap));
+    CHECK(back->height() == 2);
+    CHECK(back->balance(addr_of(b)) == 150);
+    CHECK(back->nonce(addr_of(a)) == 2);
+    CHECK(back->state_root() == src.state_root());
+    CHECK(back->mempool_size() == 0);
+    CHECK(back->archived_blocks() == 2);
+    CHECK(back->block_at(1).encode() == src.block_at(1).encode());
+    CHECK(back->drain_events_json() == "[]");
+    back->submit_transfer(view(a.secret_key), addr_of(b), 1, 2);
+    CHECK(back->produce_block(3) == 3);
+    CHECK(back->balance(addr_of(b)) == 151);
+    bool refused = false;
+    try { (void)DemoNode::restore(view(Bytes{1, 2, 3})); } catch (const std::exception&) { refused = true; }
+    CHECK(refused);
+    Bytes empty_snap = DemoNode(78).snapshot();
+    CHECK(DemoNode::restore(view(empty_snap))->height() == 0);
+  }
+
 }

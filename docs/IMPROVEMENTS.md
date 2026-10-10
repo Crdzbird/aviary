@@ -1188,3 +1188,25 @@ selectors — validated against real-world vectors). Deferred:
   `lib/aviary.dart` at 98 lines and every file under 100.
 - Tests: `test/events_smoke.dart` (pull, push, order, exhaustive switch,
   lenient decoding). All native artifacts rebuilt.
+
+## Persistence surface for the node - DONE (2026-10-10)
+- **[x] `DemoNode` keeps a `BlockStore` archive** (every finalized block with
+  its certificate) and the ordered genesis credits. `snapshot()` encodes
+  `[chain_id u64][credits u32]([address 32][amount u128])*[archive bytes]`;
+  `restore(bytes)` recreates the node (the validator identity is derived from
+  the chain id, so nothing secret is stored), replays the credits, then
+  `BftEngine::finalize`s every archived block in order so each certificate
+  is verified and the engine ends in the exact state it had (last commit
+  included), and clears the replayed events. The mempool is not persisted.
+  `block_at(h)` and `archived_blocks()` read the archive.
+- **[x] C ABI** `aviary_node_snapshot`, `aviary_node_restore` (NULL on a
+  malformed blob), `aviary_node_block_at`. Dart: `NodeStorage` (`snapshot`,
+  `blockAt`, `saveTo` with temp file + rename) and `AviaryNodeStorage`
+  (`restoreNode` throwing `badInput`, `restoreNodeFrom` returning null for a
+  missing file). `test/persistence_smoke.dart` and a C++ case in
+  `test_demo_node.cpp` cover round trip, continued production, file round
+  trip, garbage, missing block and empty snapshot. Native artifacts rebuilt.
+- Not done here: the directory based `storage::save_chain`/`load_chain`
+  (FileStore + `Ledger::snapshot`) stay C++ only; the blob approach lets each
+  app choose its storage. Go, npm, JVM and Swift do not wrap the new calls
+  yet.

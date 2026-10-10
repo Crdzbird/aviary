@@ -1,5 +1,6 @@
 #include "aviary/node/demo_node.hpp"
 
+#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 
@@ -87,6 +88,7 @@ const AccountStateMachine& DemoNode::read_state() const {
 void DemoNode::credit(const Hash& address, codec::u128 amount) {
   if (engine_) throw GenesisSealedError();
   genesis_->credit_genesis(address, amount);
+  credits_.emplace_back(address, amount);
 }
 
 crypto::KeyPair DemoNode::new_account() { return crypto::ed25519_keygen(); }
@@ -165,10 +167,50 @@ std::uint64_t DemoNode::produce_block(std::uint64_t timestamp) {
   if (auto e = engine_->finalize(blk, *cert); !e.ok) {
     throw std::runtime_error("demo_node: finalize failed: " + e.error);
   }
+  archive_.put(blk, *cert);
   std::vector<Hash> ids;
   for (const auto& t : blk.transactions) ids.push_back(t.txid());
   mempool_.remove(ids);
   return engine_->height();
+}
+
+Bytes DemoNode::snapshot() const {
+  codec::CodecWriter w;
+  w.write_u64(chain_id_);
+  w.write_u32(static_cast<std::uint32_t>(credits_.size()));
+  for (const auto& [address, amount] : credits_) {
+    w.write_fixed_bytes(view(address), address.size());
+    w.write_u128(amount);
+  }
+  const Bytes archive = archive_.serialize();
+  w.write_bytes(view(archive));
+  return w.take();
+}
+
+std::unique_ptr<DemoNode> DemoNode::restore(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  auto node = std::make_unique<DemoNode>(r.read_u64());
+  const std::uint32_t credits = r.read_u32();
+  for (std::uint32_t i = 0; i < credits; ++i) {
+    const Bytes raw = r.read_fixed_bytes(sizeof(Hash));
+    Hash address{};
+    std::copy(raw.begin(), raw.end(), address.begin());
+    node->credit(address, r.read_u128());
+  }
+  const Bytes archive_bytes = r.read_bytes();
+  if (r.remaining() != 0) throw std::runtime_error("demo_node: trailing bytes in snapshot");
+  BlockStore archive = BlockStore::load(view(archive_bytes));
+  if (archive.empty()) return node;
+  node->ensure_started();
+  for (std::uint64_t h = 1; h <= archive.tip_height(); ++h) {
+    const StoredBlock& sb = archive.by_height(h);
+    if (auto e = node->engine_->finalize(sb.block, sb.commit); !e.ok) {
+      throw std::runtime_error("demo_node: replay failed at height " + std::to_string(h) + ": " + e.error);
+    }
+    node->archive_.put(sb.block, sb.commit);
+  }
+  node->events_.clear();
+  return node;
 }
 
 std::uint64_t DemoNode::height() const { return engine_ ? engine_->height() : 0; }

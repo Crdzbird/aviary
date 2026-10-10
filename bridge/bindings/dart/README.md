@@ -52,8 +52,8 @@ Extensions that collapse the common flows into one call:
 | `Uint8List` | `hex`, `shortHex`, `equalsBytes` |
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
-| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof` |
-| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
+| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
+| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
 | `Chain` | `produceBlock(timestamp, justify:)` |
 | `TreeNode` | `withChild`, `find`, `chainIds` |
@@ -109,6 +109,25 @@ node.eventStream.listen((event) {
 
 Listeners run on the microtask after the node call that caused the event,
 so they may call the node again. Disposing the node closes the stream.
+
+## Persistence
+
+A node's whole chain travels as one blob: `node.snapshot()` holds the chain
+id, the genesis credits and every finalized block with its certificate.
+`bc.restoreNode(bytes)` rebuilds the node by replaying the blocks through
+consensus, so every certificate is verified on the way back in, and the
+restored node keeps producing. `saveTo(path)` writes the blob atomically and
+`restoreNodeFrom(path)` reads it back, returning null when no file exists.
+Pending mempool transactions are not part of a snapshot. `blockAt(height)`
+returns any archived block.
+
+```dart
+final path = '${appDocuments.path}/chain.bin';
+final node = await bc.restoreNodeFrom(path) ?? bc.createNode(7);
+node.fundAccount(1000);
+node.commit();
+await node.saveTo(path);
+```
 
 ## Lifecycle and errors
 

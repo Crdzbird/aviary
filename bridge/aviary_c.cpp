@@ -494,6 +494,19 @@ AviaryBufferResult aviary_node_drain_events(AviaryNode node) {
   try { return string_result(as_node(node)->drain_events_json()); }
   catch (const std::exception& e) { return error_result(e.what()); }
 }
+AviaryBufferResult aviary_node_snapshot(AviaryNode node) {
+  try { return bytes_result(as_node(node)->snapshot()); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+AviaryNode aviary_node_restore(const uint8_t* blob, size_t len) {
+  if (!blob) return nullptr;
+  try { return aviary::node::DemoNode::restore(aviary::codec::ByteView(blob, len)).release(); }
+  catch (...) { return nullptr; }
+}
+AviaryBufferResult aviary_node_block_at(AviaryNode node, uint64_t height) {
+  try { return bytes_result(as_node(node)->block_at(height).encode()); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
 void aviary_node_set_event_hook(AviaryNode node, AviaryEventFn fn, void* ctx) {
   if (!node) return;
   if (!fn) {
