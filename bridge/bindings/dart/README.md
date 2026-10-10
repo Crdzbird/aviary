@@ -52,11 +52,12 @@ Extensions that collapse the common flows into one call:
 | `Uint8List` | `hex`, `shortHex`, `equalsBytes` |
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
-| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
+| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `sendFromStore`, `submitTx`, `submitTransferFromStore`, `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
 | `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `newNetNode`, `generateSecureIdentity`, `initiateSecureSession`, `acceptSecureSession`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
 | `Chain` | `produceBlock(timestamp, justify:)` |
 | `TreeNode` | `withChild`, `find`, `chainIds` |
+| `KeyStore` | `signTransfer`, `publicKey`, `has`, `addresses`, `lock` |
 | `ChainTree` | `produceRound` |
 
 ```dart
@@ -110,6 +111,26 @@ node.eventStream.listen((event) {
 
 Listeners run on the microtask after the node call that caused the event,
 so they may call the node again. Disposing the node closes the stream.
+
+## Custody signing
+
+A `KeyStore` seals signing secrets at rest. Signing from it keeps the secret
+inside the engine: `store.signTransfer(...)` returns an encoded transaction,
+`node.sendFromStore(store, from, to, amount)` signs and admits in one call,
+and `node.submitTx(bytes)` admits anything already signed. The scheme follows
+the stored key, Ed25519 or hybrid post quantum, and the secret is wiped after
+use. Lock the store with `lock()` when the app goes to the background and
+`unlock(passphrase)` when it returns. `reveal` still exists for migrations,
+but nothing in the signing path needs it.
+
+```dart
+final store = bc.createKeyStore(passphrase);
+final alice = store.addAccount(account.publicKey, account.secret);
+node.sendFromStore(store, alice, bob.address, 250);
+net.setTransactions([
+  store.signTransfer(chainId: 9, from: alice, to: bob.address, amount: 4, nonce: 0),
+]);
+```
 
 ## Networking
 

@@ -85,6 +85,7 @@ add_library(aviary_core STATIC
   src/version.cpp
   src/crypto/cryptolib_backend.cpp
   src/crypto/keyring.cpp
+  src/crypto/custody_signing.cpp
   src/crypto/threshold.cpp
   src/codec/codec.cpp
   src/core/merkle.cpp

@@ -38,6 +38,17 @@ extension NodeSending on Node {
     return submitTransfer(from.secret, to, amount, next);
   }
 
+  /// Sends [amount] from the key store account at [from] with the nonce read
+  /// from the chain; the secret never leaves the engine.
+  Uint8List sendFromStore(
+    KeyStore store,
+    Uint8List from,
+    Uint8List to,
+    int amount, {
+    int fee = 0,
+  }) =>
+      submitTransferFromStore(store, from, to, amount, nonce(from), fee: fee);
+
   /// [send] to another account.
   Uint8List sendTo(Account from, Account to, int amount, {int fee = 0}) =>
       send(from, to.address, amount, fee: fee);

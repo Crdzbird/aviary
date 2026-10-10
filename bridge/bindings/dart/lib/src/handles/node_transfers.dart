@@ -51,4 +51,35 @@ extension NodeTransfers on Node {
           'submit_transfer_hybrid',
         ),
       );
+
+  /// Admits an already signed, encoded transaction, for example from
+  /// [KeyStoreSigning.signTransfer]. Returns its transaction id.
+  Uint8List submitTx(Uint8List encodedTx) => _scoped(
+        [encodedTx],
+        (p) => _bc._take(
+          _lib.lookupFunction<_ChainBlockC, _ChainBlockD>(
+              'aviary_node_submit_tx')(_h, p[0], encodedTx.length),
+          'submit_tx',
+        ),
+      );
+
+  /// Signs a transfer from the [store] account at [from] and admits it. The
+  /// secret never leaves the engine. Returns the transaction id.
+  Uint8List submitTransferFromStore(
+    KeyStore store,
+    Uint8List from,
+    Uint8List to,
+    int amount,
+    int nonce, {
+    int fee = 0,
+  }) =>
+      _scoped(
+        [from, to],
+        (p) => _bc._take(
+          _lib.lookupFunction<_SubmitKsC, _SubmitKsD>(
+                  'aviary_node_submit_transfer_keystore')(
+              _h, store._h, p[0], p[1], amount, nonce, fee),
+          'submit_transfer_keystore',
+        ),
+      );
 }

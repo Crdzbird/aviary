@@ -62,3 +62,14 @@ typedef _SmRevealC = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, Size, Size);
 typedef _SmRevealD = _BufResult Function(
     Pointer<Void>, Pointer<Uint8>, int, int);
+
+typedef _KsSignC = _BufResult Function(Pointer<Void>, Uint64, Pointer<Uint8>,
+    Pointer<Uint8>, Uint64, Uint64, Uint64);
+typedef _KsSignD = _BufResult Function(
+    Pointer<Void>, int, Pointer<Uint8>, Pointer<Uint8>, int, int, int);
+typedef _KsHasC = Int32 Function(Pointer<Void>, Pointer<Uint8>);
+typedef _KsHasD = int Function(Pointer<Void>, Pointer<Uint8>);
+typedef _SubmitKsC = _BufResult Function(Pointer<Void>, Pointer<Void>,
+    Pointer<Uint8>, Pointer<Uint8>, Uint64, Uint64, Uint64);
+typedef _SubmitKsD = _BufResult Function(Pointer<Void>, Pointer<Void>,
+    Pointer<Uint8>, Pointer<Uint8>, int, int, int);

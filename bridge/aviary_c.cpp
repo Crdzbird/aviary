@@ -22,6 +22,7 @@
 #include "aviary/subchain.hpp"
 #include "aviary/light_client.hpp"
 #include "aviary/chain_tree.hpp"
+#include "aviary/custody_signing.hpp"
 #include "aviary/networked_node.hpp"
 #include "aviary/secure_session.hpp"
 #include "aviary/genesis.hpp"
@@ -496,6 +497,25 @@ AviaryBufferResult aviary_node_drain_events(AviaryNode node) {
   try { return string_result(as_node(node)->drain_events_json()); }
   catch (const std::exception& e) { return error_result(e.what()); }
 }
+AviaryBufferResult aviary_node_submit_tx(AviaryNode node, const uint8_t* tx, size_t tx_len) {
+  if (!node || !tx) return error_result("null node or transaction");
+  try {
+    const aviary::crypto::Hash id = as_node(node)->submit_encoded(cbv(tx, tx_len));
+    return bytes_result(id.data(), id.size());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+AviaryBufferResult aviary_node_submit_transfer_keystore(AviaryNode node, AviaryKeyStore ks,
+                                                        const uint8_t* from, const uint8_t* to,
+                                                        uint64_t amount, uint64_t nonce, uint64_t fee) {
+  if (!node || !ks || !from || !to) return error_result("null node, keystore or address");
+  try {
+    aviary::Transaction tx = aviary::custody::sign_transfer(
+        *as_ks(ks), to_hash32(from), to_hash32(to), static_cast<aviary::codec::u128>(amount), nonce,
+        static_cast<aviary::codec::u128>(fee), as_node(node)->chain_id());
+    const aviary::crypto::Hash id = as_node(node)->submit(tx);
+    return bytes_result(id.data(), id.size());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
 AviaryBufferResult aviary_node_snapshot(AviaryNode node) {
   try { return bytes_result(as_node(node)->snapshot()); }
   catch (const std::exception& e) { return error_result(e.what()); }
@@ -559,6 +579,35 @@ AviaryBufferResult aviary_keystore_reveal(AviaryKeyStore ks,
   } catch (const std::exception& e) {
     return error_result(e.what());
   }
+}
+
+AviaryBufferResult aviary_keystore_public_key(AviaryKeyStore ks, const uint8_t* address) {
+  if (!ks || !address) return error_result("null keystore or address");
+  const aviary::Bytes pk = as_ks(ks)->public_key(to_hash32(address));
+  if (pk.empty()) return error_result("keystore: unknown account");
+  return bytes_result(pk);
+}
+int aviary_keystore_has(AviaryKeyStore ks, const uint8_t* address) {
+  return ks && address && as_ks(ks)->has(to_hash32(address)) ? 1 : 0;
+}
+AviaryBufferResult aviary_keystore_addresses(AviaryKeyStore ks) {
+  if (!ks) return error_result("null keystore");
+  aviary::codec::CodecWriter w;
+  w.write_list(as_ks(ks)->addresses(), [](aviary::codec::CodecWriter& ww, const aviary::crypto::Hash& h) {
+    ww.write_bytes(cbv(h.data(), h.size()));
+  });
+  return bytes_result(w.take());
+}
+void aviary_keystore_lock(AviaryKeyStore ks) { if (ks) as_ks(ks)->lock(); }
+AviaryBufferResult aviary_keystore_sign_transfer(AviaryKeyStore ks, uint64_t chain_id,
+                                                 const uint8_t* from, const uint8_t* to,
+                                                 uint64_t amount, uint64_t nonce, uint64_t fee) {
+  if (!ks || !from || !to) return error_result("null keystore or address");
+  try {
+    return bytes_result(aviary::custody::sign_transfer(*as_ks(ks), to_hash32(from), to_hash32(to),
+                                                       static_cast<aviary::codec::u128>(amount), nonce,
+                                                       static_cast<aviary::codec::u128>(fee), chain_id).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
 }
 
 AviaryBufferResult aviary_keystore_serialise(AviaryKeyStore ks) {

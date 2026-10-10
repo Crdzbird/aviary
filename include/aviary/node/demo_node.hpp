@@ -59,12 +59,19 @@ class DemoNode {
   Hash submit_transfer_hybrid(codec::ByteView secret, codec::ByteView public_key,
                               const Hash& to, codec::u128 amount, std::uint64_t nonce);
 
+  /// Admit an already signed transaction (for example from
+  /// custody::sign_transfer). Returns the txid; throws when the mempool
+  /// refuses it.
+  Hash submit(const Transaction& tx);
+  /// submit() of an encoded transaction.
+  Hash submit_encoded(codec::ByteView tx_bytes);
   // ── Consensus ────────────────────────────────────────────────────────────────
   /// Produce + finalize a block from the mempool (this node is the validator).
   /// Returns the new height, or throws on failure.
   std::uint64_t produce_block(std::uint64_t timestamp);
 
   // ── Queries (non-sealing: reading never starts the engine or seals genesis) ──
+  std::uint64_t chain_id() const { return chain_id_; }
   std::uint64_t height() const;
   codec::u128 balance(const Hash& address) const;
   std::uint64_t nonce(const Hash& address) const;

@@ -12,6 +12,10 @@
 - Shortcut extensions: hex helpers on Uint8List and String, funded
   accounts, auto nonce transfers and one call blocks on Node, single
   validator chain assembly, whole threshold ceremonies, fluent chain trees.
+- Custody signing: `KeyStore.signTransfer`, `Node.sendFromStore`,
+  `Node.submitTransferFromStore` and `Node.submitTx`; the sealed secret is
+  used inside the engine and wiped. `KeyStore` gains `publicKey`, `has`,
+  `addresses` and `lock`.
 - Networking: `NetNode` runs BFT consensus over a gossip mesh with the app
   owning sockets and timers (`start`, `onGossip`, `onTimeout`, `advance`,
   `setTransactions`, `replayLog`); `SecureSession` protects each link.

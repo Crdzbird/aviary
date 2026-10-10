@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "aviary/keyring.hpp"
+#include "aviary/custody_signing.hpp"
+#include "aviary/node/demo_node.hpp"
 #include "aviary/types.hpp"
 #include "aviary/version.hpp"
 #include "check.hpp"
@@ -248,5 +250,36 @@ int main() {
     CHECK_MSG(threw, "a tampered envelope fails closed");
   }
 
+  {
+    // Signing from the store: the secret stays inside; ed25519, fee, hybrid, locked.
+    node::DemoNode n(0x5151);
+    KeyStore ks = KeyStore::create_with_passphrase("hunter2");
+    auto alice = n.new_account();
+    auto hyb = n.new_account_hybrid();
+    auto bob = n.new_account();
+    const Hash a = ks.add_account(view(alice.public_key), view(alice.secret_key));
+    const Hash h = ks.add_account(view(hyb.public_key), view(hyb.secret_key));
+    const Hash b = crypto::address_of(view(bob.public_key));
+    n.credit(a, 1000);
+    n.credit(h, 500);
+    Transaction t1 = custody::sign_transfer(ks, a, b, 100, 0, 0, n.chain_id());
+    CHECK(t1.version == 1);
+    n.submit(t1);
+    Transaction t2 = custody::sign_transfer(ks, h, b, 50, 0, 0, n.chain_id());
+    CHECK(t2.version == 2 && t2.sig_algo == static_cast<std::uint8_t>(SigAlgo::kHybridEd25519MlDsa));
+    n.submit_encoded(view(t2.encode()));
+    CHECK(n.produce_block(1) == 1);
+    CHECK(n.balance(b) == 150);
+    Transaction t3 = custody::sign_transfer(ks, a, b, 1, 1, 7, n.chain_id());
+    CHECK(t3.version == 2 && t3.fee == 7);
+    ks.lock();
+    bool locked = false;
+    try { (void)custody::sign_transfer(ks, a, b, 1, 2, 0, n.chain_id()); } catch (const std::exception&) { locked = true; }
+    CHECK(locked);
+    bool unknown = false;
+    ks.unlock_with_passphrase("hunter2");
+    try { (void)custody::sign_transfer(ks, b, a, 1, 0, 0, n.chain_id()); } catch (const std::exception&) { unknown = true; }
+    CHECK(unknown);
+  }
   return bctest::summary();
 }

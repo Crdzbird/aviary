@@ -168,6 +168,9 @@ AVIARY_API uint64_t aviary_node_mempool_size(AviaryNode node);
 AVIARY_API AviaryBufferResult aviary_node_state_root(AviaryNode node);
 /** Drain collected chain events as a JSON array string (the streaming surface). */
 AVIARY_API AviaryBufferResult aviary_node_drain_events(AviaryNode node);
+/** Admits an already signed, encoded transaction (for example from
+ *  aviary_keystore_sign_transfer). Returns the 32 byte txid. */
+AVIARY_API AviaryBufferResult aviary_node_submit_tx(AviaryNode node, const uint8_t* tx, size_t tx_len);
 /** Persistence: the whole chain (chain id, genesis credits, every finalized
  *  block with its certificate) as one blob. The mempool is not included. */
 AVIARY_API AviaryBufferResult aviary_node_snapshot(AviaryNode node);
@@ -209,6 +212,26 @@ AVIARY_API int aviary_keystore_add_account(
 AVIARY_API AviaryBufferResult aviary_keystore_reveal(
     AviaryKeyStore ks, const uint8_t* address);
 
+/** The stored public key for [address] (32 bytes); an error when unknown. */
+AVIARY_API AviaryBufferResult aviary_keystore_public_key(AviaryKeyStore ks, const uint8_t* address);
+/** 1 when the store holds [address]. */
+AVIARY_API int aviary_keystore_has(AviaryKeyStore ks, const uint8_t* address);
+/** Every stored address as a blob list [count u32]([len u32][address 32])*. */
+AVIARY_API AviaryBufferResult aviary_keystore_addresses(AviaryKeyStore ks);
+/** Forgets the master key; secrets can no longer be revealed or used. */
+AVIARY_API void aviary_keystore_lock(AviaryKeyStore ks);
+/** Signs a transfer with the sealed secret of [from] WITHOUT revealing it: the
+ *  secret is used inside the engine and wiped. The scheme follows the stored
+ *  public key (32 bytes Ed25519, longer hybrid). Zero fee gives the version 1
+ *  envelope. Returns the encoded transaction; an error when locked or unknown. */
+AVIARY_API AviaryBufferResult aviary_keystore_sign_transfer(AviaryKeyStore ks, uint64_t chain_id,
+                                                            const uint8_t* from, const uint8_t* to,
+                                                            uint64_t amount, uint64_t nonce, uint64_t fee);
+/** Signs a transfer from the key store account [from] and admits it, the secret
+ *  never leaving the engine. Returns the 32 byte txid. */
+AVIARY_API AviaryBufferResult aviary_node_submit_transfer_keystore(AviaryNode node, AviaryKeyStore ks,
+                                                                   const uint8_t* from, const uint8_t* to,
+                                                                   uint64_t amount, uint64_t nonce, uint64_t fee);
 /** Serialise the store (keyring envelope + sealed entries; no plaintext key). */
 AVIARY_API AviaryBufferResult aviary_keystore_serialise(AviaryKeyStore ks);
 

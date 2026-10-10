@@ -158,6 +158,20 @@ Hash DemoNode::submit_transfer_fee(codec::ByteView from_secret, const Hash& to,
   return id;
 }
 
+Hash DemoNode::submit(const Transaction& tx) {
+  ensure_started();
+  if (tx.chain_id != chain_id_) throw std::runtime_error("demo_node: transaction is for another chain");
+  Hash id = tx.txid();
+  if (mempool_.add(tx, chain_id_) != AddResult::kAdded) {
+    throw std::runtime_error("demo_node: transaction rejected by mempool");
+  }
+  return id;
+}
+
+Hash DemoNode::submit_encoded(codec::ByteView tx_bytes) {
+  return submit(Transaction::decode_all(tx_bytes));
+}
+
 std::uint64_t DemoNode::produce_block(std::uint64_t timestamp) {
   ensure_started();
   auto txs = mempool_.select(engine_->ledger().state(), 1000);

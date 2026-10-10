@@ -1250,3 +1250,26 @@ selectors — validated against real-world vectors). Deferred:
 - Not done: Go, npm, JVM and Swift do not wrap the networking calls; the
   ratcheted (`ArmoredChannel`) and Noise XX tiers are not exposed; address
   book / PEX is not exposed.
+
+## Key store backed signing - DONE (2026-10-10)
+- **[x] Core:** `include/aviary/custody_signing.hpp` +
+  `src/crypto/custody_signing.cpp`: `custody::sign_transfer(store, from, to,
+  amount, nonce, fee, chain_id)` reveals the sealed secret inside the core,
+  signs, and wipes it (`custody::wipe`, volatile stores). Scheme follows the
+  stored public key (32 bytes Ed25519, longer hybrid Ed25519 + ML-DSA-65);
+  zero fee gives the version 1 envelope, byte identical to a plain transfer.
+  `DemoNode::submit(tx)` / `submit_encoded(bytes)` admit an already signed
+  transaction (chain id checked); `DemoNode::chain_id()` accessor.
+  `test_keyring` gained a case: ed25519, hybrid, fee, locked, unknown.
+- **[x] C ABI:** `aviary_keystore_sign_transfer`, `aviary_keystore_public_key`,
+  `aviary_keystore_has`, `aviary_keystore_addresses`, `aviary_keystore_lock`,
+  `aviary_node_submit_tx`, `aviary_node_submit_transfer_keystore`.
+- **[x] Dart:** `KeyStoreSigning` (`signTransfer`, `publicKey`, `has`,
+  `addresses`, `lock`), `NodeTransfers.submitTx` and
+  `submitTransferFromStore`, `NodeSending.sendFromStore` (auto nonce).
+  `test/custody_signing_smoke.dart` covers ed25519 + hybrid + fee from the
+  store, lock/unlock, unknown account, garbage, a reloaded store signing, and
+  a custody signed transfer carried by a `NetNode` block. `Blueprint` moved
+  into `api/mixtures.dart` to keep the part budget.
+- GOTCHA: a C ABI declaration that mentions `AviaryKeyStore` must come after
+  that typedef (the header is ordered by section).
