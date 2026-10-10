@@ -1,0 +1,7 @@
+# pub uses this file instead of .gitignore. The bundled engine under
+# native/<os>-<arch>/ must ship, so it is re-included here.
+.dart_tool/
+build/
+*.log
+!native/
+!native/**

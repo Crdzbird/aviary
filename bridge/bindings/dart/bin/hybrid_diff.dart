@@ -1,6 +1,3 @@
-// hybrid_diff — the Dart half of the cross-binding hybrid determinism check.
-// Replays the shared scenario emitted by the Go half and asserts the same state
-// root. ML-DSA signatures differ per run, but the resulting STATE is identical.
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:blockchainer_dart/blockchainer.dart';
@@ -17,7 +14,8 @@ Uint8List _u(String s) {
   return o;
 }
 
-String _hex(Uint8List b) => b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+String _hex(Uint8List b) =>
+    b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
 
 void main(List<String> args) {
   final j = jsonDecode(args.first) as Map<String, dynamic>;
@@ -38,7 +36,8 @@ void main(List<String> args) {
   print('  go   stateRoot $goRoot');
   print('  dart stateRoot $dartRoot');
   if (goRoot != dartRoot) {
-    throw StateError('MISMATCH — hybrid state diverges across bindings');
+    throw StateError('MISMATCH - hybrid state diverges across bindings');
   }
-  print('MATCH — post-quantum ledger state is byte-identical across Go and Dart');
+  print(
+      'MATCH - post-quantum ledger state is byte-identical across Go and Dart');
 }

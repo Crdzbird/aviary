@@ -1,0 +1,69 @@
+part of '../../blockchainer.dart';
+
+/// A membership policy: issuer key, attribute schema and tier threshold.
+/// Build one with [BlockchainerCredentials.makeCredentialPolicy].
+final class CredentialPolicy {
+  CredentialPolicy._(this._bc, this.encoded);
+
+  final Blockchainer _bc;
+
+  /// The policy's canonical bytes.
+  final Uint8List encoded;
+
+  /// The 32 byte commitment to commit into genesis.
+  Uint8List hash() => _scoped(
+        [encoded],
+        (p) => _bc._take(
+          _bc.lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
+              'blockchainer_credential_policy_hash')(p[0], encoded.length),
+          'credential_policy_hash',
+        ),
+      );
+
+  /// Issuer side: signs a credential for a member. Holder secret.
+  Uint8List issue(
+    Uint8List issuerSecret,
+    Uint8List memberSecret,
+    int tier,
+    int notAfter,
+    int issuerEpoch,
+  ) =>
+      _scoped(
+        [encoded, issuerSecret, memberSecret],
+        (p) => _bc._take(
+          _bc.lib.lookupFunction<_CredIssueC, _CredIssueD>(
+                  'blockchainer_credential_issue')(
+              p[0],
+              encoded.length,
+              p[1],
+              issuerSecret.length,
+              p[2],
+              memberSecret.length,
+              tier,
+              notAfter,
+              issuerEpoch),
+          'credential_issue',
+        ),
+      );
+
+  /// Holder side: an unlinkable presentation bound to epoch, scope and
+  /// challenge.
+  Uint8List present(
+    Uint8List credential,
+    int epoch,
+    String scope,
+    Uint8List challenge,
+  ) =>
+      _withUtf8(
+        scope,
+        (sp) => _scoped(
+          [encoded, credential, challenge],
+          (p) => _bc._take(
+            _bc.lib.lookupFunction<_CredPresentC, _CredPresentD>(
+                    'blockchainer_credential_present')(p[0], encoded.length,
+                p[1], credential.length, epoch, sp, p[2], challenge.length),
+            'credential_present',
+          ),
+        ),
+      );
+}

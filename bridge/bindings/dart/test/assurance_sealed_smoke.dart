@@ -1,6 +1,3 @@
-// AssuranceProfile (security-posture descriptor) + SealedMempool (anti-MEV) over
-// the Dart binding. The tier flags are monotonic; the sealed mempool only opens
-// for the proposer whose KEM key the txs were sealed to.
 import 'dart:typed_data';
 import 'package:blockchainer_dart/blockchainer.dart';
 
@@ -20,22 +17,25 @@ bool fails(void Function() f) {
 void main() {
   final bc = Blockchainer.instance;
 
-  // AssuranceProfile tiers: standard → hardened → fortress only tighten.
   final standard = bc.describeAssurance(1);
-  expect(!standard.ratcheted && !standard.vrf, 'standard: mutual transport, stake-weighted');
-  expect(!standard.thresholdCustody && !standard.sealedMempool, 'standard: no threshold, open mempool');
+  expect(!standard.ratcheted && !standard.vrf,
+      'standard: mutual transport, stake-weighted');
+  expect(!standard.thresholdCustody && !standard.sealedMempool,
+      'standard: no threshold, open mempool');
 
   final hardened = bc.describeAssurance(2);
-  expect(hardened.ratcheted && hardened.vrf, 'hardened: ratcheted transport, VRF consensus');
-  expect(hardened.thresholdCustody && !hardened.sealedMempool, 'hardened: threshold custody, open mempool');
+  expect(hardened.ratcheted && hardened.vrf,
+      'hardened: ratcheted transport, VRF consensus');
+  expect(hardened.thresholdCustody && !hardened.sealedMempool,
+      'hardened: threshold custody, open mempool');
 
   final fortress = bc.describeAssurance(3);
   expect(fortress.sealedMempool, 'fortress: seals the mempool');
-  expect(fortress.thresholdCustody && fortress.ratcheted && fortress.vrf, 'fortress: everything on');
+  expect(fortress.thresholdCustody && fortress.ratcheted && fortress.vrf,
+      'fortress: everything on');
 
   expect(fails(() => bc.describeAssurance(9)), 'unknown level fails closed');
 
-  // SealedMempool: seal three txs to a proposer, only the proposer can reveal.
   final proposer = bc.hybridKemKeypair();
   final pool = bc.makeSealedMempool(64);
   for (final fee in [50, 300, 120]) {
@@ -46,14 +46,14 @@ void main() {
       author: Uint8List(32),
       signature: Uint8List(64),
     );
-    expect(pool.add(bc.sealTx(tx, proposer.public)), 'sealed tx admitted (fee $fee)');
+    expect(pool.add(bc.sealTx(tx, proposer.public)),
+        'sealed tx admitted (fee $fee)');
   }
   expect(pool.size == 3, 'pool holds 3 sealed txs');
 
   final revealed = pool.reveal(proposer.secret, 10);
   expect(revealed.length == 3, 'proposer reveals all 3 sealed txs');
 
-  // Confidentiality: a non-proposer key opens nothing.
   final stranger = bc.hybridKemKeypair();
   final strangerReveal = pool.reveal(stranger.secret, 10);
   expect(strangerReveal.isEmpty, 'a non-proposer opens nothing');
