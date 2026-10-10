@@ -11,6 +11,7 @@ topics:
   - ledger
   - web3
 platforms:
+  linux:
   macos:
 environment:
   sdk: ^3.10.0

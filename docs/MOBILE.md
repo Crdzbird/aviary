@@ -81,8 +81,10 @@ host architecture against CipherBird's merged static archive
 drops it into `bridge/bindings/dart/native/linux-<x64|arm64>/`. The GitHub
 Actions workflow `native-linux.yml` does exactly that on `ubuntu-24.04` and
 `ubuntu-24.04-arm`, runs the Dart smoke tests through the build hook, and
-uploads the libraries as artifacts; commit them into the package to ship
-them. Windows has no binary yet: CipherBird's dependency build has no Windows
+uploads the libraries as artifacts; the x64 and arm64 libraries from run
+38063524511 are committed under `native/linux-x64` and `native/linux-arm64`.
+The engine links CipherBird's from-source OpenSSL 3.6 because Ubuntu's 3.0
+lacks AES-256-GCM-SIV, which the sealed mempool needs. Windows has no binary yet: CipherBird's dependency build has no Windows
 port, which is the prerequisite.
 
 ## Publishing notes

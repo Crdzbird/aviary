@@ -1294,6 +1294,16 @@ selectors — validated against real-world vectors). Deferred:
   (ubuntu-24.04 + ubuntu-24.04-arm, builds CipherBird + aviary, runs every
   Dart smoke test through the hook, uploads `aviary-linux-<arch>`). The CI
   workflow's CipherBird default repo is now `Crdzbird/CipherBird`.
+- **[x] Linux shipped.** Run 38063524511 of `native-linux.yml` built and
+  tested on ubuntu-24.04 and ubuntu-24.04-arm: every Dart smoke test passed
+  on Linux with `Aviary.loadedFrom == asset`, proving the hook path end to
+  end. The two libraries are committed under `native/linux-x64/` (self
+  contained, 21 MB x64 and 14 MB arm64 after strip) and `native/linux-arm64/`; `platforms:` lists
+  linux. Two Linux only fixes came out of it: 46 sources relied on
+  transitive standard headers that libstdc++ does not provide (`<algorithm>`
+  and friends), and Ubuntu's OpenSSL 3.0 lacks AES-256-GCM-SIV, so the
+  workflow builds CipherBird's from-source OpenSSL 3.6 (`CFLAGS=-fPIC`) and
+  points pkg-config at it with a one line `.pc` file.
 - **Windows:** the hook and loader support `native/windows-x64/aviary_c.dll`
   and the C ABI builds for `_WIN32`, but no binary ships: CipherBird has no
   Windows build of its dependencies (OpenSSL, liboqs, libsodium, blst,
