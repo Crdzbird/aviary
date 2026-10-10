@@ -30,3 +30,14 @@ Future<void> waitUntil(bool Function() done, String what) async {
   }
   throw StateError('FAIL: timed out waiting for $what');
 }
+
+/// A loopback server with one dialed and one accepted socket.
+Future<(ServerSocket, Socket, Socket)> loopbackPair() async {
+  final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+  final accepting = server.first;
+  final dialer = await Socket.connect(
+    InternetAddress.loopbackIPv4,
+    server.port,
+  );
+  return (server, dialer, await accepting);
+}

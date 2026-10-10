@@ -76,7 +76,7 @@ jobs:
         working-directory: aviary/bridge/bindings/dart
         run: |
           dart pub get
-          for t in test/*.dart; do dart run "$t"; done
+          dart test
 
       - name: Upload the library
         uses: actions/upload-artifact@v4

@@ -1317,3 +1317,27 @@ selectors — validated against real-world vectors). Deferred:
   this session were split with `test/support/{check,mesh,tcp}.dart`; eight
   older smoke tests already exceeded 100 lines before this session and were
   left as they are.
+
+## package:test conversion, Dart CI, tag driven publishing - DONE (2026-10-10)
+- **[x] Suites.** The 22 `test/*_smoke.dart` scripts became
+  `test/*_test.dart` package:test suites (`test 1.33.0`): each former `main`
+  body is one `test(...)`, the boolean helper is `check(bool, String)` because
+  package:test owns `expect`, and `dart_test.yaml` sets `concurrency: 1`
+  (one native engine, process wide registries) and `timeout: 2x`. `dart test`
+  runs all 22 in about a minute on the host; the Native Linux workflow runs
+  `dart test` too.
+- **[x] CI:** `.github/workflows/dart.yml` runs `dart format
+  --set-exit-if-changed`, `dart analyze --fatal-infos`, `dart test` and
+  `pana --exit-code-threshold 0` for `aviary_dart` on macos-latest and
+  ubuntu-latest (both bundled engines are in the repo, no native build
+  needed), and `flutter analyze --fatal-infos` + `flutter test` for
+  `aviary_lite` and `aviary` on macOS.
+- **[x] Publishing:** `.github/workflows/publish.yml` publishes on tags
+  `aviary_dart-v*`, `aviary_lite-v*`, `aviary-v*` with `id-token: write`
+  (pub.dev GitHub Actions trust via `dart-lang/setup-dart`), checks the
+  pubspec version against the tag, removes `pubspec_overrides.yaml`, and runs
+  `dart`/`flutter pub publish --force`. The pub.dev side (enable automated
+  publishing per package, repository `Crdzbird/aviary`, tag pattern
+  `<package>-v{{version}}`) is the owner's one time setup.
+- GOTCHA: package:test only discovers `*_test.dart`; `dart test` silently
+  reports "No tests were found" otherwise.

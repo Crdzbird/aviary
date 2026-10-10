@@ -1,0 +1,49 @@
+name: Dart packages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  aviary_dart:
+    name: aviary_dart on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: bridge/bindings/dart
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: dart analyze --fatal-infos
+      - run: dart test
+      - name: pub.dev score
+        run: |
+          dart pub global activate pana
+          dart pub global run pana --no-warning --exit-code-threshold 0 .
+
+  flutter_packages:
+    name: ${{ matrix.package }} on macOS
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [aviary_lite, aviary]
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: bridge/bindings/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze --fatal-infos
+      - run: flutter test

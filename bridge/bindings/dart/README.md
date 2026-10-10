@@ -201,6 +201,20 @@ release at the end of a scope. Errors are `AviaryException` with a
 `failure`). The Argon2 bound custody calls have `Async` variants that run
 on a worker isolate.
 
+## Testing
+
+```bash
+dart test
+```
+
+The suites run one at a time (`dart_test.yaml`), because each drives the
+same native engine from its own isolate. The GitHub workflow `Dart packages`
+runs format, analysis, the suites and the pub.dev score on macOS and Linux
+for `aviary_dart`, and analysis plus tests for the two Flutter packages.
+Releases are published from tags (`aviary_dart-v0.1.0`, `aviary_lite-v0.1.0`,
+`aviary-v0.1.0`) by the `Publish to pub.dev` workflow through pub.dev's
+GitHub Actions trust; see that workflow's header for the pub.dev settings.
+
 ## Determinism
 
 Every canonical byte string (hashes, transaction ids, headers, proofs) is

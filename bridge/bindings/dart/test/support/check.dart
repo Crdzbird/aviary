@@ -1,7 +1,7 @@
 import 'package:aviary_dart/aviary.dart';
 
 /// Throws when [ok] is false, naming the failed expectation.
-void expect(bool ok, String msg) {
+void check(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
 }
 

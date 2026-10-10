@@ -12,6 +12,7 @@
 - Shortcut extensions: hex helpers on Uint8List and String, funded
   accounts, auto nonce transfers and one call blocks on Node, single
   validator chain assembly, whole threshold ceremonies, fluent chain trees.
+- The smoke scripts are `package:test` suites: `dart test` runs them.
 - Linux x64 and arm64 engines ship in the package and are bundled by the
   build hook (`hook/build.dart`) as a code asset; a Windows one follows the
   same path once it exists;

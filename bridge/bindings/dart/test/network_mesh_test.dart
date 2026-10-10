@@ -1,14 +1,17 @@
 import 'dart:typed_data';
 
 import 'package:aviary_dart/aviary.dart';
+import 'package:test/test.dart';
 
 import 'support/check.dart';
 
 import 'support/mesh.dart';
 
 void main() {
-  mesh(Aviary.instance);
-  print('aviary dart network mesh smoke: OK');
+  test('network mesh', () {
+    mesh(Aviary.instance);
+    print('aviary dart network mesh smoke: OK');
+  });
 }
 
 void mesh(Aviary bc) {
@@ -34,30 +37,30 @@ void mesh(Aviary bc) {
     net.apply(i, nodes[i].start());
   }
   net.run(validatorsCommitted);
-  expect(validatorsCommitted(), 'line mesh commits through relays');
+  check(validatorsCommitted(), 'line mesh commits through relays');
   net.run(() => false);
-  expect(nodes.every((n) => n.height == 1), 'every node incl. observer at 1');
-  expect(nodes[0].tip().equalsBytes(nodes[4].tip()), 'observer has the tip');
-  expect(nodes[3].balance(alice) == 1000, 'genesis balance visible');
-  expect(nodes[0].replayLog().isNotEmpty, 'catch-up log holds the height');
-  expect(
+  check(nodes.every((n) => n.height == 1), 'every node incl. observer at 1');
+  check(nodes[0].tip().equalsBytes(nodes[4].tip()), 'observer has the tip');
+  check(nodes[3].balance(alice) == 1000, 'genesis balance visible');
+  check(nodes[0].replayLog().isNotEmpty, 'catch-up log holds the height');
+  check(
     nodes[0].onGossip(1, Uint8List.fromList([9, 9, 9])).relays.isEmpty,
     'garbage relays nothing',
   );
-  expect(!nodes[0].peerBanned(1), 'one bad payload does not ban');
-  expect(
+  check(!nodes[0].peerBanned(1), 'one bad payload does not ban');
+  check(
     bc.verifyStateProof(nodes[2].stateRoot(), nodes[2].proveAccount(alice)),
     'proof from a networked node verifies',
   );
   for (var i = 0; i < nodes.length; i++) {
     net.apply(i, nodes[i].advance());
   }
-  expect(nodes[3].replayLog().isEmpty, 'advance restarts a follower log');
-  expect(nodes[0].replayLog().isNotEmpty, 'proposer logs its new proposal');
-  expect(!nodes[0].committed, 'new height is open');
+  check(nodes[3].replayLog().isEmpty, 'advance restarts a follower log');
+  check(nodes[0].replayLog().isNotEmpty, 'proposer logs its new proposal');
+  check(!nodes[0].committed, 'new height is open');
   net.run(validatorsCommitted);
   net.run(() => false);
-  expect(nodes.every((n) => n.height == 2), 'second height committed');
+  check(nodes.every((n) => n.height == 2), 'second height committed');
   var refused = false;
   try {
     nodes[0].setTransactions([
@@ -66,7 +69,7 @@ void mesh(Aviary bc) {
   } on AviaryException catch (e) {
     refused = e.status == AviaryStatus.badInput;
   }
-  expect(refused, 'malformed transaction refused');
+  check(refused, 'malformed transaction refused');
   for (final n in nodes) {
     n.free();
   }

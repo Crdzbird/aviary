@@ -1,0 +1,4 @@
+# One suite at a time: every suite drives the same native engine and its
+# process wide registries from its own isolate, so suites must not overlap.
+concurrency: 1
+timeout: 2x
