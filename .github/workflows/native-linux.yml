@@ -43,6 +43,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build git pkg-config build-essential ca-certificates libsodium-dev libssl-dev
 
+      # Ubuntu's OpenSSL 3.0 lacks AES-256-GCM-SIV, which the sealed mempool
+      # needs, so the engine links CipherBird's from-source OpenSSL (3.6, static,
+      # position independent). The Linux archive script finds libcrypto through
+      # pkg-config, so a one line .pc file points it at that build.
+      - name: Build OpenSSL for the engine
+        working-directory: cryptolib
+        env:
+          CFLAGS: -fPIC
+        run: |
+          bash scripts/build_openssl_nosock.sh
+          mkdir -p "$PWD/build/pc"
+          printf 'libdir=%s\nName: libcrypto\nDescription: OpenSSL libcrypto\nVersion: 3.6\nLibs: -L${libdir} -lcrypto\n' \
+            "$PWD/build/host-deps/openssl-nosock/lib" > "$PWD/build/pc/libcrypto.pc"
+          echo "PKG_CONFIG_PATH=$PWD/build/pc" >> "$GITHUB_ENV"
+          PKG_CONFIG_PATH="$PWD/build/pc" pkg-config --variable=libdir libcrypto
+
       - name: Build the CipherBird static engine
         working-directory: cryptolib
         run: bash scripts/build_static_archive_linux.sh
