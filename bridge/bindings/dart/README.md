@@ -53,7 +53,7 @@ Extensions that collapse the common flows into one call:
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
 | `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `metricValues`, `verifyAccountProof` |
-| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares` |
+| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
 | `Chain` | `produceBlock(timestamp, justify:)` |
 | `TreeNode` | `withChild`, `find`, `chainIds` |
@@ -84,6 +84,18 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 - Chain trees: `TreeNode`, `buildChainTree`, `ChainTree`.
 - Custody: `KeyStore`, portable accounts, threshold accounts, `Ceremony`.
 - Assurance and sealed mempools; anonymous membership credentials.
+
+## Lifecycle and errors
+
+Handles (`Node`, `Chain`, `KeyStore`, `LightClient`, `Ceremony`,
+`SealedMempool`, `CredentialGate`, `ChainTree`) own native memory. Release
+them with `dispose` or `free`, or let the garbage collector do it: every
+handle has a finalizer, releasing twice is harmless, and `isReleased` tells
+you where you stand. The `withNode`, `withKeyStore` and `withTree` helpers
+release at the end of a scope. Errors are `AviaryException` with a
+`status` from the C ABI (`AviaryStatus.genesisSealed`, `badInput`,
+`failure`). The Argon2 bound custody calls have `Async` variants that run
+on a worker isolate.
 
 ## Determinism
 

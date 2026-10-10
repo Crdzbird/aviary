@@ -2,11 +2,8 @@ part of '../../aviary.dart';
 
 /// A custodial store that seals signing secrets at rest. Create one with
 /// [AviaryNodes.createKeyStore] or [AviaryNodes.loadKeyStore].
-final class KeyStore {
-  KeyStore._(this._bc, this._h);
-
-  final Aviary _bc;
-  final Pointer<Void> _h;
+final class KeyStore extends _NativeHandle {
+  KeyStore._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_keystore_free');
 
   DynamicLibrary get _lib => _bc.lib;
 
@@ -59,6 +56,5 @@ final class KeyStore {
       1;
 
   /// Releases the native store.
-  void dispose() => _lib
-      .lookupFunction<_HandleFreeC, _HandleFreeD>('aviary_keystore_free')(_h);
+  void dispose() => _release();
 }

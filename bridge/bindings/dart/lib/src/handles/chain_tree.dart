@@ -3,8 +3,10 @@ part of '../../aviary.dart';
 /// A built family of chains driven in process. [produce] anchors children
 /// upward automatically; [ChainTreeQueries.proveAccount] proves any
 /// descendant from the root header.
-final class ChainTree {
-  ChainTree._(this._bc, this._h) : _handle = _nextTreeHandle++ {
+final class ChainTree extends _NativeHandle {
+  ChainTree._(Aviary bc, Pointer<Void> h)
+      : _handle = _nextTreeHandle++,
+        super(bc, h, 'aviary_chain_tree_free') {
     _trees[_handle] = this;
     _fin = NativeCallable<_TreeFinC>.isolateLocal(_treeFinTrampoline)
       ..keepIsolateAlive = false;
@@ -18,8 +20,6 @@ final class ChainTree {
         'aviary_chain_tree_set_tx_source')(_h, _tx.nativeFunction, ctx);
   }
 
-  final Aviary _bc;
-  final Pointer<Void> _h;
   final int _handle;
   late final NativeCallable<_TreeFinC> _fin;
   late final NativeCallable<_TreeTxC> _tx;
@@ -48,8 +48,8 @@ final class ChainTree {
 
   /// Releases the native tree and its hooks.
   void free() {
-    _bc.lib.lookupFunction<_HandleFreeC, _HandleFreeD>(
-        'aviary_chain_tree_free')(_h);
+    if (isReleased) return;
+    _release();
     _trees.remove(_handle);
     _fin.close();
     _tx.close();

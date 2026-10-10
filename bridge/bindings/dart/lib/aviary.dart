@@ -1,8 +1,5 @@
-/// Aviary for Dart: the ledger, consensus, mixtures, subchains, light
-/// clients and chain trees of the Aviary C ABI, plus the custody and
-/// anonymous membership surfaces, over dart:ffi. The extensions under
-/// src/extensions add the one call shortcuts: funded accounts, auto nonce
-/// transfers, hex helpers, single validator chains and whole ceremonies.
+/// Aviary for Dart: the ledger, consensus, subchains, light clients, chain
+/// trees and custody of the Aviary C ABI over dart:ffi, plus shortcuts.
 library;
 
 import 'dart:convert';
@@ -34,10 +31,13 @@ part 'src/core/bundled_library.dart';
 part 'src/core/scope.dart';
 part 'src/core/codec.dart';
 part 'src/core/validator_codec.dart';
+part 'src/core/native_handle.dart';
+part 'src/core/buffers.dart';
 part 'src/core/exception.dart';
 part 'src/core/exception_impl.dart';
 part 'src/core/foreign_registry.dart';
 part 'src/core/tree_registry.dart';
+part 'src/types/aviary_status.dart';
 part 'src/types/records.dart';
 part 'src/types/skip_result.dart';
 part 'src/types/foreign_engine.dart';
@@ -96,3 +96,5 @@ part 'src/extensions/aviary_quick.dart';
 part 'src/extensions/threshold_signing.dart';
 part 'src/extensions/tree_node_building.dart';
 part 'src/extensions/chain_tree_rounds.dart';
+part 'src/extensions/aviary_async.dart';
+part 'src/extensions/aviary_scopes.dart';

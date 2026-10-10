@@ -1,11 +1,8 @@
 part of '../../aviary.dart';
 
 /// A running single validator chain node.
-final class Node {
-  Node._(this._bc, this._h);
-
-  final Aviary _bc;
-  final Pointer<Void> _h;
+final class Node extends _NativeHandle {
+  Node._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_node_free');
 
   DynamicLibrary get _lib => _bc.lib;
 
@@ -41,11 +38,12 @@ final class Node {
   void credit(Uint8List address, int amount) => _scoped([address], (p) {
         final rc = _lib.lookupFunction<_CreditC, _CreditD>(
             'aviary_node_credit')(_h, p[0], amount);
-        if (rc == 2) {
-          throw const AviaryException(
-              'genesis is sealed; fund accounts with transfers');
-        }
-        if (rc != 0) throw AviaryException('credit failed (status $rc)');
+        if (rc == 0) return;
+        final status = AviaryStatus.fromCode(rc);
+        final why = status == AviaryStatus.genesisSealed
+            ? 'genesis is sealed; fund accounts with transfers'
+            : 'credit failed (status $rc)';
+        throw AviaryException(why, status);
       });
 
   /// Produces the next block and returns its height.
@@ -62,8 +60,7 @@ final class Node {
   }
 
   /// Releases the native node.
-  void dispose() =>
-      _lib.lookupFunction<_HandleFreeC, _HandleFreeD>('aviary_node_free')(_h);
+  void dispose() => _release();
 
   /// Alias of [dispose].
   void free() => dispose();

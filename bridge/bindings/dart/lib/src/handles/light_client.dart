@@ -4,11 +4,9 @@ part of '../../aviary.dart';
 /// Sequential [accept], plus the overlap rule in [acceptSkipping]: a far
 /// header is trusted when its own set certifies it and the signers hold
 /// more than the trust level of the set already trusted.
-final class LightClient {
-  LightClient._(this._bc, this._h);
-
-  final Aviary _bc;
-  final Pointer<Void> _h;
+final class LightClient extends _NativeHandle {
+  LightClient._(Aviary bc, Pointer<Void> h)
+      : super(bc, h, 'aviary_light_client_free');
 
   /// The trusted height.
   int get height => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(
@@ -59,6 +57,5 @@ final class LightClient {
   }
 
   /// Releases the native client.
-  void free() => _bc.lib.lookupFunction<_HandleFreeC, _HandleFreeD>(
-      'aviary_light_client_free')(_h);
+  void free() => _release();
 }

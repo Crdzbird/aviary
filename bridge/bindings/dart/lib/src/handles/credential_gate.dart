@@ -2,11 +2,9 @@ part of '../../aviary.dart';
 
 /// A verifier's anonymous membership admission gate. It admits a holder by a
 /// zero knowledge proof of an issuer signed credential clearing the policy.
-final class CredentialGate {
-  CredentialGate._(this._bc, this._h);
-
-  final Aviary _bc;
-  final Pointer<Void> _h;
+final class CredentialGate extends _NativeHandle {
+  CredentialGate._(Aviary bc, Pointer<Void> h)
+      : super(bc, h, 'aviary_credential_gate_free');
 
   /// Bulk revocation: refuses every credential issued in [epoch].
   void revokeIssuerEpoch(int epoch) =>
@@ -35,6 +33,5 @@ final class CredentialGate {
       );
 
   /// Releases the native gate.
-  void free() => _bc.lib.lookupFunction<_HandleFreeC, _HandleFreeD>(
-      'aviary_credential_gate_free')(_h);
+  void free() => _release();
 }

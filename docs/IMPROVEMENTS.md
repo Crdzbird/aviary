@@ -1143,3 +1143,26 @@ selectors — validated against real-world vectors). Deferred:
 - The GitHub repository must be renamed to `aviary` by the owner (the Go
   module path and the pubspec URLs already point there; GitHub redirects the
   old name). The local checkout directory keeps its old name for now.
+
+## Dart lifecycle, typed errors, worker isolates, Apple minimums - DONE (2026-10-10)
+- **[x] Finalizers.** Every handle class extends a private `_NativeHandle`
+  (`implements Finalizable`) that attaches a `NativeFinalizer` for its free
+  symbol on construction; `free`/`dispose` detach and release once, a second
+  call is a no-op, `isReleased` reports it. `ChainTree` keeps its explicit
+  `free` (it also closes the two `NativeCallable`s and leaves the registry).
+  `withNode`, `withKeyStore`, `withTree` release at scope end.
+- **[x] Typed errors.** `AviaryStatus` mirrors the C ABI codes (ok, failure,
+  genesisSealed, badInput); `AviaryException.status` defaults to `failure`
+  for message only errors; `Node.credit` maps its status code.
+- **[x] Worker isolate variants.** `sealShareAsync`, `unsealShareAsync`,
+  `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` run through
+  `Isolate.run`; the worker loads the engine from the same explicit path the
+  main instance used (`Aviary._path`) or the platform default. Buffer
+  helpers moved to a private extension (`core/buffers.dart`) to keep the core
+  class under 100 lines.
+- **[x] Apple minimums** raised to iOS 15 / macOS 12 in both plugin
+  manifests, the dynamic xcframework script (link flags and Info.plist) and
+  the interop app, matching the CipherBird binary. Lite's static slices
+  already follow CipherBird's toolchain.
+- Tests: `test/lifecycle_smoke.dart` (double release, 200 undisposed nodes,
+  typed status, scopes, async round trips, wrong passphrase).

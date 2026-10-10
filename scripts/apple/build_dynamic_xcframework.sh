@@ -28,9 +28,9 @@ mkdir -p "$BUILD"
 slice_ios_platform() { case "$1" in iphoneos) echo OS;; iphonesimulator) echo SIMULATOR;; macosx) echo MAC;; esac; }
 slice_sdk()          { case "$1" in iphoneos) echo iphoneos;; iphonesimulator) echo iphonesimulator;; macosx) echo macosx;; esac; }
 slice_minflag()      { case "$1" in
-  iphoneos)        echo "-miphoneos-version-min=13.0";;
-  iphonesimulator) echo "-mios-simulator-version-min=13.0";;
-  macosx)          echo "-mmacosx-version-min=11.0";; esac; }
+  iphoneos)        echo "-miphoneos-version-min=15.0";;
+  iphonesimulator) echo "-mios-simulator-version-min=15.0";;
+  macosx)          echo "-mmacosx-version-min=12.0";; esac; }
 slice_platform_name(){ case "$1" in iphoneos) echo iPhoneOS;; iphonesimulator) echo iPhoneSimulator;; macosx) echo MacOSX;; esac; }
 
 build_archives() {  # <slice>
@@ -51,7 +51,7 @@ build_archives() {  # <slice>
 info_plist() {  # <slice> <out>
   local slice="$1" out="$2" platform min_key min_ver
   platform="$(slice_platform_name "$slice")"
-  if [[ "$slice" == macosx ]]; then min_key=LSMinimumSystemVersion; min_ver=11.0; else min_key=MinimumOSVersion; min_ver=13.0; fi
+  if [[ "$slice" == macosx ]]; then min_key=LSMinimumSystemVersion; min_ver=12.0; else min_key=MinimumOSVersion; min_ver=15.0; fi
   cat > "$out" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

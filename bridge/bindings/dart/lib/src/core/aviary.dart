@@ -4,7 +4,9 @@ part of '../../aviary.dart';
 /// surfaces are extensions on this class; stateful objects are created
 /// through it.
 final class Aviary {
-  Aviary._(this.lib);
+  Aviary._(this.lib, [this._path]);
+
+  final String? _path;
 
   /// The resolved native library.
   final DynamicLibrary lib;
@@ -16,8 +18,8 @@ final class Aviary {
   static Aviary open(String path) => fromLibrary(DynamicLibrary.open(path));
 
   /// Wraps an already resolved [lib] and runs the one time native init.
-  static Aviary fromLibrary(DynamicLibrary lib) {
-    final bc = Aviary._(lib);
+  static Aviary fromLibrary(DynamicLibrary lib, [String? path]) {
+    final bc = Aviary._(lib, path);
     final rc = lib.lookupFunction<_IntVoid, int Function()>('aviary_init');
     if (rc() != 0) throw const AviaryException('init failed');
     return bc;
@@ -69,27 +71,4 @@ final class Aviary {
 
   /// Alias of [cryptoBackend].
   String cryptoBackendVersion() => cryptoBackend();
-
-  String _cString(String symbol) =>
-      lib.lookupFunction<_PtrVoid, _PtrVoid>(symbol)().toDartString();
-
-  Uint8List _take(_BufResult r, String op) {
-    if (r.buf.data == nullptr) throw _takeError(r, op);
-    final out = Uint8List.fromList(r.buf.data.asTypedList(r.buf.len));
-    final tmp = calloc<_Buffer>();
-    tmp.ref.data = r.buf.data;
-    tmp.ref.len = r.buf.len;
-    lib.lookupFunction<_BufFreeC, _BufFreeD>('aviary_buffer_free')(tmp);
-    calloc.free(tmp);
-    return out;
-  }
-
-  AviaryException _takeError(_BufResult r, String op) {
-    if (r.error == nullptr) return AviaryException('$op failed');
-    final message = r.error.toDartString();
-    lib.lookupFunction<_StrFreeC, _StrFreeD>('aviary_str_free')(r.error);
-    return AviaryException(message);
-  }
-
-  String _takeStr(_BufResult r, String op) => utf8.decode(_take(r, op));
 }

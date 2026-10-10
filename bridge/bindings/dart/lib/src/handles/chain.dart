@@ -1,11 +1,8 @@
 part of '../../aviary.dart';
 
 /// An assembled node behind the uniform propose, justify, submit flow.
-final class Chain {
-  Chain._(this._bc, this._h);
-
-  final Aviary _bc;
-  final Pointer<Void> _h;
+final class Chain extends _NativeHandle {
+  Chain._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_chain_free');
 
   /// The chain height.
   int get height => _bc.lib
@@ -71,6 +68,5 @@ final class Chain {
       );
 
   /// Releases the native chain.
-  void free() => _bc.lib
-      .lookupFunction<_HandleFreeC, _HandleFreeD>('aviary_chain_free')(_h);
+  void free() => _release();
 }

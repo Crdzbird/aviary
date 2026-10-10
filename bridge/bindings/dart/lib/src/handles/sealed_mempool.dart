@@ -1,11 +1,9 @@
 part of '../../aviary.dart';
 
 /// A mempool of sealed transactions only the block proposer can open.
-final class SealedMempool {
-  SealedMempool._(this._bc, this._h);
-
-  final Aviary _bc;
-  final Pointer<Void> _h;
+final class SealedMempool extends _NativeHandle {
+  SealedMempool._(Aviary bc, Pointer<Void> h)
+      : super(bc, h, 'aviary_sealed_mempool_free');
 
   /// Admits a sealed transaction. False when the pool is at capacity.
   bool add(Uint8List sealedTx) => _scoped(
@@ -33,6 +31,5 @@ final class SealedMempool {
       );
 
   /// Releases the native pool.
-  void free() => _bc.lib.lookupFunction<_HandleFreeC, _HandleFreeD>(
-      'aviary_sealed_mempool_free')(_h);
+  void free() => _release();
 }
