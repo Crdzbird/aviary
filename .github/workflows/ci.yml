@@ -31,7 +31,8 @@ jobs:
           git clone --depth 1 https://github.com/supranational/blst.git /tmp/blst
           (cd /tmp/blst && ./build.sh)
           sudo cp /tmp/blst/libblst.a /opt/homebrew/lib/
-          sudo cp /tmp/blst/bindings/blst.h /tmp/blst/bindings/blst_aux.h /opt/homebrew/include/
+          sudo mkdir -p /opt/homebrew/include/blst
+          sudo cp /tmp/blst/bindings/blst.h /tmp/blst/bindings/blst_aux.h /opt/homebrew/include/blst/
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
