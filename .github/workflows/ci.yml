@@ -14,8 +14,8 @@ jobs:
         with:
           path: aviary
 
-      # cryptolib is a separate repo aviary links against. Point CRYPTOLIB_REPO
-      # at your fork/mirror; this builds its self-contained C ABI.
+      # CipherBird (the cryptolib repo) is what aviary links against; CRYPTOLIB_REPO
+      # can point at a fork. This builds its C ABI.
       - name: Checkout cryptolib
         uses: actions/checkout@v4
         with:
@@ -23,7 +23,15 @@ jobs:
           path: cryptolib
 
       - name: Install native deps
-        run: brew install cmake ninja libsodium liboqs blake3 openssl@3 go
+        run: brew install cmake ninja libsodium liboqs blake3 openssl@3 secp256k1 go
+
+      # blst is not a Homebrew formula; CipherBird's own CI builds it the same way.
+      - name: Build blst from source
+        run: |
+          git clone --depth 1 https://github.com/supranational/blst.git /tmp/blst
+          (cd /tmp/blst && ./build.sh)
+          sudo cp /tmp/blst/libblst.a /opt/homebrew/lib/
+          sudo cp /tmp/blst/bindings/blst.h /tmp/blst/bindings/blst_aux.h /opt/homebrew/include/
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
