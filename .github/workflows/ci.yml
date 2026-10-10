@@ -39,6 +39,14 @@ jobs:
         with:
           channel: stable
 
+      # The JVM binding uses the foreign function and memory API, final since
+      # Java 22; the runner's default JDK still treats it as a preview.
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '23'
+
       - name: Build cryptolib C ABI
         working-directory: cryptolib
         run: |
