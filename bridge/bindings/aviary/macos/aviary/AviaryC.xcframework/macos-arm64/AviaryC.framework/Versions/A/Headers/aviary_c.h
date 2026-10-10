@@ -168,6 +168,11 @@ AVIARY_API uint64_t aviary_node_mempool_size(AviaryNode node);
 AVIARY_API AviaryBufferResult aviary_node_state_root(AviaryNode node);
 /** Drain collected chain events as a JSON array string (the streaming surface). */
 AVIARY_API AviaryBufferResult aviary_node_drain_events(AviaryNode node);
+/** Push observer: one JSON object per chain event, delivered synchronously from
+ *  inside the node call that produced it. While a hook is set the events are
+ *  not buffered for aviary_node_drain_events. A NULL fn removes the hook. */
+typedef void (*AviaryEventFn)(void* ctx, const char* json, size_t len);
+AVIARY_API void aviary_node_set_event_hook(AviaryNode node, AviaryEventFn fn, void* ctx);
 /** Prometheus-format metrics snapshot. */
 AVIARY_API AviaryBufferResult aviary_node_metrics(AviaryNode node);
 /** State-inclusion proof for [address]; verify with aviary_verify_state_proof. */

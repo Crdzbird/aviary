@@ -1166,3 +1166,25 @@ selectors — validated against real-world vectors). Deferred:
   already follow CipherBird's toolchain.
 - Tests: `test/lifecycle_smoke.dart` (double release, 200 undisposed nodes,
   typed status, scopes, async round trips, wrong passphrase).
+
+## Typed events and a push stream - DONE (2026-10-10)
+- **[x] C ABI `aviary_node_set_event_hook(node, fn, ctx)`** with
+  `typedef void (*AviaryEventFn)(void* ctx, const char* json, size_t len)`.
+  `DemoNode::set_event_hook` delivers each JSON object synchronously from the
+  bus subscription; while a hook is set nothing is buffered for
+  `drain_events`. The JSON now carries `block_id` on `block_finalized`, `txid`
+  on `tx_removed`, and a new `block_rejected` kind. Only the Dart binding
+  consumes the hook so far; Go, npm, JVM and Swift keep draining.
+- **[x] Dart `ChainEvent`** is a sealed class with `BlockFinalized`,
+  `BlockRejected`, `TxAdmitted`, `TxRemoved` and `UnknownEvent` (abstract
+  final + const factory + private impl, one class per file under
+  `types/events/`). `Node.events()` returns the typed list; `Node.eventStream`
+  attaches a `NativeCallable` (isolateLocal, keepIsolateAlive false) through a
+  `_NodeEventSink` registry keyed by handle address and feeds a broadcast
+  `StreamController`; `Node.dispose` unhooks first, then frees, then closes.
+  Listeners run on the next microtask, never inside the native callback.
+- Housekeeping: the 13 typedef only `sigs_*` parts became 5 grouped files and
+  the smallest same receiver extension files were merged, keeping
+  `lib/aviary.dart` at 98 lines and every file under 100.
+- Tests: `test/events_smoke.dart` (pull, push, order, exhaustive switch,
+  lenient decoding). All native artifacts rebuilt.

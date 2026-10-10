@@ -60,7 +60,10 @@ final class Node extends _NativeHandle {
   }
 
   /// Releases the native node.
-  void dispose() => _release();
+  void dispose() {
+    _nodeSinks.remove(_h.address)?.close();
+    _release();
+  }
 
   /// Alias of [dispose].
   void free() => dispose();

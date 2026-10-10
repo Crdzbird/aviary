@@ -1,5 +1,23 @@
 part of '../../aviary.dart';
 
+/// Account creation with genesis funding in one step.
+extension NodeFunding on Node {
+  /// A fresh Ed25519 account credited with [amount] at genesis. Throws once
+  /// the first block has been produced.
+  Account fundAccount(int amount) {
+    final account = newAccount();
+    credit(account.address, amount);
+    return account;
+  }
+
+  /// A fresh hybrid post quantum account credited with [amount] at genesis.
+  Account fundHybridAccount(int amount) {
+    final account = newAccountHybrid();
+    credit(account.address, amount);
+    return account;
+  }
+}
+
 /// Transfers that pick the nonce and the signature scheme for you.
 extension NodeSending on Node {
   /// Sends [amount] from [from] to the address [to]. The nonce is read from
@@ -28,4 +46,25 @@ extension NodeSending on Node {
   /// the new height, a monotone placeholder for callers that do not track
   /// time.
   int commit({int? timestamp}) => produceBlock(timestamp ?? height() + 1);
+}
+
+/// Decoded views of a node's state.
+extension NodeViews on Node {
+  /// Whether [proof] from [NodeQueries.proveAccount] holds under the
+  /// current state root.
+  bool verifyAccountProof(Uint8List proof) =>
+      _bc.verifyStateProof(stateRoot(), proof);
+
+  /// Prometheus metric values keyed by sample name with its labels verbatim.
+  Map<String, double> metricValues() {
+    final out = <String, double>{};
+    for (final line in metrics().split('\n')) {
+      if (line.isEmpty || line.startsWith('#')) continue;
+      final space = line.lastIndexOf(' ');
+      if (space < 0) continue;
+      final value = double.tryParse(line.substring(space + 1));
+      if (value != null) out[line.substring(0, space)] = value;
+    }
+    return out;
+  }
 }

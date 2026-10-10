@@ -43,21 +43,39 @@ void DemoNode::ensure_started() {
   bus_.subscribe<observe::BlockFinalized>([this](const observe::BlockFinalized& e) {
     std::ostringstream os;
     os << "{\"type\":\"block_finalized\",\"height\":" << e.height
-       << ",\"tx_count\":" << e.tx_count << ",\"state_root\":\"" << hex(e.state_root) << "\"}";
-    events_.push_back(os.str());
+       << ",\"tx_count\":" << e.tx_count << ",\"block_id\":\"" << hex(e.block_id)
+       << "\",\"state_root\":\"" << hex(e.state_root) << "\"}";
+    emit(os.str());
+  });
+  bus_.subscribe<observe::BlockRejected>([this](const observe::BlockRejected& e) {
+    std::ostringstream os;
+    os << "{\"type\":\"block_rejected\",\"attempted_height\":" << e.attempted_height
+       << ",\"block_id\":\"" << hex(e.block_id) << "\"}";
+    emit(os.str());
   });
   bus_.subscribe<observe::TxAdmitted>([this](const observe::TxAdmitted& e) {
     std::ostringstream os;
     os << "{\"type\":\"tx_admitted\",\"txid\":\"" << hex(e.txid)
        << "\",\"mempool_size\":" << e.mempool_size << "}";
-    events_.push_back(os.str());
+    emit(os.str());
   });
   bus_.subscribe<observe::TxRemoved>([this](const observe::TxRemoved& e) {
     std::ostringstream os;
-    os << "{\"type\":\"tx_removed\",\"mempool_size\":" << e.mempool_size << "}";
-    events_.push_back(os.str());
+    os << "{\"type\":\"tx_removed\",\"txid\":\"" << hex(e.txid)
+       << "\",\"mempool_size\":" << e.mempool_size << "}";
+    emit(os.str());
   });
 }
+
+void DemoNode::emit(std::string json) {
+  if (hook_) {
+    hook_(json);
+    return;
+  }
+  events_.push_back(std::move(json));
+}
+
+void DemoNode::set_event_hook(EventHook hook) { hook_ = std::move(hook); }
 
 const AccountStateMachine& DemoNode::read_state() const {
   if (engine_) {

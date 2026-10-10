@@ -52,7 +52,7 @@ Extensions that collapse the common flows into one call:
 | `Uint8List` | `hex`, `shortHex`, `equalsBytes` |
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
-| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `metricValues`, `verifyAccountProof` |
+| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof` |
 | `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
 | `Chain` | `produceBlock(timestamp, justify:)` |
@@ -84,6 +84,31 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 - Chain trees: `TreeNode`, `buildChainTree`, `ChainTree`.
 - Custody: `KeyStore`, portable accounts, threshold accounts, `Ceremony`.
 - Assurance and sealed mempools; anonymous membership credentials.
+
+## Events
+
+Chain events are typed. `node.events()` drains the buffer as a
+`List<ChainEvent>`; `node.eventStream` is a broadcast `Stream<ChainEvent>`
+fed by a native hook, so nothing is polled. The sealed `ChainEvent` has five
+subtypes, so a switch is exhaustive:
+
+```dart
+node.eventStream.listen((event) {
+  switch (event) {
+    case BlockFinalized(:final height, :final txCount):
+      print('block $height with $txCount txs');
+    case TxAdmitted(:final txid):
+      print('pending ${txid.shortHex}');
+    case TxRemoved():
+    case BlockRejected():
+    case UnknownEvent():
+      break;
+  }
+});
+```
+
+Listeners run on the microtask after the node call that caused the event,
+so they may call the node again. Disposing the node closes the stream.
 
 ## Lifecycle and errors
 

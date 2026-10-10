@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -72,6 +73,12 @@ class DemoNode {
   // ── Observability / streaming ────────────────────────────────────────────────
   /// Drain collected chain events as a JSON array, clearing the buffer.
   std::string drain_events_json();
+  /// Receives each chain event as one JSON object, synchronously, as it is
+  /// published. While a hook is set events are delivered to it instead of
+  /// being buffered for drain_events_json(); pass an empty function to go
+  /// back to buffering.
+  using EventHook = std::function<void(const std::string& json)>;
+  void set_event_hook(EventHook hook);
   /// Prometheus-format metrics snapshot.
   std::string metrics_text();
 
@@ -92,7 +99,9 @@ class DemoNode {
   Mempool mempool_;
   observe::EventBus bus_;
   observe::MetricsRegistry metrics_;
+  void emit(std::string json);
   std::vector<std::string> events_;  // JSON fragments collected from the bus
+  EventHook hook_;
 };
 
 }  // namespace aviary::node

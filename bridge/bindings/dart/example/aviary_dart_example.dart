@@ -19,7 +19,7 @@ void main() {
   print('state root ${node.stateRoot().hex}');
 
   for (final event in node.events()) {
-    print('event ${event['type']}');
+    print('event $event');
   }
   node.dispose();
 }

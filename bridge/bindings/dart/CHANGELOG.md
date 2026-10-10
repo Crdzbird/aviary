@@ -12,6 +12,9 @@
 - Shortcut extensions: hex helpers on Uint8List and String, funded
   accounts, auto nonce transfers and one call blocks on Node, single
   validator chain assembly, whole threshold ceremonies, fluent chain trees.
+- Typed chain events (`BlockFinalized`, `BlockRejected`, `TxAdmitted`,
+  `TxRemoved`, `UnknownEvent`) from `events()` and the push based
+  `eventStream`, fed by a native hook instead of polling.
 - Native handles are freed by a finalizer when their Dart object is
   collected; releasing twice is a no-op and `isReleased` reports the state.
   `withNode`, `withKeyStore` and `withTree` run a body and release after.

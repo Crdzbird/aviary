@@ -494,6 +494,15 @@ AviaryBufferResult aviary_node_drain_events(AviaryNode node) {
   try { return string_result(as_node(node)->drain_events_json()); }
   catch (const std::exception& e) { return error_result(e.what()); }
 }
+void aviary_node_set_event_hook(AviaryNode node, AviaryEventFn fn, void* ctx) {
+  if (!node) return;
+  if (!fn) {
+    as_node(node)->set_event_hook(nullptr);
+    return;
+  }
+  as_node(node)->set_event_hook(
+      [fn, ctx](const std::string& json) { fn(ctx, json.data(), json.size()); });
+}
 AviaryBufferResult aviary_node_metrics(AviaryNode node) {
   try { return string_result(as_node(node)->metrics_text()); }
   catch (const std::exception& e) { return error_result(e.what()); }
