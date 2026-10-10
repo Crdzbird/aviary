@@ -94,7 +94,7 @@ make run
 
 ```bash
 curl -s localhost:8080/version
-# {"version":"0.0.1","cryptoBackend":"3.0.0"}
+# {"version":"0.1.0","cryptoBackend":"3.0.0"}
 ```
 
 ---

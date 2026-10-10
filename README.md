@@ -81,10 +81,13 @@ canonical txid, canonical header hash).
 cmake -S . -B build-asan -DAVIARY_SANITIZE=ON
 cmake --build build-asan && ctest --test-dir build-asan --output-on-failure
 
-# libFuzzer codec harness (needs a libFuzzer-capable clang)
-cmake -S . -B build-fuzz -DAVIARY_BUILD_FUZZERS=ON
-cmake --build build-fuzz --target fuzz_codec
-./build-fuzz/fuzz_codec -max_total_time=60
+# libFuzzer harnesses: codec, persistence and networking decoders, C ABI inputs
+cmake -S . -B build-fuzz -DAVIARY_BUILD_FUZZERS=ON -DAVIARY_SANITIZE=ON
+cmake --build build-fuzz --target fuzz_codec fuzz_restore fuzz_c_abi
+./build-fuzz/fuzz_c_abi -max_total_time=60
+# Apple clang has no libFuzzer: add -DAVIARY_FUZZER_STANDALONE=ON and run a target over seed files
+# ThreadSanitizer build of the registry concurrency test
+cmake -S . -B build-tsan -DAVIARY_SANITIZE_THREAD=ON && cmake --build build-tsan --target test_registry_threads && ./build-tsan/test_registry_threads
 ```
 
 ## Dart and Flutter packages

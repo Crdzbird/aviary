@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0
+
+- Module path github.com/Crdzbird/aviary/bridge/bindings/go, depending on the
+  published CipherBird Go module; tag bridge/bindings/go/v0.1.0.
+- Event hook, snapshot and restore, key store backed signing, NetNode and
+  SecureSession wrappers; the whole C ABI is covered.
+
 ## 0.0.1
 
 - Initial Go binding for the Aviary C ABI (cgo). **Full ABI coverage** —

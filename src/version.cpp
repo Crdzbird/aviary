@@ -7,7 +7,10 @@
 namespace aviary {
 
 namespace {
-constexpr const char* kVersion = "0.0.1";
+#ifndef AVIARY_VERSION_STRING
+#define AVIARY_VERSION_STRING "0.0.0"
+#endif
+constexpr const char* kVersion = AVIARY_VERSION_STRING;
 }
 
 void init() {

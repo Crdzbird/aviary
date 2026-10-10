@@ -1420,3 +1420,33 @@ selectors — validated against real-world vectors). Deferred:
   directory so the darwin pair keeps its loader relative link. Verified by
   running the jar from `/tmp` with no path override. Publishing to a Maven
   repository is left to the owner's coordinates.
+
+## Pre-release: one version source, registry concurrency proof, fuzz targets - DONE (2026-10-11)
+- **[x] Version.** `VERSION` at the repository root is the single source: CMake
+  reads it into `project(aviary VERSION ...)` and passes `AVIARY_VERSION_STRING`
+  to the core, so `aviary_version()` now reports 0.1.0 like every package.
+  `scripts/release/bump.sh X.Y.Z` rewrites VERSION, the three pubspecs, the
+  npm package, the three Android modules, the jar default, the pkg-config
+  template is updated by hand, and it opens a new section in each changelog.
+  All native artifacts were rebuilt because the string is embedded.
+- **[x] Registry concurrency.** The component registry was already guarded by
+  a mutex (the earlier assessment was wrong on that point); what was missing
+  was proof. `tests/test_registry_threads.cpp` runs eight threads registering
+  foreign engines, listing and looking up ids, and driving independent nodes;
+  it passes plain, under ASan/UBSan, and under the new `AVIARY_SANITIZE_THREAD`
+  build with zero ThreadSanitizer reports. Remaining caveat: `find_*` returns
+  pointers into the maps, so re-registering an id that another thread is using
+  is still a race by design; ids are chain identity and are never renamed.
+- **[x] Fuzzing.** Three libFuzzer targets behind `AVIARY_BUILD_FUZZERS`:
+  `fuzz_codec` (existing decoders), `fuzz_restore` (snapshot restore, encoded
+  transaction admission, gossip payloads into a NetworkedNode) and
+  `fuzz_c_abi` (restore, submit_tx, set_transactions, on_gossip, secure
+  accept/complete/decrypt, keystore load, chain tree build and spec error,
+  portable and share unseal, subchain policy, light client new). Apple clang
+  has no libFuzzer, so `AVIARY_FUZZER_STANDALONE=ON` links a file driver that
+  runs each target over seed files under ASan; all three pass locally. The
+  `Fuzz` workflow (ubuntu-24.04, clang + libclang-rt, CipherBird with the
+  from-source OpenSSL) runs each target for two minutes on pushes touching the
+  core and weekly, and uploads the corpus and any crash.
+- GOTCHA: the fuzz section of CMakeLists sits after the `AVIARY_BUILD_TESTS`
+  early return, so configure with tests on when building fuzzers.

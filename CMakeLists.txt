@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
-project(aviary VERSION 0.0.1 LANGUAGES CXX)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" AVIARY_VERSION_FROM_FILE LIMIT_COUNT 1)
+string(STRIP "${AVIARY_VERSION_FROM_FILE}" AVIARY_VERSION_FROM_FILE)
+project(aviary VERSION ${AVIARY_VERSION_FROM_FILE} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,6 +21,11 @@ option(AVIARY_SANITIZE "Build with ASan + UBSan" OFF)
 if(AVIARY_SANITIZE)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
   add_link_options(-fsanitize=address,undefined)
+endif()
+option(AVIARY_SANITIZE_THREAD "Build with ThreadSanitizer (exclusive with AVIARY_SANITIZE)" OFF)
+if(AVIARY_SANITIZE_THREAD)
+  add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=thread)
 endif()
 
 # Optional libFuzzer targets (needs a libFuzzer-capable clang, e.g. LLVM clang).
@@ -143,6 +150,7 @@ add_library(aviary_core STATIC
   src/node/chain_tree.cpp
   src/node/remote_guard.cpp
   src/node/demo_node.cpp)
+target_compile_definitions(aviary_core PRIVATE AVIARY_VERSION_STRING="${PROJECT_VERSION}")
 target_include_directories(aviary_core
   PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/include"
   PRIVATE "${CRYPTOLIB_C_INCLUDE_DIR}")
@@ -197,6 +205,7 @@ function(aviary_add_test name source)
 endfunction()
 
 aviary_add_test(test_smoke tests/test_smoke.cpp)
+aviary_add_test(test_registry_threads tests/test_registry_threads.cpp)
 aviary_add_test(test_codec tests/test_codec.cpp)
 aviary_add_test(test_merkle tests/test_merkle.cpp)
 aviary_add_test(test_types tests/test_types.cpp)
@@ -265,10 +274,21 @@ aviary_add_test(test_credential_gate_pseudonym tests/test_credential_gate_pseudo
 aviary_add_test(test_admission tests/test_admission.cpp)
 aviary_add_test(test_admission_socket tests/test_admission_socket.cpp)
 
+option(AVIARY_FUZZER_STANDALONE "Build the fuzz targets with a file driver instead of libFuzzer" OFF)
 if(AVIARY_BUILD_FUZZERS)
-  add_executable(fuzz_codec fuzz/fuzz_codec.cpp)
-  target_link_libraries(fuzz_codec PRIVATE aviary_core)
-  target_compile_options(fuzz_codec PRIVATE -fsanitize=fuzzer,address,undefined)
-  target_link_options(fuzz_codec PRIVATE -fsanitize=fuzzer,address,undefined)
-  set_target_properties(fuzz_codec PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+  function(aviary_add_fuzzer name source)
+    if(AVIARY_FUZZER_STANDALONE)
+      add_executable(${name} ${source} fuzz/standalone_main.cpp)
+    else()
+      add_executable(${name} ${source})
+      target_compile_options(${name} PRIVATE -fsanitize=fuzzer)
+      target_link_options(${name} PRIVATE -fsanitize=fuzzer)
+    endif()
+    target_link_libraries(${name} PRIVATE ${ARGN} aviary_core)
+    target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/bridge")
+    set_target_properties(${name} PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+  endfunction()
+  aviary_add_fuzzer(fuzz_codec fuzz/fuzz_codec.cpp)
+  aviary_add_fuzzer(fuzz_restore fuzz/fuzz_restore.cpp)
+  aviary_add_fuzzer(fuzz_c_abi fuzz/fuzz_c_abi.cpp aviary_c)
 endif()
