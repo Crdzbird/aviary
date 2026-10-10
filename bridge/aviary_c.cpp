@@ -1,3 +1,7 @@
+#include <functional>
+#include <memory>
+#include <optional>
+#include <stdexcept>
 #include "aviary_c.h"
 
 #include <cstdlib>

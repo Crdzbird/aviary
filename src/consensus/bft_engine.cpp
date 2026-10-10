@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/bft_engine.hpp"
 
 #include <stdexcept>

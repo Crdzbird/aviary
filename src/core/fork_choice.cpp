@@ -1,3 +1,5 @@
+#include <functional>
+#include <memory>
 #include "aviary/fork_choice.hpp"
 
 #include <algorithm>

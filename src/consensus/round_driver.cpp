@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/round_driver.hpp"
 
 #include <utility>

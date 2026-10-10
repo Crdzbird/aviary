@@ -1,3 +1,5 @@
+#include <map>
+#include <memory>
 #include "aviary/utxo_state.hpp"
 
 #include <set>

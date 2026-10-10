@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/gossip.hpp"
 
 #include "aviary/credential_gate.hpp"

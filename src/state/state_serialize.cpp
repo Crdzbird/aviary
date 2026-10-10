@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/account_state.hpp"
 #include "aviary/state.hpp"
 #include "aviary/utxo_state.hpp"

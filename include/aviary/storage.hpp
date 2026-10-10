@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <filesystem>
 #include <optional>
 #include <string>

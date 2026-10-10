@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/ledger.hpp"
 
 #include <optional>

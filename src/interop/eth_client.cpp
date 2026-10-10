@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "aviary/interop/eth_client.hpp"
 
 #include <stdexcept>

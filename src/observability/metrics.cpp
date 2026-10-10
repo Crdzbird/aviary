@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/observability/metrics.hpp"
 
 #include <sstream>

@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/chain_blueprint.hpp"
 
 #include "aviary/codec.hpp"

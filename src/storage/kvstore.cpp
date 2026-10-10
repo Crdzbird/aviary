@@ -1,3 +1,5 @@
+#include <map>
+#include <optional>
 #include "aviary/kvstore.hpp"
 
 #include <stdexcept>

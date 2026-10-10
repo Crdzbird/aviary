@@ -1,3 +1,4 @@
+#include <map>
 #include "aviary/peer_book.hpp"
 
 namespace aviary::p2p {

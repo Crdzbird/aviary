@@ -1,3 +1,5 @@
+#include <memory>
+#include <optional>
 #include "aviary/vrf_pos.hpp"
 
 #include <stdexcept>

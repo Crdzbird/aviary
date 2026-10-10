@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/subchain_relay.hpp"
 
 #include <algorithm>

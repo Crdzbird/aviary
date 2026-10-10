@@ -1,3 +1,5 @@
+#include <optional>
+#include <set>
 #include "aviary/interop/bridge.hpp"
 
 #include <algorithm>

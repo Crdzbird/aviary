@@ -1,3 +1,5 @@
+#include <map>
+#include <optional>
 #include "aviary/block_store.hpp"
 
 #include <stdexcept>

@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/secure_session.hpp"
 
 #include <stdexcept>

@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/genesis.hpp"
 
 #include <algorithm>

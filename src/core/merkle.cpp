@@ -1,3 +1,4 @@
+#include <map>
 #include "aviary/merkle.hpp"
 
 #include <set>

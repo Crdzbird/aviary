@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/consensus.hpp"
 
 #include <algorithm>

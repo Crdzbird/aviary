@@ -1,3 +1,7 @@
+#include <algorithm>
+#include <functional>
+#include <map>
+#include <memory>
 #include "aviary/chain_tree.hpp"
 
 #include <set>

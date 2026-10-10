@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/profiled_validator.hpp"
 
 #include <stdexcept>

@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/node/demo_node.hpp"
 
 #include <algorithm>

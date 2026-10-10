@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/subchain.hpp"
 
 #include "aviary/codec.hpp"

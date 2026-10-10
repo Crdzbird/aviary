@@ -1,3 +1,4 @@
+#include <memory>
 #include "aviary/chain_assembler.hpp"
 
 #include <map>

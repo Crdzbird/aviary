@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "aviary/interop/abi.hpp"
 
 #include <stdexcept>

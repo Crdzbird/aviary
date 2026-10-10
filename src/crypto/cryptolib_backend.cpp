@@ -1,3 +1,4 @@
+#include <optional>
 #include "aviary/crypto.hpp"
 
 #include <algorithm>

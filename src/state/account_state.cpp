@@ -1,3 +1,5 @@
+#include <map>
+#include <memory>
 #include "aviary/account_state.hpp"
 
 #include <algorithm>

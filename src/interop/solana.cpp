@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "aviary/interop/solana.hpp"
 
 #include <stdexcept>

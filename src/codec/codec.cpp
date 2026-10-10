@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "aviary/codec.hpp"
 
 namespace aviary::codec {

@@ -1,3 +1,5 @@
+#include <functional>
+#include <optional>
 #include "aviary/light_client.hpp"
 #include <vector>
 #include <string>
