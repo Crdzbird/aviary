@@ -19,7 +19,7 @@ jobs:
       - name: Checkout cryptolib
         uses: actions/checkout@v4
         with:
-          repository: ${{ vars.CRYPTOLIB_REPO || 'your-org/cryptolib' }}
+          repository: ${{ vars.CRYPTOLIB_REPO || 'Crdzbird/CipherBird' }}
           path: cryptolib
 
       - name: Install native deps

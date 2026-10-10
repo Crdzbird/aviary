@@ -40,8 +40,10 @@ void typedStatus(Aviary bc) {
   }
   expect(status == AviaryStatus.genesisSealed, 'credit after block is typed');
   expect(AviaryStatus.fromCode(99) == AviaryStatus.failure, 'unknown maps');
-  expect(const AviaryException('x').status == AviaryStatus.failure,
-      'default status');
+  expect(
+    const AviaryException('x').status == AviaryStatus.failure,
+    'default status',
+  );
   node.dispose();
 }
 
@@ -55,8 +57,10 @@ void scopes(Aviary bc) {
   expect(height == 1 && leaked.isReleased, 'withNode frees after body');
   final v = bc.newValidator().treeValidator(1);
   final ids = bc.withTree(
-    TreeNode(chainId: 1, validators: [v])
-        .withChild(TreeNode(chainId: 2, validators: [v])),
+    TreeNode(
+      chainId: 1,
+      validators: [v],
+    ).withChild(TreeNode(chainId: 2, validators: [v])),
     (tree) => tree.chainIds(),
   );
   expect(ids.length == 2, 'withTree returns the body value');

@@ -4,39 +4,8 @@ import 'dart:typed_data';
 
 import 'package:aviary_dart/aviary.dart';
 
-void expect(bool ok, String msg) {
-  if (!ok) throw StateError('FAIL: $msg');
-}
-
-Uint8List frame(Uint8List payload) {
-  final out = BytesBuilder()
-    ..add((ByteData(4)..setUint32(0, payload.length)).buffer.asUint8List())
-    ..add(payload);
-  return out.toBytes();
-}
-
-Stream<Uint8List> frames(Socket socket) async* {
-  var pending = Uint8List(0);
-  await for (final chunk in socket) {
-    final data = Uint8List.fromList([...pending, ...chunk]);
-    var off = 0;
-    while (data.length - off >= 4) {
-      final len = ByteData.sublistView(data, off, off + 4).getUint32(0);
-      if (data.length - off - 4 < len) break;
-      yield Uint8List.sublistView(data, off + 4, off + 4 + len);
-      off += 4 + len;
-    }
-    pending = Uint8List.sublistView(data, off);
-  }
-}
-
-Future<void> waitUntil(bool Function() done, String what) async {
-  for (var i = 0; i < 1000; i++) {
-    if (done()) return;
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-  throw StateError('FAIL: timed out waiting for $what');
-}
+import 'support/check.dart';
+import 'support/tcp.dart';
 
 Future<void> main() async {
   final bc = Aviary.instance;
@@ -52,16 +21,17 @@ Future<void> main() async {
     bc.newNetNode(genesis: genesis, me: 0, blsKey: keys[0], peers: [1]),
     bc.newNetNode(genesis: genesis, me: 1, blsKey: keys[1], peers: [0]),
   ];
-
   final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
   final accepting = server.first;
-  final dialer =
-      await Socket.connect(InternetAddress.loopbackIPv4, server.port);
+  final dialer = await Socket.connect(
+    InternetAddress.loopbackIPv4,
+    server.port,
+  );
   final acceptor = await accepting;
   final sockets = [dialer, acceptor];
   final readers = [
     StreamIterator(frames(dialer)),
-    StreamIterator(frames(acceptor))
+    StreamIterator(frames(acceptor)),
   ];
 
   final init = bc.initiateSecureSession(ids[1].kem.public, ids[0].sig);
@@ -94,7 +64,9 @@ Future<void> main() async {
     while (await readers[i].moveNext()) {
       if (stopped) return;
       apply(
-          i, nodes[i].onGossip(1 - i, sessions[i].decrypt(readers[i].current)));
+        i,
+        nodes[i].onGossip(1 - i, sessions[i].decrypt(readers[i].current)),
+      );
     }
   }
 

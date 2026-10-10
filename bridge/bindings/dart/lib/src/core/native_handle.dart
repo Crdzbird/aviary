@@ -4,7 +4,8 @@ final Map<String, NativeFinalizer> _finalizers = {};
 
 NativeFinalizer _finalizerFor(DynamicLibrary lib, String symbol) =>
     _finalizers['${lib.handle.address}:$symbol'] ??= NativeFinalizer(
-        lib.lookup<NativeFunction<Void Function(Pointer<Void>)>>(symbol));
+      lib.lookup<NativeFunction<Void Function(Pointer<Void>)>>(symbol),
+    );
 
 /// Owns one native handle. The handle is freed by [free] or [dispose] on the
 /// public classes, and otherwise when the Dart object is collected, so a

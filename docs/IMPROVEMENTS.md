@@ -1273,3 +1273,37 @@ selectors — validated against real-world vectors). Deferred:
   into `api/mixtures.dart` to keep the part budget.
 - GOTCHA: a C ABI declaration that mentions `AviaryKeyStore` must come after
   that typedef (the header is ordered by section).
+
+## Native assets: build hook, Linux pipeline, Windows slot - DONE (2026-10-10)
+- **[x] `aviary_dart` build hook** (`hook/build.dart`, deps `hooks ^2.2.0`,
+  `code_assets ^2.1.0`, SDK `^3.10.0`): for Linux and Windows targets it
+  declares `native/<os>-<arch>/libaviary_c.so|aviary_c.dll` as a
+  `DynamicLoadingBundled` code asset named `aviary.dart` (the library URI, so
+  `@Native` resolves it); quiet on Apple and Android (the Flutter plugins
+  carry the engine there) and for the macOS pure Dart case (package root
+  lookup); quiet when no binary exists for the target so builds never fail.
+- **[x] Loader:** C ABI `aviary_library_path(out, cap)` (dladdr / Win32
+  GetModuleHandleEx) returns the loaded module's path; the Dart loader calls
+  it through `@Native` first and reopens the asset by path so
+  `lookupFunction` keeps working, falling back to the previous strategies.
+  `Aviary.loadedFrom` reports explicit / asset / process / bundled / system;
+  `preload_smoke` asserts `asset` on Linux.
+- **[x] Linux pipeline:** `scripts/linux/build_so.sh` (CipherBird merged
+  static archive, `-Wl,--exclude-libs,ALL -Wl,-z,defs`, strip, into
+  `native/linux-<arch>/`) and `.github/workflows/native-linux.yml`
+  (ubuntu-24.04 + ubuntu-24.04-arm, builds CipherBird + aviary, runs every
+  Dart smoke test through the hook, uploads `aviary-linux-<arch>`). The CI
+  workflow's CipherBird default repo is now `Crdzbird/CipherBird`.
+- **Windows:** the hook and loader support `native/windows-x64/aviary_c.dll`
+  and the C ABI builds for `_WIN32`, but no binary ships: CipherBird has no
+  Windows build of its dependencies (OpenSSL, liboqs, libsodium, blst,
+  secp256k1, BLAKE3). That upstream port is the prerequisite.
+- **Formatting fallout:** the SDK bump switched `dart format` to the tall
+  style; typedef files are kept under 100 lines with the private aliases
+  `_U8`, `_V`, `_BR` and single line typedefs, `trailing_commas: preserve` in
+  `analysis_options.yaml`, helpers moved (`_decodeOutbound`,
+  `_chainEventsFromJsonArray`, `_shareInfo`) and the two spare part slots used
+  for `blueprint.dart` and `credential_gate_pseudonymous.dart`. Tests written
+  this session were split with `test/support/{check,mesh,tcp}.dart`; eight
+  older smoke tests already exceeded 100 lines before this session and were
+  left as they are.

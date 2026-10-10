@@ -15,8 +15,14 @@ dependencies:
   aviary_dart: ^0.1.0
 ```
 
-The engine for macOS arm64 ships inside the package. On other hosts point
-`AVIARY_DYLIB` at a built `libaviary_c` library.
+The engine for macOS arm64 ships inside the package and is found through the
+package root. Linux binaries under `native/linux-x64` and `native/linux-arm64`
+are bundled by the package's build hook (`hook/build.dart`), so a Dart or
+Flutter application on Linux gets `libaviary_c.so` next to its executable
+with no setup. The hook also bundles `native/windows-x64/aviary_c.dll` when
+that file exists; no Windows binary ships yet because the CipherBird engine
+has no Windows build. Anywhere else, point `AVIARY_DYLIB` at a built
+`libaviary_c` library. `Aviary.loadedFrom` reports which path won.
 
 ## Use
 

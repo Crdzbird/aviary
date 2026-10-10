@@ -42,8 +42,9 @@ String _libraryFileName() {
 }
 
 List<String> _packageRootsFromConfig() {
-  final config =
-      File('${Directory.current.path}/.dart_tool/package_config.json');
+  final config = File(
+    '${Directory.current.path}/.dart_tool/package_config.json',
+  );
   if (!config.existsSync()) return const [];
   final decoded = jsonDecode(config.readAsStringSync()) as Map<String, dynamic>;
   final packages = decoded['packages'];

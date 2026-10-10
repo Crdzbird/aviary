@@ -32,6 +32,10 @@ final class Aviary {
   /// The process wide instance, loaded synchronously on first access.
   static Aviary get instance => _singleton ??= load();
 
+  /// How the engine was located: explicit, asset, process, bundled or
+  /// system; null before the first load.
+  static String? get loadedFrom => _loadedFrom;
+
   /// Whether [instance] is ready without any load work on this isolate.
   static bool get isInitialized => _singleton != null;
 

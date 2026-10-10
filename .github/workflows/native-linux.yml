@@ -1,0 +1,70 @@
+name: Native Linux
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/native-linux.yml
+      - scripts/linux/**
+      - CMakeLists.txt
+      - src/**
+      - include/**
+      - bridge/aviary_c.h
+      - bridge/aviary_c.cpp
+      - bridge/bindings/dart/hook/**
+      - bridge/bindings/dart/lib/src/core/loader.dart
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            slot: linux-x64
+          - runner: ubuntu-24.04-arm
+            slot: linux-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout aviary
+        uses: actions/checkout@v4
+        with:
+          path: aviary
+
+      - name: Checkout CipherBird
+        uses: actions/checkout@v4
+        with:
+          repository: Crdzbird/CipherBird
+          path: cryptolib
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build git pkg-config build-essential ca-certificates libsodium-dev libssl-dev
+
+      - name: Build the CipherBird static engine
+        working-directory: cryptolib
+        run: bash scripts/build_static_archive_linux.sh
+
+      - name: Build libaviary_c.so
+        working-directory: aviary
+        env:
+          CRYPTOLIB_ROOT: ${{ github.workspace }}/cryptolib
+        run: bash scripts/linux/build_so.sh
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Run the Dart smoke tests through the build hook
+        working-directory: aviary/bridge/bindings/dart
+        run: |
+          dart pub get
+          for t in test/*.dart; do dart run "$t"; done
+
+      - name: Upload the library
+        uses: actions/upload-artifact@v4
+        with:
+          name: aviary-${{ matrix.slot }}
+          path: aviary/bridge/bindings/dart/native/${{ matrix.slot }}/libaviary_c.so
+          if-no-files-found: error

@@ -33,25 +33,34 @@ void main() {
   final s0 = cer.sign(cards[0].bytes, c0.nonces);
   final s2 = cer.sign(cards[2].bytes, c2.nonces);
 
-  expect(cer.verifyShare(cards[0].index, cards[0].publicShare, s0),
-      'honest share attributed');
+  expect(
+    cer.verifyShare(cards[0].index, cards[0].publicShare, s0),
+    'honest share attributed',
+  );
   final bad = Uint8List.fromList(s2);
   bad[5] ^= 1;
-  expect(!cer.verifyShare(cards[2].index, cards[2].publicShare, bad),
-      'corrupt cosigner detected');
+  expect(
+    !cer.verifyShare(cards[2].index, cards[2].publicShare, bad),
+    'corrupt cosigner detected',
+  );
 
   final sig = cer.aggregate([cards[0].index, cards[2].index], [s0, s2]);
   expect(sig.length == 64, 'aggregate is a 64-byte Ed25519 signature');
   cer.free();
 
   final env = bc.sealShare(cards[1].bytes, 'share-pass', ops: 3, mem: 1 << 16);
-  expect(_eq(bc.unsealShare(env, 'share-pass'), cards[1].bytes),
-      'sealed share round-trips');
-  expect(fails(() => bc.unsealShare(env, 'wrong')),
-      'wrong passphrase fails closed');
+  expect(
+    _eq(bc.unsealShare(env, 'share-pass'), cards[1].bytes),
+    'sealed share round-trips',
+  );
+  expect(
+    fails(() => bc.unsealShare(env, 'wrong')),
+    'wrong passphrase fails closed',
+  );
 
   print(
-      'aviary dart threshold smoke: OK (2-of-3, attribution, 64B aggregate, sealed)');
+    'aviary dart threshold smoke: OK (2-of-3, attribution, 64B aggregate, sealed)',
+  );
 }
 
 bool _eq(Uint8List a, Uint8List b) {

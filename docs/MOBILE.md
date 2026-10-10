@@ -69,9 +69,21 @@ lite `.so` is 8 to 9 MB per ABI; the full one is about 1 MB.
 |---|---|
 | Flutter `aviary_lite` | ffiPlugin. iOS/macOS: SPM binary target, the static archive is linked into the app and Dart uses `DynamicLibrary.process()`. Android: `DynamicLibrary.open('libaviary_c.so')`. |
 | Flutter `aviary` | ffiPlugin. iOS/macOS: SPM binary target, `AviaryC.framework` and `CipherBird.framework` are both embedded. Android: the loader opens `libcipherbird.so` first, then `libaviary_c.so`. |
-| Pure Dart `aviary_dart` | Bundles `native/darwin-arm64/{libaviary_c,libcipherbird}.dylib`, resolved through the package root in `package_config.json`; `AVIARY_DYLIB` overrides. |
+| Pure Dart `aviary_dart` | macOS: bundles `native/darwin-arm64/{libaviary_c,libcipherbird}.dylib`, resolved through the package root in `package_config.json`. Linux (and Windows once a binary exists): the build hook `hook/build.dart` declares `native/<os>-<arch>/` as a code asset, the Dart or Flutter build copies it next to the executable, and the loader reopens it through `aviary_library_path`. `AVIARY_DYLIB` overrides everything. |
 | Swift (`bridge/bindings/swift`) | SPM package with binary target xcframeworks (AviaryC + CipherBird). CipherBird ships iOS and macOS as two bundles, so run `bash scripts/apple/vendor_cipherbird.sh` once to merge them into the gitignored `Vendor/CipherBird.xcframework`. |
 | JVM | Foreign Function and Memory API loading `libaviary_c` (desktop uses the host dylib). |
+
+## Linux
+
+`scripts/linux/build_so.sh` builds the self-contained `libaviary_c.so` for the
+host architecture against CipherBird's merged static archive
+(`scripts/build_static_archive_linux.sh` in the CipherBird checkout) and
+drops it into `bridge/bindings/dart/native/linux-<x64|arm64>/`. The GitHub
+Actions workflow `native-linux.yml` does exactly that on `ubuntu-24.04` and
+`ubuntu-24.04-arm`, runs the Dart smoke tests through the build hook, and
+uploads the libraries as artifacts; commit them into the package to ship
+them. Windows has no binary yet: CipherBird's dependency build has no Windows
+port, which is the prerequisite.
 
 ## Publishing notes
 

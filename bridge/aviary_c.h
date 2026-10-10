@@ -69,6 +69,11 @@ AVIARY_API const char* aviary_version(void);
 
 /** Linked cryptolib backend version (proves linkage). Static — do not free. */
 AVIARY_API const char* aviary_crypto_backend_version(void);
+/** The file system path of the loaded Aviary library, written to [out] (not NUL
+ *  terminated). Returns the length, or 0 when unknown or [cap] is too small.
+ *  Lets a binding that was handed this library as a bundled asset reopen it
+ *  by path for symbol lookup. */
+AVIARY_API size_t aviary_library_path(char* out, size_t cap);
 
 /** BLAKE3-256 of [msg, msg+len). On success buf.len == 32. Free with
  *  aviary_buffer_free(). */

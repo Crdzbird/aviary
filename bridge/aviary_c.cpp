@@ -22,6 +22,12 @@
 #include "aviary/subchain.hpp"
 #include "aviary/light_client.hpp"
 #include "aviary/chain_tree.hpp"
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
+#include <cstring>
 #include "aviary/custody_signing.hpp"
 #include "aviary/networked_node.hpp"
 #include "aviary/secure_session.hpp"
@@ -249,6 +255,27 @@ const char* aviary_version(void) {
 const char* aviary_crypto_backend_version(void) {
   static const std::string v = aviary::crypto_backend_version();
   return v.c_str();
+}
+
+size_t aviary_library_path(char* out, size_t cap) {
+  if (!out || cap == 0) return 0;
+#if defined(_WIN32)
+  HMODULE mod = nullptr;
+  if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          reinterpret_cast<LPCSTR>(&aviary_library_path), &mod)) {
+    return 0;
+  }
+  const DWORD n = GetModuleFileNameA(mod, out, static_cast<DWORD>(cap));
+  if (n == 0 || n >= cap) return 0;
+  return n;
+#else
+  Dl_info info{};
+  if (!dladdr(reinterpret_cast<void*>(&aviary_library_path), &info) || !info.dli_fname) return 0;
+  const size_t n = std::strlen(info.dli_fname);
+  if (n >= cap) return 0;
+  std::memcpy(out, info.dli_fname, n);
+  return n;
+#endif
 }
 
 AviaryBufferResult aviary_hash(const uint8_t* msg, size_t len) {

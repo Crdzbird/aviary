@@ -21,7 +21,10 @@ extension AviarySubchainProofs on Aviary {
       [blob],
       (p) => _take(
         lib.lookupFunction<_ScAnchorC, _ScAnchorD>('aviary_anchor_encode')(
-            childChainId, p[0], blob.length),
+          childChainId,
+          p[0],
+          blob.length,
+        ),
         'anchor_encode',
       ),
     );
@@ -39,7 +42,8 @@ extension AviarySubchainProofs on Aviary {
       [parentSubchainRoot, proof],
       (p) =>
           lib.lookupFunction<_VerifyC, _VerifyD>(
-              'aviary_subchain_proof_verify')(p[0], p[1], proof.length) ==
+            'aviary_subchain_proof_verify',
+          )(p[0], p[1], proof.length) ==
           1,
     );
   }

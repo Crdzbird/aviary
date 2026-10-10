@@ -13,19 +13,26 @@ extension AviarySubchains on Aviary {
     required Uint8List genesisHeader,
     required List<ValidatorEntry> validators,
     int maxDepth = 0,
-  }) =>
-      _withU64s(
-        _powers(validators),
-        (pw) => _scoped(
-          [genesisHeader, _publicKeys(validators)],
-          (p) => _take(
-            lib.lookupFunction<_ScChildRegC, _ScChildRegD>(
-                    'aviary_child_registration_encode')(chainId, p[0],
-                genesisHeader.length, p[1], pw, validators.length, maxDepth),
-            'child_registration_encode',
-          ),
+  }) => _withU64s(
+    _powers(validators),
+    (pw) => _scoped(
+      [genesisHeader, _publicKeys(validators)],
+      (p) => _take(
+        lib.lookupFunction<_ScChildRegC, _ScChildRegD>(
+          'aviary_child_registration_encode',
+        )(
+          chainId,
+          p[0],
+          genesisHeader.length,
+          p[1],
+          pw,
+          validators.length,
+          maxDepth,
         ),
-      );
+        'child_registration_encode',
+      ),
+    ),
+  );
 
   /// Encodes a parent's subchain policy from encoded registrations, which
   /// must be ascending and unique by chain id. Zero bounds are unlimited.
@@ -41,8 +48,15 @@ extension AviarySubchains on Aviary {
       [blob],
       (p) => _take(
         lib.lookupFunction<_ScPolicyC, _ScPolicyD>(
-                'aviary_subchain_policy_encode')(maxChildren, maxDepth,
-            maxAnchorsPerBlock, maxHeadersPerAnchor, p[0], blob.length),
+          'aviary_subchain_policy_encode',
+        )(
+          maxChildren,
+          maxDepth,
+          maxAnchorsPerBlock,
+          maxHeadersPerAnchor,
+          p[0],
+          blob.length,
+        ),
         'subchain_policy_encode',
       ),
     );
@@ -57,14 +71,13 @@ extension AviarySubchains on Aviary {
     Uint8List genesis,
     int parentChainId,
     Uint8List parentGenesisHash,
-  ) =>
-      _scoped(
-        [genesis, parentGenesisHash],
-        (p) => _take(
-          lib.lookupFunction<_ScBindingC, _ScBindingD>(
-                  'aviary_genesis_commit_parent_binding')(
-              p[0], genesis.length, parentChainId, p[1]),
-          'genesis_commit_parent_binding',
-        ),
-      );
+  ) => _scoped(
+    [genesis, parentGenesisHash],
+    (p) => _take(
+      lib.lookupFunction<_ScBindingC, _ScBindingD>(
+        'aviary_genesis_commit_parent_binding',
+      )(p[0], genesis.length, parentChainId, p[1]),
+      'genesis_commit_parent_binding',
+    ),
+  );
 }

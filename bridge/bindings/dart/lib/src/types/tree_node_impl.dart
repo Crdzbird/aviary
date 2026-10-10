@@ -39,15 +39,14 @@ final class _TreeNode implements TreeNode {
     int? maxAnchorsPerBlock,
     int? maxHeadersPerAnchor,
     List<TreeNode>? children,
-  }) =>
-      _TreeNode(
-        chainId: chainId ?? this.chainId,
-        validators: validators ?? this.validators,
-        blueprint: blueprint ?? this.blueprint,
-        assuranceLevel: assuranceLevel ?? this.assuranceLevel,
-        accounts: accounts ?? this.accounts,
-        maxAnchorsPerBlock: maxAnchorsPerBlock ?? this.maxAnchorsPerBlock,
-        maxHeadersPerAnchor: maxHeadersPerAnchor ?? this.maxHeadersPerAnchor,
-        children: children ?? this.children,
-      );
+  }) => _TreeNode(
+    chainId: chainId ?? this.chainId,
+    validators: validators ?? this.validators,
+    blueprint: blueprint ?? this.blueprint,
+    assuranceLevel: assuranceLevel ?? this.assuranceLevel,
+    accounts: accounts ?? this.accounts,
+    maxAnchorsPerBlock: maxAnchorsPerBlock ?? this.maxAnchorsPerBlock,
+    maxHeadersPerAnchor: maxHeadersPerAnchor ?? this.maxHeadersPerAnchor,
+    children: children ?? this.children,
+  );
 }

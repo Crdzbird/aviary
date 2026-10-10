@@ -5,8 +5,14 @@ final Map<int, int Function(int height, int validators)> _foreignProposers = {};
 int _nextForeignHandle = 1;
 final List<NativeCallable<Function>> _foreignCallables = [];
 
-int _justifyTrampoline(Pointer<Void> ctx, Pointer<Uint8> block, int len,
-    Pointer<Uint8> out, int cap, Pointer<Size> outLen) {
+int _justifyTrampoline(
+  Pointer<Void> ctx,
+  Pointer<Uint8> block,
+  int len,
+  Pointer<Uint8> out,
+  int cap,
+  Pointer<Size> outLen,
+) {
   final e = _foreignEngines[ctx.address];
   if (e == null) return 0;
   final j = e.justify(Uint8List.fromList(block.asTypedList(len)));
@@ -16,8 +22,13 @@ int _justifyTrampoline(Pointer<Void> ctx, Pointer<Uint8> block, int len,
   return 1;
 }
 
-int _verifyTrampoline(Pointer<Void> ctx, Pointer<Uint8> block, int len,
-    Pointer<Uint8> just, int jlen) {
+int _verifyTrampoline(
+  Pointer<Void> ctx,
+  Pointer<Uint8> block,
+  int len,
+  Pointer<Uint8> just,
+  int jlen,
+) {
   final e = _foreignEngines[ctx.address];
   if (e == null) return 0;
   final ok = e.verify(

@@ -18,21 +18,31 @@ void main() {
   final bc = Aviary.instance;
 
   final standard = bc.describeAssurance(1);
-  expect(!standard.ratcheted && !standard.vrf,
-      'standard: mutual transport, stake-weighted');
-  expect(!standard.thresholdCustody && !standard.sealedMempool,
-      'standard: no threshold, open mempool');
+  expect(
+    !standard.ratcheted && !standard.vrf,
+    'standard: mutual transport, stake-weighted',
+  );
+  expect(
+    !standard.thresholdCustody && !standard.sealedMempool,
+    'standard: no threshold, open mempool',
+  );
 
   final hardened = bc.describeAssurance(2);
-  expect(hardened.ratcheted && hardened.vrf,
-      'hardened: ratcheted transport, VRF consensus');
-  expect(hardened.thresholdCustody && !hardened.sealedMempool,
-      'hardened: threshold custody, open mempool');
+  expect(
+    hardened.ratcheted && hardened.vrf,
+    'hardened: ratcheted transport, VRF consensus',
+  );
+  expect(
+    hardened.thresholdCustody && !hardened.sealedMempool,
+    'hardened: threshold custody, open mempool',
+  );
 
   final fortress = bc.describeAssurance(3);
   expect(fortress.sealedMempool, 'fortress: seals the mempool');
-  expect(fortress.thresholdCustody && fortress.ratcheted && fortress.vrf,
-      'fortress: everything on');
+  expect(
+    fortress.thresholdCustody && fortress.ratcheted && fortress.vrf,
+    'fortress: everything on',
+  );
 
   expect(fails(() => bc.describeAssurance(9)), 'unknown level fails closed');
 
@@ -46,8 +56,10 @@ void main() {
       author: Uint8List(32),
       signature: Uint8List(64),
     );
-    expect(pool.add(bc.sealTx(tx, proposer.public)),
-        'sealed tx admitted (fee $fee)');
+    expect(
+      pool.add(bc.sealTx(tx, proposer.public)),
+      'sealed tx admitted (fee $fee)',
+    );
   }
   expect(pool.size == 3, 'pool holds 3 sealed txs');
 
@@ -59,6 +71,8 @@ void main() {
   expect(strangerReveal.isEmpty, 'a non-proposer opens nothing');
 
   pool.free();
-  print('aviary dart assurance + sealed-mempool smoke: OK '
-      '(3 tiers monotonic, 3 sealed txs, proposer-only reveal)');
+  print(
+    'aviary dart assurance + sealed-mempool smoke: OK '
+    '(3 tiers monotonic, 3 sealed txs, proposer-only reveal)',
+  );
 }

@@ -3,17 +3,21 @@ part of '../../aviary.dart';
 /// A two round threshold signing ceremony over one message and roster.
 final class Ceremony extends _NativeHandle {
   Ceremony._(Aviary bc, Pointer<Void> h)
-      : super(bc, h, 'aviary_threshold_ceremony_free');
+    : super(bc, h, 'aviary_threshold_ceremony_free');
 
   /// Round two for [card] with its round one [nonces]: a signature share.
   Uint8List sign(Uint8List card, Uint8List nonces) => _scoped(
-        [card, nonces],
-        (p) => _bc._take(
-          _bc.lib.lookupFunction<_ThSignC, _ThSignD>('aviary_threshold_sign')(
-              _h, p[0], card.length, p[1]),
-          'threshold_sign',
-        ),
-      );
+    [card, nonces],
+    (p) => _bc._take(
+      _bc.lib.lookupFunction<_ThSignC, _ThSignD>('aviary_threshold_sign')(
+        _h,
+        p[0],
+        card.length,
+        p[1],
+      ),
+      'threshold_sign',
+    ),
+  );
 
   /// Attributes a share to participant [id] so a lying cosigner is named.
   bool verifyShare(int id, Uint8List publicShare, Uint8List sigShare) =>
@@ -21,7 +25,8 @@ final class Ceremony extends _NativeHandle {
         [publicShare, sigShare],
         (p) =>
             _bc.lib.lookupFunction<_ThVerifyC, _ThVerifyD>(
-                'aviary_threshold_verify_share')(_h, id, p[0], p[1]) ==
+              'aviary_threshold_verify_share',
+            )(_h, id, p[0], p[1]) ==
             1,
       );
 
@@ -36,7 +41,8 @@ final class Ceremony extends _NativeHandle {
         [_concat(sigShares)],
         (p) => _bc._take(
           _bc.lib.lookupFunction<_ThAggC, _ThAggD>(
-              'aviary_threshold_aggregate')(_h, idP, p[0], ids.length),
+            'aviary_threshold_aggregate',
+          )(_h, idP, p[0], ids.length),
           'threshold_aggregate',
         ),
       );
@@ -48,3 +54,18 @@ final class Ceremony extends _NativeHandle {
   /// Releases the native ceremony.
   void free() => _release();
 }
+
+ThresholdShare _shareInfo(Aviary bc, Uint8List card) => _scoped([card], (p) {
+  final info = bc._take(
+    bc.lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
+      'aviary_threshold_share_info',
+    )(p[0], card.length),
+    'threshold_share_info',
+  );
+  return ThresholdShare(
+    card,
+    (info[0] << 8) | info[1],
+    Uint8List.sublistView(info, 2, 34),
+    Uint8List.sublistView(info, 34, 66),
+  );
+});

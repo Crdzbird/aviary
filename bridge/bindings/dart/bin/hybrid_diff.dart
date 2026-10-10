@@ -39,5 +39,6 @@ void main(List<String> args) {
     throw StateError('MISMATCH - hybrid state diverges across bindings');
   }
   print(
-      'MATCH - post-quantum ledger state is byte-identical across Go and Dart');
+    'MATCH - post-quantum ledger state is byte-identical across Go and Dart',
+  );
 }

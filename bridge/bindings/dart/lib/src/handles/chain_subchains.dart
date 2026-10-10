@@ -10,15 +10,17 @@ extension ChainSubchains on Chain {
       [blob],
       (p) => _bc._take(
         _bc.lib.lookupFunction<_ScChainAnchoredC, _ScChainAnchoredD>(
-            'aviary_chain_propose_anchored')(_h, timestamp, p[0], blob.length),
+          'aviary_chain_propose_anchored',
+        )(_h, timestamp, p[0], blob.length),
         'chain_propose_anchored',
       ),
     );
   }
 
   Uint8List _byChild(String fn, int childChainId) => _bc._take(
-      _bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>(fn)(_h, childChainId),
-      fn);
+    _bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>(fn)(_h, childChainId),
+    fn,
+  );
 
   /// The last anchored header of a child.
   Uint8List childTip(int childChainId) =>
@@ -30,11 +32,12 @@ extension ChainSubchains on Chain {
 
   /// A state inclusion proof for an address on this account model chain.
   Uint8List proveAccount(Uint8List address) => _scoped(
-        [address],
-        (p) => _bc._take(
-          _bc.lib.lookupFunction<_ScChainAddrC, _ScChainAddrD>(
-              'aviary_chain_prove_account')(_h, p[0]),
-          'chain_prove_account',
-        ),
-      );
+    [address],
+    (p) => _bc._take(
+      _bc.lib.lookupFunction<_ScChainAddrC, _ScChainAddrD>(
+        'aviary_chain_prove_account',
+      )(_h, p[0]),
+      'chain_prove_account',
+    ),
+  );
 }

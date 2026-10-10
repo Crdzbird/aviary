@@ -6,7 +6,8 @@ extension AviaryAssurance on Aviary {
   AssuranceProfile describeAssurance(int level) {
     final b = _take(
       lib.lookupFunction<_AsDescribeC, _AsDescribeD>(
-          'aviary_assurance_describe')(level),
+        'aviary_assurance_describe',
+      )(level),
       'assurance_describe',
     );
     return AssuranceProfile(
@@ -27,39 +28,44 @@ extension AviaryAssurance on Aviary {
     int version = 2,
     int sigAlgo = 1,
     int fee = 0,
-  }) =>
-      _scoped(
-        [body, author, signature],
-        (p) => _take(
-          lib.lookupFunction<_TxEncodeC, _TxEncodeD>('aviary_tx_encode')(
-              version,
-              chainId,
-              sigAlgo,
-              fee,
-              p[0],
-              body.length,
-              p[1],
-              author.length,
-              p[2],
-              signature.length),
-          'tx_encode',
-        ),
-      );
+  }) => _scoped(
+    [body, author, signature],
+    (p) => _take(
+      lib.lookupFunction<_TxEncodeC, _TxEncodeD>('aviary_tx_encode')(
+        version,
+        chainId,
+        sigAlgo,
+        fee,
+        p[0],
+        body.length,
+        p[1],
+        author.length,
+        p[2],
+        signature.length,
+      ),
+      'tx_encode',
+    ),
+  );
 
   /// Seals an encoded transaction to a proposer's KEM public key.
   Uint8List sealTx(Uint8List txEncoded, Uint8List proposerKemPublic) => _scoped(
-        [txEncoded, proposerKemPublic],
-        (p) => _take(
-          lib.lookupFunction<_Buf2C, _Buf2D>('aviary_sealed_tx_seal')(
-              p[0], txEncoded.length, p[1], proposerKemPublic.length),
-          'sealed_tx_seal',
-        ),
-      );
+    [txEncoded, proposerKemPublic],
+    (p) => _take(
+      lib.lookupFunction<_Buf2C, _Buf2D>('aviary_sealed_tx_seal')(
+        p[0],
+        txEncoded.length,
+        p[1],
+        proposerKemPublic.length,
+      ),
+      'sealed_tx_seal',
+    ),
+  );
 
   /// Opens a sealed mempool with room for [capacity] transactions.
   SealedMempool makeSealedMempool(int capacity) {
     final h = lib.lookupFunction<_SmNewC, _SmNewD>('aviary_sealed_mempool_new')(
-        capacity);
+      capacity,
+    );
     return SealedMempool._(this, _requireHandle(h, 'sealed mempool creation'));
   }
 }

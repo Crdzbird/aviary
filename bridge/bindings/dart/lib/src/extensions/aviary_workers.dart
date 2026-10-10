@@ -10,8 +10,7 @@ extension AviaryAsync on Aviary {
     String passphrase, {
     int ops = 0,
     int mem = 0,
-  }) =>
-      _onWorker((bc) => bc.sealShare(card, passphrase, ops: ops, mem: mem));
+  }) => _onWorker((bc) => bc.sealShare(card, passphrase, ops: ops, mem: mem));
 
   /// [AviaryThreshold.unsealShare] on a worker isolate.
   Future<Uint8List> unsealShareAsync(Uint8List envelope, String passphrase) =>
@@ -24,16 +23,21 @@ extension AviaryAsync on Aviary {
     String passphrase, {
     int ops = 0,
     int mem = 0,
-  }) =>
-      _onWorker((bc) => bc.sealAccountPassphrase(public, secret, passphrase,
-          ops: ops, mem: mem));
+  }) => _onWorker(
+    (bc) => bc.sealAccountPassphrase(
+      public,
+      secret,
+      passphrase,
+      ops: ops,
+      mem: mem,
+    ),
+  );
 
   /// [AviaryPortableOpen.openAccountPassphrase] on a worker isolate.
   Future<PortableAccount> openAccountPassphraseAsync(
     Uint8List envelope,
     String passphrase,
-  ) =>
-      _onWorker((bc) => bc.openAccountPassphrase(envelope, passphrase));
+  ) => _onWorker((bc) => bc.openAccountPassphrase(envelope, passphrase));
 
   Future<R> _onWorker<R>(R Function(Aviary engine) body) {
     final path = _path;
@@ -52,11 +56,9 @@ extension ThresholdSigning on Aviary {
   Uint8List signWithShares(List<ThresholdShare> shares, Uint8List message) {
     if (shares.isEmpty) throw ArgumentError.value(shares, 'shares', 'empty');
     final commits = [for (final s in shares) commit(s.bytes)];
-    final ceremony = makeCeremony(
-      shares.first.groupPublicKey,
-      message,
-      [for (final c in commits) c.commitment],
-    );
+    final ceremony = makeCeremony(shares.first.groupPublicKey, message, [
+      for (final c in commits) c.commitment,
+    ]);
     try {
       final signatures = <Uint8List>[];
       for (var i = 0; i < shares.length; i++) {

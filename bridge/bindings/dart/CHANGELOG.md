@@ -12,6 +12,9 @@
 - Shortcut extensions: hex helpers on Uint8List and String, funded
   accounts, auto nonce transfers and one call blocks on Node, single
   validator chain assembly, whole threshold ceremonies, fluent chain trees.
+- Build hook (`hook/build.dart`) bundles the Linux engine from
+  `native/linux-<arch>/` as a code asset, and a Windows one when present;
+  `Aviary.loadedFrom` reports how the engine was found. Requires Dart 3.10.
 - Custody signing: `KeyStore.signTransfer`, `Node.sendFromStore`,
   `Node.submitTransferFromStore` and `Node.submitTx`; the sealed secret is
   used inside the engine and wiped. `KeyStore` gains `publicKey`, `has`,

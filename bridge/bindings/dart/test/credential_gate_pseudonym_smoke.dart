@@ -45,83 +45,159 @@ void main() {
       policy.presentPseudonymous(c, epoch, scope, fill(ch));
 
   final nymA = gate.admitPseudonymous(
-      5, 'gossip', fill(1), present(cred, 5, 'gossip', 1), now);
+    5,
+    'gossip',
+    fill(1),
+    present(cred, 5, 'gossip', 1),
+    now,
+  );
   expect(
-      nymA != null && nymA.length == 48, 'admit returns a 48-byte pseudonym');
+    nymA != null && nymA.length == 48,
+    'admit returns a 48-byte pseudonym',
+  );
 
   final nym2 = gate.admitPseudonymous(
-      5, 'gossip', fill(2), present(cred, 5, 'gossip', 2), now);
+    5,
+    'gossip',
+    fill(2),
+    present(cred, 5, 'gossip', 2),
+    now,
+  );
   expect(
-      nym2 != null && eq(nym2, nymA!), 'same member+epoch+scope -> same nym');
+    nym2 != null && eq(nym2, nymA!),
+    'same member+epoch+scope -> same nym',
+  );
   expect(gate.noteAdmission(5, 'gossip', nymA!), 'first admission fresh');
   expect(
-      !gate.noteAdmission(5, 'gossip', nym2!), 'Sybil cap flags the duplicate');
+    !gate.noteAdmission(5, 'gossip', nym2!),
+    'Sybil cap flags the duplicate',
+  );
 
   final nymE = gate.admitPseudonymous(
-      6, 'gossip', fill(1), present(cred, 6, 'gossip', 1), now);
+    6,
+    'gossip',
+    fill(1),
+    present(cred, 6, 'gossip', 1),
+    now,
+  );
   expect(nymE != null && !eq(nymE, nymA), 'different epoch -> different nym');
   final nymS = gate.admitPseudonymous(
-      5, 'submit', fill(1), present(cred, 5, 'submit', 1), now);
+    5,
+    'submit',
+    fill(1),
+    present(cred, 5, 'submit', 1),
+    now,
+  );
   expect(nymS != null && !eq(nymS, nymA), 'different scope -> different nym');
 
-  final nymO = gate.admitPseudonymous(5, 'gossip', fill(1),
-      present(issue(fill(0x88), 3, notAfter, 1), 5, 'gossip', 1), now);
+  final nymO = gate.admitPseudonymous(
+    5,
+    'gossip',
+    fill(1),
+    present(issue(fill(0x88), 3, notAfter, 1), 5, 'gossip', 1),
+    now,
+  );
   expect(nymO != null && !eq(nymO, nymA), 'different member -> different nym');
 
   final presA = present(cred, 5, 'gossip', 1);
-  expect(gate.admitPseudonymous(6, 'gossip', fill(1), presA, now) == null,
-      'wrong epoch rejected');
-  expect(gate.admitPseudonymous(5, 'submit', fill(1), presA, now) == null,
-      'wrong scope rejected');
-  expect(gate.admitPseudonymous(5, 'gossip', fill(9), presA, now) == null,
-      'wrong challenge rejected');
+  expect(
+    gate.admitPseudonymous(6, 'gossip', fill(1), presA, now) == null,
+    'wrong epoch rejected',
+  );
+  expect(
+    gate.admitPseudonymous(5, 'submit', fill(1), presA, now) == null,
+    'wrong scope rejected',
+  );
+  expect(
+    gate.admitPseudonymous(5, 'gossip', fill(9), presA, now) == null,
+    'wrong challenge rejected',
+  );
 
   expect(
-      gate.admitPseudonymous(5, 'gossip', fill(1),
-              present(issue(memberSecret, 3, 1000, 1), 5, 'gossip', 1), now) ==
-          null,
-      'expired rejected');
+    gate.admitPseudonymous(
+          5,
+          'gossip',
+          fill(1),
+          present(issue(memberSecret, 3, 1000, 1), 5, 'gossip', 1),
+          now,
+        ) ==
+        null,
+    'expired rejected',
+  );
   expect(
-      gate.admitPseudonymous(
-              5,
-              'gossip',
-              fill(1),
-              present(issue(memberSecret, 1, notAfter, 1), 5, 'gossip', 1),
-              now) ==
-          null,
-      'below-min-tier rejected');
+    gate.admitPseudonymous(
+          5,
+          'gossip',
+          fill(1),
+          present(issue(memberSecret, 1, notAfter, 1), 5, 'gossip', 1),
+          now,
+        ) ==
+        null,
+    'below-min-tier rejected',
+  );
 
   final revoking = bc.makeCredentialGate(policy);
   revoking.revokeNym(nymA);
   expect(
-      revoking.admitPseudonymous(
-              5, 'gossip', fill(3), present(cred, 5, 'gossip', 3), now) ==
-          null,
-      'revoked nym rejected');
+    revoking.admitPseudonymous(
+          5,
+          'gossip',
+          fill(3),
+          present(cred, 5, 'gossip', 3),
+          now,
+        ) ==
+        null,
+    'revoked nym rejected',
+  );
   expect(
-      revoking.admitPseudonymous(
-              6, 'gossip', fill(3), present(cred, 6, 'gossip', 3), now) !=
-          null,
-      "a different epoch's nym is not banned");
+    revoking.admitPseudonymous(
+          6,
+          'gossip',
+          fill(3),
+          present(cred, 6, 'gossip', 3),
+          now,
+        ) !=
+        null,
+    "a different epoch's nym is not banned",
+  );
   revoking.free();
 
   final rogue = bc.newBBSIssuer(fill(0x99));
   final fmc = policy.membershipCommit(memberSecret);
-  final fbi =
-      policy.blindIssue(rogue.secret, extractCommitment(fmc), 3, notAfter, 1);
+  final fbi = policy.blindIssue(
+    rogue.secret,
+    extractCommitment(fmc),
+    3,
+    notAfter,
+    1,
+  );
   final forged = bc.finalizeMembership(fmc, fbi);
   expect(
-      gate.admitPseudonymous(
-              5, 'gossip', fill(1), present(forged, 5, 'gossip', 1), now) ==
-          null,
-      'forged issuer rejected');
+    gate.admitPseudonymous(
+          5,
+          'gossip',
+          fill(1),
+          present(forged, 5, 'gossip', 1),
+          now,
+        ) ==
+        null,
+    'forged issuer rejected',
+  );
   expect(
-      gate.admitPseudonymous(5, 'gossip', fill(1),
-              Uint8List.fromList('garbage'.codeUnits), now) ==
-          null,
-      'malformed rejected');
+    gate.admitPseudonymous(
+          5,
+          'gossip',
+          fill(1),
+          Uint8List.fromList('garbage'.codeUnits),
+          now,
+        ) ==
+        null,
+    'malformed rejected',
+  );
 
   gate.free();
-  print('aviary dart credential-gate pseudonymous smoke: OK '
-      '(blind issuance, per-epoch pseudonym, Sybil cap, revocation)');
+  print(
+    'aviary dart credential-gate pseudonymous smoke: OK '
+    '(blind issuance, per-epoch pseudonym, Sybil cap, revocation)',
+  );
 }

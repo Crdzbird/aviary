@@ -6,3 +6,5 @@ build/
 !native/
 !native/**
 !**/*.dylib
+!**/*.so
+!**/*.dll

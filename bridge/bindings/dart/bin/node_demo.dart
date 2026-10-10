@@ -19,8 +19,8 @@ void main(List<String> args) {
   final libPath = args.isNotEmpty
       ? args[0]
       : Platform.script
-          .resolve('../../../../build/libaviary_c.dylib')
-          .toFilePath();
+            .resolve('../../../../build/libaviary_c.dylib')
+            .toFilePath();
   final bc = Aviary.open(libPath);
 
   print('aviary ${bc.version()} (crypto backend ${bc.cryptoBackend()})\n');
@@ -31,7 +31,8 @@ void main(List<String> args) {
   node.credit(alice.address, 1000);
   print('created chain 42; alice funded 1000');
   print(
-      '  alice ${_hex(alice.address).substring(0, 16)}...  balance=${node.balance(alice.address)}');
+    '  alice ${_hex(alice.address).substring(0, 16)}...  balance=${node.balance(alice.address)}',
+  );
 
   node.submitTransfer(alice.secret, bob.address, 100, 0);
   node.submitTransfer(alice.secret, bob.address, 50, 1);
@@ -39,7 +40,8 @@ void main(List<String> args) {
   final h = node.produceBlock(1);
   print('produced block -> height=$h');
   print(
-      '  alice=${node.balance(alice.address)}  bob=${node.balance(bob.address)}');
+    '  alice=${node.balance(alice.address)}  bob=${node.balance(bob.address)}',
+  );
 
   print('\n-- streamed events --');
   for (final e in jsonDecode(node.drainEvents()) as List) {
@@ -56,11 +58,13 @@ void main(List<String> args) {
   print('\nlight-client proof of alice verifies: $ok');
 
   final ethKey = _unhex(
-      'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80');
+    'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+  );
   print('\n-- multi-chain interop addresses --');
   print('  ETH: ${bc.ethAddress(ethKey)}');
   print(
-      '  BTC: ${bc.btcAddress(_unhex('0000000000000000000000000000000000000000000000000000000000000001'))}');
+    '  BTC: ${bc.btcAddress(_unhex('0000000000000000000000000000000000000000000000000000000000000001'))}',
+  );
   print('  SOL: ${bc.solAddress(alice.secret)}');
 
   node.dispose();

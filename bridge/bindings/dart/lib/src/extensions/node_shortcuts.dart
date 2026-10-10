@@ -32,7 +32,12 @@ extension NodeSending on Node {
         throw ArgumentError.value(fee, 'fee', 'hybrid transfers carry no fee');
       }
       return submitTransferHybrid(
-          from.secret, from.publicKey, to, amount, next);
+        from.secret,
+        from.publicKey,
+        to,
+        amount,
+        next,
+      );
     }
     if (fee != 0) return submitTransferFee(from.secret, to, amount, next, fee);
     return submitTransfer(from.secret, to, amount, next);
@@ -46,8 +51,7 @@ extension NodeSending on Node {
     Uint8List to,
     int amount, {
     int fee = 0,
-  }) =>
-      submitTransferFromStore(store, from, to, amount, nonce(from), fee: fee);
+  }) => submitTransferFromStore(store, from, to, amount, nonce(from), fee: fee);
 
   /// [send] to another account.
   Uint8List sendTo(Account from, Account to, int amount, {int fee = 0}) =>

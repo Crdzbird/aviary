@@ -2,11 +2,9 @@ part of '../../aviary.dart';
 
 /// Multi chain address derivation and EVM calldata helpers.
 extension AviaryInterop on Aviary {
-  String _addr(String fn, Uint8List secret) => _scoped(
-        [secret],
-        (p) =>
-            _takeStr(lib.lookupFunction<_BufOfPtrC, _BufOfPtrD>(fn)(p[0]), fn),
-      );
+  String _addr(String fn, Uint8List secret) => _scoped([
+    secret,
+  ], (p) => _takeStr(lib.lookupFunction<_BufOfPtrC, _BufOfPtrD>(fn)(p[0]), fn));
 
   /// The Ethereum address of a 32 byte secp256k1 secret.
   String ethAddress(Uint8List secret32) =>
@@ -22,22 +20,24 @@ extension AviaryInterop on Aviary {
 
   /// ABI calldata for an ERC-20 transfer to a 20 byte address.
   Uint8List ethErc20TransferCalldata(Uint8List to20, int amount) => _scoped(
-        [to20],
-        (p) => _take(
-          lib.lookupFunction<_Erc20C, _Erc20D>('aviary_eth_erc20_transfer')(
-              p[0], amount),
-          'ethErc20TransferCalldata',
-        ),
-      );
+    [to20],
+    (p) => _take(
+      lib.lookupFunction<_Erc20C, _Erc20D>('aviary_eth_erc20_transfer')(
+        p[0],
+        amount,
+      ),
+      'ethErc20TransferCalldata',
+    ),
+  );
 
   /// The 4 byte ABI selector of a function signature.
   Uint8List ethSelector(String signature) => _withUtf8(
-        signature,
-        (s) => _take(
-          lib.lookupFunction<_SelectorC, _SelectorD>('aviary_eth_selector')(s),
-          'ethSelector',
-        ),
-      );
+    signature,
+    (s) => _take(
+      lib.lookupFunction<_SelectorC, _SelectorD>('aviary_eth_selector')(s),
+      'ethSelector',
+    ),
+  );
 
   /// Signs an EVM legacy transaction with a 32 byte secp256k1 key. [to] null
   /// creates a contract; [data] null is a plain value transfer.
@@ -56,8 +56,19 @@ extension AviaryInterop on Aviary {
       [to ?? Uint8List(0), data ?? Uint8List(0), secret32],
       (p) => _take(
         lib.lookupFunction<_SignLegacyC, _SignLegacyD>(
-                'aviary_eth_sign_legacy')(nonce, gasPrice, gasLimit, p[0],
-            hasTo, value, p[1], data?.length ?? 0, chainId, p[2]),
+          'aviary_eth_sign_legacy',
+        )(
+          nonce,
+          gasPrice,
+          gasLimit,
+          p[0],
+          hasTo,
+          value,
+          p[1],
+          data?.length ?? 0,
+          chainId,
+          p[2],
+        ),
         'ethSignLegacy',
       ),
     );

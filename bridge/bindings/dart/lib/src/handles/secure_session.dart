@@ -8,19 +8,24 @@ part of '../../aviary.dart';
 /// peer holds that key, not that it is the peer you wanted.
 final class SecureSession extends _NativeHandle {
   SecureSession._(Aviary bc, Pointer<Void> h)
-      : super(bc, h, 'aviary_secure_free');
+    : super(bc, h, 'aviary_secure_free');
 
   Uint8List _buf(String fn) => _bc._take(
-      _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h), fn);
+    _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
+    fn,
+  );
 
   Uint8List _crypt(String fn, Uint8List input) => _scoped(
-        [input],
-        (p) => _bc._take(
-          _bc.lib.lookupFunction<_ChainBlockC, _ChainBlockD>(fn)(
-              _h, p[0], input.length),
-          fn,
-        ),
-      );
+    [input],
+    (p) => _bc._take(
+      _bc.lib.lookupFunction<_ChainBlockC, _ChainBlockD>(fn)(
+        _h,
+        p[0],
+        input.length,
+      ),
+      fn,
+    ),
+  );
 
   /// The handshake message this side must send: the first message for an
   /// initiator, the reply for a responder.
@@ -32,18 +37,22 @@ final class SecureSession extends _NativeHandle {
     final ok = _scoped(
       [reply],
       (p) => _bc.lib.lookupFunction<_HandleBytesIntC, _HandleBytesIntD>(
-          'aviary_secure_complete')(_h, p[0], reply.length),
+        'aviary_secure_complete',
+      )(_h, p[0], reply.length),
     );
     if (ok != 1) {
       throw const AviaryException(
-          'secure session: responder refused', AviaryStatus.badInput);
+        'secure session: responder refused',
+        AviaryStatus.badInput,
+      );
     }
   }
 
   /// Whether both directions are ready.
   bool get isOpen =>
       _bc.lib.lookupFunction<_HandleFlagC, _HandleFlagD>('aviary_secure_open')(
-          _h) ==
+        _h,
+      ) ==
       1;
 
   /// The authenticated remote signing public key; empty until open.

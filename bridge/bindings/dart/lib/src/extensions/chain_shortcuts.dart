@@ -8,11 +8,8 @@ extension ValidatorKeyPair on KeyPairBytes {
 
   /// A tree validator with [power]. Set [holdsSecret] false to describe a
   /// validator this process does not run.
-  TreeValidator treeValidator(int power, {bool holdsSecret = true}) => (
-        publicKey: public,
-        secret: holdsSecret ? secret : null,
-        power: power,
-      );
+  TreeValidator treeValidator(int power, {bool holdsSecret = true}) =>
+      (publicKey: public, secret: holdsSecret ? secret : null, power: power);
 }
 
 /// The propose, justify and submit flow in one call.
@@ -60,6 +57,7 @@ extension ChainTreeRounds on ChainTree {
   /// Produces one block on every chain, children before parents, so each
   /// parent anchors what its children just finalized. Returns the blocks in
   /// that order.
-  List<Uint8List> produceRound(int timestamp) =>
-      [for (final id in chainIds().reversed) produce(id, timestamp)];
+  List<Uint8List> produceRound(int timestamp) => [
+    for (final id in chainIds().reversed) produce(id, timestamp),
+  ];
 }

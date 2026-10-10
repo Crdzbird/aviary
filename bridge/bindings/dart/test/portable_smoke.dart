@@ -21,11 +21,18 @@ void main() {
   final acct = node.newAccountHybrid();
   final public = acct.publicKey, secret = acct.secret;
 
-  final env1 = bc.sealAccountPassphrase(public, secret, 'backup-phrase',
-      ops: 3, mem: 1 << 16);
+  final env1 = bc.sealAccountPassphrase(
+    public,
+    secret,
+    'backup-phrase',
+    ops: 3,
+    mem: 1 << 16,
+  );
   final back1 = bc.openAccountPassphrase(env1, 'backup-phrase');
-  _expect(_eq(back1.secret, secret) && _eq(back1.public, public),
-      'passphrase round-trip');
+  _expect(
+    _eq(back1.secret, secret) && _eq(back1.public, public),
+    'passphrase round-trip',
+  );
   var threw = false;
   try {
     bc.openAccountPassphrase(env1, 'wrong');
@@ -37,8 +44,10 @@ void main() {
   final dev = bc.hybridKemKeypair();
 
   final env2 = bc.sealAccountTo(public, secret, dev.public);
-  _expect(_eq(bc.openAccountTo(env2, dev.secret).secret, secret),
-      'recipient round-trip');
+  _expect(
+    _eq(bc.openAccountTo(env2, dev.secret).secret, secret),
+    'recipient round-trip',
+  );
   final stranger = bc.hybridKemKeypair();
   threw = false;
   try {
@@ -50,8 +59,9 @@ void main() {
 
   final env3 = bc.sealAccountSignedTo(public, secret, dev.public, secret);
   _expect(
-      _eq(bc.openAccountSignedFrom(env3, dev.secret, public).secret, secret),
-      'signed-recipient round-trip');
+    _eq(bc.openAccountSignedFrom(env3, dev.secret, public).secret, secret),
+    'signed-recipient round-trip',
+  );
   threw = false;
   try {
     bc.openAccountSignedFrom(env3, dev.secret, stranger.public);
@@ -61,6 +71,8 @@ void main() {
   _expect(threw, 'wrong expected signer fails closed');
 
   node.dispose();
-  print('aviary Dart portable smoke: OK '
-      '(passphrase + recipient + signed tiers, all fail-closed)');
+  print(
+    'aviary Dart portable smoke: OK '
+    '(passphrase + recipient + signed tiers, all fail-closed)',
+  );
 }

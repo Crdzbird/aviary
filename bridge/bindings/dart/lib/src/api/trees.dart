@@ -18,22 +18,24 @@ extension AviaryTrees on Aviary {
           [bp, _concat(n.accounts.map((a) => a.address)), pks, secrets, kids],
           (p) => _take(
             lib.lookupFunction<_TreeNodeC, _TreeNodeD>(
-                    'aviary_chain_tree_node_encode')(
-                n.chainId,
-                p[0],
-                bp.length,
-                n.assuranceLevel,
-                p[1],
-                bal,
-                n.accounts.length,
-                p[2],
-                p[3],
-                pw,
-                n.validators.length,
-                n.maxAnchorsPerBlock,
-                n.maxHeadersPerAnchor,
-                p[4],
-                kids.length),
+              'aviary_chain_tree_node_encode',
+            )(
+              n.chainId,
+              p[0],
+              bp.length,
+              n.assuranceLevel,
+              p[1],
+              bal,
+              n.accounts.length,
+              p[2],
+              p[3],
+              pw,
+              n.validators.length,
+              n.maxAnchorsPerBlock,
+              n.maxHeadersPerAnchor,
+              p[4],
+              kids.length,
+            ),
             'chain_tree_node_encode',
           ),
         ),
@@ -53,7 +55,8 @@ extension AviaryTrees on Aviary {
     if (err.isNotEmpty) throw StateError('chain tree: $err');
     return _scoped([spec], (p) {
       final h = lib.lookupFunction<_TreeBuildC, _TreeBuildD>(
-          'aviary_chain_tree_build')(p[0], spec.length);
+        'aviary_chain_tree_build',
+      )(p[0], spec.length);
       if (h == nullptr) throw StateError('chain tree: build rejected');
       return ChainTree._(this, h);
     });

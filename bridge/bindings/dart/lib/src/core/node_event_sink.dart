@@ -43,15 +43,6 @@ ChainEvent _chainEventFromJson(Map<String, Object?> json) {
   return UnknownEvent(type, json);
 }
 
-List<ChainEvent> _chainEventsFromJsonArray(String text) {
-  final decoded = jsonDecode(text);
-  if (decoded is! List) return const [];
-  return [
-    for (final e in decoded)
-      if (e is Map<String, Object?>) _chainEventFromJson(e),
-  ];
-}
-
 final Map<int, _NodeEventSink> _nodeSinks = {};
 
 void _nodeEventTrampoline(Pointer<Void> ctx, Pointer<Utf8> json, int len) {
@@ -73,7 +64,8 @@ final class _NodeEventSink {
       _nodeEventTrampoline,
     )..keepIsolateAlive = false;
     bc.lib.lookupFunction<_NodeSetEventC, _NodeSetEventD>(
-        'aviary_node_set_event_hook')(node, callable.nativeFunction, node);
+      'aviary_node_set_event_hook',
+    )(node, callable.nativeFunction, node);
     final sink = _NodeEventSink._(
       bc.lib,
       node,
@@ -92,7 +84,8 @@ final class _NodeEventSink {
   /// Detaches the hook before the node is freed and closes the stream.
   void close() {
     _lib.lookupFunction<_NodeSetEventC, _NodeSetEventD>(
-        'aviary_node_set_event_hook')(_node, nullptr, nullptr);
+      'aviary_node_set_event_hook',
+    )(_node, nullptr, nullptr);
     _callable.close();
     _nodeSinks.remove(_node.address);
     unawaited(controller.close());
