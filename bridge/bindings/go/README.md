@@ -5,7 +5,7 @@ consensus, mempool, observability, light-client verification) plus
 EVM/Bitcoin/Solana interop, over a stable C ABI (`libaviary_c`) via cgo.
 
 ```go
-import bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+import bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 
 func main() {
     bc.Preload()                 // optional background warm-up — returns at once
@@ -49,8 +49,8 @@ available alongside the ledger, from one `go get`:
 
 ```go
 import (
-    bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
-    "github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
+    bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
+    "github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
 )
 
 digest, _ := cryptolib.Blake3(doc, 32)      // off-chain crypto
@@ -110,3 +110,25 @@ go run  ./cmd/demo           # cross-language golden-vector determinism check
   authenticated post quantum hybrid handshake (`GenerateSecureIdentity`,
   `InitiateSecureSession`, `AcceptSecureSession`, `Encrypt`, `Decrypt`).
   Names follow each language's casing.
+
+## Install
+
+```bash
+go get github.com/Crdzbird/aviary/bridge/bindings/go@bridge/bindings/go/v0.1.0
+```
+
+The module depends on CipherBird's Go module (`github.com/Crdzbird/CipherBird/
+bridge/bindings/go`) at a pinned pseudo version. Both bindings are cgo
+wrappers over C libraries, so a fetched copy needs those libraries available
+through pkg-config: install `libaviary_c` and `libcryptolib_c` with their
+`.pc` files (`bridge/bindings/go/aviary/aviary_c.pc.in` is the template) and
+build with
+
+```bash
+go build -tags aviary_pkgconfig,cryptolib_pkgconfig ./...
+```
+
+Inside this repository the root `go.work` puts the binding, the example
+servers and the sibling CipherBird checkout in one workspace, so plain
+`go build` and `go test` link the development build in `build/` without any
+tags.

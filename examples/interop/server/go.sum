@@ -1,3 +1,5 @@
+github.com/Crdzbird/CipherBird/bridge/bindings/go v0.0.0-20261005192042-bffafd77df2f h1:a4SWpKMORvTwftjDdzxuUB54mddKws9ZdFLrlfOgsIg=
+github.com/Crdzbird/CipherBird/bridge/bindings/go v0.0.0-20261005192042-bffafd77df2f/go.mod h1:Nft0xPqlHKQoZDsS6CsfvpTgbml9I5bPnxfKl2DLyus=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 	pb "sentinel/gen"
 
 	"google.golang.org/grpc/codes"

@@ -14,9 +14,38 @@ on:
       - 'aviary_dart-v[0-9]+.[0-9]+.[0-9]+*'
       - 'aviary_lite-v[0-9]+.[0-9]+.[0-9]+*'
       - 'aviary-v[0-9]+.[0-9]+.[0-9]+*'
+      - 'aviary-ledger-v[0-9]+.[0-9]+.[0-9]+*'
 
 jobs:
+  # npm: trusted publishing (https://docs.npmjs.com/trusted-publishers). After
+  # the first manual publish of aviary-ledger, add this repository and workflow
+  # as a trusted publisher on npmjs.com; npm then mints the token from the
+  # GitHub OIDC identity and attaches provenance.
+  npm:
+    if: startsWith(github.ref_name, 'aviary-ledger-v')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: bridge/bindings/aviary-node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Check the package version against the tag
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "aviary-ledger-v$v" = "${GITHUB_REF_NAME}" ] || { echo "package.json version $v does not match tag ${GITHUB_REF_NAME}"; exit 1; }
+      - run: npm install --no-audit --no-fund
+      - run: for t in test/*.js; do node "$t"; done
+      - run: npm publish --provenance --access public
+
   publish:
+    if: "!startsWith(github.ref_name, 'aviary-ledger-v')"
     runs-on: macos-latest
     permissions:
       id-token: write

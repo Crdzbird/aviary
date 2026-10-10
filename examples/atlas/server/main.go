@@ -6,7 +6,7 @@ import (
 	"net"
 
 	pb "atlas/gen"
-	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

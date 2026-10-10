@@ -1,8 +1,5 @@
-module github.com/Crdzbird/Aviary/bridge/bindings/go
+module github.com/Crdzbird/aviary/bridge/bindings/go
 
 go 1.24
 
-require github.com/Crdzbird/CryptoLib/bridge/bindings/go v0.0.0-00010101000000-000000000000
-
-// cryptolib is not published yet — consume it from the sibling checkout.
-replace github.com/Crdzbird/CryptoLib/bridge/bindings/go => ../../../../cryptolib/bridge/bindings/go
+require github.com/Crdzbird/CipherBird/bridge/bindings/go v0.0.0-20261005192042-bffafd77df2f

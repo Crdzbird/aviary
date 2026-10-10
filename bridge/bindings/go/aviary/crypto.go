@@ -10,13 +10,13 @@ package aviary
 // Use it directly:
 //
 //	import (
-//		bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
-//		"github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
+//		bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
+//		"github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
 //	)
 //	digest, _ := cryptolib.Blake3(data, 32)
 //	node := bc.NewNode(1)
 
-import cryptolib "github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
+import cryptolib "github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
 
 // cryptoInit initializes cryptolib's Go binding (called once during Init). This
 // also links libcryptolib_c, which aviary_c needs. Use CryptoBackendVersion

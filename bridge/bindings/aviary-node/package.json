@@ -1,13 +1,16 @@
 {
   "name": "aviary-ledger",
-  "version": "0.0.1",
-  "description": "Aviary for Node.js — a full DLT (ledger, BFT consensus, mempool, observability, light-client verification) plus EVM/Bitcoin/Solana interop, via koffi FFI. The native library is bundled and loaded automatically; preload() warms it off the main thread.",
+  "version": "0.1.0",
+  "description": "Aviary for Node.js: a ledger with BFT consensus, mempool, events, persistence, custody signing, networking and light client verification, plus EVM, Bitcoin and Solana interop, over koffi FFI. Native libraries for macOS arm64 and Linux x64 and arm64 are bundled.",
   "main": "index.js",
   "types": "index.d.ts",
   "files": [
     "index.js",
     "index.d.ts",
-    "prebuilds/"
+    "prebuilds/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "node test/preload.test.js"
@@ -18,5 +21,26 @@
   "dependencies": {
     "koffi": "^2.9.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Crdzbird/aviary.git",
+    "directory": "bridge/bindings/aviary-node"
+  },
+  "homepage": "https://github.com/Crdzbird/aviary/tree/main/bridge/bindings/aviary-node",
+  "keywords": [
+    "blockchain",
+    "ledger",
+    "bft",
+    "ffi",
+    "post-quantum"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "arm64",
+    "x64"
+  ]
 }

@@ -62,3 +62,6 @@ local.properties
 
 # merged CipherBird xcframework for the Swift binding (scripts/apple/vendor_cipherbird.sh)
 bridge/bindings/swift/Vendor/
+
+# release assets built by scripts/*/package_*.sh and build_jar.sh
+dist/

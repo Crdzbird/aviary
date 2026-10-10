@@ -1128,7 +1128,7 @@ selectors — validated against real-world vectors). Deferred:
   `AVIARY_DYLIB`. Packages: pub `aviary_dart`, `aviary_lite`, `aviary`
   (Dart class `Aviary`, entry points `AviaryLite` and `AviaryShared`); npm
   `aviary-ledger` (plain `aviary` is taken on npm); Go module
-  `github.com/Crdzbird/Aviary/bridge/bindings/go`; JVM package `aviary`;
+  `github.com/Crdzbird/aviary/bridge/bindings/go`; JVM package `aviary`;
   Swift package `Aviary` with the `AviaryC` binary target; Android plugin
   `aviary-android`; Flutter demo `examples/aviary_demo`.
 - Consensus bytes are unchanged: the golden vectors only carried the name in
@@ -1387,3 +1387,36 @@ selectors — validated against real-world vectors). Deferred:
   `Node.deinit` unhooks). `main.swift` exercises all of it; `precondition`
   cannot take `try` in its autoclosure, hence the `ensure` helper.
 - Every binding now wraps the entire C ABI again.
+
+## Distribution: npm bundled natives, Go module fetchable, Swift by URL, JVM jar - DONE (2026-10-11)
+- **[x] npm `aviary-ledger` 0.1.0** ships `prebuilds/{darwin-arm64,linux-x64,
+  linux-arm64}` (the aviary_dart libraries; `scripts/node/stage_prebuild.sh`
+  copies them), an `.npmignore` so the root `.gitignore` no longer strips the
+  binaries from the tarball, `repository`/`os`/`cpu` fields, a CHANGELOG and
+  LICENSE. `resolveCryptolib` prefers the `libcipherbird` sibling. All 16 tests
+  pass with no environment override; `npm pack` is 21 MB. `publish.yml` gained
+  an `npm` job on `aviary-ledger-vX.Y.Z` tags using npm trusted publishing with
+  provenance (enable the trusted publisher on npmjs.com after the first manual
+  publish).
+- **[x] Go**: module path is now lowercase `github.com/Crdzbird/aviary/bridge/
+  bindings/go`; it requires CipherBird's Go module at the published pseudo
+  version `v0.0.0-20261005192042-bffafd77df2f` instead of a local replace.
+  CipherBird's module keeps its C header outside the module, so a fetched copy
+  builds only with `-tags aviary_pkgconfig,cryptolib_pkgconfig` against
+  installed libraries (documented); inside the repo the root `go.work`
+  (binding, three example servers, sibling CipherBird) makes plain `go build`
+  work. Tag `bridge/bindings/go/v0.1.0`.
+- **[x] Swift**: `Package.swift` moved to the repository root (SwiftPM resolves
+  git URL dependencies only from there) with target paths under
+  `bridge/bindings/swift/`. Binary targets default to release URLs with
+  checksums; `AVIARY_LOCAL_XCFRAMEWORKS=1` switches to the local trees for
+  the demo. `scripts/apple/package_swift_release.sh swift-v0.1.0` produced
+  `dist/swift/{AviaryC,CipherBird}.xcframework.zip` and wrote the checksums
+  into the manifest. The zips must be attached by the repository owner to a
+  GitHub release named `swift-v0.1.0` (my GitHub identity has no write access).
+- **[x] JVM**: `scripts/jvm/build_jar.sh 0.1.0` builds `dist/jvm/aviary-0.1.0.jar`
+  (21 MB) with every native slot under `/native/<os>-<arch>/` plus an
+  `index.txt`; `NativeLoader` extracts the whole slot into one temporary
+  directory so the darwin pair keeps its loader relative link. Verified by
+  running the jar from `/tmp` with no path override. Publishing to a Maven
+  repository is left to the owner's coordinates.

@@ -60,3 +60,15 @@ point at any build with `AVIARY_DYLIB` / `CRYPTOLIB_DYLIB`.
   authenticated post quantum hybrid handshake (`GenerateSecureIdentity`,
   `InitiateSecureSession`, `AcceptSecureSession`, `Encrypt`, `Decrypt`).
   Names follow each language's casing.
+
+## Install
+
+```bash
+npm install aviary-ledger
+```
+
+The package bundles the native engine for macOS arm64 and Linux x64 and
+arm64 under `prebuilds/`; `require('aviary-ledger')` finds it with no
+configuration. `AVIARY_DYLIB` still overrides the path for development
+builds. Releases are published from tags `aviary-ledger-vX.Y.Z` by the
+`Publish to pub.dev` workflow through npm trusted publishing.

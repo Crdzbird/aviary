@@ -11,7 +11,7 @@ import (
 	"time"
 
 	pb "atlas/gen"
-	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

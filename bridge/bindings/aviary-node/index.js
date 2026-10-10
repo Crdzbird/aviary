@@ -16,6 +16,7 @@
 // dev build tree. During local development set AVIARY_DYLIB / CRYPTOLIB_DYLIB.
 
 'use strict';
+const fs = require('node:fs');
 const path = require('node:path');
 const koffi = require('koffi');
 // Foreign-component callback prototypes (mirror bridge/aviary_c.h).
@@ -36,9 +37,13 @@ function resolveAviary() {
     path.join(__dirname, 'prebuilds', triple(), `libaviary_c.${ext()}`);
 }
 function resolveCryptolib() {
-  // Optional: load cryptolib first so its symbols are present in the process.
-  return process.env.CRYPTOLIB_DYLIB ||
-    path.join(__dirname, 'prebuilds', triple(), `libcryptolib_c.${ext()}`);
+  // Optional: load the CipherBird engine first so its symbols are present in
+  // the process. The bundled darwin pair ships it as libcipherbird next to
+  // libaviary_c; the Linux library is self contained and has no sibling.
+  if (process.env.CRYPTOLIB_DYLIB) return process.env.CRYPTOLIB_DYLIB;
+  const dir = path.join(__dirname, 'prebuilds', triple());
+  const sibling = path.join(dir, `libcipherbird.${ext()}`);
+  return fs.existsSync(sibling) ? sibling : path.join(dir, `libcryptolib_c.${ext()}`);
 }
 
 // ── Lazy native binding ──────────────────────────────────────────────────────

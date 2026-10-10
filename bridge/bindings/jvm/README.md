@@ -52,3 +52,17 @@ automatically; a packaged JAR should ship both natives side by side.
   authenticated post quantum hybrid handshake (`GenerateSecureIdentity`,
   `InitiateSecureSession`, `AcceptSecureSession`, `Encrypt`, `Decrypt`).
   Names follow each language's casing.
+
+## Self contained jar
+
+```bash
+bash scripts/jvm/build_jar.sh 0.1.0
+java --enable-native-access=ALL-UNNAMED -jar dist/jvm/aviary-0.1.0.jar
+```
+
+The jar carries the compiled binding and the native engine for macOS arm64
+and Linux x64 and arm64 under `/native/<os>-<arch>/`; `NativeLoader`
+extracts the whole slot (every file in its `index.txt`) into one temporary
+directory so `libaviary_c` finds its CipherBird sibling, and `-Daviary.path`
+or `AVIARY_DYLIB` still override it. Attach the jar to a GitHub release or
+publish it to a Maven repository with your own coordinates.

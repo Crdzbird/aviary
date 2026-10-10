@@ -16,10 +16,28 @@
 // Slices: iOS 15+ device (arm64), iOS simulator (arm64), macOS 14+ (arm64).
 //
 // Usage from another package:
-//     dependencies: [ .package(path: "path/to/aviary/bridge/bindings/swift") ]
+//     dependencies: [ .package(url: "https://github.com/Crdzbird/aviary", from: "0.1.0") ]
 //     .product(name: "Aviary", package: "Aviary")
 // then `import Aviary`.
 import PackageDescription
+import Foundation
+
+// Remote consumers get the xcframeworks from a GitHub release by URL and
+// checksum (written by scripts/apple/package_swift_release.sh). A local
+// checkout sets AVIARY_LOCAL_XCFRAMEWORKS=1 to use the trees in this repo,
+// which is what the demo and CI do. The manifest lives at the repository root
+// because SwiftPM resolves git URL dependencies from there.
+let releaseBase = "https://github.com/Crdzbird/aviary/releases/download/swift-v0.1.0"
+let aviaryChecksum = "d5122c13e1fb297a8869910622dc837967f73e6b18cf0170df2cef03b3154845"
+let cipherBirdChecksum = "56bcd951a6aea85a6a694bf23fc355c790932fb617d95d6660f8f16d7cad091e"
+let useLocal = ProcessInfo.processInfo.environment["AVIARY_LOCAL_XCFRAMEWORKS"] != nil
+
+let aviaryBinary: Target = useLocal
+    ? .binaryTarget(name: "AviaryC", path: "bridge/bindings/aviary/ios/aviary/AviaryC.xcframework")
+    : .binaryTarget(name: "AviaryC", url: "\(releaseBase)/AviaryC.xcframework.zip", checksum: aviaryChecksum)
+let cipherBirdBinary: Target = useLocal
+    ? .binaryTarget(name: "CipherBird", path: "bridge/bindings/swift/Vendor/CipherBird.xcframework")
+    : .binaryTarget(name: "CipherBird", url: "\(releaseBase)/CipherBird.xcframework.zip", checksum: cipherBirdChecksum)
 
 let package = Package(
     name: "Aviary",
@@ -34,19 +52,13 @@ let package = Package(
     dependencies: [],
     targets: [
         // The Aviary C ABI as a dynamic-framework binary target.
-        .binaryTarget(
-            name: "AviaryC",
-            path: "../aviary/ios/aviary/AviaryC.xcframework"
-        ),
+        aviaryBinary,
         // CipherBird's dynamic framework, vendored as a binary target so
         // Aviary's runtime cryptolib_* lookups resolve. The cipherbird
         // Flutter plugin ships iOS and macOS as two xcframeworks; run
         // scripts/apple/vendor_cipherbird.sh once to merge them into
         // Vendor/CipherBird.xcframework (gitignored).
-        .binaryTarget(
-            name: "CipherBird",
-            path: "Vendor/CipherBird.xcframework"
-        ),
+        cipherBirdBinary,
         // Ergonomic Swift wrapper. Links CipherBird so Aviary's runtime
         // cryptolib_* lookups resolve.
         .target(
@@ -55,7 +67,7 @@ let package = Package(
                 "AviaryC",
                 "CipherBird",
             ],
-            path: "Sources/Aviary",
+            path: "bridge/bindings/swift/Sources/Aviary",
             resources: [
                 .process("PrivacyInfo.xcprivacy"),
             ]
@@ -64,7 +76,7 @@ let package = Package(
         .executableTarget(
             name: "AviaryDemo",
             dependencies: ["Aviary"],
-            path: "Sources/AviaryDemo"
+            path: "bridge/bindings/swift/Sources/AviaryDemo"
         ),
     ]
 )

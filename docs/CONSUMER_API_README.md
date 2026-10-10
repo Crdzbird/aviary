@@ -71,17 +71,17 @@ module github.com/Crdzbird/aviary-api
 
 go 1.24
 
-require github.com/Crdzbird/Aviary/bridge/bindings/go v0.0.0-00010101000000-000000000000
+require github.com/Crdzbird/aviary/bridge/bindings/go v0.0.0-00010101000000-000000000000
 
 // Sibling checkouts (neither library is published yet).
-replace github.com/Crdzbird/Aviary/bridge/bindings/go => ../aviary/bridge/bindings/go
-replace github.com/Crdzbird/CryptoLib/bridge/bindings/go    => ../cryptolib/bridge/bindings/go
+replace github.com/Crdzbird/aviary/bridge/bindings/go => ../aviary/bridge/bindings/go
+replace github.com/Crdzbird/CipherBird/bridge/bindings/go    => ../cryptolib/bridge/bindings/go
 ```
 
 Import the package:
 
 ```go
-import bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+import bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 ```
 
 ## 3. Run
@@ -206,7 +206,7 @@ import (
 	"net/http"
 	"sync"
 
-	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 )
 
 type chain struct {

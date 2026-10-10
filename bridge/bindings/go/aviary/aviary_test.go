@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
-	"github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
+	"github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
 )
 
 // The API self-initializes; no explicit Init() needed.

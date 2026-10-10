@@ -1,0 +1,12 @@
+// Local development workspace: the Go binding, the example servers and the
+// sibling CipherBird checkout. Consumers fetching the module ignore this file;
+// they build with the pkg-config tags against installed libraries.
+go 1.24
+
+use (
+	./bridge/bindings/go
+	./examples/atlas/server
+	./examples/interop/server
+	./examples/sentinel/server
+	../cryptolib/bridge/bindings/go
+)

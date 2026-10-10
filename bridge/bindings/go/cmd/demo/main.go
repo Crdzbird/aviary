@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	aviary "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+	aviary "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 )
 
 func main() {

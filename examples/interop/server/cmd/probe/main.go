@@ -10,7 +10,7 @@ import (
 	"log"
 	"time"
 
-	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 	pb "interop/gen"
 
 	"google.golang.org/grpc"

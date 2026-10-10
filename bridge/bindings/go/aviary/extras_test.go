@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 )
 
 func ok(t *testing.T) func([]byte, error) []byte {
