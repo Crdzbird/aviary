@@ -1341,3 +1341,10 @@ selectors — validated against real-world vectors). Deferred:
   `<package>-v{{version}}`) is the owner's one time setup.
 - GOTCHA: package:test only discovers `*_test.dart`; `dart test` silently
   reports "No tests were found" otherwise.
+- **[x] The original `CI` workflow is green again** (run 38077401151, about
+  11 minutes): it needed `secp256k1` from Homebrew, blst built from source
+  with its headers under `/opt/homebrew/include/blst/` (mirroring CipherBird's
+  own workflow), the CipherBird default repository `Crdzbird/CipherBird`, and
+  JDK 23 because the runner's Java 21 treats the foreign function API as a
+  preview. It runs the 68 C++ suites plain and under ASan/UBSan, the Dart
+  demos, the Go demo, the JVM demo and the Flutter demo analysis.
