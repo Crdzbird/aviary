@@ -17,7 +17,10 @@ let package = Package(
         ),
         .target(
             name: "aviary",
-            dependencies: ["AviaryC"]
+            dependencies: ["AviaryC"],
+            resources: [
+                .process("PrivacyInfo.xcprivacy"),
+            ]
         ),
     ]
 )

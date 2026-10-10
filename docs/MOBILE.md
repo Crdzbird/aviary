@@ -87,6 +87,18 @@ The engine links CipherBird's from-source OpenSSL 3.6 because Ubuntu's 3.0
 lacks AES-256-GCM-SIV, which the sealed mempool needs. Windows has no binary yet: CipherBird's dependency build has no Windows
 port, which is the prerequisite.
 
+## Privacy manifests
+
+`bridge/apple/PrivacyInfo.xcprivacy` is the single source. It declares no
+tracking, no tracking domains, no collected data, and two required reason API
+categories: file timestamps (reason C617.1, files inside the app container:
+the key value store and OpenSSL's `stat` calls) and system boot time (reason
+35F9.1, elapsed time: libsodium's `sysctlbyname`). Copies live in each Swift
+target (`Sources/<target>/PrivacyInfo.xcprivacy`, declared as a processed
+resource in the manifests of both Flutter plugins and of the Swift binding),
+and the dynamic xcframework build embeds it in every `AviaryC.framework`
+slice. Edit the source file and copy it to the targets when it changes.
+
 ## Publishing notes
 
 - pub only ships git-tracked files and honors the root `.gitignore`, so the

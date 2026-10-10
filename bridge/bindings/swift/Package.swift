@@ -55,7 +55,10 @@ let package = Package(
                 "AviaryC",
                 "CipherBird",
             ],
-            path: "Sources/Aviary"
+            path: "Sources/Aviary",
+            resources: [
+                .process("PrivacyInfo.xcprivacy"),
+            ]
         ),
         // A tiny demo proving the bridge links + the preload path (macOS).
         .executableTarget(

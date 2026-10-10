@@ -94,6 +94,7 @@ make_framework() {  # <slice> -> echoes .framework path
     cp "$ROOT/bridge/aviary_c.h" "$vdir/Headers/aviary_c.h"
     printf '%s\n' "$modulemap" > "$vdir/Modules/module.modulemap"
     info_plist "$slice" "$vdir/Resources/Info.plist"
+    cp "$ROOT/bridge/apple/PrivacyInfo.xcprivacy" "$vdir/Resources/PrivacyInfo.xcprivacy"
     ( cd "$fwdir/Versions" && ln -sfn A Current )
     ( cd "$fwdir" && ln -sfn "Versions/Current/${FW_NAME}" "${FW_NAME}" \
         && ln -sfn Versions/Current/Headers Headers \
@@ -106,6 +107,7 @@ make_framework() {  # <slice> -> echoes .framework path
     cp "$ROOT/bridge/aviary_c.h" "$fwdir/Headers/aviary_c.h"
     printf '%s\n' "$modulemap" > "$fwdir/Modules/module.modulemap"
     info_plist "$slice" "$fwdir/Info.plist"
+    cp "$ROOT/bridge/apple/PrivacyInfo.xcprivacy" "$fwdir/PrivacyInfo.xcprivacy"
   fi
   echo "$fwdir"
 }

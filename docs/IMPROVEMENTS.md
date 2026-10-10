@@ -1348,3 +1348,16 @@ selectors — validated against real-world vectors). Deferred:
   JDK 23 because the runner's Java 21 treats the foreign function API as a
   preview. It runs the 68 C++ suites plain and under ASan/UBSan, the Dart
   demos, the Go demo, the JVM demo and the Flutter demo analysis.
+
+## Apple privacy manifests - DONE (2026-10-10)
+- **[x]** `bridge/apple/PrivacyInfo.xcprivacy` (NSPrivacyTracking false, no
+  domains, no collected data types, accessed API types: FileTimestamp C617.1
+  and SystemBootTime 35F9.1). Symbol scan: `AviaryC` itself imports none of
+  the required reason APIs (std::filesystem lives in libc++), the lite static
+  archive and the CipherBird framework import `stat`, `fstat` (OpenSSL) and
+  `sysctlbyname` (libsodium), so the declaration is conservative and
+  identical everywhere. Copies as processed resources in the four Flutter
+  plugin Swift targets and the `Aviary` Swift binding target; the dynamic
+  xcframework script embeds it in each `AviaryC.framework` slice (iOS root,
+  macOS `Versions/A/Resources`). The static lite xcframework cannot carry a
+  manifest, so its plugin target's resource is the one that ships.

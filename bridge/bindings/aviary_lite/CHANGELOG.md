@@ -9,3 +9,5 @@
 - `AviaryLite` entry point (`ensureInitialized`, `instance`) and the
   shortcut extensions of aviary_dart.
 - Requires iOS 15 and macOS 12, matching the CipherBird engine inside.
+- Ships an Apple privacy manifest (no tracking, no collected data, file
+  timestamp and system boot time reasons declared).
