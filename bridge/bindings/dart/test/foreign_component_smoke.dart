@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -36,7 +36,7 @@ class DartHashEngine extends ForeignEngine {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   final eng = DartHashEngine();
   expect(bc.registerEngine('dart-engine', eng), 'register Dart engine');
   expect(
@@ -84,5 +84,5 @@ void main() {
       'PoS with a Dart proposer committed');
   pc.free();
   print(
-      'blockchainer dart foreign-component smoke: OK (Dart engine + proposer in the mixture)');
+      'aviary dart foreign-component smoke: OK (Dart engine + proposer in the mixture)');
 }

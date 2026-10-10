@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void _expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -15,7 +15,7 @@ bool _eq(Uint8List a, Uint8List b) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
 
   final node = bc.createNode(7);
   final acct = node.newAccountHybrid();
@@ -61,6 +61,6 @@ void main() {
   _expect(threw, 'wrong expected signer fails closed');
 
   node.dispose();
-  print('blockchainer Dart portable smoke: OK '
+  print('aviary Dart portable smoke: OK '
       '(passphrase + recipient + signed tiers, all fail-closed)');
 }

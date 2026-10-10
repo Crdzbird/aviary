@@ -2,18 +2,18 @@
 // surface). Each decoder must either succeed or throw CodecError — anything else
 // (or a crash caught by ASan/UBSan) is a bug.
 //
-// Build: cmake -DBLOCKCHAINER_BUILD_FUZZERS=ON (needs a libFuzzer-capable clang)
+// Build: cmake -DAVIARY_BUILD_FUZZERS=ON (needs a libFuzzer-capable clang)
 // Run:   ./build/fuzz_codec -max_total_time=60
 #include <cstddef>
 #include <cstdint>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/consensus.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/utxo_state.hpp"
-#include "blockchainer/wire.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/consensus.hpp"
+#include "aviary/types.hpp"
+#include "aviary/utxo_state.hpp"
+#include "aviary/wire.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 template <class F>

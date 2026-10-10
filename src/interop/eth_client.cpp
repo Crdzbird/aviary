@@ -1,8 +1,8 @@
-#include "blockchainer/interop/eth_client.hpp"
+#include "aviary/interop/eth_client.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer::interop {
+namespace aviary::interop {
 
 namespace {
 const char* kHex = "0123456789abcdef";
@@ -103,4 +103,4 @@ crypto::Hash EthClient::send_raw_transaction(const Bytes& raw) {
   return out;
 }
 
-}  // namespace blockchainer::interop
+}  // namespace aviary::interop

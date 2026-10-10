@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void main(List<String> args) {
-  final bc = args.isEmpty ? Blockchainer.instance : Blockchainer.open(args[0]);
-  stdout.writeln('blockchainer ${bc.version()} (${bc.cryptoBackend()})');
+  final bc = args.isEmpty ? Aviary.instance : Aviary.open(args[0]);
+  stdout.writeln('aviary ${bc.version()} (${bc.cryptoBackend()})');
   final digest = bc.hash(Uint8List.fromList('hello'.codeUnits));
   stdout.writeln(
       'blake3(hello) = ${digest.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}');

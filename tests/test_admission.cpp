@@ -5,14 +5,14 @@
 // (run_tcp_bft_node) just moves these wire bytes over a socket.
 #include <string>
 
-#include "blockchainer/admission.hpp"
-#include "blockchainer/credential_gate.hpp"
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/admission.hpp"
+#include "aviary/credential_gate.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 crypto::ByteView view(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
@@ -36,7 +36,7 @@ int main() {
   consensus::CredentialPolicy policy;
   policy.chain_id = 11;
   policy.issuer_public_key = issuer.public_key;
-  policy.header = bytes("blockchainer.credential.v1");
+  policy.header = bytes("aviary.credential.v1");
   policy.min_tier = 1;
   consensus::CredentialGate gate(policy);
 

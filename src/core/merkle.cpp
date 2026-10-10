@@ -1,10 +1,10 @@
-#include "blockchainer/merkle.hpp"
+#include "aviary/merkle.hpp"
 
 #include <set>
 #include <stdexcept>
 #include <utility>
 
-namespace blockchainer::merkle {
+namespace aviary::merkle {
 
 namespace {
 // Build the next level up, carrying a lone trailing node up unchanged.
@@ -136,4 +136,4 @@ Hash MerkleIndex::root_with_updates(const std::map<std::size_t, Hash>& changes) 
   return it != ov.end() ? it->second : levels_.back().front();
 }
 
-}  // namespace blockchainer::merkle
+}  // namespace aviary::merkle

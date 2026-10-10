@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _IntVoid = Int32 Function();
 typedef _PtrVoid = Pointer<Utf8> Function();

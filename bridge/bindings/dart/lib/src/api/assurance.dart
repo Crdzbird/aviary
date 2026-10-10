@@ -1,12 +1,12 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Assurance postures and the sealed mempool.
-extension BlockchainerAssurance on Blockchainer {
+extension AviaryAssurance on Aviary {
   /// Describes the posture at [level]: 1 standard, 2 hardened, 3 fortress.
   AssuranceProfile describeAssurance(int level) {
     final b = _take(
       lib.lookupFunction<_AsDescribeC, _AsDescribeD>(
-          'blockchainer_assurance_describe')(level),
+          'aviary_assurance_describe')(level),
       'assurance_describe',
     );
     return AssuranceProfile(
@@ -31,7 +31,7 @@ extension BlockchainerAssurance on Blockchainer {
       _scoped(
         [body, author, signature],
         (p) => _take(
-          lib.lookupFunction<_TxEncodeC, _TxEncodeD>('blockchainer_tx_encode')(
+          lib.lookupFunction<_TxEncodeC, _TxEncodeD>('aviary_tx_encode')(
               version,
               chainId,
               sigAlgo,
@@ -50,7 +50,7 @@ extension BlockchainerAssurance on Blockchainer {
   Uint8List sealTx(Uint8List txEncoded, Uint8List proposerKemPublic) => _scoped(
         [txEncoded, proposerKemPublic],
         (p) => _take(
-          lib.lookupFunction<_Buf2C, _Buf2D>('blockchainer_sealed_tx_seal')(
+          lib.lookupFunction<_Buf2C, _Buf2D>('aviary_sealed_tx_seal')(
               p[0], txEncoded.length, p[1], proposerKemPublic.length),
           'sealed_tx_seal',
         ),
@@ -58,8 +58,8 @@ extension BlockchainerAssurance on Blockchainer {
 
   /// Opens a sealed mempool with room for [capacity] transactions.
   SealedMempool makeSealedMempool(int capacity) {
-    final h = lib.lookupFunction<_SmNewC, _SmNewD>(
-        'blockchainer_sealed_mempool_new')(capacity);
+    final h = lib.lookupFunction<_SmNewC, _SmNewD>('aviary_sealed_mempool_new')(
+        capacity);
     return SealedMempool._(this, _requireHandle(h, 'sealed mempool creation'));
   }
 }

@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A validator's BLS public key and voting power.
 typedef ValidatorEntry = ({Uint8List publicKey, int power});

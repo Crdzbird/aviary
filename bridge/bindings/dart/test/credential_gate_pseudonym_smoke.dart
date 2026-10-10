@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -16,13 +16,13 @@ bool eq(Uint8List a, Uint8List b) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
 
   final issuer = bc.newBBSIssuer(fill(0x2a));
   final policy = bc.makeCredentialPolicy(
     chainId: 7,
     issuerPublic: issuer.public,
-    header: Uint8List.fromList('blockchainer.credential.v2'.codeUnits),
+    header: Uint8List.fromList('aviary.credential.v2'.codeUnits),
     minTier: 2,
     mode: 1,
   );
@@ -122,6 +122,6 @@ void main() {
       'malformed rejected');
 
   gate.free();
-  print('blockchainer dart credential-gate pseudonymous smoke: OK '
+  print('aviary dart credential-gate pseudonymous smoke: OK '
       '(blind issuance, per-epoch pseudonym, Sybil cap, revocation)');
 }

@@ -1,9 +1,9 @@
-#include "blockchainer/interop/bridge.hpp"
+#include "aviary/interop/bridge.hpp"
 
 #include <algorithm>
 #include <stdexcept>
 
-namespace blockchainer::interop::bridge {
+namespace aviary::interop::bridge {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -221,4 +221,4 @@ bool BridgeEndpoint::processed(std::uint64_t source_chain, std::uint64_t nonce) 
   return processed_.count({source_chain, nonce}) != 0;
 }
 
-}  // namespace blockchainer::interop::bridge
+}  // namespace aviary::interop::bridge

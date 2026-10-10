@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 const chainId = 0x9001;
 const credit = 1000000;
@@ -24,7 +24,7 @@ void main(List<String> args) {
   final bAddr = _u(j['bobAddress'] as String);
   final goRoot = j['stateRoot'] as String;
 
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   final node = bc.createNode(chainId);
   final aAddr = node.accountAddress(aPub);
   node.credit(aAddr, credit);

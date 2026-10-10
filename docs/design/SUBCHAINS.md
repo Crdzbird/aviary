@@ -14,7 +14,7 @@ this reuses); `IMPROVEMENTS.md` (composable chains, foreign components).
 
 ## 0. One-paragraph summary
 
-A **subchain** is an ordinary blockchainer chain (any mixture the
+A **subchain** is an ordinary aviary chain (any mixture the
 `ChainBlueprint` allows) whose finalized progress is **anchored** into a
 *parent* chain: a parent block carries, for each child it anchors, the child's
 finalized block header plus the child's commit certificate. The parent's
@@ -361,7 +361,7 @@ Integration
   the same block hash — proves anchors validate identically on non-proposers.
 - Sanitizers: ASan/UBSan on all of the above, TSan on the reactor run.
 
-Bindings (after the core is green): C ABI `blockchainer_subchain_policy_encode`,
+Bindings (after the core is green): C ABI `aviary_subchain_policy_encode`,
 `_genesis_commit_subchains`, `_anchor_encode`, `_chain_propose_anchored`,
 `_chain_child_tip`, `_verify_subchain_proof`; Go/npm/JVM/Swift/Dart each build a
 two-level tree and verify a cross-chain proof — 1-1 parity as always.

@@ -37,8 +37,8 @@ dependencies:
   grpc: ^5.1.0
   protobuf: ^6.0.0
   fixnum: ^1.1.0
-  blockchainer:
-    path: ../../../bridge/bindings/blockchainer
+  aviary:
+    path: ../../../bridge/bindings/aviary
 
 dev_dependencies:
   flutter_test:

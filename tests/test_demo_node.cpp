@@ -1,11 +1,11 @@
 #include <string>
 
-#include "blockchainer/node/demo_node.hpp"
-#include "blockchainer/proofs.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/node/demo_node.hpp"
+#include "aviary/proofs.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using node::DemoNode;
 
 namespace {
@@ -49,8 +49,8 @@ int main() {
   std::printf("== observability: metrics ==\n");
   {
     std::string m = node.metrics_text();
-    CHECK(contains(m, "blockchainer_chain_height 1"));
-    CHECK(contains(m, "blockchainer_transactions_total 1"));
+    CHECK(contains(m, "aviary_chain_height 1"));
+    CHECK(contains(m, "aviary_transactions_total 1"));
   }
 
   std::printf("== verification: prove alice's balance ==\n");

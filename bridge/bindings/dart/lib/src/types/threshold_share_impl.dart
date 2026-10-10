@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final class _ThresholdShare implements ThresholdShare {
   const _ThresholdShare(

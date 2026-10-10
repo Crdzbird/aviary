@@ -4,13 +4,13 @@
 // or a tampered envelope is dropped on reveal.
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/sealed_mempool.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/sealed_mempool.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using p2p::SealedMempool;
 using p2p::SealedTx;
 

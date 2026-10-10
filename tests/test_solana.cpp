@@ -2,15 +2,15 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/codec.hpp"
-#include "blockchainer/interop/encoding.hpp"
-#include "blockchainer/interop/json.hpp"
-#include "blockchainer/interop/solana.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/codec.hpp"
+#include "aviary/interop/encoding.hpp"
+#include "aviary/interop/json.hpp"
+#include "aviary/interop/solana.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::interop;
+using namespace aviary;
+using namespace aviary::interop;
 using solana::Pubkey;
 
 namespace {

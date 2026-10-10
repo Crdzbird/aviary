@@ -1,4 +1,4 @@
-module github.com/Crdzbird/Blockchainer/bridge/bindings/go
+module github.com/Crdzbird/Aviary/bridge/bindings/go
 
 go 1.24
 

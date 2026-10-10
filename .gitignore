@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Blockchainer .gitignore
+# Aviary .gitignore
 # Native libraries and platform build outputs are NOT committed — they are large
 # and machine-built. Rebuild them with the scripts in scripts/ (and the sibling
 # cryptolib checkout). See each binding's README.
@@ -30,7 +30,7 @@ DerivedData/
 /examples/atlas/server/atlas-server
 /examples/sentinel/server/sentinel-server
 /examples/interop/server/interop-server
-/bridge/bindings/go/**/blockchainer_demo
+/bridge/bindings/go/**/aviary_demo
 
 # ── JVM ──
 /bridge/bindings/jvm/out/
@@ -59,3 +59,6 @@ local.properties
 *.iml
 **/xcuserdata/
 .DS_Store
+
+# merged CipherBird xcframework for the Swift binding (scripts/apple/vendor_cipherbird.sh)
+bridge/bindings/swift/Vendor/

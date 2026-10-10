@@ -1,10 +1,10 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Subchains: registering children and binding them to a parent.
-extension BlockchainerSubchains on Blockchainer {
+extension AviarySubchains on Aviary {
   /// The genesis header of a genesis, the identity a parent registers by.
   Uint8List genesisHeader(Uint8List genesis) =>
-      _bufOp('blockchainer_genesis_header', genesis);
+      _bufOp('aviary_genesis_header', genesis);
 
   /// Encodes a child registration. [maxDepth] is the child's own subtree
   /// depth, 0 for a leaf.
@@ -20,7 +20,7 @@ extension BlockchainerSubchains on Blockchainer {
           [genesisHeader, _publicKeys(validators)],
           (p) => _take(
             lib.lookupFunction<_ScChildRegC, _ScChildRegD>(
-                    'blockchainer_child_registration_encode')(chainId, p[0],
+                    'aviary_child_registration_encode')(chainId, p[0],
                 genesisHeader.length, p[1], pw, validators.length, maxDepth),
             'child_registration_encode',
           ),
@@ -41,7 +41,7 @@ extension BlockchainerSubchains on Blockchainer {
       [blob],
       (p) => _take(
         lib.lookupFunction<_ScPolicyC, _ScPolicyD>(
-                'blockchainer_subchain_policy_encode')(maxChildren, maxDepth,
+                'aviary_subchain_policy_encode')(maxChildren, maxDepth,
             maxAnchorsPerBlock, maxHeadersPerAnchor, p[0], blob.length),
         'subchain_policy_encode',
       ),
@@ -50,7 +50,7 @@ extension BlockchainerSubchains on Blockchainer {
 
   /// Commits a policy into a genesis; the chain becomes a parent.
   Uint8List commitSubchainPolicy(Uint8List genesis, Uint8List policy) =>
-      _buf2Op('blockchainer_genesis_commit_subchain_policy', genesis, policy);
+      _buf2Op('aviary_genesis_commit_subchain_policy', genesis, policy);
 
   /// Binds a child genesis to its parent by id and 32 byte genesis hash.
   Uint8List commitParentBinding(
@@ -62,7 +62,7 @@ extension BlockchainerSubchains on Blockchainer {
         [genesis, parentGenesisHash],
         (p) => _take(
           lib.lookupFunction<_ScBindingC, _ScBindingD>(
-                  'blockchainer_genesis_commit_parent_binding')(
+                  'aviary_genesis_commit_parent_binding')(
               p[0], genesis.length, parentChainId, p[1]),
           'genesis_commit_parent_binding',
         ),

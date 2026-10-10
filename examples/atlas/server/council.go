@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	pb "atlas/gen"
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

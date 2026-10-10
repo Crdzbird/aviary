@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// One chain of a family; [children] are subchains and must be BFT.
 abstract final class TreeNode {

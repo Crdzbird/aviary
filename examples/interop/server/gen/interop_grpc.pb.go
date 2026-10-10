@@ -4,9 +4,9 @@
 // - protoc             v7.36.1
 // source: interop.proto
 
-// Interop — proves the Blockchainer ledger is byte-identical across language
-// bindings. A Go server (blockchainer Go binding, full node) and a Flutter
-// client (blockchainer, native) each run the ledger independently and
+// Interop — proves the Aviary ledger is byte-identical across language
+// bindings. A Go server (aviary Go binding, full node) and a Flutter
+// client (aviary, native) each run the ledger independently and
 // cross-check three directions:
 //
 //   • go → flutter : the server builds a chain and returns a light-client proof;

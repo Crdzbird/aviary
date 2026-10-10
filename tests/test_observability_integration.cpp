@@ -3,18 +3,18 @@
 #include <memory>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/bft_engine.hpp"
-#include "blockchainer/mempool.hpp"
-#include "blockchainer/observability/event_bus.hpp"
-#include "blockchainer/observability/events.hpp"
-#include "blockchainer/observability/metrics.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/mempool.hpp"
+#include "aviary/observability/event_bus.hpp"
+#include "aviary/observability/events.hpp"
+#include "aviary/observability/metrics.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::consensus;
-namespace obs = blockchainer::observe;
+using namespace aviary;
+using namespace aviary::consensus;
+namespace obs = aviary::observe;
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -82,9 +82,9 @@ int main() {
   CHECK(finalized_txcounts[0] == 2);  // both alice txs included
   CHECK(removed == 2);
 
-  CHECK(metrics.gauge("blockchainer_chain_height").value() == 1);
-  CHECK(metrics.counter("blockchainer_blocks_finalized_total").value() == 1);
-  CHECK(metrics.counter("blockchainer_transactions_total").value() == 2);
+  CHECK(metrics.gauge("aviary_chain_height").value() == 1);
+  CHECK(metrics.counter("aviary_blocks_finalized_total").value() == 1);
+  CHECK(metrics.counter("aviary_transactions_total").value() == 2);
 
   std::printf("== a second (empty) block advances height, not tx count ==\n");
   {
@@ -93,8 +93,8 @@ int main() {
     CHECK(engine.finalize(blk, *cert).ok);
   }
   CHECK(finalized_heights.size() == 2);
-  CHECK(metrics.gauge("blockchainer_chain_height").value() == 2);
-  CHECK(metrics.counter("blockchainer_transactions_total").value() == 2);  // unchanged
+  CHECK(metrics.gauge("aviary_chain_height").value() == 2);
+  CHECK(metrics.counter("aviary_transactions_total").value() == 2);  // unchanged
 
   std::printf("== a rejected block fires BlockRejected ==\n");
   {
@@ -109,9 +109,9 @@ int main() {
   std::printf("== prometheus exposition reflects chain state ==\n");
   {
     const std::string text = metrics.prometheus_text();
-    CHECK(contains(text, "blockchainer_chain_height 2"));
-    CHECK(contains(text, "blockchainer_blocks_finalized_total 2"));
-    CHECK(contains(text, "blockchainer_transactions_total 2"));
+    CHECK(contains(text, "aviary_chain_height 2"));
+    CHECK(contains(text, "aviary_blocks_finalized_total 2"));
+    CHECK(contains(text, "aviary_transactions_total 2"));
   }
 
   return bctest::summary();

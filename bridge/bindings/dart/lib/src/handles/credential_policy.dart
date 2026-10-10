@@ -1,11 +1,11 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A membership policy: issuer key, attribute schema and tier threshold.
-/// Build one with [BlockchainerCredentials.makeCredentialPolicy].
+/// Build one with [AviaryCredentials.makeCredentialPolicy].
 final class CredentialPolicy {
   CredentialPolicy._(this._bc, this.encoded);
 
-  final Blockchainer _bc;
+  final Aviary _bc;
 
   /// The policy's canonical bytes.
   final Uint8List encoded;
@@ -15,7 +15,7 @@ final class CredentialPolicy {
         [encoded],
         (p) => _bc._take(
           _bc.lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-              'blockchainer_credential_policy_hash')(p[0], encoded.length),
+              'aviary_credential_policy_hash')(p[0], encoded.length),
           'credential_policy_hash',
         ),
       );
@@ -32,7 +32,7 @@ final class CredentialPolicy {
         [encoded, issuerSecret, memberSecret],
         (p) => _bc._take(
           _bc.lib.lookupFunction<_CredIssueC, _CredIssueD>(
-                  'blockchainer_credential_issue')(
+                  'aviary_credential_issue')(
               p[0],
               encoded.length,
               p[1],
@@ -60,8 +60,8 @@ final class CredentialPolicy {
           [encoded, credential, challenge],
           (p) => _bc._take(
             _bc.lib.lookupFunction<_CredPresentC, _CredPresentD>(
-                    'blockchainer_credential_present')(p[0], encoded.length,
-                p[1], credential.length, epoch, sp, p[2], challenge.length),
+                    'aviary_credential_present')(p[0], encoded.length, p[1],
+                credential.length, epoch, sp, p[2], challenge.length),
             'credential_present',
           ),
         ),

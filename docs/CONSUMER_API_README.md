@@ -1,14 +1,14 @@
-# Blockchainer API
+# Aviary API
 
-A small, production-shaped **HTTP/JSON API** over [Blockchainer](https://github.com/Crdzbird/blockchainer) —
+A small, production-shaped **HTTP/JSON API** over [Aviary](https://github.com/Crdzbird/aviary) —
 a distributed-ledger core (ledger, BFT consensus, mempool, observability,
 light-client verification) plus EVM/Bitcoin/Solana interop. This service embeds
-the Blockchainer **Go binding** (cgo) and exposes it as a stateless-ish REST API:
+the Aviary **Go binding** (cgo) and exposes it as a stateless-ish REST API:
 create chains, manage accounts, submit transfers, finalize blocks, serve
 light-client proofs, and derive/sign cross-chain transactions.
 
 ```
-HTTP client ──REST/JSON──▶ blockchainer-api (Go) ──cgo──▶ libblockchainer_c
+HTTP client ──REST/JSON──▶ aviary-api (Go) ──cgo──▶ libaviary_c
                                                             └─▶ libcryptolib_c
 ```
 
@@ -24,7 +24,7 @@ HTTP client ──REST/JSON──▶ blockchainer-api (Go) ──cgo──▶ li
 - **Interop** — derive Ethereum / Bitcoin / Solana addresses; build + **sign
   ERC-20 / legacy EVM transactions** server-side.
 - **Deterministic** — canonical bytes (hash, txid, header hash) are byte-identical
-  to every other Blockchainer binding (Dart/Flutter, Node, Swift).
+  to every other Aviary binding (Dart/Flutter, Node, Swift).
 
 ---
 
@@ -35,18 +35,18 @@ HTTP client ──REST/JSON──▶ blockchainer-api (Go) ──cgo──▶ li
 | Go | 1.24+ |
 | cgo | **`CGO_ENABLED=1`** (default unless cross-compiling) — this service links C |
 | Toolchain | a C/C++ toolchain (clang/gcc) and `cmake`/`ninja` to build the native libs |
-| Native libs | `libblockchainer_c` + `libcryptolib_c` (built once; see below) |
+| Native libs | `libaviary_c` + `libcryptolib_c` (built once; see below) |
 
-> Blockchainer's crypto backend is **cryptolib**. Until both are published, you
+> Aviary's crypto backend is **cryptolib**. Until both are published, you
 > consume them from **sibling checkouts** via Go `replace` directives.
 
 Lay the repos out side by side:
 
 ```
 ~/code/
-├── blockchainer/        # github.com/Crdzbird/blockchainer
+├── aviary/        # github.com/Crdzbird/aviary
 ├── cryptolib/           # the cryptolib repo (private/sibling)
-└── blockchainer-api/    # THIS service
+└── aviary-api/    # THIS service
 ```
 
 ---
@@ -57,31 +57,31 @@ Lay the repos out side by side:
 # cryptolib (provides libcryptolib_c)
 ( cd ../cryptolib   && cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release )
 
-# blockchainer (provides libblockchainer_c, which links cryptolib)
-( cd ../blockchainer && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build )
+# aviary (provides libaviary_c, which links cryptolib)
+( cd ../aviary && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build )
 ```
 
-The Blockchainer Go binding's default (`cgo_local`) linkage bakes the rpaths to
+The Aviary Go binding's default (`cgo_local`) linkage bakes the rpaths to
 these build dirs, so dev binaries run with **no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH`**.
 
 ## 2. Wire up the dependency (`go.mod`)
 
 ```go
-module github.com/Crdzbird/blockchainer-api
+module github.com/Crdzbird/aviary-api
 
 go 1.24
 
-require github.com/Crdzbird/Blockchainer/bridge/bindings/go v0.0.0-00010101000000-000000000000
+require github.com/Crdzbird/Aviary/bridge/bindings/go v0.0.0-00010101000000-000000000000
 
 // Sibling checkouts (neither library is published yet).
-replace github.com/Crdzbird/Blockchainer/bridge/bindings/go => ../blockchainer/bridge/bindings/go
+replace github.com/Crdzbird/Aviary/bridge/bindings/go => ../aviary/bridge/bindings/go
 replace github.com/Crdzbird/CryptoLib/bridge/bindings/go    => ../cryptolib/bridge/bindings/go
 ```
 
 Import the package:
 
 ```go
-import bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+import bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 ```
 
 ## 3. Run
@@ -206,7 +206,7 @@ import (
 	"net/http"
 	"sync"
 
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 )
 
 type chain struct {
@@ -263,10 +263,10 @@ func (s *server) produceBlock(w http.ResponseWriter, r *http.Request) {
 ### Dynamic (default, dev)
 
 ```bash
-CGO_ENABLED=1 go build -o blockchainer-api ./cmd/server
+CGO_ENABLED=1 go build -o aviary-api ./cmd/server
 ```
 
-Ship `libblockchainer_c` + `libcryptolib_c` alongside, or rely on the baked dev
+Ship `libaviary_c` + `libcryptolib_c` alongside, or rely on the baked dev
 rpaths / set `LD_LIBRARY_PATH`.
 
 ### Static (recommended for containers) — one self-contained binary
@@ -275,18 +275,18 @@ Build the merged static archives once, then link them in:
 
 ```bash
 ( cd ../cryptolib    && scripts/build_static_archive.sh )   # build/static/libcryptolib_c.a
-( cd ../blockchainer && scripts/build_static_archive.sh )   # build/static/libblockchainer_c.a
+( cd ../aviary && scripts/build_static_archive.sh )   # build/static/libaviary_c.a
 
-CGO_ENABLED=1 go build -tags "blockchainer_static cryptolib_static" -o blockchainer-api ./cmd/server
+CGO_ENABLED=1 go build -tags "aviary_static cryptolib_static" -o aviary-api ./cmd/server
 ```
 
-The result has **no `libblockchainer_c` / `libcryptolib_c` shared-library
+The result has **no `libaviary_c` / `libcryptolib_c` shared-library
 dependency** — nothing to ship, no rpath, no `LD_LIBRARY_PATH` (only the system
 C++ runtime). Verify:
 
 ```bash
-otool -L blockchainer-api | grep -iE 'blockchainer|cryptolib' || echo "self-contained ✓"   # macOS
-ldd      blockchainer-api | grep -iE 'blockchainer|cryptolib' || echo "self-contained ✓"   # Linux
+otool -L aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ✓"   # macOS
+ldd      aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ✓"   # Linux
 ```
 
 ### Docker (multi-stage, static)
@@ -295,15 +295,15 @@ ldd      blockchainer-api | grep -iE 'blockchainer|cryptolib' || echo "self-cont
 FROM golang:1.24 AS build
 RUN apt-get update && apt-get install -y cmake ninja-build clang
 WORKDIR /src
-# COPY the three repos (blockchainer-api, blockchainer, cryptolib) side by side,
+# COPY the three repos (aviary-api, aviary, cryptolib) side by side,
 # build the static archives, then:
-RUN CGO_ENABLED=1 go build -tags "blockchainer_static cryptolib_static" \
-    -o /out/blockchainer-api ./cmd/server
+RUN CGO_ENABLED=1 go build -tags "aviary_static cryptolib_static" \
+    -o /out/aviary-api ./cmd/server
 
 FROM gcc:14-slim          # provides libstdc++ for the C++ runtime
-COPY --from=build /out/blockchainer-api /usr/local/bin/
+COPY --from=build /out/aviary-api /usr/local/bin/
 EXPOSE 8080
-ENTRYPOINT ["blockchainer-api"]
+ENTRYPOINT ["aviary-api"]
 ```
 
 ---
@@ -311,7 +311,7 @@ ENTRYPOINT ["blockchainer-api"]
 ## Project layout
 
 ```
-blockchainer-api/
+aviary-api/
 ├── cmd/server/main.go     # wiring, http.Server, graceful shutdown
 ├── internal/api/          # handlers, routing, request/response types
 ├── internal/ledger/       # thin service over *bc.Node (mutex-guarded registry)
@@ -326,7 +326,7 @@ blockchainer-api/
 ## Safety notes
 
 - **Determinism is consensus.** The canonical bytes this service returns (txids,
-  state roots, header hashes) are byte-identical across every Blockchainer
+  state roots, header hashes) are byte-identical across every Aviary
   binding — don't post-process them; pass them through verbatim.
 - **Secrets.** Transfer/signing endpoints accept raw private keys for demo
   ergonomics. In production, keep keys server-side (a custodial keyring or HSM)
@@ -336,4 +336,4 @@ blockchainer-api/
 
 ## License
 
-MIT (match Blockchainer).
+MIT (match Aviary).

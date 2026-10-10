@@ -1,8 +1,8 @@
-#include "blockchainer/noise_session.hpp"
+#include "aviary/noise_session.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 constexpr std::uint8_t kVersion = 0x01;
@@ -109,4 +109,4 @@ Bytes NoiseSession::decrypt(const Bytes& record) {
   return noise_.decrypt(view(record));
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

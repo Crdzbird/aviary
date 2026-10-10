@@ -1,6 +1,6 @@
-#include "blockchainer/peer_book.hpp"
+#include "aviary/peer_book.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -110,4 +110,4 @@ AddressBook AddressBook::decode(codec::ByteView bytes) {
   return book;
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

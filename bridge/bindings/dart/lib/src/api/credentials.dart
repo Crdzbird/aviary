@@ -1,13 +1,13 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Anonymous membership credentials: issuers, policies and gates.
-extension BlockchainerCredentials on Blockchainer {
+extension AviaryCredentials on Aviary {
   /// A BBS issuer key pair from at least 32 bytes of key material.
   KeyPairBytes newBBSIssuer(Uint8List keyMaterial) => _scoped(
         [keyMaterial],
         (p) => _splitKeyBlob(_take(
-          lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-              'blockchainer_bbs_keygen')(p[0], keyMaterial.length),
+          lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_bbs_keygen')(
+              p[0], keyMaterial.length),
           'bbs_keygen',
         )),
       );
@@ -25,7 +25,7 @@ extension BlockchainerCredentials on Blockchainer {
       _scoped([issuerPublic, header], (p) {
         final enc = mode == 0
             ? lib.lookupFunction<_CredPolicyEncodeC, _CredPolicyEncodeD>(
-                    'blockchainer_credential_policy_encode')(
+                    'aviary_credential_policy_encode')(
                 chainId,
                 p[0],
                 issuerPublic.length,
@@ -34,7 +34,7 @@ extension BlockchainerCredentials on Blockchainer {
                 attributeCount,
                 minTier)
             : lib.lookupFunction<_CredPolicyEncodeExC, _CredPolicyEncodeExD>(
-                    'blockchainer_credential_policy_encode_ex')(
+                    'aviary_credential_policy_encode_ex')(
                 chainId,
                 p[0],
                 issuerPublic.length,
@@ -50,7 +50,7 @@ extension BlockchainerCredentials on Blockchainer {
   CredentialGate makeCredentialGate(CredentialPolicy policy) =>
       _scoped([policy.encoded], (p) {
         final h = lib.lookupFunction<_CredGateNewC, _CredGateNewD>(
-            'blockchainer_credential_gate_new')(p[0], policy.encoded.length);
+            'aviary_credential_gate_new')(p[0], policy.encoded.length);
         return CredentialGate._(
             this, _requireHandle(h, 'credential gate creation'));
       });
@@ -61,8 +61,7 @@ extension BlockchainerCredentials on Blockchainer {
       _scoped(
         [membershipCommit, blindIssuance],
         (p) => _take(
-          lib.lookupFunction<_Buf2C, _Buf2D>(
-                  'blockchainer_finalize_membership')(
+          lib.lookupFunction<_Buf2C, _Buf2D>('aviary_finalize_membership')(
               p[0], membershipCommit.length, p[1], blindIssuance.length),
           'finalize_membership',
         ),

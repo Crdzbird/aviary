@@ -1,11 +1,11 @@
 // Kotlin demo — the same Java FFM binding, called idiomatically from Kotlin.
 // Build:  kotlinc Demo.kt -cp out -include-runtime -d demo.jar
 // Run:    java --enable-native-access=ALL-UNNAMED -cp out:demo.jar DemoKt
-import blockchainer.Blockchainer
+import aviary.Aviary
 
 fun main() {
-    Blockchainer().use { bc ->
-        println("blockchainer ${bc.version()} (crypto backend ${bc.cryptoBackend()})\n")
+    Aviary().use { bc ->
+        println("aviary ${bc.version()} (crypto backend ${bc.cryptoBackend()})\n")
 
         val node = bc.createNode(7)
         val alice = node.newAccount()

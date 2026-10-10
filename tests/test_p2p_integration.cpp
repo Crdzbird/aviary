@@ -5,16 +5,16 @@
 #include <memory>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/bft_engine.hpp"
-#include "blockchainer/mempool.hpp"
-#include "blockchainer/secure_session.hpp"
-#include "blockchainer/version.hpp"
-#include "blockchainer/wire.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/mempool.hpp"
+#include "aviary/secure_session.hpp"
+#include "aviary/version.hpp"
+#include "aviary/wire.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::consensus;
+using namespace aviary;
+using namespace aviary::consensus;
 using p2p::SecureSession;
 
 namespace {

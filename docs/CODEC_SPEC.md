@@ -1,4 +1,4 @@
-# Blockchainer Canonical Codec — Specification (DRAFT)
+# Aviary Canonical Codec — Specification (DRAFT)
 
 > The byte-exact encoding rules every hashed object obeys. This is the
 > determinism contract (ARCHITECTURE §2, §4): one value has **exactly one** valid
@@ -38,7 +38,7 @@
 
 ## Hashing & domain separation
 
-Primary hash: **BLAKE3-256** (`blockchainer::crypto::blake3_256`). Every hashed
+Primary hash: **BLAKE3-256** (`aviary::crypto::blake3_256`). Every hashed
 structure is prefixed with a 1-byte **domain tag** so a leaf can never collide
 with an internal node or a header:
 

@@ -338,7 +338,7 @@ namespace crypto {
 }
 
 // consensus/membership policy + the gate
-namespace blockchainer::consensus {
+namespace aviary::consensus {
   struct CredentialPolicy { /* §7; encode()/decode_all()/hash() */ };
 
   class CredentialGate {
@@ -374,7 +374,7 @@ recorded inline.**
    - **(a) Preferred — upstream it.** Request the BBS *pseudonym* extension
      (`draft-irtf-cfrg-bbs-per-verifier-linkability`, aka BBS# pseudonym mode) in
      cryptolib. This puts the ZK-soundness burden where the crypto expertise is
-     and keeps blockchainer a *consumer* of vetted primitives — consistent with
+     and keeps aviary a *consumer* of vetted primitives — consistent with
      the whole architecture (we never reimplement crypto).
    - **(b) Fallback — custom construction.** OPRF *is* available
      (`oprf_{blind,blind_evaluate,evaluate,finalize,derive_keypair}`), so a
@@ -471,7 +471,7 @@ Given the §10 audit (bare BBS only; OPRF present; no pseudonym or blind-commit)
 The shippable-now core is **BBS wrappers + Option-A unlinkable admission**; the
 headline feature (Sybil-resistant anonymous membership) is **correctly blocked on
 an upstream cryptolib primitive** rather than on a home-grown ZK protocol. This
-keeps blockchainer a consumer of vetted crypto and avoids the single most
+keeps aviary a consumer of vetted crypto and avoids the single most
 dangerous way this feature could go wrong. Next action is a **cryptolib feature
 request for BBS pseudonyms** — **filed** as
 [`docs/CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md`](../CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md)

@@ -1,8 +1,8 @@
-#include "blockchainer/subchain_relay.hpp"
+#include "aviary/subchain_relay.hpp"
 
 #include <algorithm>
 
-namespace blockchainer::node {
+namespace aviary::node {
 
 std::optional<Anchor> pending_anchor(const SubchainRegistry& parent, std::uint64_t child_chain_id,
                                      const BlockStore& child_archive, std::uint16_t limit) {
@@ -36,4 +36,4 @@ std::vector<Anchor> pending_anchors(const SubchainRegistry& parent,
   return out;
 }
 
-}  // namespace blockchainer::node
+}  // namespace aviary::node

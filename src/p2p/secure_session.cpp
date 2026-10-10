@@ -1,20 +1,20 @@
-#include "blockchainer/secure_session.hpp"
+#include "aviary/secure_session.hpp"
 
 #include <stdexcept>
 
-#include "blockchainer/codec.hpp"
+#include "aviary/codec.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 
 // Domain-separated directional keys derived from the KEM shared secret.
-constexpr const char* kCtxI2R = "blockchainer-p2p-i2r-v1";
-constexpr const char* kCtxR2I = "blockchainer-p2p-r2i-v1";
+constexpr const char* kCtxI2R = "aviary-p2p-i2r-v1";
+constexpr const char* kCtxR2I = "aviary-p2p-r2i-v1";
 // Channel binder: proves knowledge of the shared secret inside the signed
 // transcript, so a transcript signature is bound to this exact key agreement.
-constexpr const char* kCtxBind = "blockchainer-p2p-bind-v1";
+constexpr const char* kCtxBind = "aviary-p2p-bind-v1";
 
 // Transcript role tags — a signature for one role can never verify as the other.
 constexpr std::uint8_t kRoleInitiator = 0x01;
@@ -153,4 +153,4 @@ Bytes SecureSession::decrypt(const Bytes& frame) {
   return dec_->pull(view(frame));
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

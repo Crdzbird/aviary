@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 String _hex(Uint8List b) =>
     b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
@@ -19,12 +19,11 @@ void main(List<String> args) {
   final libPath = args.isNotEmpty
       ? args[0]
       : Platform.script
-          .resolve('../../../../build/libblockchainer_c.dylib')
+          .resolve('../../../../build/libaviary_c.dylib')
           .toFilePath();
-  final bc = Blockchainer.open(libPath);
+  final bc = Aviary.open(libPath);
 
-  print(
-      'blockchainer ${bc.version()} (crypto backend ${bc.cryptoBackend()})\n');
+  print('aviary ${bc.version()} (crypto backend ${bc.cryptoBackend()})\n');
 
   final node = bc.createNode(42);
   final alice = node.newAccount();

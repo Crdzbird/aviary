@@ -2,21 +2,21 @@
 // version-3 header fence, and genesis commitment — no anchoring behaviour yet.
 #include <cstdio>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/assurance.hpp"
-#include "blockchainer/bft_engine.hpp"
-#include "blockchainer/block_store.hpp"
-#include "blockchainer/chain_assembler.hpp"
-#include "blockchainer/chain_blueprint.hpp"
-#include "blockchainer/pos_engine.hpp"
-#include "blockchainer/subchain_relay.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/ledger.hpp"
-#include "blockchainer/subchain.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/assurance.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/block_store.hpp"
+#include "aviary/chain_assembler.hpp"
+#include "aviary/chain_blueprint.hpp"
+#include "aviary/pos_engine.hpp"
+#include "aviary/subchain_relay.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/ledger.hpp"
+#include "aviary/subchain.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 crypto::ByteView v(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }

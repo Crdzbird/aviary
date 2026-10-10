@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A built family of chains driven in process. [produce] anchors children
 /// upward automatically; [ChainTreeQueries.proveAccount] proves any
@@ -13,13 +13,12 @@ final class ChainTree {
       ..keepIsolateAlive = false;
     final ctx = Pointer<Void>.fromAddress(_handle);
     _bc.lib.lookupFunction<_TreeSetFinC, _TreeSetFinD>(
-            'blockchainer_chain_tree_set_finalized_hook')(
-        _h, _fin.nativeFunction, ctx);
+        'aviary_chain_tree_set_finalized_hook')(_h, _fin.nativeFunction, ctx);
     _bc.lib.lookupFunction<_TreeSetTxC, _TreeSetTxD>(
-        'blockchainer_chain_tree_set_tx_source')(_h, _tx.nativeFunction, ctx);
+        'aviary_chain_tree_set_tx_source')(_h, _tx.nativeFunction, ctx);
   }
 
-  final Blockchainer _bc;
+  final Aviary _bc;
   final Pointer<Void> _h;
   final int _handle;
   late final NativeCallable<_TreeFinC> _fin;
@@ -34,7 +33,7 @@ final class ChainTree {
   /// Produces and finalizes the next block on [chainId].
   Uint8List produce(int chainId, int timestamp) => _bc._take(
         _bc.lib.lookupFunction<_TreeProduceC, _TreeProduceD>(
-            'blockchainer_chain_tree_produce')(_h, chainId, timestamp),
+            'aviary_chain_tree_produce')(_h, chainId, timestamp),
         'chain_tree_produce',
       );
 
@@ -43,14 +42,14 @@ final class ChainTree {
         [proof],
         (p) =>
             _bc.lib.lookupFunction<_TreeVerifyC, _TreeVerifyD>(
-                'blockchainer_chain_tree_verify')(_h, p[0], proof.length) ==
+                'aviary_chain_tree_verify')(_h, p[0], proof.length) ==
             1,
       );
 
   /// Releases the native tree and its hooks.
   void free() {
     _bc.lib.lookupFunction<_HandleFreeC, _HandleFreeD>(
-        'blockchainer_chain_tree_free')(_h);
+        'aviary_chain_tree_free')(_h);
     _trees.remove(_handle);
     _fin.close();
     _tx.close();

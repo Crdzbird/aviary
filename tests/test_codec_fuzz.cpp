@@ -1,37 +1,37 @@
 // Deterministic fuzz-lite + round-trip property tests for the deserializers
 // (the untrusted-input attack surface). Goal: on ANY bytes, every decoder
 // either succeeds or throws CodecError — never any other exception, never a
-// crash. Build with -DBLOCKCHAINER_SANITIZE=ON to run these under ASan/UBSan.
+// crash. Build with -DAVIARY_SANITIZE=ON to run these under ASan/UBSan.
 #include <cstdint>
 #include <vector>
 
 #include <string>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/block_store.hpp"
-#include "blockchainer/chain_blueprint.hpp"
-#include "blockchainer/subchain.hpp"
-#include "blockchainer/chain_tree.hpp"
-#include "blockchainer/consensus.hpp"
-#include "blockchainer/credential_gate.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/interop/bridge.hpp"
-#include "blockchainer/interop/encoding.hpp"
-#include "blockchainer/interop/json.hpp"
-#include "blockchainer/interop/rlp.hpp"
-#include "blockchainer/peer_book.hpp"
-#include "blockchainer/threshold.hpp"
-#include "blockchainer/pos_engine.hpp"
-#include "blockchainer/sealed_mempool.hpp"
-#include "blockchainer/vrf_pos.hpp"
-#include "blockchainer/pow_engine.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/utxo_state.hpp"
-#include "blockchainer/version.hpp"
-#include "blockchainer/wire.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/block_store.hpp"
+#include "aviary/chain_blueprint.hpp"
+#include "aviary/subchain.hpp"
+#include "aviary/chain_tree.hpp"
+#include "aviary/consensus.hpp"
+#include "aviary/credential_gate.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/interop/bridge.hpp"
+#include "aviary/interop/encoding.hpp"
+#include "aviary/interop/json.hpp"
+#include "aviary/interop/rlp.hpp"
+#include "aviary/peer_book.hpp"
+#include "aviary/threshold.hpp"
+#include "aviary/pos_engine.hpp"
+#include "aviary/sealed_mempool.hpp"
+#include "aviary/vrf_pos.hpp"
+#include "aviary/pow_engine.hpp"
+#include "aviary/types.hpp"
+#include "aviary/utxo_state.hpp"
+#include "aviary/version.hpp"
+#include "aviary/wire.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 // Seeded xorshift64 — deterministic, no std::rand / clock (determinism mandate).
@@ -126,13 +126,13 @@ int main() {
     // These throw various exception types; the property under test (and under
     // ASan/UBSan) is: no crash, no memory error, no unbounded recursion.
     auto run = [](auto&& f) { try { f(); } catch (...) {} };
-    namespace ib = blockchainer::interop;
+    namespace ib = aviary::interop;
     for (int i = 0; i < 20000; ++i) {
       Bytes b = random_bytes(rng, rng.below(257));
       auto v = view(b);
       std::string s(b.begin(), b.end());
       run([&] { (void)ib::rlp::decode(v); });
-      run([&] { (void)blockchainer::json::Value::parse(s); });
+      run([&] { (void)aviary::json::Value::parse(s); });
       run([&] { (void)ib::encoding::base58_decode(s); });
       run([&] { (void)ib::encoding::base64_decode(s); });
       run([&] { std::size_t p = 0; (void)ib::encoding::compact_u16_decode(b, p); });

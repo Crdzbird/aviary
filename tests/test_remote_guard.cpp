@@ -3,13 +3,13 @@
 // login releases a capability the node itself cannot read.
 #include <string>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/remote_guard.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/remote_guard.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using node::RemoteGuard;
 
 namespace {

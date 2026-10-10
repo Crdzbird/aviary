@@ -1,10 +1,10 @@
-#include "blockchainer/pow_engine.hpp"
+#include "aviary/pow_engine.hpp"
 
 #include <algorithm>
 #include <array>
 #include <string>
 
-namespace blockchainer::consensus {
+namespace aviary::consensus {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -132,4 +132,4 @@ BlockError PowEngine::submit(const Block& block, codec::ByteView /*justification
   return ledger_->process_block(block);
 }
 
-}  // namespace blockchainer::consensus
+}  // namespace aviary::consensus

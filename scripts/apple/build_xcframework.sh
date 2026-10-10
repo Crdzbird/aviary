@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Build libblockchainer_c as a static archive for iOS device, iOS simulator, and
-# macOS, then assemble Blockchainer.xcframework. blockchainer_c only needs
+# Build libaviary_c as a static archive for iOS device, iOS simulator, and
+# macOS, then assemble Aviary.xcframework. aviary_c only needs
 # cryptolib's *header* to compile (its symbols resolve when the app links
 # alongside cryptolib_flutter's xcframework), so this build links nothing.
 #
-# Output: bridge/bindings/blockchainer_flutter/{ios,macos}/Blockchainer.xcframework
+# Output: bridge/bindings/aviary_flutter/{ios,macos}/Aviary.xcframework
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
 TOOLCHAIN="$CRYPTOLIB_ROOT/cmake/ios.toolchain.cmake"
-PLUGIN="$ROOT/bridge/bindings/blockchainer_lite"
+PLUGIN="$ROOT/bridge/bindings/aviary_lite"
 BUILD="$ROOT/build-apple"
 
 [[ -f "$TOOLCHAIN" ]] || { echo "missing $TOOLCHAIN"; exit 1; }
@@ -21,10 +21,10 @@ build_slice() {  # <slice> <IOS_PLATFORM> <cryptolib-slice>
   cmake -B "$BUILD/$slice" -S "$ROOT" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DIOS_PLATFORM="$platform" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBLOCKCHAINER_STATIC=ON \
+    -DAVIARY_STATIC=ON \
     -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
     -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" >/dev/null
-  cmake --build "$BUILD/$slice" --target blockchainer_c >/dev/null
+  cmake --build "$BUILD/$slice" --target aviary_c >/dev/null
   # Merge core + bridge + cryptolib's slice into ONE self-contained archive, so
   # the xcframework needs no companion pod (avoids cross-plugin OTHER_LDFLAGS
   # conflicts). cryptolib's merged.a already bundles its own deps.
@@ -34,22 +34,22 @@ build_slice() {  # <slice> <IOS_PLATFORM> <cryptolib-slice>
   local crypto_a="$CRYPTOLIB_ROOT/build/ios/$slice/libcryptolib_c_merged.a"
   [[ -f "$crypto_a" ]] || crypto_a="$CRYPTOLIB_ROOT/CryptoLib.xcframework/$cryptoslice/libcryptolib_c_merged.a"
   [[ -f "$crypto_a" ]] || { echo "missing $crypto_a - run cryptolib's scripts/ios/build_all.sh"; exit 1; }
-  libtool -static -o "$BUILD/$slice/libblockchainer_c_merged.a" \
-    "$BUILD/$slice/libblockchainer_core.a" "$BUILD/$slice/libblockchainer_c.a" "$crypto_a"
-  echo "   $(du -h "$BUILD/$slice/libblockchainer_c_merged.a" | awk '{print $1}')  libblockchainer_c_merged.a (incl. cryptolib)"
+  libtool -static -o "$BUILD/$slice/libaviary_c_merged.a" \
+    "$BUILD/$slice/libaviary_core.a" "$BUILD/$slice/libaviary_c.a" "$crypto_a"
+  echo "   $(du -h "$BUILD/$slice/libaviary_c_merged.a" | awk '{print $1}')  libaviary_c_merged.a (incl. cryptolib)"
 }
 
 build_slice iphoneos        OS        ios-arm64
 build_slice iphonesimulator SIMULATOR ios-arm64-simulator
 build_slice macosx          MAC       macos-arm64
 
-# Stage headers + modulemap (so Swift can `import BlockchainerC`).
+# Stage headers + modulemap (so Swift can `import AviaryC`).
 HDR="$BUILD/headers"
 rm -rf "$HDR"; mkdir -p "$HDR"
-cp "$ROOT/bridge/blockchainer_c.h" "$HDR/blockchainer_c.h"
+cp "$ROOT/bridge/aviary_c.h" "$HDR/aviary_c.h"
 cat > "$HDR/module.modulemap" <<EOF
-module BlockchainerC {
-    header "blockchainer_c.h"
+module AviaryC {
+    header "aviary_c.h"
     export *
 }
 EOF
@@ -58,14 +58,14 @@ assemble() {  # <out-dir> <slice...>
   local out="$1"; shift
   local args=()
   for s in "$@"; do
-    args+=(-library "$BUILD/$s/libblockchainer_c_merged.a" -headers "$HDR")
+    args+=(-library "$BUILD/$s/libaviary_c_merged.a" -headers "$HDR")
   done
   mkdir -p "$out"
-  rm -rf "$out/Blockchainer.xcframework"
-  xcodebuild -create-xcframework "${args[@]}" -output "$out/Blockchainer.xcframework" >/dev/null
-  echo "ok: $out/Blockchainer.xcframework"
+  rm -rf "$out/Aviary.xcframework"
+  xcodebuild -create-xcframework "${args[@]}" -output "$out/Aviary.xcframework" >/dev/null
+  echo "ok: $out/Aviary.xcframework"
 }
 
-assemble "$PLUGIN/ios/blockchainer_lite"   iphoneos iphonesimulator
-assemble "$PLUGIN/macos/blockchainer_lite" macosx
+assemble "$PLUGIN/ios/aviary_lite"   iphoneos iphonesimulator
+assemble "$PLUGIN/macos/aviary_lite" macosx
 echo "done."

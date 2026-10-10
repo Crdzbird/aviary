@@ -13,11 +13,11 @@
 #include <random>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/merkle.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/merkle.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 

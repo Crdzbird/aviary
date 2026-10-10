@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -17,7 +17,7 @@ bool throws(void Function() f) {
 Uint8List fill(int b) => Uint8List(32)..fillRange(0, 32, b);
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   final va = bc.newBLSValidator(fill(0x91)),
       vb = bc.newBLSValidator(fill(0x92));
   final bft = bc.makeBlueprint(consensus: 'bft', stateModel: 'account');
@@ -91,5 +91,5 @@ void main() {
   A.free();
   B.free();
   print(
-      'blockchainer dart light-client-skip smoke: OK (thin overlap -> bisection through the rotation -> follow the new set)');
+      'aviary dart light-client-skip smoke: OK (thin overlap -> bisection through the rotation -> follow the new set)');
 }

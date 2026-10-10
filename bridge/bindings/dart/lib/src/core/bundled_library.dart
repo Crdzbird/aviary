@@ -1,10 +1,6 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
-const _bundledPackages = [
-  'blockchainer_dart',
-  'blockchainer',
-  'blockchainer_lite'
-];
+const _bundledPackages = ['aviary_dart', 'aviary', 'aviary_lite'];
 
 /// The engine shipped inside the package under the native directory, if any.
 String? _bundledLibraryPath() {
@@ -40,9 +36,9 @@ String? _osSlot() {
 }
 
 String _libraryFileName() {
-  if (Platform.isMacOS) return 'libblockchainer_c.dylib';
-  if (Platform.isWindows) return 'blockchainer_c.dll';
-  return 'libblockchainer_c.so';
+  if (Platform.isMacOS) return 'libaviary_c.dylib';
+  if (Platform.isWindows) return 'aviary_c.dll';
+  return 'libaviary_c.so';
 }
 
 List<String> _packageRootsFromConfig() {

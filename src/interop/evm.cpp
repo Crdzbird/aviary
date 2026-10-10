@@ -1,8 +1,8 @@
-#include "blockchainer/interop/evm.hpp"
+#include "aviary/interop/evm.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer::interop::evm {
+namespace aviary::interop::evm {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -205,4 +205,4 @@ Address recover_sender(const Eip1559Tx& tx, const SignedEip1559& signed_tx) {
   return address_from_pubkey(view(pk));
 }
 
-}  // namespace blockchainer::interop::evm
+}  // namespace aviary::interop::evm

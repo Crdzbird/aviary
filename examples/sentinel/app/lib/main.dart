@@ -17,7 +17,9 @@ import 'gen/sentinel.pbgrpc.dart' as pb;
 
 // Stable per-install credential so re-launching re-enrolls the SAME device chain
 // (provisioning is idempotent on the device fingerprint).
-final Uint8List _credential = Uint8List.fromList(List.generate(32, (i) => (i * 31 + 7) & 0xff));
+final Uint8List _credential = Uint8List.fromList(
+  List.generate(32, (i) => (i * 31 + 7) & 0xff),
+);
 
 void main() => runApp(const SentinelApp());
 
@@ -25,10 +27,14 @@ class SentinelApp extends StatelessWidget {
   const SentinelApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Sentinel',
-        theme: ThemeData(colorSchemeSeed: const Color(0xFF00897B), useMaterial3: true, brightness: Brightness.dark),
-        home: const Recorder(),
-      );
+    title: 'Sentinel',
+    theme: ThemeData(
+      colorSchemeSeed: const Color(0xFF00897B),
+      useMaterial3: true,
+      brightness: Brightness.dark,
+    ),
+    home: const Recorder(),
+  );
 }
 
 class _Rec {
@@ -79,13 +85,20 @@ class _RecorderState extends State<Recorder> {
   Future<void> _connect() async {
     setState(() => _error = null);
     try {
-      _channel = ClientChannel(_host.text.trim(),
-          port: 50052, options: const ChannelOptions(credentials: ChannelCredentials.insecure()));
+      _channel = ClientChannel(
+        _host.text.trim(),
+        port: 50052,
+        options: const ChannelOptions(
+          credentials: ChannelCredentials.insecure(),
+        ),
+      );
       _client = pb.SentinelClient(_channel!);
 
       _info = pb.DeviceInfo()
         ..deviceId = 'SENTINEL-${Platform.operatingSystem}-DEMO'
-        ..model = Platform.operatingSystem == 'ios' ? 'iPhone (simulator)' : Platform.operatingSystem
+        ..model = Platform.operatingSystem == 'ios'
+            ? 'iPhone (simulator)'
+            : Platform.operatingSystem
         ..platform = Platform.operatingSystem
         ..osVersion = Platform.operatingSystemVersion
         ..label = 'Field Recorder'
@@ -94,7 +107,10 @@ class _RecorderState extends State<Recorder> {
       _prov = await _client!.provisionDevice(_info!);
       _openStream();
       await _poll();
-      _pollTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _poll());
+      _pollTimer = Timer.periodic(
+        const Duration(milliseconds: 1500),
+        (_) => _poll(),
+      );
       _seedCaptures();
     } catch (e) {
       setState(() => _error = '$e');
@@ -137,39 +153,47 @@ class _RecorderState extends State<Recorder> {
     _out!.add(r);
   }
 
-  void _capturePhoto() => _send(pb.DataRecord()
-    ..chainId = _chain
-    ..kind = pb.DataKind.PHOTO
-    ..payload = _randomBytes(3072 + _rng.nextInt(5120))
-    ..mime = 'image/jpeg'
-    ..capturedUnixMillis = _now
-    ..note = 'still capture');
+  void _capturePhoto() => _send(
+    pb.DataRecord()
+      ..chainId = _chain
+      ..kind = pb.DataKind.PHOTO
+      ..payload = _randomBytes(3072 + _rng.nextInt(5120))
+      ..mime = 'image/jpeg'
+      ..capturedUnixMillis = _now
+      ..note = 'still capture',
+  );
 
-  void _captureVideo() => _send(pb.DataRecord()
-    ..chainId = _chain
-    ..kind = pb.DataKind.VIDEO
-    ..payload = _randomBytes(16384)
-    ..mime = 'video/mp4'
-    ..capturedUnixMillis = _now
-    ..note = '1s clip @30fps');
+  void _captureVideo() => _send(
+    pb.DataRecord()
+      ..chainId = _chain
+      ..kind = pb.DataKind.VIDEO
+      ..payload = _randomBytes(16384)
+      ..mime = 'video/mp4'
+      ..capturedUnixMillis = _now
+      ..note = '1s clip @30fps',
+  );
 
-  void _captureLocation() => _send(pb.DataRecord()
-    ..chainId = _chain
-    ..kind = pb.DataKind.LOCATION
-    ..lat = 37.7749 + (_rng.nextDouble() - 0.5) * 0.02
-    ..lon = -122.4194 + (_rng.nextDouble() - 0.5) * 0.02
-    ..accuracyM = 3 + _rng.nextDouble() * 6
-    ..capturedUnixMillis = _now);
+  void _captureLocation() => _send(
+    pb.DataRecord()
+      ..chainId = _chain
+      ..kind = pb.DataKind.LOCATION
+      ..lat = 37.7749 + (_rng.nextDouble() - 0.5) * 0.02
+      ..lon = -122.4194 + (_rng.nextDouble() - 0.5) * 0.02
+      ..accuracyM = 3 + _rng.nextDouble() * 6
+      ..capturedUnixMillis = _now,
+  );
 
-  void _captureSensors() => _send(pb.DataRecord()
-    ..chainId = _chain
-    ..kind = pb.DataKind.SENSOR
-    ..sensors.addAll({
-      'temp_c': 18 + _rng.nextDouble() * 8,
-      'accel_g': 0.95 + _rng.nextDouble() * 0.2,
-      'lux': (_rng.nextInt(900) + 50).toDouble(),
-    })
-    ..capturedUnixMillis = _now);
+  void _captureSensors() => _send(
+    pb.DataRecord()
+      ..chainId = _chain
+      ..kind = pb.DataKind.SENSOR
+      ..sensors.addAll({
+        'temp_c': 18 + _rng.nextDouble() * 8,
+        'accel_g': 0.95 + _rng.nextDouble() * 0.2,
+        'lux': (_rng.nextInt(900) + 50).toDouble(),
+      })
+      ..capturedUnixMillis = _now,
+  );
 
   void _toggleLive(bool on) {
     setState(() => _live = on);
@@ -207,16 +231,19 @@ class _RecorderState extends State<Recorder> {
 
   Future<void> _verify(_Rec rec) async {
     try {
-      final v = await _client!.verifyRecord(pb.VerifyRequest()
-        ..chainId = _chain
-        ..contentHash = rec.hash);
+      final v = await _client!.verifyRecord(
+        pb.VerifyRequest()
+          ..chainId = _chain
+          ..contentHash = rec.hash,
+      );
       setState(() => rec.verified = v.anchored && v.verified);
     } catch (e) {
       _snack('$e');
     }
   }
 
-  void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  void _snack(String m) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
   @override
   void dispose() {
@@ -237,14 +264,22 @@ class _RecorderState extends State<Recorder> {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('Cannot reach the Sentinel server.\n$_error', textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              const Text('Start it: cd examples/sentinel/server && go run .',
-                  style: TextStyle(color: Colors.white54)),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: _connect, child: const Text('Retry')),
-            ]),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Cannot reach the Sentinel server.\n$_error',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Start it: cd examples/sentinel/server && go run .',
+                  style: TextStyle(color: Colors.white54),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(onPressed: _connect, child: const Text('Retry')),
+              ],
+            ),
           ),
         ),
       );
@@ -257,20 +292,27 @@ class _RecorderState extends State<Recorder> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Sentinel · Device Provenance'),
-          bottom: const TabBar(tabs: [
-            Tab(icon: Icon(Icons.videocam), text: 'Recorder'),
-            Tab(icon: Icon(Icons.device_hub), text: 'Fleet'),
-          ]),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.videocam), text: 'Recorder'),
+              Tab(icon: Icon(Icons.device_hub), text: 'Fleet'),
+            ],
+          ),
         ),
-        body: TabBarView(children: [
-          ListView(padding: const EdgeInsets.all(16), children: [
-            _identityCard(),
-            _captureCard(),
-            _ledgerCard(),
-            _feedCard(),
-          ]),
-          _fleetTab(),
-        ]),
+        body: TabBarView(
+          children: [
+            ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _identityCard(),
+                _captureCard(),
+                _ledgerCard(),
+                _feedCard(),
+              ],
+            ),
+            _fleetTab(),
+          ],
+        ),
       ),
     );
   }
@@ -288,97 +330,204 @@ class _RecorderState extends State<Recorder> {
   }
 
   Future<void> _fleetBuild() => _fleetCall(() async {
-        final me = _info?.model.isNotEmpty == true ? _info!.model : 'this device';
-        final f = await _client!.buildFleet(pb.FleetSpec()..deviceLabels.addAll([me, 'bodycam-07', 'dashcam-12']));
-        if (mounted) setState(() { _fleet = f; _fleetProof = null; });
+    final me = _info?.model.isNotEmpty == true ? _info!.model : 'this device';
+    final f = await _client!.buildFleet(
+      pb.FleetSpec()..deviceLabels.addAll([me, 'bodycam-07', 'dashcam-12']),
+    );
+    if (mounted)
+      setState(() {
+        _fleet = f;
+        _fleetProof = null;
       });
+  });
   Future<void> _fleetRefresh() => _fleetCall(() async {
-        final f = await _client!.getFleet(pb.FleetRef());
-        if (mounted) setState(() => _fleet = f);
-      });
+    final f = await _client!.getFleet(pb.FleetRef());
+    if (mounted) setState(() => _fleet = f);
+  });
   Future<void> _fleetProduce(int chainId) => _fleetCall(() async {
-        final f = await _client!.fleetProduce(pb.FleetRef()..chainId = Int64(chainId));
-        if (mounted) setState(() => _fleet = f);
-      });
+    final f = await _client!.fleetProduce(
+      pb.FleetRef()..chainId = Int64(chainId),
+    );
+    if (mounted) setState(() => _fleet = f);
+  });
   Future<void> _fleetProve(int chainId) => _fleetCall(() async {
-        final p = await _client!.fleetProveDevice(pb.FleetRef()..chainId = Int64(chainId));
-        final f = await _client!.getFleet(pb.FleetRef());
-        if (mounted) setState(() { _fleetProof = p; _fleet = f; });
+    final p = await _client!.fleetProveDevice(
+      pb.FleetRef()..chainId = Int64(chainId),
+    );
+    final f = await _client!.getFleet(pb.FleetRef());
+    if (mounted)
+      setState(() {
+        _fleetProof = p;
+        _fleet = f;
       });
+  });
 
   Widget _fleetTab() {
     final f = _fleet;
     if (f == null && !_fleetBusy) _fleetRefresh();
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      _section('Fleet chain tree', Icons.device_hub, [
-        const Text(
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _section('Fleet chain tree', Icons.device_hub, [
+          const Text(
             'One declaration builds the whole fleet: a root chain and a BFT subchain per '
             'device (genesis bottom-up, bindings top-down). Producing on the root anchors '
             'every device\'s finalized headers; a device\'s on-chain identity is then '
             'provable from the fleet root header alone.',
-            style: TextStyle(color: Colors.white70, fontSize: 13)),
-        const SizedBox(height: 10),
-        if (f == null || !f.built)
-          FilledButton.icon(onPressed: _fleetBusy ? null : _fleetBuild, icon: const Icon(Icons.build), label: const Text('Build fleet (this device + 2 more)'))
-        else ...[
-          for (final n in f.nodes)
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(n.root ? Icons.hub : Icons.smartphone, size: 18, color: n.root ? Colors.amberAccent : Colors.tealAccent),
-              title: Text('${n.label} · chain ${n.chainId}', style: const TextStyle(fontSize: 13)),
-              subtitle: Text('height ${n.height}${n.root ? " · pending anchors ${n.pendingAnchors}" : " · identity ${n.identityAddress.substring(0, 12)}…"}',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
-              trailing: Wrap(spacing: 4, children: [
-                IconButton(tooltip: n.root ? 'Produce root block (anchor devices)' : 'Produce device block', onPressed: _fleetBusy ? null : () => _fleetProduce(n.chainId.toInt()), icon: const Icon(Icons.layers, size: 18)),
-                if (!n.root) IconButton(tooltip: 'Prove identity from the fleet root', onPressed: _fleetBusy ? null : () => _fleetProve(n.chainId.toInt()), icon: const Icon(Icons.verified_user, size: 18)),
-              ]),
+            style: TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+          const SizedBox(height: 10),
+          if (f == null || !f.built)
+            FilledButton.icon(
+              onPressed: _fleetBusy ? null : _fleetBuild,
+              icon: const Icon(Icons.build),
+              label: const Text('Build fleet (this device + 2 more)'),
+            )
+          else ...[
+            for (final n in f.nodes)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  n.root ? Icons.hub : Icons.smartphone,
+                  size: 18,
+                  color: n.root ? Colors.amberAccent : Colors.tealAccent,
+                ),
+                title: Text(
+                  '${n.label} · chain ${n.chainId}',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                subtitle: Text(
+                  'height ${n.height}${n.root ? " · pending anchors ${n.pendingAnchors}" : " · identity ${n.identityAddress.substring(0, 12)}…"}',
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                ),
+                trailing: Wrap(
+                  spacing: 4,
+                  children: [
+                    IconButton(
+                      tooltip: n.root
+                          ? 'Produce root block (anchor devices)'
+                          : 'Produce device block',
+                      onPressed: _fleetBusy
+                          ? null
+                          : () => _fleetProduce(n.chainId.toInt()),
+                      icon: const Icon(Icons.layers, size: 18),
+                    ),
+                    if (!n.root)
+                      IconButton(
+                        tooltip: 'Prove identity from the fleet root',
+                        onPressed: _fleetBusy
+                            ? null
+                            : () => _fleetProve(n.chainId.toInt()),
+                        icon: const Icon(Icons.verified_user, size: 18),
+                      ),
+                  ],
+                ),
+              ),
+            if (f.rootSubchainRoot.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'root subchain_root ${f.rootSubchainRoot.substring(0, 24)}…',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    color: Colors.white54,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _fleetBusy ? null : _fleetBuild,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Rebuild fleet'),
             ),
-          if (f.rootSubchainRoot.isNotEmpty)
-            Padding(padding: const EdgeInsets.only(top: 6), child: Text('root subchain_root ${f.rootSubchainRoot.substring(0, 24)}…', style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.white54))),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(onPressed: _fleetBusy ? null : _fleetBuild, icon: const Icon(Icons.refresh), label: const Text('Rebuild fleet')),
-        ],
-      ]),
-      if (_fleetProof != null)
-        _section('Cross-chain proof', Icons.verified_user, [
-          Row(children: [
-            Icon(_fleetProof!.verified ? Icons.check_circle : Icons.error, color: _fleetProof!.verified ? Colors.lightGreenAccent : Colors.redAccent),
-            const SizedBox(width: 8),
-            Expanded(child: Text(_fleetProof!.verified
-                ? 'Device ${_fleetProof!.chainId} identity verified from the fleet root header (${_fleetProof!.proofBytes} B proof)'
-                : 'Not verifiable from the current root — produce a device block, then a root block, then prove again.')),
-          ]),
-          const SizedBox(height: 6),
-          Text('identity ${_fleetProof!.identityAddress}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
-          Text('against subchain_root ${_fleetProof!.rootSubchainRoot}', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+          ],
         ]),
-      _section('Fleet log', Icons.receipt_long, [
-        if (f == null || f.log.isEmpty)
-          const Text('No fleet activity yet.', style: TextStyle(color: Colors.white54))
-        else
-          for (final l in f.log.reversed)
-            Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(l, style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
-      ]),
-    ]);
+        if (_fleetProof != null)
+          _section('Cross-chain proof', Icons.verified_user, [
+            Row(
+              children: [
+                Icon(
+                  _fleetProof!.verified ? Icons.check_circle : Icons.error,
+                  color: _fleetProof!.verified
+                      ? Colors.lightGreenAccent
+                      : Colors.redAccent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _fleetProof!.verified
+                        ? 'Device ${_fleetProof!.chainId} identity verified from the fleet root header (${_fleetProof!.proofBytes} B proof)'
+                        : 'Not verifiable from the current root — produce a device block, then a root block, then prove again.',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'identity ${_fleetProof!.identityAddress}',
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+            ),
+            Text(
+              'against subchain_root ${_fleetProof!.rootSubchainRoot}',
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+            ),
+          ]),
+        _section('Fleet log', Icons.receipt_long, [
+          if (f == null || f.log.isEmpty)
+            const Text(
+              'No fleet activity yet.',
+              style: TextStyle(color: Colors.white54),
+            )
+          else
+            for (final l in f.log.reversed)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  l,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                ),
+              ),
+        ]),
+      ],
+    );
   }
 
-  Widget _section(String title, IconData icon, List<Widget> children, {Widget? trailing}) => Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
+  Widget _section(
+    String title,
+    IconData icon,
+    List<Widget> children, {
+    Widget? trailing,
+  }) => Card(
+    margin: const EdgeInsets.only(bottom: 16),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
               Icon(icon, size: 20),
               const SizedBox(width: 8),
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
               ?trailing,
-            ]),
-            const Divider(),
-            ...children,
-          ]),
-        ),
-      );
+            ],
+          ),
+          const Divider(),
+          ...children,
+        ],
+      ),
+    ),
+  );
 
   Widget _identityCard() {
     final p = _prov!, i = _info!;
@@ -391,37 +540,52 @@ class _RecorderState extends State<Recorder> {
       _kv('Identity addr', p.deviceAddress),
       Padding(
         padding: const EdgeInsets.only(top: 6),
-        child: Row(children: [
-          const Icon(Icons.check_circle, color: Colors.tealAccent, size: 16),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text('Origin block sealed at height ${p.genesisHeight} — bound to this device + credential',
-                style: const TextStyle(color: Colors.white70, fontSize: 12)),
-          ),
-        ]),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.tealAccent, size: 16),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Origin block sealed at height ${p.genesisHeight} — bound to this device + credential',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
       ),
     ]);
   }
 
   Widget _captureCard() => _section(
-        'Capture & anchor',
-        Icons.sensors,
-        [
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            _capBtn('Photo', Icons.photo_camera, _capturePhoto),
-            _capBtn('Video', Icons.videocam, _captureVideo),
-            _capBtn('Location', Icons.location_on, _captureLocation),
-            _capBtn('Sensors', Icons.thermostat, _captureSensors),
-          ]),
+    'Capture & anchor',
+    Icons.sensors,
+    [
+      Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          _capBtn('Photo', Icons.photo_camera, _capturePhoto),
+          _capBtn('Video', Icons.videocam, _captureVideo),
+          _capBtn('Location', Icons.location_on, _captureLocation),
+          _capBtn('Sensors', Icons.thermostat, _captureSensors),
         ],
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Live', style: TextStyle(fontSize: 13)),
-          Switch(value: _live, onChanged: _toggleLive),
-        ]),
-      );
+      ),
+    ],
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Live', style: TextStyle(fontSize: 13)),
+        Switch(value: _live, onChanged: _toggleLive),
+      ],
+    ),
+  );
 
   Widget _capBtn(String label, IconData icon, VoidCallback onTap) =>
-      FilledButton.tonalIcon(onPressed: onTap, icon: Icon(icon, size: 18), label: Text(label));
+      FilledButton.tonalIcon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+      );
 
   Widget _ledgerCard() {
     final l = _ledger;
@@ -429,29 +593,42 @@ class _RecorderState extends State<Recorder> {
       if (l == null)
         const Text('…')
       else ...[
-        Wrap(spacing: 28, runSpacing: 10, children: [
-          _stat('Height', '${l.height}'),
-          _stat('Anchored', '${l.records}'),
-          _stat('Pending', '${l.mempool}'),
-        ]),
+        Wrap(
+          spacing: 28,
+          runSpacing: 10,
+          children: [
+            _stat('Height', '${l.height}'),
+            _stat('Anchored', '${l.records}'),
+            _stat('Pending', '${l.mempool}'),
+          ],
+        ),
         if (l.kindCounts.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: Wrap(spacing: 8, children: [
-              for (final e in l.kindCounts.entries)
-                Chip(label: Text('${_kindName(e.key)} ${e.value}'), visualDensity: VisualDensity.compact),
-            ]),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                for (final e in l.kindCounts.entries)
+                  Chip(
+                    label: Text('${_kindName(e.key)} ${e.value}'),
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
           ),
       ],
     ]);
   }
 
   Widget _feedCard() => _section('Provenance feed', Icons.receipt_long, [
-        if (_recs.isEmpty)
-          const Text('No captures yet — tap a capture button or flip "Live".', style: TextStyle(color: Colors.white54))
-        else
-          ..._recs.map(_recRow),
-      ]);
+    if (_recs.isEmpty)
+      const Text(
+        'No captures yet — tap a capture button or flip "Live".',
+        style: TextStyle(color: Colors.white54),
+      )
+    else
+      ..._recs.map(_recRow),
+  ]);
 
   Widget _recRow(_Rec r) {
     final color = r.finalized ? Colors.tealAccent : Colors.amberAccent;
@@ -467,31 +644,55 @@ class _RecorderState extends State<Recorder> {
       trailing: r.verified == true
           ? const Icon(Icons.gpp_good, color: Colors.tealAccent)
           : r.verified == false
-              ? const Icon(Icons.gpp_bad, color: Colors.redAccent)
-              : TextButton(onPressed: r.finalized ? () => _verify(r) : null, child: const Text('Verify')),
+          ? const Icon(Icons.gpp_bad, color: Colors.redAccent)
+          : TextButton(
+              onPressed: r.finalized ? () => _verify(r) : null,
+              child: const Text('Verify'),
+            ),
     );
   }
 
   IconData _kindIcon(pb.DataKind k) => switch (k) {
-        pb.DataKind.PHOTO => Icons.photo_camera,
-        pb.DataKind.VIDEO => Icons.videocam,
-        pb.DataKind.LOCATION => Icons.location_on,
-        pb.DataKind.SENSOR => Icons.thermostat,
-        _ => Icons.bolt,
-      };
+    pb.DataKind.PHOTO => Icons.photo_camera,
+    pb.DataKind.VIDEO => Icons.videocam,
+    pb.DataKind.LOCATION => Icons.location_on,
+    pb.DataKind.SENSOR => Icons.thermostat,
+    _ => Icons.bolt,
+  };
 
-  String _kindName(String enumName) => enumName.replaceFirst('DATA_', '').toLowerCase();
+  String _kindName(String enumName) =>
+      enumName.replaceFirst('DATA_', '').toLowerCase();
 
   Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 100, child: Text(k, style: const TextStyle(color: Colors.white54, fontSize: 12))),
-          Expanded(child: SelectableText(v, style: const TextStyle(fontFamily: 'monospace', fontSize: 11))),
-        ]),
-      );
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            k,
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ),
+        Expanded(
+          child: SelectableText(
+            v,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+          ),
+        ),
+      ],
+    ),
+  );
 
-  Widget _stat(String label, String value) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.white54)),
-        Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-      ]);
+  Widget _stat(String label, String value) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+      Text(
+        value,
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+      ),
+    ],
+  );
 }

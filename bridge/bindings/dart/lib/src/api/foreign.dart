@@ -1,7 +1,7 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Foreign components: engines and proposer policies implemented in Dart.
-extension BlockchainerForeign on Blockchainer {
+extension AviaryForeign on Aviary {
   /// Registers [engine] under [id]. The id is chain identity; never rename
   /// it. [grindProof] declares an unpredictable leader election.
   bool registerEngine(String id, ForeignEngine engine,
@@ -21,7 +21,7 @@ extension BlockchainerForeign on Blockchainer {
       id,
       (cid) =>
           lib.lookupFunction<_RegEngineC, _RegEngineD>(
-                  'blockchainer_registry_add_engine')(
+                  'aviary_registry_add_engine')(
               cid,
               j.nativeFunction,
               v.nativeFunction,
@@ -43,7 +43,7 @@ extension BlockchainerForeign on Blockchainer {
       id,
       (cid) =>
           lib.lookupFunction<_RegProposerC, _RegProposerD>(
-                  'blockchainer_registry_add_proposer')(
+                  'aviary_registry_add_proposer')(
               cid, p.nativeFunction, Pointer<Void>.fromAddress(h)) ==
           1,
     );

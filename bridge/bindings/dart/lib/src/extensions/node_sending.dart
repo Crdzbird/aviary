@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Transfers that pick the nonce and the signature scheme for you.
 extension NodeSending on Node {

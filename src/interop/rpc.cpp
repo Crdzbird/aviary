@@ -1,6 +1,6 @@
-#include "blockchainer/interop/rpc.hpp"
+#include "aviary/interop/rpc.hpp"
 
-namespace blockchainer::interop {
+namespace aviary::interop {
 
 json::Value JsonRpcClient::call(const std::string& method, json::Value params) {
   json::Value request = json::Value::object();
@@ -24,4 +24,4 @@ json::Value JsonRpcClient::call(const std::string& method, json::Value params) {
   return response["result"];
 }
 
-}  // namespace blockchainer::interop
+}  // namespace aviary::interop

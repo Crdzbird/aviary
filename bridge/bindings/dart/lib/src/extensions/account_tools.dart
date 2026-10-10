@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Convenience views of an account.
 extension AccountTools on Account {

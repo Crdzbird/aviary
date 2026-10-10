@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Build libblockchainer_c.so for each Android ABI.
+# Build libaviary_c.so for each Android ABI.
 #   full (default): links CipherBird's shared libcipherbird.so (shipped by the
-#                   cipherbird pub package); output -> blockchainer plugin jniLibs
+#                   cipherbird pub package); output -> aviary plugin jniLibs
 #   lite:           links CipherBird's STATIC archives so the .so is self
-#                   contained; output -> blockchainer_lite plugin jniLibs
+#                   contained; output -> aviary_lite plugin jniLibs
 # Usage: build_so.sh [full|lite]
 set -euo pipefail
 MODE="${1:-full}"
@@ -13,8 +13,8 @@ CIPHERBIRD_JNILIBS="$CRYPTOLIB_ROOT/bridge/bindings/cipherbird/android/src/main/
 CIPHERBIRD_STATIC="$CRYPTOLIB_ROOT/build-android-static"
 CIPHERBIRD_DEPS="$CRYPTOLIB_ROOT/third_party/android"
 case "$MODE" in
-  full) PLUGIN_JNILIBS="$ROOT/bridge/bindings/blockchainer/android/src/main/jniLibs" ;;
-  lite) PLUGIN_JNILIBS="$ROOT/bridge/bindings/blockchainer_lite/android/src/main/jniLibs" ;;
+  full) PLUGIN_JNILIBS="$ROOT/bridge/bindings/aviary/android/src/main/jniLibs" ;;
+  lite) PLUGIN_JNILIBS="$ROOT/bridge/bindings/aviary_lite/android/src/main/jniLibs" ;;
   *) echo "usage: $0 [full|lite]"; exit 1 ;;
 esac
 NDK="${ANDROID_NDK_HOME:-}"
@@ -46,10 +46,10 @@ for abi in arm64-v8a x86_64; do
     -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
     -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" \
     -DCRYPTOLIB_C_LIBRARY="$engine" >/dev/null
-  cmake --build "$BUILD/$abi" --target blockchainer_c >/dev/null
-  "$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-strip" --strip-unneeded "$BUILD/$abi/libblockchainer_c.so"
+  cmake --build "$BUILD/$abi" --target aviary_c >/dev/null
+  "$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-strip" --strip-unneeded "$BUILD/$abi/libaviary_c.so"
   mkdir -p "$PLUGIN_JNILIBS/$abi"
-  cp "$BUILD/$abi/libblockchainer_c.so" "$PLUGIN_JNILIBS/$abi/"
-  echo "   $(du -h "$PLUGIN_JNILIBS/$abi/libblockchainer_c.so" | awk '{print $1}')  $abi/libblockchainer_c.so"
+  cp "$BUILD/$abi/libaviary_c.so" "$PLUGIN_JNILIBS/$abi/"
+  echo "   $(du -h "$PLUGIN_JNILIBS/$abi/libaviary_c.so" | awk '{print $1}')  $abi/libaviary_c.so"
 done
 echo "done."

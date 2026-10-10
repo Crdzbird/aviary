@@ -1,14 +1,14 @@
-#include "blockchainer/chain_assembler.hpp"
+#include "aviary/chain_assembler.hpp"
 
 #include <map>
 #include <mutex>
 #include <stdexcept>
 
-#include "blockchainer/bft_engine.hpp"
-#include "blockchainer/pow_engine.hpp"
-#include "blockchainer/vrf_pos.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/pow_engine.hpp"
+#include "aviary/vrf_pos.hpp"
 
-namespace blockchainer::node {
+namespace aviary::node {
 
 namespace {
 
@@ -211,4 +211,4 @@ AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_
   return AssembledChain{std::move(bp), profile, std::move(engine)};
 }
 
-}  // namespace blockchainer::node
+}  // namespace aviary::node

@@ -2,10 +2,10 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/codec.hpp"
+#include "aviary/codec.hpp"
 #include "check.hpp"
 
-using namespace blockchainer::codec;
+using namespace aviary::codec;
 
 namespace {
 

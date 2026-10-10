@@ -1,4 +1,0 @@
-module BlockchainerC {
-    header "blockchainer_c.h"
-    export *
-}

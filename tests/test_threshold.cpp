@@ -5,14 +5,14 @@
 #include <memory>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/ledger.hpp"
-#include "blockchainer/threshold.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/ledger.hpp"
+#include "aviary/threshold.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using custody::ShareCard;
 using custody::SigningCeremony;
 using custody::ThresholdAccount;

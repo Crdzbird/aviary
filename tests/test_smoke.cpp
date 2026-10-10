@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/version.hpp"
 
 namespace {
 int g_failures = 0;
@@ -25,10 +25,10 @@ std::vector<std::uint8_t> bytes(const char* s) {
 }  // namespace
 
 int main() {
-  using namespace blockchainer;
+  using namespace aviary;
   init();
 
-  check(!version().empty(), "blockchainer::version() non-empty");
+  check(!version().empty(), "aviary::version() non-empty");
   check(!crypto_backend_version().empty(),
         "crypto_backend_version() non-empty (cryptolib linkage live)");
   std::printf("  ..   backend = cryptolib %s\n", crypto_backend_version().c_str());
@@ -41,12 +41,12 @@ int main() {
         "BLAKE3('') matches official vector");
 
   // Structural + determinism properties.
-  const auto h1 = crypto::blake3_256(bytes("blockchainer"));
-  const auto h2 = crypto::blake3_256(bytes("blockchainer"));
+  const auto h1 = crypto::blake3_256(bytes("aviary"));
+  const auto h2 = crypto::blake3_256(bytes("aviary"));
   check(h1.size() == 32, "digest width is 32 bytes");
   check(h1 == h2, "hashing is deterministic");
   check(h1 != h_empty, "distinct inputs hash distinctly");
-  std::printf("  ..   blake3('blockchainer') = %s\n", crypto::to_hex(h1).c_str());
+  std::printf("  ..   blake3('aviary') = %s\n", crypto::to_hex(h1).c_str());
 
   std::printf(g_failures == 0 ? "\nALL PASS\n" : "\n%d FAILURE(S)\n", g_failures);
   return g_failures == 0 ? 0 : 1;

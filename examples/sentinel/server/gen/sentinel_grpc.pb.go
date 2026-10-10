@@ -4,7 +4,7 @@
 // - protoc             v7.36.1
 // source: sentinel.proto
 
-// Sentinel — a tamper-evident DEVICE PROVENANCE LEDGER built on Blockchainer.
+// Sentinel — a tamper-evident DEVICE PROVENANCE LEDGER built on Aviary.
 //
 // A device enrolls by sending its hardware information + a credential; the server
 // derives a chain whose GENESIS/ORIGIN block is cryptographically bound to that
@@ -18,7 +18,7 @@
 // proof. Real use cases: bodycam/dashcam evidence integrity, field-sensor audit
 // trails, supply-chain telemetry, mobile-device attestation.
 //
-// All ledger work happens server-side through the Blockchainer Go binding; the
+// All ledger work happens server-side through the Aviary Go binding; the
 // device app is a thin gRPC client.
 
 package sentinelv1

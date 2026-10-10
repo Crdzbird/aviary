@@ -1,9 +1,9 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Raised when a native call reports an error.
-abstract final class BlockchainerException implements Exception {
+abstract final class AviaryException implements Exception {
   /// An error carrying the native [message].
-  const factory BlockchainerException(String message) = _BlockchainerException;
+  const factory AviaryException(String message) = _AviaryException;
 
   /// The native error message.
   String get message;

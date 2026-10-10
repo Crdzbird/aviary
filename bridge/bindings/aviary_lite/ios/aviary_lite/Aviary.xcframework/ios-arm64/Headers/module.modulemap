@@ -1,0 +1,4 @@
+module AviaryC {
+    header "aviary_c.h"
+    export *
+}

@@ -1,4 +1,4 @@
-# Blockchainer
+# Aviary
 
 A **C++** distributed-ledger toolkit — build custom chains, run them privately or
 permissionlessly, connect to other chains, and stream/observe/verify everything —
@@ -30,12 +30,12 @@ in C++, and the bindings only marshal.
 ## Layout
 
 ```
-include/blockchainer/   public C++ headers
+include/aviary/   public C++ headers
 src/                    C++ core (crypto seam over the CipherBird C ABI)
-bridge/blockchainer_c.* the C ABI every binding marshals over
-bridge/bindings/dart/   blockchainer_dart: dart:ffi binding (pub package)
-bridge/bindings/blockchainer_lite/  Flutter plugin, self-contained engine
-bridge/bindings/blockchainer/       Flutter plugin over the cipherbird package
+bridge/aviary_c.* the C ABI every binding marshals over
+bridge/bindings/dart/   aviary_dart: dart:ffi binding (pub package)
+bridge/bindings/aviary_lite/  Flutter plugin, self-contained engine
+bridge/bindings/aviary/       Flutter plugin over the cipherbird package
 bridge/bindings/go/     cgo binding + demo
 tests/                  C++ zero-dependency test runner
 vectors/                language-neutral golden vectors (replayed by all langs)
@@ -78,11 +78,11 @@ canonical txid, canonical header hash).
 
 ```bash
 # AddressSanitizer + UBSan over the suite (runs the fuzzed codec under sanitizers)
-cmake -S . -B build-asan -DBLOCKCHAINER_SANITIZE=ON
+cmake -S . -B build-asan -DAVIARY_SANITIZE=ON
 cmake --build build-asan && ctest --test-dir build-asan --output-on-failure
 
 # libFuzzer codec harness (needs a libFuzzer-capable clang)
-cmake -S . -B build-fuzz -DBLOCKCHAINER_BUILD_FUZZERS=ON
+cmake -S . -B build-fuzz -DAVIARY_BUILD_FUZZERS=ON
 cmake --build build-fuzz --target fuzz_codec
 ./build-fuzz/fuzz_codec -max_total_time=60
 ```
@@ -93,21 +93,21 @@ Three packages are published to pub.dev from this repo:
 
 | Package | Use it when |
 |---|---|
-| `blockchainer_dart` | Pure Dart (CLI, server, tests). Bundles the macOS arm64 dylibs. |
-| `blockchainer_lite` | Flutter app that only needs the ledger. One self-contained native binary, no `cipherbird` dependency. |
-| `blockchainer` | Flutter app that also uses CipherBird directly. Depends on and re-exports the `cipherbird` package so the engine exists once in the app. |
+| `aviary_dart` | Pure Dart (CLI, server, tests). Bundles the macOS arm64 dylibs. |
+| `aviary_lite` | Flutter app that only needs the ledger. One self-contained native binary, no `cipherbird` dependency. |
+| `aviary` | Flutter app that also uses CipherBird directly. Depends on and re-exports the `cipherbird` package so the engine exists once in the app. |
 
-`blockchainer_lite` and `blockchainer` expose the same API (everything the C ABI
-offers) through `blockchainer_dart`. Native builds and publishing notes are in
+`aviary_lite` and `aviary` expose the same API (everything the C ABI
+offers) through `aviary_dart`. Native builds and publishing notes are in
 [`docs/MOBILE.md`](docs/MOBILE.md).
 
 ## Example app: Flutter dashboard
 
-[`examples/blockchainer_demo`](examples/blockchainer_demo) is a desktop Flutter app
+[`examples/aviary_demo`](examples/aviary_demo) is a desktop Flutter app
 that drives the whole stack through the C ABI: create a chain, send transactions,
 produce blocks (BFT), watch a live event stream, read Prometheus metrics, verify a
 light-client proof, and derive Ethereum/Bitcoin/Solana addresses. Build the dylib,
-then `cd examples/blockchainer_demo && flutter run -d macos`.
+then `cd examples/aviary_demo && flutter run -d macos`.
 
 A console version: `cd bridge/bindings/dart && dart run bin/node_demo.dart`.
 

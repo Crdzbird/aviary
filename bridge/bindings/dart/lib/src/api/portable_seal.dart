@@ -1,12 +1,12 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Portable account export: sealing an account for transport.
-extension BlockchainerPortableSeal on Blockchainer {
+extension AviaryPortableSeal on Aviary {
   /// A hybrid KEM device key pair for the recipient bound tiers.
   PortableAccount hybridKemKeypair() {
     final kp = _splitKeyBlob(_take(
       lib.lookupFunction<_KemKeygenC, _KemKeygenD>(
-          'blockchainer_hybrid_kem_keygen')(),
+          'aviary_hybrid_kem_keygen')(),
       'hybrid_kem_keygen',
     ));
     return PortableAccount(kp.public, kp.secret);
@@ -27,7 +27,7 @@ extension BlockchainerPortableSeal on Blockchainer {
           [public, secret],
           (p) => _take(
             lib.lookupFunction<_PSealPassC, _PSealPassD>(
-                    'blockchainer_portable_seal_passphrase')(
+                    'aviary_portable_seal_passphrase')(
                 p[0], public.length, p[1], secret.length, cp, ops, mem),
             'portable_seal_passphrase',
           ),
@@ -43,9 +43,13 @@ extension BlockchainerPortableSeal on Blockchainer {
       _scoped(
         [public, secret, recipientKemPublic],
         (p) => _take(
-          lib.lookupFunction<_PSealToC, _PSealToD>(
-                  'blockchainer_portable_seal_to')(p[0], public.length, p[1],
-              secret.length, p[2], recipientKemPublic.length),
+          lib.lookupFunction<_PSealToC, _PSealToD>('aviary_portable_seal_to')(
+              p[0],
+              public.length,
+              p[1],
+              secret.length,
+              p[2],
+              recipientKemPublic.length),
           'portable_seal_to',
         ),
       );
@@ -62,7 +66,7 @@ extension BlockchainerPortableSeal on Blockchainer {
         [public, secret, recipientKemPublic, senderSigSecret],
         (p) => _take(
           lib.lookupFunction<_PSealSignedC, _PSealSignedD>(
-                  'blockchainer_portable_seal_signed_to')(
+                  'aviary_portable_seal_signed_to')(
               p[0],
               public.length,
               p[1],

@@ -1,0 +1,3 @@
+dependency_overrides:
+  aviary_dart:
+    path: ../../dart

@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final Map<int, ForeignEngine> _foreignEngines = {};
 final Map<int, int Function(int height, int validators)> _foreignProposers = {};

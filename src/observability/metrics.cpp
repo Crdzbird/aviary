@@ -1,8 +1,8 @@
-#include "blockchainer/observability/metrics.hpp"
+#include "aviary/observability/metrics.hpp"
 
 #include <sstream>
 
-namespace blockchainer::observe {
+namespace aviary::observe {
 
 Histogram::Histogram(std::vector<double> upper_bounds)
     : bounds_(std::move(upper_bounds)), counts_(bounds_.size(), 0) {}
@@ -91,4 +91,4 @@ std::string MetricsRegistry::prometheus_text() const {
   return os.str();
 }
 
-}  // namespace blockchainer::observe
+}  // namespace aviary::observe

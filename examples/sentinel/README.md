@@ -1,10 +1,10 @@
 # Sentinel — Device Provenance Ledger
 
 A tamper-evident **provenance ledger for device-captured data**, built on
-Blockchainer with a **Go gRPC server** and a **Flutter device recorder**.
+Aviary with a **Go gRPC server** and a **Flutter device recorder**.
 
 ```
-Flutter recorder ──gRPC (bidi stream)──▶  Go server  ──cgo──▶  Blockchainer (C++ core)
+Flutter recorder ──gRPC (bidi stream)──▶  Go server  ──cgo──▶  Aviary (C++ core)
 ```
 
 A device **enrolls** by sending its hardware info + a credential; the server derives
@@ -43,7 +43,7 @@ re-hashes the original bytes and checks the proof against the chain root.
 ## Run
 
 ```bash
-# 1. Build the blockchainer host library
+# 1. Build the aviary host library
 ( cd ../.. && cmake -S . -B build && cmake --build build )
 
 # 2. Start the server + recorder (macOS desktop, iOS sim, or Android)

@@ -1,9 +1,9 @@
 #include <string>
 
-#include "blockchainer/interop/encoding.hpp"
+#include "aviary/interop/encoding.hpp"
 #include "check.hpp"
 
-using namespace blockchainer::interop::encoding;
+using namespace aviary::interop::encoding;
 
 namespace {
 Bytes str(const char* s) { Bytes b; for (; *s; ++s) b.push_back(static_cast<std::uint8_t>(*s)); return b; }

@@ -1,9 +1,9 @@
-#include "blockchainer/interop/encoding.hpp"
+#include "aviary/interop/encoding.hpp"
 
 #include <array>
 #include <stdexcept>
 
-namespace blockchainer::interop::encoding {
+namespace aviary::interop::encoding {
 
 namespace {
 const char* kB58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -146,4 +146,4 @@ std::uint16_t compact_u16_decode(const Bytes& in, std::size_t& pos) {
   throw std::runtime_error("compact_u16: too long");
 }
 
-}  // namespace blockchainer::interop::encoding
+}  // namespace aviary::interop::encoding

@@ -4,12 +4,12 @@
 #include <map>
 #include <vector>
 
-#include "blockchainer/credential_gate.hpp"
-#include "blockchainer/gossip.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/credential_gate.hpp"
+#include "aviary/gossip.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using p2p::GossipOverlay;
 
 namespace {

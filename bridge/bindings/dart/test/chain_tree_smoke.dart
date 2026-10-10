@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -17,7 +17,7 @@ bool throws(void Function() f) {
 Uint8List fill(int b) => Uint8List(32)..fillRange(0, 32, b);
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   ({Uint8List publicKey, Uint8List? secret, int power}) val(int seed) {
     final v = bc.newBLSValidator(fill(seed));
     return (publicKey: v.public, secret: v.secret, power: 1);
@@ -103,5 +103,5 @@ void main() {
   expect(calls == 1, 'tx source from Dart');
   tree.free();
   print(
-      'blockchainer dart chain-tree smoke: OK (root <- child <- grandchild built together, produced upward, proven from the root, hooks from Dart)');
+      'aviary dart chain-tree smoke: OK (root <- child <- grandchild built together, produced upward, proven from the root, hooks from Dart)');
 }

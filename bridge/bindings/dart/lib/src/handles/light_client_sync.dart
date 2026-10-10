@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Bisection sync for a light client.
 extension LightClientSync on LightClient {

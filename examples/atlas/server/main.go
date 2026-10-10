@@ -1,4 +1,4 @@
-// Atlas Settlement Network — gRPC server backed by Blockchainer (Go binding).
+// Atlas Settlement Network — gRPC server backed by Aviary (Go binding).
 package main
 
 import (
@@ -6,7 +6,7 @@ import (
 	"net"
 
 	pb "atlas/gen"
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -14,9 +14,9 @@ import (
 
 func main() {
 	if err := bc.Init(); err != nil {
-		log.Fatalf("blockchainer init: %v", err)
+		log.Fatalf("aviary init: %v", err)
 	}
-	log.Printf("Atlas Settlement Network — blockchainer %s (crypto %s)",
+	log.Printf("Atlas Settlement Network — aviary %s (crypto %s)",
 		bc.Version(), bc.CryptoBackendVersion())
 
 	addr := ":50051"

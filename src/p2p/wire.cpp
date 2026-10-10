@@ -1,6 +1,6 @@
-#include "blockchainer/wire.hpp"
+#include "aviary/wire.hpp"
 
-namespace blockchainer::wire {
+namespace aviary::wire {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -191,4 +191,4 @@ AdmissionPresentation as_admission_presentation(const Message& m) {
   return a;
 }
 
-}  // namespace blockchainer::wire
+}  // namespace aviary::wire

@@ -1,10 +1,10 @@
-#include "blockchainer/version.hpp"
+#include "aviary/version.hpp"
 
 #include <stdexcept>
 
 #include "cryptolib_c.h"
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 constexpr const char* kVersion = "0.0.1";
@@ -12,7 +12,7 @@ constexpr const char* kVersion = "0.0.1";
 
 void init() {
   if (cryptolib_init() != 0) {
-    throw std::runtime_error("blockchainer::init: cryptolib_init failed");
+    throw std::runtime_error("aviary::init: cryptolib_init failed");
   }
 }
 
@@ -23,4 +23,4 @@ std::string crypto_backend_version() {
   return v != nullptr ? std::string(v) : std::string();
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

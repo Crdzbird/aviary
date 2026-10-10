@@ -1,4 +1,4 @@
-#include "blockchainer/admission_socket.hpp"
+#include "aviary/admission_socket.hpp"
 
 #include <poll.h>
 #include <sys/socket.h>
@@ -7,11 +7,11 @@
 #include <cstddef>
 #include <optional>
 
-#include "blockchainer/admission.hpp"
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/types.hpp"
+#include "aviary/admission.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/types.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 crypto::ByteView cv(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
@@ -95,4 +95,4 @@ bool present_over_socket(int fd, const consensus::CredentialPolicy& policy,
   return send_frame(fd, reply);
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

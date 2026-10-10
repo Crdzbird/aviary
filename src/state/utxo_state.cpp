@@ -1,11 +1,11 @@
-#include "blockchainer/utxo_state.hpp"
+#include "aviary/utxo_state.hpp"
 
 #include <set>
 #include <vector>
 
-#include "blockchainer/merkle.hpp"
+#include "aviary/merkle.hpp"
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -343,4 +343,4 @@ std::unique_ptr<UtxoStateMachine> UtxoStateMachine::deserialize(codec::ByteView 
   return sm;
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

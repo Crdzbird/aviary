@@ -1,11 +1,11 @@
 #include <vector>
 
-#include "blockchainer/interop/bridge.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/interop/bridge.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::interop::bridge;
+using namespace aviary;
+using namespace aviary::interop::bridge;
 using consensus::Validator;
 using consensus::ValidatorSet;
 

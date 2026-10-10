@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final class _Account implements Account {
   const _Account(this.secret, this.publicKey, this.address);

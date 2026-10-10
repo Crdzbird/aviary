@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// The security posture a chain commits to at genesis. Higher tiers only
 /// ever tighten the tier below them.

@@ -1,12 +1,12 @@
-#include "blockchainer/keyring.hpp"
+#include "aviary/keyring.hpp"
 
 #include <stdexcept>
 #include <utility>
 
-#include "blockchainer/codec.hpp"
+#include "aviary/codec.hpp"
 #include "cryptolib_c.h"
 
-namespace blockchainer::custody {
+namespace aviary::custody {
 
 namespace {
 // Consume a CryptoBufferResult into Bytes; throws with the backend message on
@@ -137,7 +137,7 @@ Bytes Vault::open_max(const SealedBlob& blob, std::string_view aad) const {
 namespace {
 // Fixed domain AAD — every tier binds it, so an envelope can't be reinterpreted
 // as a different context.
-constexpr const char* kPortableAad = "blockchainer.portable-account.v1";
+constexpr const char* kPortableAad = "aviary.portable-account.v1";
 codec::ByteView portable_aad() {
   return codec::ByteView(reinterpret_cast<const std::uint8_t*>(kPortableAad),
                          std::char_traits<char>::length(kPortableAad));
@@ -252,7 +252,7 @@ Bytes KeyStore::reveal_secret(const Hash& address) const {
 // cascade). The AAD is a fixed domain string so an envelope can't be replayed
 // into a different context; the address is recomputed from the public key.
 namespace {
-constexpr const char* kExportAad = "blockchainer.account.export.v1";
+constexpr const char* kExportAad = "aviary.account.export.v1";
 }
 
 Bytes KeyStore::export_account(const Hash& address, std::string_view passphrase,
@@ -351,4 +351,4 @@ KeyStore KeyStore::load(ByteView blob) {
   return ks;  // locked (no vault)
 }
 
-}  // namespace blockchainer::custody
+}  // namespace aviary::custody

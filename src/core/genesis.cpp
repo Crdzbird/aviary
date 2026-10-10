@@ -1,12 +1,12 @@
-#include "blockchainer/genesis.hpp"
+#include "aviary/genesis.hpp"
 
 #include <algorithm>
 #include <stdexcept>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/utxo_state.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/utxo_state.hpp"
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -128,4 +128,4 @@ std::unique_ptr<Ledger> ledger_from_genesis(const GenesisSpec& spec) {
   return std::make_unique<Ledger>(spec.chain_spec(), spec.build_state(), spec.timestamp);
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

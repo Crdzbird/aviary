@@ -7,12 +7,12 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 crypto::ByteView view(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
@@ -23,7 +23,7 @@ int main() {
   init();
 
   auto issuer = crypto::bbs_keygen(view(Bytes(32, 0x2a)));
-  Bytes header = msg("blockchainer.credential.v2");
+  Bytes header = msg("aviary.credential.v2");
   Bytes ph = msg("presentation-nonce");
 
   // Signer-set (issuer) attributes + committed (holder-hidden) attributes.

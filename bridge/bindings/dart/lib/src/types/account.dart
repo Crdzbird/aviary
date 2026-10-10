@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A generated account: the signing secret, public key and chain address.
 abstract final class Account {

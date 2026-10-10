@@ -1,11 +1,11 @@
 #include <string>
 
-#include "blockchainer/interop/abi.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/interop/abi.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::interop;
+using namespace aviary;
+using namespace aviary::interop;
 
 namespace {
 std::string hex(const std::vector<std::uint8_t>& b) {

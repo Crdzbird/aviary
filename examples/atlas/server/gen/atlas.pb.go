@@ -5,11 +5,11 @@
 // source: atlas.proto
 
 // Atlas Settlement Network — a wholesale settlement & tokenized-asset platform
-// built on Blockchainer. Operators launch custom settlement chains (BFT, instant
+// built on Aviary. Operators launch custom settlement chains (BFT, instant
 // finality); institutions hold custodial wallets; settlements finalize with
 // cryptographic balance proofs; and wallets interact with EVM smart contracts
 // (ERC-20) for cross-chain bridging. All blockchain work happens server-side via
-// the Blockchainer Go binding.
+// the Aviary Go binding.
 
 package atlasv1
 

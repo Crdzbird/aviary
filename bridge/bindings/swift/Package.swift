@@ -1,14 +1,14 @@
 // swift-tools-version: 5.10
 //
-// Blockchainer Swift Package
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// A standalone Swift package wrapping Blockchainer's C ABI with a Swift API and
-// an off-main-thread preload (Blockchainer.preload()).
+// Aviary Swift Package
+// 
+// A standalone Swift package wrapping Aviary's C ABI with a Swift API and
+// an off-main-thread preload (Aviary.preload()).
 //
-//   • `BlockchainerC`  — the raw C FFI module (a DYNAMIC framework xcframework,
+//   - `AviaryC`  - the raw C FFI module (a DYNAMIC framework xcframework,
 //     produced by scripts/apple/build_dynamic_xcframework.sh). Its cryptolib_*
-//     symbols resolve at runtime against CryptoLibC.
-//   • `Blockchainer`   — the ergonomic Swift wrapper (Node, interop, preload).
+//     symbols resolve at runtime against CipherBird.
+//   - `Aviary`   - the ergonomic Swift wrapper (Node, interop, preload).
 //
 // The crypto backend comes from the cryptolib Swift package (depended on, not
 // bundled). Local path until cryptolib is published.
@@ -16,52 +16,52 @@
 // Slices: iOS 15+ device (arm64), iOS simulator (arm64), macOS 14+ (arm64).
 //
 // Usage from another package:
-//     dependencies: [ .package(path: "path/to/blockchainer/bridge/bindings/swift") ]
-//     .product(name: "Blockchainer", package: "Blockchainer")
-// then `import Blockchainer`.
+//     dependencies: [ .package(path: "path/to/aviary/bridge/bindings/swift") ]
+//     .product(name: "Aviary", package: "Aviary")
+// then `import Aviary`.
 import PackageDescription
 
 let package = Package(
-    name: "Blockchainer",
+    name: "Aviary",
     platforms: [
         .iOS(.v15),
         .macOS(.v14),
     ],
     products: [
-        .library(name: "Blockchainer", targets: ["Blockchainer"]),
-        .library(name: "BlockchainerC", targets: ["BlockchainerC"]),
+        .library(name: "Aviary", targets: ["Aviary"]),
+        .library(name: "AviaryC", targets: ["AviaryC"]),
     ],
     dependencies: [],
     targets: [
-        // The Blockchainer C ABI as a dynamic-framework binary target.
+        // The Aviary C ABI as a dynamic-framework binary target.
         .binaryTarget(
-            name: "BlockchainerC",
-            path: "../blockchainer/ios/blockchainer/BlockchainerC.xcframework"
+            name: "AviaryC",
+            path: "../aviary/ios/aviary/AviaryC.xcframework"
         ),
-        // cryptolib's dynamic framework — vendored as a binary target so
-        // Blockchainer's runtime cryptolib_* lookups resolve. (Referenced
-        // directly rather than via the cryptolib SwiftPM package to avoid the
-        // same-leaf-name path-package identity clash; this is the same dynamic
-        // CryptoLibC the cryptolib_flutter plugin ships.)
+        // CipherBird's dynamic framework, vendored as a binary target so
+        // Aviary's runtime cryptolib_* lookups resolve. The cipherbird
+        // Flutter plugin ships iOS and macOS as two xcframeworks; run
+        // scripts/apple/vendor_cipherbird.sh once to merge them into
+        // Vendor/CipherBird.xcframework (gitignored).
         .binaryTarget(
-            name: "CryptoLibC",
-            path: "../../../../cryptolib/bridge/bindings/cryptolib_flutter/ios/cryptolib_flutter/CryptoLibC.xcframework"
+            name: "CipherBird",
+            path: "Vendor/CipherBird.xcframework"
         ),
-        // Ergonomic Swift wrapper. Links CryptoLibC so Blockchainer's runtime
+        // Ergonomic Swift wrapper. Links CipherBird so Aviary's runtime
         // cryptolib_* lookups resolve.
         .target(
-            name: "Blockchainer",
+            name: "Aviary",
             dependencies: [
-                "BlockchainerC",
-                "CryptoLibC",
+                "AviaryC",
+                "CipherBird",
             ],
-            path: "Sources/Blockchainer"
+            path: "Sources/Aviary"
         ),
         // A tiny demo proving the bridge links + the preload path (macOS).
         .executableTarget(
-            name: "BlockchainerDemo",
-            dependencies: ["Blockchainer"],
-            path: "Sources/BlockchainerDemo"
+            name: "AviaryDemo",
+            dependencies: ["Aviary"],
+            path: "Sources/AviaryDemo"
         ),
     ]
 )

@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _KemKeygenC = _BufResult Function();
 typedef _KemKeygenD = _BufResult Function();

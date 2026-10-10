@@ -1,4 +1,4 @@
-# Blockchainer golden vectors — BLAKE3-256.
+# Aviary golden vectors — BLAKE3-256.
 #
 # Source of truth for cross-language determinism (ARCHITECTURE §2). Every
 # language (C++ core, Dart, Go) must reproduce these EXACTLY. A binding that
@@ -11,4 +11,4 @@
 # verifiable; the rest are snapshotted from the proven implementation.
 
 ""            af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262
-626c6f636b636861696e6572  c9ab2bfe296411d91948b0afc12eda63d2a7ef470e95eb1cb390c58821d8c8ce
+617669617279  6345ac5b1229b0a0eba19d679ca4359442f623f4f6a1cf823d5b9c280f289b2b

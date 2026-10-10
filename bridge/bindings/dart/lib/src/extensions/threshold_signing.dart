@@ -1,7 +1,7 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A whole threshold signing ceremony run in one process.
-extension ThresholdSigning on Blockchainer {
+extension ThresholdSigning on Aviary {
   /// Signs [message] with [shares], at least the account's threshold of
   /// them, and returns the 64 byte Ed25519 signature. Every share commits,
   /// signs and is attributed; a share whose signature does not verify
@@ -20,7 +20,7 @@ extension ThresholdSigning on Blockchainer {
         final share = shares[i];
         final signature = ceremony.sign(share.bytes, commits[i].nonces);
         if (!ceremony.verifyShare(share.index, share.publicShare, signature)) {
-          throw BlockchainerException('share ${share.index} did not verify');
+          throw AviaryException('share ${share.index} did not verify');
         }
         signatures.add(signature);
       }

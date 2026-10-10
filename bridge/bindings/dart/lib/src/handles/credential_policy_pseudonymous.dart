@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// The pseudonymous issuance and presentation flow of a policy.
 extension CredentialPolicyPseudonymous on CredentialPolicy {
@@ -7,8 +7,7 @@ extension CredentialPolicyPseudonymous on CredentialPolicy {
   Uint8List membershipCommit(Uint8List memberSecret) => _scoped(
         [encoded, memberSecret],
         (p) => _bc._take(
-          _bc.lib.lookupFunction<_Buf2C, _Buf2D>(
-                  'blockchainer_membership_commit')(
+          _bc.lib.lookupFunction<_Buf2C, _Buf2D>('aviary_membership_commit')(
               p[0], encoded.length, p[1], memberSecret.length),
           'membership_commit',
         ),
@@ -26,7 +25,7 @@ extension CredentialPolicyPseudonymous on CredentialPolicy {
         [encoded, issuerSecret, commitment],
         (p) => _bc._take(
           _bc.lib.lookupFunction<_BlindIssueC, _BlindIssueD>(
-                  'blockchainer_blind_issue')(
+                  'aviary_blind_issue')(
               p[0],
               encoded.length,
               p[1],
@@ -53,7 +52,7 @@ extension CredentialPolicyPseudonymous on CredentialPolicy {
           [encoded, credential, challenge],
           (p) => _bc._take(
             _bc.lib.lookupFunction<_CredPresentC, _CredPresentD>(
-                    'blockchainer_credential_present_pseudonymous')(
+                    'aviary_credential_present_pseudonymous')(
                 p[0],
                 encoded.length,
                 p[1],

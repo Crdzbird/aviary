@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _NodeNewC = Pointer<Void> Function(Uint64);
 typedef _NodeNewD = Pointer<Void> Function(int);

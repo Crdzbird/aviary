@@ -1,8 +1,8 @@
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/state.hpp"
-#include "blockchainer/utxo_state.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/state.hpp"
+#include "aviary/utxo_state.hpp"
 
-namespace blockchainer {
+namespace aviary {
 
 std::unique_ptr<StateMachine> deserialize_state(StateModel model, codec::ByteView bytes) {
   switch (model) {
@@ -14,4 +14,4 @@ std::unique_ptr<StateMachine> deserialize_state(StateModel model, codec::ByteVie
   return AccountStateMachine::deserialize(bytes);  // unreachable; keeps the compiler happy
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

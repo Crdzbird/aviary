@@ -1,10 +1,10 @@
 #include <vector>
 
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }

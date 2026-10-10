@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -15,7 +15,7 @@ bool fails(void Function() f) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
 
   final standard = bc.describeAssurance(1);
   expect(!standard.ratcheted && !standard.vrf,
@@ -59,6 +59,6 @@ void main() {
   expect(strangerReveal.isEmpty, 'a non-proposer opens nothing');
 
   pool.free();
-  print('blockchainer dart assurance + sealed-mempool smoke: OK '
+  print('aviary dart assurance + sealed-mempool smoke: OK '
       '(3 tiers monotonic, 3 sealed txs, proposer-only reveal)');
 }

@@ -1,9 +1,9 @@
 #include <string>
 
-#include "blockchainer/interop/rlp.hpp"
+#include "aviary/interop/rlp.hpp"
 #include "check.hpp"
 
-using namespace blockchainer::interop::rlp;
+using namespace aviary::interop::rlp;
 
 namespace {
 Bytes str(const char* s) { Bytes b; for (; *s; ++s) b.push_back(static_cast<std::uint8_t>(*s)); return b; }

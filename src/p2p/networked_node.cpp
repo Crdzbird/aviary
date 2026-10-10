@@ -1,10 +1,10 @@
-#include "blockchainer/networked_node.hpp"
+#include "aviary/networked_node.hpp"
 
 #include <deque>
 
-#include "blockchainer/wire.hpp"
+#include "aviary/wire.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -71,4 +71,4 @@ NetworkedNode::Outbound NetworkedNode::on_timeout(consensus::Step step, std::uin
   return emit(driver_.on_timeout(step, round));
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

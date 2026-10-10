@@ -1,11 +1,11 @@
-#include "blockchainer/vrf_pos.hpp"
+#include "aviary/vrf_pos.hpp"
 
 #include <stdexcept>
 #include <string>
 
-#include "blockchainer/pos_engine.hpp"  // pos_signing_bytes — same sealing rule
+#include "aviary/pos_engine.hpp"  // pos_signing_bytes — same sealing rule
 
-namespace blockchainer::consensus {
+namespace aviary::consensus {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -143,4 +143,4 @@ BlockError VrfPosEngine::submit(const Block& block, codec::ByteView justificatio
   return ledger_->process_block(block);
 }
 
-}  // namespace blockchainer::consensus
+}  // namespace aviary::consensus

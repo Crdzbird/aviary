@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -15,7 +15,7 @@ bool eq(Uint8List a, Uint8List b) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   final eng = bc.engineIds();
   expect(
       eng.contains('bft') &&
@@ -92,5 +92,5 @@ void main() {
           null,
       'state mismatch rejected');
   print(
-      'blockchainer dart chain-blueprint smoke: OK (discovery, mixture=identity, PoS+PoW commit, fail-closed rejects)');
+      'aviary dart chain-blueprint smoke: OK (discovery, mixture=identity, PoS+PoW commit, fail-closed rejects)');
 }

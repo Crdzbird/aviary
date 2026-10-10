@@ -1,6 +1,6 @@
-#include "blockchainer/codec.hpp"
+#include "aviary/codec.hpp"
 
-namespace blockchainer::codec {
+namespace aviary::codec {
 
 // ── Writer ───────────────────────────────────────────────────────────────────
 
@@ -153,4 +153,4 @@ Bytes CodecReader::read_biguint() {
   return b;
 }
 
-}  // namespace blockchainer::codec
+}  // namespace aviary::codec

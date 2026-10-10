@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build BlockchainerC.xcframework as a DYNAMIC-framework xcframework for the
+# Build AviaryC.xcframework as a DYNAMIC-framework xcframework for the
 # Flutter plugin's Swift Package.
 #
-# Unlike the old static+merged build, blockchainer's cryptolib_* symbols are
+# Unlike the old static+merged build, aviary's cryptolib_* symbols are
 # left UNDEFINED (-undefined dynamic_lookup) and resolve at runtime against the
 # CryptoLibC framework that cryptolib_flutter embeds. So this build:
-#   1. compiles blockchainer_core.a + blockchainer_c.a per slice (no cryptolib),
-#   2. wraps them in a dynamic BlockchainerC.framework (force-load -> all C-ABI
+#   1. compiles aviary_core.a + aviary_c.a per slice (no cryptolib),
+#   2. wraps them in a dynamic AviaryC.framework (force-load -> all C-ABI
 #      symbols exported for DynamicLibrary.process()),
 #   3. assembles ios-arm64 + ios-arm64-simulator + macos-arm64 into one
 #      xcframework, copied into the plugin's ios/ and macos/ SPM trees.
@@ -16,9 +16,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
 TOOLCHAIN="$CRYPTOLIB_ROOT/cmake/ios.toolchain.cmake"
-PLUGIN="$ROOT/bridge/bindings/blockchainer"
+PLUGIN="$ROOT/bridge/bindings/aviary"
 BUILD="$ROOT/build-apple"
-FW_NAME="BlockchainerC"
+FW_NAME="AviaryC"
 VERSION="0.0.1"
 
 [[ -f "$TOOLCHAIN" ]] || { echo "missing $TOOLCHAIN"; exit 1; }
@@ -35,17 +35,17 @@ slice_platform_name(){ case "$1" in iphoneos) echo iPhoneOS;; iphonesimulator) e
 
 build_archives() {  # <slice>
   local slice="$1" platform; platform="$(slice_ios_platform "$slice")"
-  echo "== compiling blockchainer archives: $slice ($platform) =="
+  echo "== compiling aviary archives: $slice ($platform) =="
   cmake -B "$BUILD/$slice" -S "$ROOT" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DIOS_PLATFORM="$platform" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBLOCKCHAINER_STATIC=ON \
+    -DAVIARY_STATIC=ON \
     -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
     -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" >/dev/null
-  cmake --build "$BUILD/$slice" --target blockchainer_c >/dev/null
-  # One archive with blockchainer core + C ABI only (cryptolib stays external).
-  libtool -static -o "$BUILD/$slice/libblockchainer_only.a" \
-    "$BUILD/$slice/libblockchainer_core.a" "$BUILD/$slice/libblockchainer_c.a"
+  cmake --build "$BUILD/$slice" --target aviary_c >/dev/null
+  # One archive with aviary core + C ABI only (cryptolib stays external).
+  libtool -static -o "$BUILD/$slice/libaviary_only.a" \
+    "$BUILD/$slice/libaviary_core.a" "$BUILD/$slice/libaviary_c.a"
 }
 
 info_plist() {  # <slice> <out>
@@ -58,7 +58,7 @@ info_plist() {  # <slice> <out>
 <plist version="1.0"><dict>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleExecutable</key><string>${FW_NAME}</string>
-  <key>CFBundleIdentifier</key><string>com.blockchainer.${FW_NAME}</string>
+  <key>CFBundleIdentifier</key><string>com.aviary.${FW_NAME}</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleName</key><string>${FW_NAME}</string>
   <key>CFBundlePackageType</key><string>FMWK</string>
@@ -73,13 +73,13 @@ EOF
 make_framework() {  # <slice> -> echoes .framework path
   local slice="$1" sdk minflag archive fwdir cc modulemap sysroot
   sdk="$(slice_sdk "$slice")"; minflag="$(slice_minflag "$slice")"
-  archive="$BUILD/$slice/libblockchainer_only.a"
+  archive="$BUILD/$slice/libaviary_only.a"
   fwdir="$BUILD/$slice/${FW_NAME}.framework"
   rm -rf "$fwdir"
   sysroot="$(xcrun --sdk "$sdk" --show-sdk-path)"
   cc="$(xcrun --sdk "$sdk" -f clang)"
   modulemap="framework module ${FW_NAME} {
-    header \"blockchainer_c.h\"
+    header \"aviary_c.h\"
     export *
 }"
   # -undefined dynamic_lookup: cryptolib_* symbols resolve at load time from the
@@ -91,7 +91,7 @@ make_framework() {  # <slice> -> echoes .framework path
     mkdir -p "$vdir/Headers" "$vdir/Modules" "$vdir/Resources"
     "$cc" "${common[@]}" -install_name "@rpath/${FW_NAME}.framework/Versions/A/${FW_NAME}" \
       -o "$vdir/${FW_NAME}" 2>"$BUILD/$slice/dylink.log" || { cat "$BUILD/$slice/dylink.log"; exit 1; }
-    cp "$ROOT/bridge/blockchainer_c.h" "$vdir/Headers/blockchainer_c.h"
+    cp "$ROOT/bridge/aviary_c.h" "$vdir/Headers/aviary_c.h"
     printf '%s\n' "$modulemap" > "$vdir/Modules/module.modulemap"
     info_plist "$slice" "$vdir/Resources/Info.plist"
     ( cd "$fwdir/Versions" && ln -sfn A Current )
@@ -103,7 +103,7 @@ make_framework() {  # <slice> -> echoes .framework path
     mkdir -p "$fwdir/Headers" "$fwdir/Modules"
     "$cc" "${common[@]}" -install_name "@rpath/${FW_NAME}.framework/${FW_NAME}" \
       -o "$fwdir/${FW_NAME}" 2>"$BUILD/$slice/dylink.log" || { cat "$BUILD/$slice/dylink.log"; exit 1; }
-    cp "$ROOT/bridge/blockchainer_c.h" "$fwdir/Headers/blockchainer_c.h"
+    cp "$ROOT/bridge/aviary_c.h" "$fwdir/Headers/aviary_c.h"
     printf '%s\n' "$modulemap" > "$fwdir/Modules/module.modulemap"
     info_plist "$slice" "$fwdir/Info.plist"
   fi
@@ -125,7 +125,7 @@ xcodebuild -create-xcframework "${ARGS[@]}" -output "$OUT" >/dev/null
 echo "ok: assembled $OUT"
 
 # Stage into the plugin's SPM trees (ios + macos each get the full xcframework).
-for dest in "$PLUGIN/ios/blockchainer" "$PLUGIN/macos/blockchainer"; do
+for dest in "$PLUGIN/ios/aviary" "$PLUGIN/macos/aviary"; do
   mkdir -p "$dest"
   rm -rf "$dest/${FW_NAME}.xcframework"
   cp -R "$OUT" "$dest/${FW_NAME}.xcframework"

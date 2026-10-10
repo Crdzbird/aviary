@@ -6,7 +6,7 @@ import (
 	"log"
 	"net"
 
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 	pb "interop/gen"
 
 	"google.golang.org/grpc"
@@ -77,9 +77,9 @@ func applyScenario(node *bc.Node, in *pb.ChainScenario) (*pb.ChainResult, error)
 
 func main() {
 	if err := bc.Init(); err != nil {
-		log.Fatalf("blockchainer init: %v", err)
+		log.Fatalf("aviary init: %v", err)
 	}
-	log.Printf("Interop server — blockchainer %s (crypto %s)", bc.Version(), bc.CryptoBackendVersion())
+	log.Printf("Interop server — aviary %s (crypto %s)", bc.Version(), bc.CryptoBackendVersion())
 	lis, err := net.Listen("tcp", ":50053")
 	if err != nil {
 		log.Fatalf("listen: %v", err)

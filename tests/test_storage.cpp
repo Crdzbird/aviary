@@ -4,17 +4,17 @@
 #include <memory>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/bft_engine.hpp"
-#include "blockchainer/block_store.hpp"
-#include "blockchainer/ledger.hpp"
-#include "blockchainer/storage.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/block_store.hpp"
+#include "aviary/ledger.hpp"
+#include "aviary/storage.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::consensus;
-using blockchainer::storage::FileStore;
+using namespace aviary;
+using namespace aviary::consensus;
+using aviary::storage::FileStore;
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -37,7 +37,7 @@ const AccountStateMachine& as_account(const Ledger& l) {
 
 int main() {
   init();
-  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "blockchainer_storage_test";
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "aviary_storage_test";
   std::filesystem::remove_all(dir);  // fresh
   FileStore store(dir);
 
@@ -113,7 +113,7 @@ int main() {
 
   std::printf("== load_chain returns nullopt for an empty store ==\n");
   {
-    FileStore empty(std::filesystem::temp_directory_path() / "blockchainer_storage_empty");
+    FileStore empty(std::filesystem::temp_directory_path() / "aviary_storage_empty");
     std::filesystem::remove_all(empty.dir());
     CHECK(!storage::load_chain(empty, spec).has_value());
   }

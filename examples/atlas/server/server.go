@@ -11,7 +11,7 @@ import (
 	"time"
 
 	pb "atlas/gen"
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -298,8 +298,8 @@ func (s *server) GetMetrics(_ context.Context, r *pb.ChainRef) (*pb.Metrics, err
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	m := parseMetrics(c.node.Metrics())
-	return &pb.Metrics{Height: c.node.Height(), Blocks: m["blockchainer_blocks_finalized_total"],
-		Transactions: m["blockchainer_transactions_total"], Mempool: uint64(c.node.MempoolSize())}, nil
+	return &pb.Metrics{Height: c.node.Height(), Blocks: m["aviary_blocks_finalized_total"],
+		Transactions: m["aviary_transactions_total"], Mempool: uint64(c.node.MempoolSize())}, nil
 }
 
 func (s *server) StreamEvents(r *pb.ChainRef, stream pb.Atlas_StreamEventsServer) error {

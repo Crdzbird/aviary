@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -15,7 +15,7 @@ bool fails(void Function() f) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
 
   final cards = bc.createThresholdAccount(3, 2);
   expect(cards.length == 3, '3 share cards dealt');
@@ -51,7 +51,7 @@ void main() {
       'wrong passphrase fails closed');
 
   print(
-      'blockchainer dart threshold smoke: OK (2-of-3, attribution, 64B aggregate, sealed)');
+      'aviary dart threshold smoke: OK (2-of-3, attribution, 64B aggregate, sealed)');
 }
 
 bool _eq(Uint8List a, Uint8List b) {

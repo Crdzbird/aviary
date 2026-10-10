@@ -1,8 +1,8 @@
-#include "blockchainer/gossip.hpp"
+#include "aviary/gossip.hpp"
 
-#include "blockchainer/credential_gate.hpp"
+#include "aviary/credential_gate.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 bool GossipOverlay::admit_peer(std::uint32_t peer, std::uint32_t epoch, crypto::ByteView challenge,
                                crypto::ByteView presentation, std::uint64_t now) {
@@ -88,4 +88,4 @@ int GossipOverlay::score(std::uint32_t peer) const {
   return it == misbehavior_.end() ? 0 : it->second;
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

@@ -1,12 +1,12 @@
-#include "blockchainer/subchain.hpp"
+#include "aviary/subchain.hpp"
 
-#include "blockchainer/codec.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/light_client.hpp"
+#include "aviary/codec.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/light_client.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 codec::ByteView bview(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -347,4 +347,4 @@ void SubchainRegistry::restore_tips(crypto::ByteView bytes) {
   }
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

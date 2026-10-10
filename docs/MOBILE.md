@@ -1,6 +1,6 @@
 # Native multi-platform builds (iOS / Android / macOS / Swift / JVM)
 
-Blockchainer's C ABI (`libblockchainer_c`) compiles to every platform and is
+Aviary's C ABI (`libaviary_c`) compiles to every platform and is
 consumed by the language bindings. The C ABI calls the CipherBird C ABI
 (`cryptolib_*` symbols, header `bridge/cryptolib_c.h` in the CipherBird repo),
 so every platform build needs CipherBird's native artifact for that platform.
@@ -41,18 +41,18 @@ done
 
 | Package | Native packaging | CipherBird |
 |---|---|---|
-| `blockchainer_lite` | Static merged `Blockchainer.xcframework` (iOS + macOS) and a self-contained `libblockchainer_c.so` per Android ABI. | Linked inside the binary. No pub dependency. |
-| `blockchainer` | Dynamic `BlockchainerC.xcframework` built with `-undefined dynamic_lookup`, and a thin `libblockchainer_c.so`. | Depends on and re-exports the `cipherbird` pub package, which ships the engine. |
+| `aviary_lite` | Static merged `Aviary.xcframework` (iOS + macOS) and a self-contained `libaviary_c.so` per Android ABI. | Linked inside the binary. No pub dependency. |
+| `aviary` | Dynamic `AviaryC.xcframework` built with `-undefined dynamic_lookup`, and a thin `libaviary_c.so`. | Depends on and re-exports the `cipherbird` pub package, which ships the engine. |
 
-Both expose the same Dart API through `blockchainer_dart`.
+Both expose the same Dart API through `aviary_dart`.
 
-## Build blockchainer's native artifacts
+## Build aviary's native artifacts
 
 ```bash
-# lite: static xcframework into bridge/bindings/blockchainer_lite/{ios,macos}
+# lite: static xcframework into bridge/bindings/aviary_lite/{ios,macos}
 bash scripts/apple/build_xcframework.sh
 
-# full: dynamic xcframework into bridge/bindings/blockchainer/{ios,macos}
+# full: dynamic xcframework into bridge/bindings/aviary/{ios,macos}
 bash scripts/apple/build_dynamic_xcframework.sh
 
 # Android, one of:
@@ -67,20 +67,20 @@ lite `.so` is 8 to 9 MB per ABI; the full one is about 1 MB.
 
 | Binding | Native loading |
 |---|---|
-| Flutter `blockchainer_lite` | ffiPlugin. iOS/macOS: SPM binary target, the static archive is linked into the app and Dart uses `DynamicLibrary.process()`. Android: `DynamicLibrary.open('libblockchainer_c.so')`. |
-| Flutter `blockchainer` | ffiPlugin. iOS/macOS: SPM binary target, `BlockchainerC.framework` and `CipherBird.framework` are both embedded. Android: the loader opens `libcipherbird.so` first, then `libblockchainer_c.so`. |
-| Pure Dart `blockchainer_dart` | Bundles `native/darwin-arm64/{libblockchainer_c,libcipherbird}.dylib`, resolved through the package root in `package_config.json`; `BLOCKCHAINER_DYLIB` overrides. |
-| Swift (`bridge/bindings/swift`) | SPM package with binary target xcframeworks (BlockchainerC + CipherBird). |
-| JVM | Foreign Function and Memory API loading `libblockchainer_c` (desktop uses the host dylib). |
+| Flutter `aviary_lite` | ffiPlugin. iOS/macOS: SPM binary target, the static archive is linked into the app and Dart uses `DynamicLibrary.process()`. Android: `DynamicLibrary.open('libaviary_c.so')`. |
+| Flutter `aviary` | ffiPlugin. iOS/macOS: SPM binary target, `AviaryC.framework` and `CipherBird.framework` are both embedded. Android: the loader opens `libcipherbird.so` first, then `libaviary_c.so`. |
+| Pure Dart `aviary_dart` | Bundles `native/darwin-arm64/{libaviary_c,libcipherbird}.dylib`, resolved through the package root in `package_config.json`; `AVIARY_DYLIB` overrides. |
+| Swift (`bridge/bindings/swift`) | SPM package with binary target xcframeworks (AviaryC + CipherBird). CipherBird ships iOS and macOS as two bundles, so run `bash scripts/apple/vendor_cipherbird.sh` once to merge them into the gitignored `Vendor/CipherBird.xcframework`. |
+| JVM | Foreign Function and Memory API loading `libaviary_c` (desktop uses the host dylib). |
 
 ## Publishing notes
 
 - pub only ships git-tracked files and honors the root `.gitignore`, so the
   binaries are force-added and each package has a `.pubignore` that re-includes
   them with `!` patterns.
-- `pubspec_overrides.yaml` points `blockchainer_dart` at `../dart` for local
+- `pubspec_overrides.yaml` points `aviary_dart` at `../dart` for local
   development; it is excluded from the archive and the published packages
-  resolve `blockchainer_dart` from pub.
+  resolve `aviary_dart` from pub.
 - pub flattens symlinks in the archive. The macOS slice of a versioned
   framework therefore arrives with `Versions/Current` as a real directory. Xcode
   logs "Couldn't resolve framework symlink" as a warning and the build still
@@ -90,7 +90,7 @@ lite `.so` is 8 to 9 MB per ABI; the full one is about 1 MB.
 
 ## Why the build is simple
 
-`blockchainer_c` is pure C++ that only needs CipherBird's header to compile.
+`aviary_c` is pure C++ that only needs CipherBird's header to compile.
 Its `cryptolib_*` calls resolve when the final app links (iOS/macOS, or inside
 the merged lite archive) or at load time from `libcipherbird.so` (full
-Android). The per-platform build compiles blockchainer's sources only.
+Android). The per-platform build compiles aviary's sources only.

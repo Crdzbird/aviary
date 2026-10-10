@@ -1,10 +1,10 @@
-#include "blockchainer/interop/json.hpp"
+#include "aviary/interop/json.hpp"
 
 #include <cmath>
 #include <cstdio>
 #include <sstream>
 
-namespace blockchainer::json {
+namespace aviary::json {
 
 bool Value::as_bool() const {
   if (type_ != Type::kBool) throw JsonError("json: not a bool");
@@ -282,4 +282,4 @@ class Parser {
 
 Value Value::parse(const std::string& text) { return Parser(text).parse(); }
 
-}  // namespace blockchainer::json
+}  // namespace aviary::json

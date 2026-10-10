@@ -1,9 +1,9 @@
-#include "blockchainer/fork_choice.hpp"
+#include "aviary/fork_choice.hpp"
 
 #include <algorithm>
 #include <vector>
 
-namespace blockchainer {
+namespace aviary {
 
 ForkChoice::ForkChoice(ChainSpec spec,
                        std::function<std::unique_ptr<StateMachine>()> genesis_state,
@@ -88,4 +88,4 @@ ForkChoice::AddResult ForkChoice::add_block(const Block& block, std::uint64_t we
   return {true, false, ""};  // stored, but not canonical
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

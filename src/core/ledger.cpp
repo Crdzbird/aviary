@@ -1,9 +1,9 @@
-#include "blockchainer/ledger.hpp"
+#include "aviary/ledger.hpp"
 
 #include <optional>
 #include <stdexcept>
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 // Total encoded size of a block's transactions — the quantity ChainSpec bounds.
@@ -224,4 +224,4 @@ std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot
   return ledger;
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

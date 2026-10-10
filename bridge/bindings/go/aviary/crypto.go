@@ -1,0 +1,24 @@
+package aviary
+
+// Aviary's crypto backend is cryptolib. This package depends on cryptolib's
+// Go binding so the full crypto surface — hashing, AEAD, Ed25519/X25519,
+// post-quantum (ML-KEM/ML-DSA), BLS, vaults, keyring, EVM/Bitcoin primitives —
+// is available to consumers ALONGSIDE the ledger, from one dependency. Importing
+// cryptolib's package also links libcryptolib_c (which aviary_c needs),
+// the Go analog of how aviary_flutter depends on cryptolib_flutter.
+//
+// Use it directly:
+//
+//	import (
+//		bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
+//		"github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
+//	)
+//	digest, _ := cryptolib.Blake3(data, 32)
+//	node := bc.NewNode(1)
+
+import cryptolib "github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
+
+// cryptoInit initializes cryptolib's Go binding (called once during Init). This
+// also links libcryptolib_c, which aviary_c needs. Use CryptoBackendVersion
+// for the backend version (parity with the other bindings).
+func cryptoInit() error { return cryptolib.Init() }

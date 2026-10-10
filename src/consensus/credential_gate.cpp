@@ -1,12 +1,12 @@
-#include "blockchainer/credential_gate.hpp"
+#include "aviary/credential_gate.hpp"
 
 #include <stdexcept>
 #include <string>
 
-#include "blockchainer/codec.hpp"
-#include "blockchainer/genesis.hpp"
+#include "aviary/codec.hpp"
+#include "aviary/genesis.hpp"
 
-namespace blockchainer::consensus {
+namespace aviary::consensus {
 
 namespace {
 
@@ -308,4 +308,4 @@ bool CredentialGate::note_admission(std::uint32_t epoch, std::string_view scope,
   return admitted_.insert(std::move(key)).second;  // true iff first this (epoch, scope)
 }
 
-}  // namespace blockchainer::consensus
+}  // namespace aviary::consensus

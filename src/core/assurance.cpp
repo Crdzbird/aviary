@@ -1,8 +1,8 @@
-#include "blockchainer/assurance.hpp"
+#include "aviary/assurance.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer {
+namespace aviary {
 
 std::vector<std::uint8_t> AssuranceProfile::required_sig_algos() const {
   switch (level_) {
@@ -64,4 +64,4 @@ AssuranceProfile AssuranceProfile::from_genesis(const GenesisSpec& g) {
   return p;
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

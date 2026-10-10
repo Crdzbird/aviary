@@ -1,6 +1,6 @@
-#include "blockchainer/proofs.hpp"
+#include "aviary/proofs.hpp"
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -132,4 +132,4 @@ bool verify_receipt_inclusion(const Hash& receipt_root, const ReceiptProof& p) {
   return merkle::verify_proof(receipt_root, leaf, p.proof, p.leaf_count);
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

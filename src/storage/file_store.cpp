@@ -1,10 +1,10 @@
-#include "blockchainer/storage.hpp"
+#include "aviary/storage.hpp"
 
 #include <cstdio>
 #include <fstream>
 #include <stdexcept>
 
-namespace blockchainer::storage {
+namespace aviary::storage {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -78,4 +78,4 @@ std::optional<LoadedChain> load_chain(const FileStore& store, ChainSpec spec) {
   return out;
 }
 
-}  // namespace blockchainer::storage
+}  // namespace aviary::storage

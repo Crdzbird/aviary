@@ -1,8 +1,8 @@
-#include "blockchainer/round_state.hpp"
+#include "aviary/round_state.hpp"
 
 #include <utility>
 
-namespace blockchainer::consensus {
+namespace aviary::consensus {
 
 namespace {
 Action broadcast(ConsensusMessage::Kind kind, std::uint32_t round, Value value,
@@ -259,4 +259,4 @@ void RoundStateMachine::try_transitions(std::vector<Action>& out) {
   }
 }
 
-}  // namespace blockchainer::consensus
+}  // namespace aviary::consensus

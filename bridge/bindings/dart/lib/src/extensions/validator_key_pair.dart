@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Turning a validator key pair into the entries the genesis, rotation and
 /// tree APIs take.

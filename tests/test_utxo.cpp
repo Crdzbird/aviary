@@ -5,13 +5,13 @@
 #include <random>
 #include <vector>
 
-#include "blockchainer/ledger.hpp"
-#include "blockchainer/merkle.hpp"
-#include "blockchainer/utxo_state.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/ledger.hpp"
+#include "aviary/merkle.hpp"
+#include "aviary/utxo_state.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using Outpoint = UtxoStateMachine::Outpoint;
 using Output = UtxoStateMachine::Output;
 

@@ -2,8 +2,8 @@
 
 ## 0.0.1
 
-- Initial Go binding for the Blockchainer C ABI (cgo). **Full ABI coverage** —
-  every `blockchainer_*` C function is wrapped.
+- Initial Go binding for the Aviary C ABI (cgo). **Full ABI coverage** —
+  every `aviary_*` C function is wrapped.
   - Canonical bytes: `Hash`, `Txid`, `HeaderHash`.
   - Verification: `VerifyStateProof`, `VerifyTxInclusion`, `VerifyCommit`.
   - Node (ledger + BFT + mempool + observability): `NewNode`, `NewAccount`,
@@ -19,5 +19,5 @@
   available alongside the ledger). `CryptoBackendVersion()` reports the linked
   backend version, proving the link.
 - Linking: `cgo_local.go` (default), `cgo_pkgconfig.go` (`-tags
-  blockchainer_pkgconfig`), `cgo_static.go` (`-tags blockchainer_static`, fully
+  aviary_pkgconfig`), `cgo_static.go` (`-tags aviary_static`, fully
   self-contained), and a `!cgo` build guard.

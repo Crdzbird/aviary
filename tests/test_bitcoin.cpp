@@ -1,12 +1,12 @@
 #include <string>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/interop/bitcoin.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/interop/bitcoin.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::interop;
+using namespace aviary;
+using namespace aviary::interop;
 
 namespace {
 codec::ByteView view(const std::vector<std::uint8_t>& b) { return codec::ByteView(b.data(), b.size()); }

@@ -1,11 +1,11 @@
-#include "blockchainer/node/demo_node.hpp"
+#include "aviary/node/demo_node.hpp"
 
 #include <sstream>
 #include <stdexcept>
 
-#include "blockchainer/observability/events.hpp"
+#include "aviary/observability/events.hpp"
 
-namespace blockchainer::node {
+namespace aviary::node {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -177,7 +177,7 @@ std::string DemoNode::drain_events_json() {
 std::string DemoNode::metrics_text() {
   // Non-sealing: a metrics scrape must never start the engine. Engine counters
   // appear once the engine registers them (on first transact/produce).
-  metrics_.gauge("blockchainer_mempool_size", "pending transactions")
+  metrics_.gauge("aviary_mempool_size", "pending transactions")
       .set(static_cast<std::int64_t>(mempool_.size()));
   return metrics_.prometheus_text();
 }
@@ -186,4 +186,4 @@ StateProof DemoNode::prove_account(const Hash& address) const {
   return read_state().prove_account(address);
 }
 
-}  // namespace blockchainer::node
+}  // namespace aviary::node

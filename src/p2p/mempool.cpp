@@ -1,4 +1,4 @@
-#include "blockchainer/mempool.hpp"
+#include "aviary/mempool.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -6,11 +6,11 @@
 #include <utility>
 #include <vector>
 
-#include "blockchainer/credential_gate.hpp"
-#include "blockchainer/observability/event_bus.hpp"
-#include "blockchainer/observability/events.hpp"
+#include "aviary/credential_gate.hpp"
+#include "aviary/observability/event_bus.hpp"
+#include "aviary/observability/events.hpp"
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 // The sender bucket used for per-account accounting: BLAKE3(author). Absent for
@@ -150,4 +150,4 @@ void Mempool::remove(const std::vector<Hash>& txids) {
   }
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

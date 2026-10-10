@@ -1,12 +1,12 @@
 #include <cstdint>
 #include <vector>
 
-#include "blockchainer/codec.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/codec.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 Bytes str_bytes(const char* s) {

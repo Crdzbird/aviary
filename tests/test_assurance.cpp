@@ -3,12 +3,12 @@
 // the same configuration — no node can silently join with a weaker one.
 #include <vector>
 
-#include "blockchainer/assurance.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/assurance.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using Level = AssuranceProfile::Level;
 using Transport = AssuranceProfile::Transport;
 using Consensus = AssuranceProfile::Consensus;

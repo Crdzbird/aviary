@@ -1,10 +1,10 @@
-#include "blockchainer/foreign_engine.hpp"
+#include "aviary/foreign_engine.hpp"
 
 #include <stdexcept>
 
-#include "blockchainer/chain_assembler.hpp"
+#include "aviary/chain_assembler.hpp"
 
-namespace blockchainer::node {
+namespace aviary::node {
 
 ForeignEngine::ForeignEngine(std::unique_ptr<Ledger> ledger, JustifyFn justify, VerifyFn verify)
     : ledger_(std::move(ledger)), justify_(std::move(justify)), verify_(std::move(verify)) {
@@ -50,4 +50,4 @@ void register_foreign_proposer(const std::string& id, ForeignProposerFn fn) {
   });
 }
 
-}  // namespace blockchainer::node
+}  // namespace aviary::node

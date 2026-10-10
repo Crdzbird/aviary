@@ -1,12 +1,12 @@
-#include "blockchainer/interop/solana.hpp"
+#include "aviary/interop/solana.hpp"
 
 #include <stdexcept>
 
-#include "blockchainer/codec.hpp"
-#include "blockchainer/interop/encoding.hpp"
-#include "blockchainer/interop/json.hpp"
+#include "aviary/codec.hpp"
+#include "aviary/interop/encoding.hpp"
+#include "aviary/interop/json.hpp"
 
-namespace blockchainer::interop::solana {
+namespace aviary::interop::solana {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -96,4 +96,4 @@ std::string SolanaClient::send_transaction(const Bytes& signed_tx) {
   return rpc_.call("sendTransaction", std::move(params)).as_string();
 }
 
-}  // namespace blockchainer::interop::solana
+}  // namespace aviary::interop::solana

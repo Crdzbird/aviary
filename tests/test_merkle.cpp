@@ -1,17 +1,17 @@
 #include <cstdint>
 #include <vector>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/merkle.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/merkle.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using blockchainer::crypto::Hash;
-using namespace blockchainer::merkle;
+using aviary::crypto::Hash;
+using namespace aviary::merkle;
 
 namespace {
 Hash leaf(std::uint8_t i) {
-  return blockchainer::crypto::hash_tagged(blockchainer::crypto::Domain::kLeaf,
+  return aviary::crypto::hash_tagged(aviary::crypto::Domain::kLeaf,
                                            {i});
 }
 std::vector<Hash> leaves(std::uint32_t n) {
@@ -22,25 +22,25 @@ std::vector<Hash> leaves(std::uint32_t n) {
 }  // namespace
 
 int main() {
-  blockchainer::init();  // crypto backend
+  aviary::init();  // crypto backend
 
   std::printf("== structural ==\n");
   // Single leaf is its own root.
   CHECK(compute_root(leaves(1)) == leaf(0));
   // Two leaves -> node hash.
   CHECK(compute_root(leaves(2)) ==
-        blockchainer::crypto::hash_node(leaf(0), leaf(1)));
+        aviary::crypto::hash_node(leaf(0), leaf(1)));
   // Empty root is stable and equals the domain-separated empty constant.
   CHECK(compute_root({}) ==
-        blockchainer::crypto::hash_tagged(blockchainer::crypto::Domain::kNode, {}));
+        aviary::crypto::hash_tagged(aviary::crypto::Domain::kNode, {}));
   // Determinism.
   CHECK(compute_root(leaves(5)) == compute_root(leaves(5)));
 
   // Carry-up: 3 leaves. Root = node( node(l0,l1), l2 ).
   {
     auto ls = leaves(3);
-    Hash expect = blockchainer::crypto::hash_node(
-        blockchainer::crypto::hash_node(ls[0], ls[1]), ls[2]);
+    Hash expect = aviary::crypto::hash_node(
+        aviary::crypto::hash_node(ls[0], ls[1]), ls[2]);
     CHECK(compute_root(ls) == expect);
   }
 

@@ -1,8 +1,8 @@
-#include "blockchainer/block_store.hpp"
+#include "aviary/block_store.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -76,4 +76,4 @@ BlockStore BlockStore::load(codec::ByteView bytes) {
   return store;
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

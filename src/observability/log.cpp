@@ -1,8 +1,8 @@
-#include "blockchainer/observability/log.hpp"
+#include "aviary/observability/log.hpp"
 
 #include <sstream>
 
-namespace blockchainer::observe {
+namespace aviary::observe {
 
 const char* to_string(LogLevel level) {
   switch (level) {
@@ -27,4 +27,4 @@ void Logger::log(LogLevel level, std::string message, std::vector<LogField> fiel
   sink_->write(LogRecord{level, std::move(message), std::move(fields)});
 }
 
-}  // namespace blockchainer::observe
+}  // namespace aviary::observe

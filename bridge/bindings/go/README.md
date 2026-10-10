@@ -1,11 +1,11 @@
-# Blockchainer — Go binding
+# Aviary — Go binding
 
-Idiomatic Go bindings for Blockchainer, a distributed-ledger core (ledger, BFT
+Idiomatic Go bindings for Aviary, a distributed-ledger core (ledger, BFT
 consensus, mempool, observability, light-client verification) plus
-EVM/Bitcoin/Solana interop, over a stable C ABI (`libblockchainer_c`) via cgo.
+EVM/Bitcoin/Solana interop, over a stable C ABI (`libaviary_c`) via cgo.
 
 ```go
-import bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+import bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 
 func main() {
     bc.Preload()                 // optional background warm-up — returns at once
@@ -37,19 +37,19 @@ preload:
 | `bc.Init() error` | yes (once) | Optional; runs init synchronously and surfaces any error. |
 | `bc.Initialized() bool` | — | `true` once the backend is ready. |
 
-`blockchainer_init` → `cryptolib_init`, which is idempotent; init runs exactly
+`aviary_init` → `cryptolib_init`, which is idempotent; init runs exactly
 once (`sync.Once`), concurrency-safe.
 
 ## Crypto backend: cryptolib (depended on, not bundled)
 
-Blockchainer's crypto backend is **cryptolib**, whose Go binding is a dependency
+Aviary's crypto backend is **cryptolib**, whose Go binding is a dependency
 of this module — so the full crypto surface (hashing, AEAD, Ed25519/X25519,
 post-quantum ML-KEM/ML-DSA, BLS, vaults, keyring, EVM/Bitcoin primitives) is
 available alongside the ledger, from one `go get`:
 
 ```go
 import (
-    bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+    bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
     "github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
 )
 
@@ -58,8 +58,8 @@ kp := cryptolib.Ed25519Keygen()
 node := bc.NewNode(1)                         // on-chain ledger
 ```
 
-`blockchainer_c` links `cryptolib_c` (CipherBird); importing its Go package provides
-that library (the Go analog of the `blockchainer` Flutter package depending on
+`aviary_c` links `cryptolib_c` (CipherBird); importing its Go package provides
+that library (the Go analog of the `aviary` Flutter package depending on
 `cipherbird`). `bc.CryptoBackendVersion()` reports the linked backend
 version (`3.0.0`), proving the link end to end.
 
@@ -67,27 +67,27 @@ version (`3.0.0`), proving the link end to end.
 
 Requires `CGO_ENABLED=1` and the prebuilt native libraries.
 
-- **Local (default)** — `cgo_local.go` links `libblockchainer_c` from the repo
+- **Local (default)** — `cgo_local.go` links `libaviary_c` from the repo
   `build/` dir and bakes an rpath to it; cryptolib's own Go binding bakes the
   rpath to its `build/release`. So in-repo binaries run with no environment
-  setup — just check out `cryptolib` next to `blockchainer`.
-- **Static (`-tags "blockchainer_static cryptolib_static"`)** — the "just works
-  everywhere" option: links the merged `build/static/libblockchainer_c.a` plus
-  cryptolib's static archive. The binary has **no `libblockchainer_c` /
+  setup — just check out `cryptolib` next to `aviary`.
+- **Static (`-tags "aviary_static cryptolib_static"`)** — the "just works
+  everywhere" option: links the merged `build/static/libaviary_c.a` plus
+  cryptolib's static archive. The binary has **no `libaviary_c` /
   `libcryptolib_c` shared-library dependency** — nothing to ship, no rpath, no
   `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`. Build the archives once:
 
   ```bash
   ( cd ../cryptolib && scripts/build_static_archive.sh )   # cryptolib archive
-  scripts/build_static_archive.sh                          # blockchainer archive
-  ( cd bridge/bindings/go && go build -tags "blockchainer_static cryptolib_static" ./... )
+  scripts/build_static_archive.sh                          # aviary archive
+  ( cd bridge/bindings/go && go build -tags "aviary_static cryptolib_static" ./... )
   ```
-- **Installed (`-tags blockchainer_pkgconfig`)** — resolves flags from a
-  `blockchainer_c.pc` on `PKG_CONFIG_PATH` (template: `blockchainer_c.pc.in`).
+- **Installed (`-tags aviary_pkgconfig`)** — resolves flags from a
+  `aviary_c.pc` on `PKG_CONFIG_PATH` (template: `aviary_c.pc.in`).
   Set `CGO_LDFLAGS`/`DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH` to your install.
 
 ```bash
-go test ./blockchainer/      # unit tests + cross-binding determinism
+go test ./aviary/      # unit tests + cross-binding determinism
 go run  ./example            # ledger + cryptolib crypto together
 go run  ./cmd/demo           # cross-language golden-vector determinism check
 ```

@@ -10,7 +10,7 @@ import (
 	"log"
 	"time"
 
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 	pb "interop/gen"
 
 	"google.golang.org/grpc"

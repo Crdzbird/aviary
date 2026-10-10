@@ -14,10 +14,10 @@
 #include <map>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/merkle.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/merkle.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using clk = std::chrono::steady_clock;
 
 static Hash addr_from(std::uint64_t n) {

@@ -1,17 +1,17 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A verifier's anonymous membership admission gate. It admits a holder by a
 /// zero knowledge proof of an issuer signed credential clearing the policy.
 final class CredentialGate {
   CredentialGate._(this._bc, this._h);
 
-  final Blockchainer _bc;
+  final Aviary _bc;
   final Pointer<Void> _h;
 
   /// Bulk revocation: refuses every credential issued in [epoch].
   void revokeIssuerEpoch(int epoch) =>
       _bc.lib.lookupFunction<_CredGateRevokeC, _CredGateRevokeD>(
-          'blockchainer_credential_gate_revoke_epoch')(_h, epoch);
+          'aviary_credential_gate_revoke_epoch')(_h, epoch);
 
   /// Runs the full admission checklist. A malformed presentation is false;
   /// this never throws.
@@ -28,7 +28,7 @@ final class CredentialGate {
           [challenge, presentation],
           (p) =>
               _bc.lib.lookupFunction<_CredGateAdmitC, _CredGateAdmitD>(
-                      'blockchainer_credential_gate_admit')(_h, epoch, sp, p[0],
+                      'aviary_credential_gate_admit')(_h, epoch, sp, p[0],
                   challenge.length, p[1], presentation.length, now) ==
               1,
         ),
@@ -36,5 +36,5 @@ final class CredentialGate {
 
   /// Releases the native gate.
   void free() => _bc.lib.lookupFunction<_HandleFreeC, _HandleFreeD>(
-      'blockchainer_credential_gate_free')(_h);
+      'aviary_credential_gate_free')(_h);
 }

@@ -5,12 +5,12 @@
 // identity into the other session (the proof is bound to the handshake hash).
 #include <cstdio>
 
-#include "blockchainer/noise_session.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/noise_session.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using blockchainer::p2p::NoiseSession;
+using namespace aviary;
+using aviary::p2p::NoiseSession;
 
 namespace {
 Bytes bytes(const char* s) {

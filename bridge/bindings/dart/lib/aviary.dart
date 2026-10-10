@@ -1,0 +1,98 @@
+/// Aviary for Dart: the ledger, consensus, mixtures, subchains, light
+/// clients and chain trees of the Aviary C ABI, plus the custody and
+/// anonymous membership surfaces, over dart:ffi. The extensions under
+/// src/extensions add the one call shortcuts: funded accounts, auto nonce
+/// transfers, hex helpers, single validator chains and whole ceremonies.
+library;
+
+import 'dart:convert';
+import 'dart:ffi';
+import 'dart:io';
+import 'dart:isolate';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:ffi/ffi.dart';
+
+part 'src/ffi/buffer.dart';
+part 'src/ffi/buf_result.dart';
+part 'src/ffi/sigs_core.dart';
+part 'src/ffi/sigs_node.dart';
+part 'src/ffi/sigs_portable.dart';
+part 'src/ffi/sigs_threshold.dart';
+part 'src/ffi/sigs_assurance.dart';
+part 'src/ffi/sigs_credentials.dart';
+part 'src/ffi/sigs_credentials_pseudonymous.dart';
+part 'src/ffi/sigs_chains.dart';
+part 'src/ffi/sigs_subchains.dart';
+part 'src/ffi/sigs_light_client.dart';
+part 'src/ffi/sigs_tree.dart';
+part 'src/ffi/sigs_foreign.dart';
+part 'src/core/aviary.dart';
+part 'src/core/loader.dart';
+part 'src/core/bundled_library.dart';
+part 'src/core/scope.dart';
+part 'src/core/codec.dart';
+part 'src/core/validator_codec.dart';
+part 'src/core/exception.dart';
+part 'src/core/exception_impl.dart';
+part 'src/core/foreign_registry.dart';
+part 'src/core/tree_registry.dart';
+part 'src/types/records.dart';
+part 'src/types/skip_result.dart';
+part 'src/types/foreign_engine.dart';
+part 'src/types/account.dart';
+part 'src/types/account_impl.dart';
+part 'src/types/portable_account.dart';
+part 'src/types/portable_account_impl.dart';
+part 'src/types/threshold_share.dart';
+part 'src/types/threshold_share_impl.dart';
+part 'src/types/assurance_profile.dart';
+part 'src/types/assurance_profile_impl.dart';
+part 'src/types/tree_node.dart';
+part 'src/types/tree_node_impl.dart';
+part 'src/api/interop.dart';
+part 'src/api/canonical.dart';
+part 'src/api/proofs.dart';
+part 'src/api/nodes.dart';
+part 'src/api/portable_seal.dart';
+part 'src/api/portable_open.dart';
+part 'src/api/threshold.dart';
+part 'src/api/assurance.dart';
+part 'src/api/credentials.dart';
+part 'src/api/mixtures.dart';
+part 'src/api/genesis.dart';
+part 'src/api/subchains.dart';
+part 'src/api/subchain_proofs.dart';
+part 'src/api/foreign.dart';
+part 'src/api/trees.dart';
+part 'src/api/light_clients.dart';
+part 'src/handles/node.dart';
+part 'src/handles/node_transfers.dart';
+part 'src/handles/node_queries.dart';
+part 'src/handles/key_store.dart';
+part 'src/handles/ceremony.dart';
+part 'src/handles/sealed_mempool.dart';
+part 'src/handles/credential_policy.dart';
+part 'src/handles/credential_policy_pseudonymous.dart';
+part 'src/handles/blueprint.dart';
+part 'src/handles/chain.dart';
+part 'src/handles/chain_subchains.dart';
+part 'src/handles/credential_gate.dart';
+part 'src/handles/credential_gate_pseudonymous.dart';
+part 'src/handles/light_client.dart';
+part 'src/handles/light_client_sync.dart';
+part 'src/handles/chain_tree.dart';
+part 'src/handles/chain_tree_queries.dart';
+part 'src/extensions/hex_bytes.dart';
+part 'src/extensions/hex_string.dart';
+part 'src/extensions/account_tools.dart';
+part 'src/extensions/node_funding.dart';
+part 'src/extensions/node_sending.dart';
+part 'src/extensions/node_views.dart';
+part 'src/extensions/chain_blocks.dart';
+part 'src/extensions/validator_key_pair.dart';
+part 'src/extensions/aviary_quick.dart';
+part 'src/extensions/threshold_signing.dart';
+part 'src/extensions/tree_node_building.dart';
+part 'src/extensions/chain_tree_rounds.dart';

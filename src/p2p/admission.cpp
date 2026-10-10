@@ -1,8 +1,8 @@
-#include "blockchainer/admission.hpp"
+#include "aviary/admission.hpp"
 
-#include "blockchainer/wire.hpp"
+#include "aviary/wire.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 crypto::ByteView view(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
@@ -38,4 +38,4 @@ bool admission_granted(const consensus::CredentialGate& gate, std::uint32_t epoc
   return gate.admit(epoch, "gossip", nonce, view(presentation), now);
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

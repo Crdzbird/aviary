@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Decoded views of a node's state.
 extension NodeViews on Node {

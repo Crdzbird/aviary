@@ -1,7 +1,7 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Portable account import: opening a sealed account.
-extension BlockchainerPortableOpen on Blockchainer {
+extension AviaryPortableOpen on Aviary {
   PortableAccount _account(Uint8List blob) {
     final kp = _splitKeyBlob(blob);
     return PortableAccount(kp.public, kp.secret);
@@ -16,8 +16,7 @@ extension BlockchainerPortableOpen on Blockchainer {
           [envelope],
           (p) => _account(_take(
             lib.lookupFunction<_POpenPassC, _POpenPassD>(
-                    'blockchainer_portable_open_passphrase')(
-                p[0], envelope.length, cp),
+                'aviary_portable_open_passphrase')(p[0], envelope.length, cp),
             'portable_open_passphrase',
           )),
         ),
@@ -29,7 +28,7 @@ extension BlockchainerPortableOpen on Blockchainer {
       _scoped(
         [envelope, recipientKemSecret],
         (p) => _account(_take(
-          lib.lookupFunction<_Buf2C, _Buf2D>('blockchainer_portable_open_to')(
+          lib.lookupFunction<_Buf2C, _Buf2D>('aviary_portable_open_to')(
               p[0], envelope.length, p[1], recipientKemSecret.length),
           'portable_open_to',
         )),
@@ -46,13 +45,8 @@ extension BlockchainerPortableOpen on Blockchainer {
         [envelope, recipientKemSecret, senderSigPublic],
         (p) => _account(_take(
           lib.lookupFunction<_POpenSignedC, _POpenSignedD>(
-                  'blockchainer_portable_open_signed_from')(
-              p[0],
-              envelope.length,
-              p[1],
-              recipientKemSecret.length,
-              p[2],
-              senderSigPublic.length),
+                  'aviary_portable_open_signed_from')(p[0], envelope.length,
+              p[1], recipientKemSecret.length, p[2], senderSigPublic.length),
           'portable_open_signed_from',
         )),
       );

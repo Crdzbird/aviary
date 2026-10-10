@@ -6,13 +6,13 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/credential_gate.hpp"
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/credential_gate.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using consensus::Credential;
 using consensus::CredentialGate;
 using consensus::CredentialPolicy;
@@ -32,7 +32,7 @@ int main() {
   CredentialPolicy policy;
   policy.chain_id = 7;
   policy.issuer_public_key = issuer.public_key;
-  policy.header = bytes("blockchainer.credential.v1");
+  policy.header = bytes("aviary.credential.v1");
   policy.attribute_count = consensus::credential_attr::kBaseCount;  // just the four well-known
   policy.min_tier = 2;
 

@@ -1,4 +1,4 @@
-// Cross-language determinism check (Go side). Links libblockchainer_c and
+// Cross-language determinism check (Go side). Links libaviary_c and
 // asserts the SAME golden vectors the C++ test and the Dart demo assert.
 package main
 
@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"os"
 
-	blockchainer "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	aviary "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 )
 
 func main() {
-	if err := blockchainer.Init(); err != nil {
+	if err := aviary.Init(); err != nil {
 		panic(err)
 	}
-	fmt.Println("blockchainer  version :", blockchainer.Version())
-	fmt.Println("crypto backend version:", blockchainer.CryptoBackendVersion())
+	fmt.Println("aviary  version :", aviary.Version())
+	fmt.Println("crypto backend version:", aviary.CryptoBackendVersion())
 
 	failures := 0
 	check := func(cond bool, what string) {
@@ -27,7 +27,7 @@ func main() {
 		}
 	}
 
-	empty, err := blockchainer.Hash([]byte{})
+	empty, err := aviary.Hash([]byte{})
 	if err != nil {
 		panic(err)
 	}
@@ -35,13 +35,13 @@ func main() {
 		"af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
 		"BLAKE3('') golden vector")
 
-	tag, err := blockchainer.Hash([]byte("blockchainer"))
+	tag, err := aviary.Hash([]byte("aviary"))
 	if err != nil {
 		panic(err)
 	}
 	check(hex.EncodeToString(tag) ==
-		"c9ab2bfe296411d91948b0afc12eda63d2a7ef470e95eb1cb390c58821d8c8ce",
-		"BLAKE3('blockchainer') cross-language vector")
+		"6345ac5b1229b0a0eba19d679ca4359442f623f4f6a1cf823d5b9c280f289b2b",
+		"BLAKE3('aviary') cross-language vector")
 
 	// Replay the canonical txid / header_hash golden vectors through the C ABI.
 	author := make([]byte, 32)
@@ -52,7 +52,7 @@ func main() {
 	for i := range sig {
 		sig[i] = 0x22
 	}
-	txid, err := blockchainer.Txid(1, 7, []byte("hello"), author, sig)
+	txid, err := aviary.Txid(1, 7, []byte("hello"), author, sig)
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func main() {
 		txRoot[i] = 0xAA
 		stateRoot[i] = 0xBB
 	}
-	hh, err := blockchainer.HeaderHash(1, 7, 42, parent, 1000, txRoot, stateRoot, nil)
+	hh, err := aviary.HeaderHash(1, 7, 42, parent, 1000, txRoot, stateRoot, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -80,11 +80,11 @@ func main() {
 		"9918413a2ad25fc3ec37457f522bcf091f0aaefc14af15d56b3cb2100632bce3")
 	proofBytes, _ := hex.DecodeString(
 		"01000000381111111111111111111111111111111111111111111111111111111111111111000000000000000000000000000001f40000000000000000000000020000000000000001bb53fe611991a376f327f60748faf0ceaae4671df4d5fb7a89b8f56cbce17033")
-	check(blockchainer.VerifyStateProof(proofRoot, proofBytes), "state proof verifies")
+	check(aviary.VerifyStateProof(proofRoot, proofBytes), "state proof verifies")
 	tampered := make([]byte, len(proofBytes))
 	copy(tampered, proofBytes)
 	tampered[40] ^= 0x01
-	check(!blockchainer.VerifyStateProof(proofRoot, tampered), "tampered state proof rejected")
+	check(!aviary.VerifyStateProof(proofRoot, tampered), "tampered state proof rejected")
 
 	if failures == 0 {
 		fmt.Println("\nALL PASS")

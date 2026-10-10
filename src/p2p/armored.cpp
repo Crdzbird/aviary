@@ -1,10 +1,10 @@
-#include "blockchainer/armored.hpp"
+#include "aviary/armored.hpp"
 
 #include <stdexcept>
 
-#include "blockchainer/codec.hpp"
+#include "aviary/codec.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -76,4 +76,4 @@ ArmoredChannel ArmoredChannel::accept(const Bytes& handshake, const crypto::KeyP
 Bytes ArmoredChannel::encrypt(const Bytes& plaintext) { return ratchet_.encrypt(view(plaintext)); }
 Bytes ArmoredChannel::decrypt(const Bytes& frame) { return ratchet_.decrypt(view(frame)); }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

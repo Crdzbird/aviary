@@ -1,4 +1,4 @@
-#include "blockchainer/crypto.hpp"
+#include "aviary/crypto.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -7,7 +7,7 @@
 
 #include "cryptolib_c.h"
 
-namespace blockchainer::crypto {
+namespace aviary::crypto {
 
 Hash blake3_256(const std::uint8_t* data, std::size_t len) {
   // Pass a valid (non-null) pointer even for empty input, so the borrowed-input
@@ -971,4 +971,4 @@ std::string to_hex(const Hash& h) {
   return s;
 }
 
-}  // namespace blockchainer::crypto
+}  // namespace aviary::crypto

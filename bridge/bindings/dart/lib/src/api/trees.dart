@@ -1,7 +1,7 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Chain trees: a declared family of chains built and driven together.
-extension BlockchainerTrees on Blockchainer {
+extension AviaryTrees on Aviary {
   /// Canonically encodes a tree node, children first.
   Uint8List encodeTreeNode(TreeNode n) {
     final bp =
@@ -18,7 +18,7 @@ extension BlockchainerTrees on Blockchainer {
           [bp, _concat(n.accounts.map((a) => a.address)), pks, secrets, kids],
           (p) => _take(
             lib.lookupFunction<_TreeNodeC, _TreeNodeD>(
-                    'blockchainer_chain_tree_node_encode')(
+                    'aviary_chain_tree_node_encode')(
                 n.chainId,
                 p[0],
                 bp.length,
@@ -43,7 +43,7 @@ extension BlockchainerTrees on Blockchainer {
 
   /// Why a spec is structurally invalid; empty means valid.
   String chainTreeSpecError(Uint8List spec) =>
-      String.fromCharCodes(_bufOp('blockchainer_chain_tree_spec_error', spec));
+      String.fromCharCodes(_bufOp('aviary_chain_tree_spec_error', spec));
 
   /// Builds a family from [root]. Throws with the structural reason, or a
   /// generic reject when the registry or posture refuses.
@@ -53,7 +53,7 @@ extension BlockchainerTrees on Blockchainer {
     if (err.isNotEmpty) throw StateError('chain tree: $err');
     return _scoped([spec], (p) {
       final h = lib.lookupFunction<_TreeBuildC, _TreeBuildD>(
-          'blockchainer_chain_tree_build')(p[0], spec.length);
+          'aviary_chain_tree_build')(p[0], spec.length);
       if (h == nullptr) throw StateError('chain tree: build rejected');
       return ChainTree._(this, h);
     });

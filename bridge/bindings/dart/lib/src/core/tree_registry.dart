@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final Map<int, ChainTree> _trees = {};
 int _nextTreeHandle = 1;

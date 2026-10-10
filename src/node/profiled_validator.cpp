@@ -1,8 +1,8 @@
-#include "blockchainer/profiled_validator.hpp"
+#include "aviary/profiled_validator.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer::node {
+namespace aviary::node {
 
 ProfiledValidator ProfiledValidator::boot(const GenesisSpec& genesis, std::uint32_t me,
                                           crypto::KeyPair bls_key, Bytes vrf_secret,
@@ -49,4 +49,4 @@ Bytes ProfiledValidator::seal(const Block& block) const {
   return pos_ ? pos_->seal(block) : vrf_->seal(block);
 }
 
-}  // namespace blockchainer::node
+}  // namespace aviary::node

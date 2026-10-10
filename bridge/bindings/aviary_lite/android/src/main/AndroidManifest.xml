@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="com.aviary.aviary_lite">
+  <application>
+    <provider
+      android:name="com.aviary.aviary_lite.AviaryStartup"
+      android:authorities="${applicationId}.aviary_lite-startup"
+      android:exported="false"
+      android:initOrder="90" />
+  </application>
+</manifest>

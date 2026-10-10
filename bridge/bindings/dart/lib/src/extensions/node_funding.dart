@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Account creation with genesis funding in one step.
 extension NodeFunding on Node {

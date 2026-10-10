@@ -1,8 +1,8 @@
-#include "blockchainer/interop/rlp.hpp"
+#include "aviary/interop/rlp.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer::interop::rlp {
+namespace aviary::interop::rlp {
 
 namespace {
 // Minimal big-endian bytes of a length (no leading zeros). Used for long forms.
@@ -138,4 +138,4 @@ Item decode(ByteView bytes) {
   return item;
 }
 
-}  // namespace blockchainer::interop::rlp
+}  // namespace aviary::interop::rlp

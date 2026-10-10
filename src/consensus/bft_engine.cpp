@@ -1,12 +1,12 @@
-#include "blockchainer/bft_engine.hpp"
+#include "aviary/bft_engine.hpp"
 
 #include <stdexcept>
 
-#include "blockchainer/observability/event_bus.hpp"
-#include "blockchainer/observability/events.hpp"
-#include "blockchainer/observability/metrics.hpp"
+#include "aviary/observability/event_bus.hpp"
+#include "aviary/observability/events.hpp"
+#include "aviary/observability/metrics.hpp"
 
-namespace blockchainer::consensus {
+namespace aviary::consensus {
 
 void BftEngine::set_observability(observe::EventBus* bus,
                                   observe::MetricsRegistry* metrics) {
@@ -95,10 +95,10 @@ BlockError BftEngine::finalize(const Block& b, const CommitCertificate& cert) {
                                             b.transactions.size()});
     }
     if (metrics_) {
-      metrics_->gauge("blockchainer_chain_height", "current finalized height")
+      metrics_->gauge("aviary_chain_height", "current finalized height")
           .set(static_cast<std::int64_t>(b.header.height));
-      metrics_->counter("blockchainer_blocks_finalized_total", "blocks finalized").inc();
-      metrics_->counter("blockchainer_transactions_total", "transactions applied")
+      metrics_->counter("aviary_blocks_finalized_total", "blocks finalized").inc();
+      metrics_->counter("aviary_transactions_total", "transactions applied")
           .inc(b.transactions.size());
     }
   } else if (bus_) {
@@ -107,4 +107,4 @@ BlockError BftEngine::finalize(const Block& b, const CommitCertificate& cert) {
   return be;
 }
 
-}  // namespace blockchainer::consensus
+}  // namespace aviary::consensus

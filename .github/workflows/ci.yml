@@ -9,12 +9,12 @@ jobs:
   build-and-test:
     runs-on: macos-latest
     steps:
-      - name: Checkout blockchainer
+      - name: Checkout aviary
         uses: actions/checkout@v4
         with:
-          path: blockchainer
+          path: aviary
 
-      # cryptolib is a separate repo blockchainer links against. Point CRYPTOLIB_REPO
+      # cryptolib is a separate repo aviary links against. Point CRYPTOLIB_REPO
       # at your fork/mirror; this builds its self-contained C ABI.
       - name: Checkout cryptolib
         uses: actions/checkout@v4
@@ -36,8 +36,8 @@ jobs:
           cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build/release --target cryptolib_c
 
-      - name: Run blockchainer CI
-        working-directory: blockchainer
+      - name: Run aviary CI
+        working-directory: aviary
         env:
           CRYPTOLIB_ROOT: ${{ github.workspace }}/cryptolib
         run: bash scripts/ci.sh

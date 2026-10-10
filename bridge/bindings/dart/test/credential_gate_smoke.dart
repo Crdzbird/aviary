@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -8,7 +8,7 @@ void expect(bool ok, String msg) {
 Uint8List fill(int b, [int n = 32]) => Uint8List(n)..fillRange(0, n, b);
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
 
   final issuer = bc.newBBSIssuer(fill(0x11));
   expect(issuer.public.length == 96 && issuer.secret.length == 32,
@@ -17,7 +17,7 @@ void main() {
   final policy = bc.makeCredentialPolicy(
     chainId: 7,
     issuerPublic: issuer.public,
-    header: Uint8List.fromList('blockchainer.credential.v1'.codeUnits),
+    header: Uint8List.fromList('aviary.credential.v1'.codeUnits),
     minTier: 2,
   );
   expect(policy.hash().length == 32, 'policy hash is 32 bytes');
@@ -84,7 +84,7 @@ void main() {
       'malformed presentation rejected');
 
   gate.free();
-  print('blockchainer dart credential-gate smoke: OK '
+  print('aviary dart credential-gate smoke: OK '
       '(unlinkable admission, context-binding, expiry, tier, revocation)');
 }
 

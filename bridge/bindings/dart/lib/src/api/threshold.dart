@@ -1,12 +1,12 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Threshold accounts: any t of n share holders can sign.
-extension BlockchainerThreshold on Blockchainer {
+extension AviaryThreshold on Aviary {
   /// Deals a t of n account as [n] share cards. The group secret is erased.
   List<ThresholdShare> createThresholdAccount(int n, int t) {
     final blob = _take(
-      lib.lookupFunction<_ThCreateC, _ThCreateD>(
-          'blockchainer_threshold_create')(n, t),
+      lib.lookupFunction<_ThCreateC, _ThCreateD>('aviary_threshold_create')(
+          n, t),
       'threshold_create',
     );
     final count = (blob[0] << 8) | blob[1];
@@ -24,7 +24,7 @@ extension BlockchainerThreshold on Blockchainer {
   ThresholdShare _shareInfo(Uint8List card) => _scoped([card], (p) {
         final info = _take(
           lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-              'blockchainer_threshold_share_info')(p[0], card.length),
+              'aviary_threshold_share_info')(p[0], card.length),
           'threshold_share_info',
         );
         return ThresholdShare(
@@ -43,8 +43,7 @@ extension BlockchainerThreshold on Blockchainer {
           [card],
           (p) => _take(
             lib.lookupFunction<_ThSealC, _ThSealD>(
-                    'blockchainer_threshold_share_seal')(
-                p[0], card.length, pp, ops, mem),
+                'aviary_threshold_share_seal')(p[0], card.length, pp, ops, mem),
             'threshold_share_seal',
           ),
         ),
@@ -57,8 +56,7 @@ extension BlockchainerThreshold on Blockchainer {
           [envelope],
           (p) => _take(
             lib.lookupFunction<_ThUnsealC, _ThUnsealD>(
-                    'blockchainer_threshold_share_unseal')(
-                p[0], envelope.length, pp),
+                'aviary_threshold_share_unseal')(p[0], envelope.length, pp),
             'threshold_share_unseal',
           ),
         ),
@@ -68,7 +66,7 @@ extension BlockchainerThreshold on Blockchainer {
   ThresholdCommit commit(Uint8List card) => _scoped([card], (p) {
         final b = _take(
           lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-              'blockchainer_threshold_commit')(p[0], card.length),
+              'aviary_threshold_commit')(p[0], card.length),
           'threshold_commit',
         );
         return (
@@ -86,7 +84,7 @@ extension BlockchainerThreshold on Blockchainer {
     final roster = _concat(commitments);
     return _scoped([groupPublicKey, message, roster], (p) {
       final h = lib.lookupFunction<_ThCerNewC, _ThCerNewD>(
-              'blockchainer_threshold_ceremony_new')(
+              'aviary_threshold_ceremony_new')(
           p[0], p[1], message.length, p[2], roster.length);
       return Ceremony._(this, _requireHandle(h, 'threshold ceremony creation'));
     });

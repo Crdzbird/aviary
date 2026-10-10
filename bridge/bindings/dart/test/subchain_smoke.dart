@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -24,7 +24,7 @@ bool eq(Uint8List a, Uint8List b) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   final cv = bc.newBLSValidator(fill(0x71)),
       pv = bc.newBLSValidator(fill(0x72));
   final alice = fill(0xA1);
@@ -123,5 +123,5 @@ void main() {
   child.free();
   parent.free();
   print(
-      'blockchainer dart subchain smoke: OK (BFT child anchored by a parent; cross-chain proof from the parent header)');
+      'aviary dart subchain smoke: OK (BFT child anchored by a parent; cross-chain proof from the parent header)');
 }

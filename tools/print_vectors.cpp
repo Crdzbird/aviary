@@ -5,13 +5,13 @@
 #include <cstdio>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/proofs.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/proofs.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 static void print_hash(const char* label, const Hash& h) {
   std::printf("%s ", label);

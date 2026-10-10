@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _JustifyC = Int32 Function(
     Pointer<Void>, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Size>);

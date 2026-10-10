@@ -9,19 +9,19 @@
 #include <thread>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/assurance.hpp"
-#include "blockchainer/ledger.hpp"
-#include "blockchainer/networked_node.hpp"
-#include "blockchainer/bft_engine.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/subchain.hpp"
-#include "blockchainer/tcp_transport.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/assurance.hpp"
+#include "aviary/ledger.hpp"
+#include "aviary/networked_node.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/subchain.hpp"
+#include "aviary/tcp_transport.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::consensus;
+using namespace aviary;
+using namespace aviary::consensus;
 using p2p::NetworkedNode;
 using p2p::PeerAddr;
 using p2p::SecureConfig;
@@ -256,7 +256,7 @@ int main() {
 
   std::printf("== boot wiring: a profile's transport tier builds the config from records ==\n");
   {
-    using blockchainer::AssuranceProfile;
+    using aviary::AssuranceProfile;
     // The address book of peer records the transport reads (kem + sig + prekey).
     std::vector<crypto::KeyPair> prekeys;
     for (std::uint32_t i = 0; i < n; ++i) prekeys.push_back(crypto::Ratchet::generate_prekey());

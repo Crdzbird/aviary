@@ -6,7 +6,7 @@
 >
 > This document is the consolidated spec; keep it and the two issues in sync.
 
-> What blockchainer needs added to **cryptolib's C ABI** (`bridge/cryptolib_c.h`
+> What aviary needs added to **cryptolib's C ABI** (`bridge/cryptolib_c.h`
 > + impl) to unblock the **CredentialGate** anonymous-membership feature
 > (`docs/design/CREDENTIAL_GATE.md`). Follows cryptolib's existing conventions:
 > `CryptoBuffer`/`CryptoBufferResult` (malloc'd, caller frees via
@@ -15,7 +15,7 @@
 > parallel `msgs[i]` (pointer) + `msg_lens[i]` (length) × `msg_count` arrays
 > already used by `cryptolib_bbs_*`.
 >
-> **Why this is upstream, not in blockchainer.** blockchainer's architecture rule
+> **Why this is upstream, not in aviary.** aviary's architecture rule
 > is *never reimplement crypto* — it is a consumer of vetted primitives. The two
 > asks below are standard CFRG constructions with reference vectors; building
 > either as a home-grown composition over the bare-BBS + OPRF surface would mean
@@ -25,7 +25,7 @@
 >
 > **Verify the exact draft revision, message/proof byte layouts, and KAT values
 > against the current CFRG sources when implementing** — the signatures below fix
-> the *shape and semantics* blockchainer depends on, not the wire bytes; match
+> the *shape and semantics* aviary depends on, not the wire bytes; match
 > cryptolib's chosen suite constants and the draft you implement.
 
 ---
@@ -36,7 +36,7 @@ The current ABI (`cryptolib_c.h` §"BBS Signatures", BLS12-381-SHA-256; sk 32 B,
 pk 96 B, signature 80 B) is **bare BBS** —
 `cryptolib_bbs_{keygen, sk_to_pk, sign, verify, proof_gen, proof_verify}`:
 multi-message signing plus zero-knowledge **selective disclosure**. That is
-enough for blockchainer's **Option A** (unlinkable, per-interaction credential
+enough for aviary's **Option A** (unlinkable, per-interaction credential
 presentation — shippable now on the existing surface).
 
 Bare BBS proofs from one credential are, by design, **mutually unlinkable**. For
@@ -55,7 +55,7 @@ implements. **Confirm the current revision and its constants.**
 
 The credential is signed over a message vector that includes a dedicated,
 never-disclosed **pseudonym secret** `pid` (one of the `msgs`). At presentation
-the holder binds a **context** (`verifier_id` — for blockchainer this is
+the holder binds a **context** (`verifier_id` — for aviary this is
 `chain_id ‖ epoch ‖ scope`) and derives a deterministic pseudonym
 
 ```
@@ -64,7 +64,7 @@ nym = HashToG1(verifier_id) ^ pid          (a single G1 point, ~48 B compressed)
 
 together with a proof that `nym` was formed from the *same* `pid` the issuer
 signed — in zero knowledge, revealing neither `pid` nor any other hidden
-attribute. The essential properties blockchainer relies on:
+attribute. The essential properties aviary relies on:
 
 - **Same holder, same `verifier_id` → identical `nym`** (Sybil resistance within
   an epoch/scope: one credential ⇒ one pseudonym ⇒ one participant).
@@ -119,13 +119,13 @@ Notes:
   treat proof bytes as opaque, so no fixed size is assumed.
 - If the draft you implement carries the `nym` *inside* the proof rather than
   recomputing it verifier-side, returning `proof ‖ nym` from `proof_gen_*` and
-  parsing `nym` out in `proof_verify_*` is equally acceptable — blockchainer only
+  parsing `nym` out in `proof_verify_*` is equally acceptable — aviary only
   needs (a) to obtain the `nym` bytes for its Sybil-cap / deny-list bookkeeping
   and (b) a single verify call that jointly checks proof + pseudonym.
 
 **Priority: HIGH — this is the sole blocker for CredentialGate Option B**
 (per-epoch pseudonym → real Sybil resistance + targeted revocation). With it,
-Option B lands as a thin blockchainer wrapper; without it, it cannot be built
+Option B lands as a thin aviary wrapper; without it, it cannot be built
 safely at all.
 
 ---
@@ -136,7 +136,7 @@ safely at all.
 revision.**
 
 Today `cryptolib_bbs_sign` signs a **plaintext** message vector, so in
-blockchainer's issuance flow the `member_secret` / `pid` would have to reach the
+aviary's issuance flow the `member_secret` / `pid` would have to reach the
 issuer in the clear (`CREDENTIAL_GATE.md` §5, §10.2). That is acceptable only in
 the trusted-issuer (consortium) model. Blind issuance lets the holder **commit**
 to its secret messages so the issuer signs over them **without learning them**.
@@ -168,13 +168,13 @@ compose with a blind-issued signature once the holder has finalized it — which
 matches the draft's construction).
 
 **Priority: MEDIUM — improves the threat model but is not a hard blocker.**
-blockchainer v1 ships CredentialGate under the documented trusted-issuer model
+aviary v1 ships CredentialGate under the documented trusted-issuer model
 (§10.2); deployments whose threat model includes a *malicious issuer* need this
 before they can adopt the gate. Land it after §1.
 
 ---
 
-## What this unblocks, and the order blockchainer will consume it
+## What this unblocks, and the order aviary will consume it
 
 1. **Now, no cryptolib change:** thin `crypto::bbs_*` wrappers over the six bare
    functions + **Option A** unlinkable submitter/gossip admission

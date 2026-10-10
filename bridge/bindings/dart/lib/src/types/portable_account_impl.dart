@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final class _PortableAccount implements PortableAccount {
   const _PortableAccount(this.public, this.secret);

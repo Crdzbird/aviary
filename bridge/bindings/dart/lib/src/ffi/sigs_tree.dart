@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _TreeNodeC = _BufResult Function(
     Uint64,

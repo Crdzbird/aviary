@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 	pb "sentinel/gen"
 
 	"google.golang.org/grpc/codes"

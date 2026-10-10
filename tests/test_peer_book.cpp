@@ -8,12 +8,12 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/peer_book.hpp"
-#include "blockchainer/tcp_transport.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/peer_book.hpp"
+#include "aviary/tcp_transport.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using p2p::AddressBook;
 using p2p::PeerRecord;
 using p2p::SecureConfig;

@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Hex rendering and comparison for byte strings such as addresses, hashes
 /// and transaction ids. Not constant time; do not compare secrets with it.

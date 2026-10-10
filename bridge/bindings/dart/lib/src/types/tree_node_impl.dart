@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final class _TreeNode implements TreeNode {
   const _TreeNode({

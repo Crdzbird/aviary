@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Fluent construction and inspection of chain families.
 extension TreeNodeBuilding on TreeNode {

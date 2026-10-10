@@ -1,8 +1,8 @@
-#include "blockchainer/kvstore.hpp"
+#include "aviary/kvstore.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer::storage {
+namespace aviary::storage {
 
 namespace {
 // value_len sentinel meaning "this record deletes the key".
@@ -148,4 +148,4 @@ std::uint64_t LogKvStore::compact() {
   return old_size > log_size_ ? old_size - log_size_ : 0;
 }
 
-}  // namespace blockchainer::storage
+}  // namespace aviary::storage

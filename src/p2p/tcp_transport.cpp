@@ -1,7 +1,7 @@
-#include "blockchainer/tcp_transport.hpp"
+#include "aviary/tcp_transport.hpp"
 
-#include "blockchainer/armored.hpp"
-#include "blockchainer/noise_session.hpp"
+#include "aviary/armored.hpp"
+#include "aviary/noise_session.hpp"
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -20,9 +20,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "blockchainer/wire.hpp"
+#include "aviary/wire.hpp"
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 
@@ -671,4 +671,4 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   return node.committed();
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

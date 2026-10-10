@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// The pseudonymous admission flow of a gate.
 extension CredentialGatePseudonymous on CredentialGate {
@@ -16,15 +16,8 @@ extension CredentialGatePseudonymous on CredentialGate {
         (sp) => _scoped([challenge, presentation], (p) {
           final nym = _bc._take(
             _bc.lib.lookupFunction<_CredGateAdmitPseudC, _CredGateAdmitPseudD>(
-                    'blockchainer_credential_gate_admit_pseudonymous')(
-                _h,
-                epoch,
-                sp,
-                p[0],
-                challenge.length,
-                p[1],
-                presentation.length,
-                now),
+                    'aviary_credential_gate_admit_pseudonymous')(_h, epoch, sp,
+                p[0], challenge.length, p[1], presentation.length, now),
             'admit_pseudonymous',
           );
           if (nym.isEmpty) return null;
@@ -36,7 +29,7 @@ extension CredentialGatePseudonymous on CredentialGate {
   void revokeNym(Uint8List nym) => _scoped(
         [nym],
         (p) => _bc.lib.lookupFunction<_CredGateRevokeNymC, _CredGateRevokeNymD>(
-            'blockchainer_credential_gate_revoke_nym')(_h, p[0], nym.length),
+            'aviary_credential_gate_revoke_nym')(_h, p[0], nym.length),
       );
 
   /// Records an admitted [nym]; true when it is the first for this epoch and
@@ -47,7 +40,7 @@ extension CredentialGatePseudonymous on CredentialGate {
           [nym],
           (p) =>
               _bc.lib.lookupFunction<_CredGateNoteAdmC, _CredGateNoteAdmD>(
-                      'blockchainer_credential_gate_note_admission')(
+                      'aviary_credential_gate_note_admission')(
                   _h, epoch, sp, p[0], nym.length) ==
               1,
         ),

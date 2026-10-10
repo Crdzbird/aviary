@@ -1,8 +1,8 @@
 # Go ↔ Flutter interoperability
 
-Proves the Blockchainer ledger is **byte-identical across language bindings**.
-A **Go** server (blockchainer Go binding, full node) and a **Flutter** client
-(`blockchainer`, native) each run the ledger independently and cross-check
+Proves the Aviary ledger is **byte-identical across language bindings**.
+A **Go** server (aviary Go binding, full node) and a **Flutter** client
+(`aviary`, native) each run the ledger independently and cross-check
 three directions:
 
 | Direction | Check |

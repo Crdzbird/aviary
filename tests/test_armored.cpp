@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/armored.hpp"
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/peer_book.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/armored.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/peer_book.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using p2p::ArmoredChannel;
 
 namespace {

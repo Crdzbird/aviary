@@ -1,11 +1,11 @@
-#include "blockchainer/account_state.hpp"
+#include "aviary/account_state.hpp"
 
 #include <algorithm>
 #include <vector>
 
-#include "blockchainer/merkle.hpp"
+#include "aviary/merkle.hpp"
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -284,4 +284,4 @@ std::unique_ptr<AccountStateMachine> AccountStateMachine::deserialize(codec::Byt
   return sm;
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

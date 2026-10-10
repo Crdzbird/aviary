@@ -1,30 +1,30 @@
-# blockchainer_dart
+# aviary_dart
 
-The Dart API of Blockchainer: a C++ ledger with BFT finality, composable
+The Dart API of Aviary: a C++ ledger with BFT finality, composable
 chains, subchains, validator rotation, light clients and chain trees, driven
 over dart:ffi. Cryptography comes from the CipherBird engine.
 
-Flutter apps should depend on `blockchainer` (shares the engine with the
-`cipherbird` package) or `blockchainer_lite` (self contained) instead; both
+Flutter apps should depend on `aviary` (shares the engine with the
+`cipherbird` package) or `aviary_lite` (self contained) instead; both
 re-export this API.
 
 ## Install
 
 ```yaml
 dependencies:
-  blockchainer_dart: ^0.1.0
+  aviary_dart: ^0.1.0
 ```
 
 The engine for macOS arm64 ships inside the package. On other hosts point
-`BLOCKCHAINER_DYLIB` at a built `libblockchainer_c` library.
+`AVIARY_DYLIB` at a built `libaviary_c` library.
 
 ## Use
 
 ```dart
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   final node = bc.createNode(7);
 
   final alice = node.fundAccount(1000);
@@ -53,7 +53,7 @@ Extensions that collapse the common flows into one call:
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
 | `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `commit`, `events`, `metricValues`, `verifyAccountProof` |
-| `Blockchainer` | `newValidator`, `assembleSingleValidator`, `signWithShares` |
+| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
 | `Chain` | `produceBlock(timestamp, justify:)` |
 | `TreeNode` | `withChild`, `find`, `chainIds` |

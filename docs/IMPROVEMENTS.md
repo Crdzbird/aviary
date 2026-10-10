@@ -1,4 +1,4 @@
-# Blockchainer — Improvements & Deferred Work
+# Aviary — Improvements & Deferred Work
 
 > A running backlog of everything worth improving that we consciously deferred
 > while building M0–M2. Nothing here is a bug in what exists (all 10 suites pass,
@@ -155,9 +155,9 @@
   unlinkability, context-binding, expiry, tier boundary, revocation,
   wrong-issuer, malformed-is-quiet-false); `CredentialPolicy::decode_all` in the
   fuzz totality sweep; ASan/UBSan clean; 58 C++ suites. **Surfaced through the C
-  ABI + ALL FIVE bindings:** `blockchainer_bbs_keygen` (issuer key) +
+  ABI + ALL FIVE bindings:** `aviary_bbs_keygen` (issuer key) +
   `_credential_policy_encode`/`_policy_hash` + `_credential_issue` +
-  `_credential_present` + opaque `BlockchainerCredentialGate`
+  `_credential_present` + opaque `AviaryCredentialGate`
   (`_new`/`_revoke_epoch`/`_admit`/`_free`); credential blob
   `[sig_len:4][sig]([attr_count:4]([attr_len:4][attr])×)`. Go (`credential_gate.go`
   + `TestCredentialGate`), npm (`CredentialPolicy`/`CredentialGate` classes +
@@ -250,7 +250,7 @@
   forged-issuer / malformed fail closed. 62 C++ suites, ASan-clean; Go binding
   still green (policy `mode` byte round-trips as default 0). Option A stays the
   unlinkable mode; the policy selects. **Surfaced through the C ABI + ALL 5
-  BINDINGS:** `blockchainer_credential_policy_encode_ex(…, mode)` +
+  BINDINGS:** `aviary_credential_policy_encode_ex(…, mode)` +
   `_membership_commit` / `_blind_issue` / `_finalize_membership` (3-step blind
   issuance; the membership-commit blob's first length-prefixed field is the
   commitment sent to the issuer) + `_credential_present_pseudonymous` +
@@ -262,7 +262,7 @@
   the vendored `CryptoLibC.xcframework` (macOS slice) predated the new cryptolib
   BBS symbols — fixed by rebuilding cryptolib's macOS slice
   (`scripts/ios/build_all.sh macosx`) and re-vendoring it into
-  `cryptolib_flutter/{ios,macos}`; then the dynamic blockchainer xcframework
+  `cryptolib_flutter/{ios,macos}`; then the dynamic aviary xcframework
   rebuild picked it up. **The entire CredentialGate feature (Option A + B) is now
   end-to-end across all five bindings.**
 - **[x] Composable chains — ChainBlueprint + ComponentRegistry + ChainAssembler,
@@ -277,9 +277,9 @@
   account/utxo, stake-weighted/round-robin; `*_ids()` discovery; engines declare
   grind-proof), `ChainAssembler::assemble` → a generic `ConsensusEngine`.
   `test_chain_blueprint.cpp` (32 checks) incl. a custom engine subclass booted
-  through the mixture. C ABI: `blockchainer_bls_keygen`, `_blueprint_encode/
+  through the mixture. C ABI: `aviary_bls_keygen`, `_blueprint_encode/
   _hash`, `_registry_ids(kind)`, a minimal `_genesis_build` + `_genesis_commit_
-  blueprint/_hash`, and an opaque `BlockchainerChain` (`_assemble` NULL on
+  blueprint/_hash`, and an opaque `AviaryChain` (`_assemble` NULL on
   reject, `_propose`/`_seal`/`_mine`/`_submit`) — the uniform propose →
   (seal|mine) → submit flow. Go / npm / JVM / Swift / Dart each: discovery,
   Blueprint, buildGenesis, commitBlueprint (hash changes), assembleChain, PoS +
@@ -294,10 +294,10 @@
   Ledger, so atomicity + canonical encoding are never delegated); foreign code
   supplies only what genuinely varies — the JUSTIFICATION policy (justify a
   proposed block / verify a justification) and the proposer (leader-election)
-  policy — as C callbacks with an opaque `ctx`: `BlockchainerJustifyFn`
-  (writes into a caller buffer, cap `BLOCKCHAINER_MAX_JUSTIFICATION`=4096),
-  `BlockchainerVerifyFn`, `BlockchainerProposerFn`, registered via
-  `blockchainer_registry_add_engine/_add_proposer`; `blockchainer_chain_seal`
+  policy — as C callbacks with an opaque `ctx`: `AviaryJustifyFn`
+  (writes into a caller buffer, cap `AVIARY_MAX_JUSTIFICATION`=4096),
+  `AviaryVerifyFn`, `AviaryProposerFn`, registered via
+  `aviary_registry_add_engine/_add_proposer`; `aviary_chain_seal`
   dispatches to the foreign justify. A throwing / refusing callback is a failed
   verification, never a crash. Go (cgo `//export` trampolines + `cgo.Handle`),
   npm (`koffi.register`), JVM (Panama upcall stubs), Swift (`@convention(c)` +
@@ -356,7 +356,7 @@
   commit pipeline and `RoundDriver::valid` now runs it before voting — a
   proposal with an invalid tx or anchor can no longer be certified and then
   refused at commit (stranding the height). C ABI (15 calls incl.
-  `blockchainer_chain_certify` for single-validator BFT chains) + Go / npm /
+  `aviary_chain_certify` for single-validator BFT chains) + Go / npm /
   JVM / Swift / Dart parity, each proving the same scenario. Tests: 3-level
   tree with real BFT chains, cross-chain proof of a grandchild balance from the
   root header, 12 tamper-each-link rejects, 17-row anchor rejection matrix,
@@ -386,7 +386,7 @@
   finalizable`, split from `valid` — found by the TCP test, where the one
   node that had not scheduled the change would otherwise strand itself on the
   network's decision); a node's index is remapped and a node rotated out keeps
-  following without voting. C ABI `blockchainer_chain_schedule_validators` /
+  following without voting. C ABI `aviary_chain_schedule_validators` /
   `_chain_validators` + five-binding parity (grow, certify under each set,
   rotate out, PoS refuses). Still open: staking / bonding economics and epoch
   schedules.
@@ -402,9 +402,9 @@
   is always a hard failure. `sync_to(target, fetch)` bisects iteratively with
   a bounded fetch budget and fails closed on a missing or mis-heighted
   checkpoint. **Trusting-period assumption is documented, not enforced**:
-  blockchainer has no consensus clock, so operators bound `set_max_skip` to
+  aviary has no consensus clock, so operators bound `set_max_skip` to
   their unbonding period and re-bootstrap a client whose tip is older. C ABI
-  `blockchainer_light_client_*` handle + five-binding parity, each proving a
+  `aviary_light_client_*` handle + five-binding parity, each proving a
   no-overlap jump is "thin" (never a refusal), bisection through the rotation
   header, and continuation under the new set. 67 suites, ASan-clean.
 - **[x] ChainTree — declare a FAMILY of chains and build / drive it together —
@@ -425,7 +425,7 @@
   so blocks flow upward automatically; `prove_account` walks root → … → chain
   into a `SubchainProof`; `verify` checks it against the root's current header.
   Extension: subclass hooks `select_txs` / `on_finalized`, or name custom
-  components in a node's blueprint. C ABI `blockchainer_chain_tree_*` (node
+  components in a node's blueprint. C ABI `aviary_chain_tree_*` (node
   encoder, spec error, build, ids/height/genesis/tip/pending, produce, prove,
   verify) with the hooks as C callbacks; Go / npm / JVM / Swift / Dart each
   declare the same family (PoS root ← 3-validator BFT child ← funded
@@ -562,7 +562,7 @@
   if the newcomer outbids it) and **fee-ordered selection** (highest tip offered
   to the block first) — `test_ledger.cpp` + `test_mempool.cpp`. v1 txs pay tip 0,
   so nothing changes for them. The tip is exposed across every binding
-  (`SubmitTransferFee`/`submitTransferFee`) via `blockchainer_node_submit_transfer_fee`.
+  (`SubmitTransferFee`/`submitTransferFee`) via `aviary_node_submit_transfer_fee`.
   **Remaining:** gas metering for richer execution; a variable per-tx fee for the
   UTXO model + how the envelope tip interacts with its implicit inputs−outputs fee.
 - **[M] State inclusion proofs.** `StateMachine::prove()` from the design is not
@@ -626,7 +626,7 @@
 
 ## Crypto seam (M1/M2)
 
-- **[x] Custodial key management (S3) — DONE.** `blockchainer::custody`
+- **[x] Custodial key management (S3) — DONE.** `aviary::custody`
   (`keyring.hpp`) wraps cryptolib into three pieces: `Vault` (a committing-AEAD
   envelope-encryptor keyed by a 32-byte master, AAD-bound, stateless so a blob
   seals now and opens after reload), `Keyring` (a random master key wrapped by
@@ -638,7 +638,7 @@
   equivalence, seal/open tamper + wrong-key + wrong-AAD rejection, the "no
   plaintext in the serialised blob" property, reload→unlock→reveal, and a
   revealed key producing a valid signature; ASan/UBSan-clean. The KeyStore is
-  now exposed through the C ABI (`blockchainer_keystore_*`) and wrapped in every
+  now exposed through the C ABI (`aviary_keystore_*`) and wrapped in every
   binding (Go/Dart/npm/Swift/JVM) as a `KeyStore` class — custodial signing is
   `reveal(address) → submitTransfer(secret, …)`, verified end-to-end on all four
   runtime bindings (`alice 750 / bob 250`, wrong-passphrase rejected) + a durable
@@ -698,9 +698,9 @@
 
 ## C ABI & language bindings
 
-- **[x] Expose the Ledger + BftEngine through the C ABI — DONE.** `DemoNode` (full chain: ledger+BFT+mempool+observability) is exposed via an opaque handle (`blockchainer_node_*`: create/credit/new_account/submit_transfer/produce_block/height/balance/nonce/state_root/drain_events/metrics/prove_account) + interop address derivation. A high-level Dart binding (`blockchainer.dart`) and a **Flutter example app** (`examples/blockchainer_demo`) drive all of it. Remaining: multi-validator nodes, EVM/BTC tx-signing over the C ABI.
+- **[x] Expose the Ledger + BftEngine through the C ABI — DONE.** `DemoNode` (full chain: ledger+BFT+mempool+observability) is exposed via an opaque handle (`aviary_node_*`: create/credit/new_account/submit_transfer/produce_block/height/balance/nonce/state_root/drain_events/metrics/prove_account) + interop address derivation. A high-level Dart binding (`aviary.dart`) and a **Flutter example app** (`examples/aviary_demo`) drive all of it. Remaining: multi-validator nodes, EVM/BTC tx-signing over the C ABI.
 - **[M] Packaged, auto-loading binding distribution.** Bindings load
-  `libblockchainer_c.dylib` by path (dev only). Mirror cryptolib's packaging: a
+  `libaviary_c.dylib` by path (dev only). Mirror cryptolib's packaging: a
   pub package (bundled per-platform binary) and a Go module with a vendored/
   static lib. Currently macOS-arm64 only; rpath is an absolute local path.
 - **[M] C ABI error taxonomy.** Errors are generic ints / strings. Add stable
@@ -945,7 +945,7 @@ selectors — validated against real-world vectors). Deferred:
 - **[M] cryptolib consumption.** Found via sibling path + prebuilt dylib. No
   `FetchContent`/version pin, no `find_package` config, no relocatable rpath
   (absolute local path baked in). (`CMakeLists.txt`; `ARCHITECTURE.md` §17.5)
-- **[M] No install/export for blockchainer itself.**
+- **[M] No install/export for aviary itself.**
 - **[L] Go binding distribution** unresolved (`ARCHITECTURE.md` §17.7): cgo vs
   vendored static archive.
 
@@ -980,7 +980,7 @@ selectors — validated against real-world vectors). Deferred:
 
 ## Security hardening — Phase 1 (S1/S2) — DONE (2026)
 - **[x] Genesis-seal-on-read (fund-loss bug) FIXED.** Reads (height/balance/state_root/metrics/prove) on a fresh `DemoNode` no longer start the engine or finalize the lazy genesis — only `produce_block()` seals. Credit after sealing throws `GenesisSealedError` (never a silent no-op). Regression tests in `test_demo_node.cpp` + the Go binding.
-- **[x] C ABI error taxonomy (start).** `BlockchainerStatus` enum (`BLOCKCHAINER_OK`, `BLOCKCHAINER_ERR`, `BLOCKCHAINER_ERR_GENESIS_SEALED`, `BLOCKCHAINER_ERR_BAD_INPUT`). `blockchainer_node_credit` returns codes; all six bindings surface them (Go `Credit() error` + `ErrGenesisSealed`, Dart/Node/Swift/JVM throw, C++ typed exception). Extend to submit/produce next.
+- **[x] C ABI error taxonomy (start).** `AviaryStatus` enum (`AVIARY_OK`, `AVIARY_ERR`, `AVIARY_ERR_GENESIS_SEALED`, `AVIARY_ERR_BAD_INPUT`). `aviary_node_credit` returns codes; all six bindings surface them (Go `Credit() error` + `ErrGenesisSealed`, Dart/Node/Swift/JVM throw, C++ typed exception). Extend to submit/produce next.
 
 ## Post-quantum tx signatures — Q1a (core) — DONE (2026)
 - **[x] Hybrid Ed25519+ML-DSA-65 signatures in the tx path.** Extended tx envelope
@@ -998,8 +998,8 @@ selectors — validated against real-world vectors). Deferred:
 ## Post-quantum tx signatures — Q1b (end-to-end) — DONE (2026)
 - **[x] Hybrid PQ path exposed through DemoNode + C ABI + Go binding.**
   `new_account_hybrid()` / `submit_transfer_hybrid()` in the core; C ABI
-  `blockchainer_node_new_account_hybrid` (returns `[pub_len:4 BE][public][secret]`)
-  + `blockchainer_node_submit_transfer_hybrid`; Go `NewAccountHybrid` /
+  `aviary_node_new_account_hybrid` (returns `[pub_len:4 BE][public][secret]`)
+  + `aviary_node_submit_transfer_hybrid`; Go `NewAccountHybrid` /
   `SubmitTransferHybrid`. Account state machine relaxed to accept non-32-byte
   authors for non-Ed25519 schemes (sig verify enforces key validity first).
   `TestHybridTransferEndToEnd` (Go) drives create→credit→hybrid-transfer→block→
@@ -1013,7 +1013,7 @@ selectors — validated against real-world vectors). Deferred:
 
 ## Safety classes through the bindings — DONE (2026)
 - **[x] ThresholdAccount (FROST t-of-n) through the C ABI + all five bindings.**
-  Ten `blockchainer_threshold_*` functions (create → per-share info blob
+  Ten `aviary_threshold_*` functions (create → per-share info blob
   `[id u16][gpk 32][pub 32]` → seal/unseal a share → round-1 `commit`
   `[nonces 64][commitment 66]` → opaque `Ceremony` handle → `sign` → attributable
   `verify_share` → `aggregate`). The group secret never exists on the ABI; the
@@ -1022,14 +1022,14 @@ selectors — validated against real-world vectors). Deferred:
   `node:crypto` SPKI-wrap (npm), `java.security` (JVM), CryptoKit
   `Curve25519.Signing` (Swift), and the shared ABI attribution check (Dart).
 - **[x] AssuranceProfile + SealedMempool through the C ABI + all five bindings.**
-  `blockchainer_assurance_describe(level)` returns the posture descriptor blob
+  `aviary_assurance_describe(level)` returns the posture descriptor blob
   `[transport u8][consensus u8][threshold_custody u8][sealed_mempool u8][algo_count u8][algos…]`;
   bindings expose it as an `AssuranceProfile` (ratcheted / vrf / thresholdCustody
   / sealedMempool + admitted sig algos) and assert the tiers are monotonic
   (standard → hardened → fortress only tighten) with unknown levels failing
-  closed. `blockchainer_tx_encode(...)` canonically encodes a fee-bearing tx so
-  a binding can seal one; `blockchainer_sealed_tx_seal` HPKE-seals it to a
-  proposer's KEM key; `blockchainer_sealed_mempool_{new,add,size,reveal,free}`
+  closed. `aviary_tx_encode(...)` canonically encodes a fee-bearing tx so
+  a binding can seal one; `aviary_sealed_tx_seal` HPKE-seals it to a
+  proposer's KEM key; `aviary_sealed_mempool_{new,add,size,reveal,free}`
   runs the anti-MEV pool. Every binding's smoke test seals txs to a proposer,
   reveals them all with the proposer's KEM secret, and confirms a **non-proposer
   key opens nothing** — the confidentiality guarantee. Go/npm/JVM/Swift/Dart all
@@ -1043,31 +1043,31 @@ selectors — validated against real-world vectors). Deferred:
   `libcryptolib_c.so`), and its pure Dart package is `cipherbird_dart`. Build
   scripts accept `CIPHERBIRD_ROOT` (falls back to `CRYPTOLIB_ROOT`, then the
   sibling checkout).
-- **[x] `blockchainer_dart` restructured for publishing.** The 2152-line
-  `blockchainer_ffi.dart` became one library (`lib/blockchainer.dart`) with 71
+- **[x] `aviary_dart` restructured for publishing.** The 2152-line
+  `aviary_ffi.dart` became one library (`lib/aviary.dart`) with 71
   part files under `src/{ffi,core,types,api,handles}`: feature surfaces as
-  extensions on `final class Blockchainer`, value types as
+  extensions on `final class Aviary`, value types as
   `abstract final class` with `const factory` redirects to private
   implementations, handle classes with private constructors, immutable
   `TreeNode` with `copyWith`. Every file is under 100 lines after `dart format`,
   no `else`, no inline comments. Bundles `native/darwin-arm64/
-  {libblockchainer_c,libcipherbird}.dylib` resolved through the package root in
+  {libaviary_c,libcipherbird}.dylib` resolved through the package root in
   `package_config.json`. 12 smoke tests pass on the bundled engine.
-- **[x] Two Flutter variants with the same API.** `blockchainer_lite` is self
-  contained: static merged `Blockchainer.xcframework` (blockchainer archives +
+- **[x] Two Flutter variants with the same API.** `aviary_lite` is self
+  contained: static merged `Aviary.xcframework` (aviary archives +
   CipherBird per-slice `libcryptolib_c_merged.a`, iOS device + simulator, macOS)
-  and a self-contained stripped `libblockchainer_c.so` (arm64-v8a, x86_64) whose
-  only NEEDED entries are libm/libdl/libc. `blockchainer` (renamed from
-  `blockchainer_flutter`) depends on and re-exports `cipherbird`: dynamic
-  `BlockchainerC.xcframework` linked with `-undefined dynamic_lookup` and a thin
+  and a self-contained stripped `libaviary_c.so` (arm64-v8a, x86_64) whose
+  only NEEDED entries are libm/libdl/libc. `aviary` (renamed from
+  `aviary_flutter`) depends on and re-exports `cipherbird`: dynamic
+  `AviaryC.xcframework` linked with `-undefined dynamic_lookup` and a thin
   `.so`; the Dart loader and the Kotlin startup provider open `libcipherbird.so`
-  before `libblockchainer_c.so` because of the SONAME mismatch. Both plugins are
+  before `libaviary_c.so` because of the SONAME mismatch. Both plugins are
   SPM-only ffiPlugins (`ios|macos/<name>/Package.swift`, binary target + a Swift
-  target that imports `BlockchainerC`).
+  target that imports `AviaryC`).
 - **[x] Packaging rules learned.** pub only ships git-tracked files and honors
   the root `.gitignore`, so binaries are force-added and each package carries a
   `.pubignore` with `!` re-includes; path dependencies are not publishable, so
-  `pubspec_overrides.yaml` (excluded from the archive) points `blockchainer_dart`
+  `pubspec_overrides.yaml` (excluded from the archive) points `aviary_dart`
   at `../dart` for local work; archives are 5 MB (dart), 5 MB (full), 26 MB
   (lite, after per-platform slices and `llvm-strip`). pub flattens symlinks, so a
   versioned macOS framework arrives with `Versions/Current` as a real directory;
@@ -1076,26 +1076,26 @@ selectors — validated against real-world vectors). Deferred:
   `compileOptions`. `flutter create --platforms=ios,android,macos .` scaffolds
   the example apps; their scaffolded widget tests were dropped.
 - **[x] Verified.** Both example apps build for macOS and Android (lite APK ships
-  only `libblockchainer_c.so`; full APK ships it plus `libcipherbird.so`); the
-  full macOS app embeds `BlockchainerC.framework` and `CipherBird.framework` and
-  runs. `examples/blockchainer_demo` and `examples/interop/app` now depend on
-  `blockchainer`. `dart analyze` is clean for all three packages and both
+  only `libaviary_c.so`; full APK ships it plus `libcipherbird.so`); the
+  full macOS app embeds `AviaryC.framework` and `CipherBird.framework` and
+  runs. `examples/aviary_demo` and `examples/interop/app` now depend on
+  `aviary`. `dart analyze` is clean for all three packages and both
   examples; `flutter test` passes for both plugins; `dart pub publish --dry-run`
   succeeds for all three with only the expected gitignore and overrides notes.
-- Publish order: `blockchainer_dart`, then `blockchainer_lite`, then
-  `blockchainer` (the Flutter packages pin `blockchainer_dart: ^0.1.0`).
+- Publish order: `aviary_dart`, then `aviary_lite`, then
+  `aviary` (the Flutter packages pin `aviary_dart: ^0.1.0`).
 
 ## pub.dev polish: 160/160 pana score and the shortcut extensions - DONE (2026-10-10)
-- **[x] pana 160/160 for `blockchainer_dart`** (`dart pub global activate pana`,
+- **[x] pana 160/160 for `aviary_dart`** (`dart pub global activate pana`,
   `pana --no-warning .`). Fixes: descriptions trimmed to 60 to 180 characters,
-  `example/blockchainer_dart_example.dart`, doc comments on every const factory
+  `example/aviary_dart_example.dart`, doc comments on every const factory
   redirect and a documented `const ForeignEngine()`, no angle brackets in doc
   comments, braces around every multi line `if` body (pana runs newer lints
-  than the package's `lints` pin). `blockchainer_lite` and `blockchainer`
+  than the package's `lints` pin). `aviary_lite` and `aviary`
   score 140 locally only because the local run has to use a path dependency on
-  `blockchainer_dart`; the published `^0.1.0` removes that warning. Each
-  Flutter package exposes a documented entry point (`BlockchainerLite`,
-  `BlockchainerShared`: `ensureInitialized`, `instance`, `isInitialized`) so
+  `aviary_dart`; the published `^0.1.0` removes that warning. Each
+  Flutter package exposes a documented entry point (`AviaryLite`,
+  `AviaryShared`: `ensureInitialized`, `instance`, `isInitialized`) so
   dartdoc has API elements of its own to count.
 - **[x] Shortcut extensions** under `lib/src/extensions/` (one per file):
   `HexBytes` (`hex`, `shortHex`, `equalsBytes`), `HexString` (`hexBytes`,
@@ -1104,7 +1104,7 @@ selectors — validated against real-world vectors). Deferred:
   the nonce read from the chain and the scheme following the account,
   `commit`), `NodeViews` (`events` decoded, `metricValues`,
   `verifyAccountProof`), `ChainBlocks` (`produceBlock` = propose, justify,
-  submit), `ValidatorKeyPair` (`entry`, `treeValidator`), `BlockchainerQuick`
+  submit), `ValidatorKeyPair` (`entry`, `treeValidator`), `AviaryQuick`
   (`newValidator`, `assembleSingleValidator` defaulting to bft over account),
   `ThresholdSigning` (`signWithShares` runs the whole ceremony),
   `TreeNodeBuilding` (`withChild`, `find`, `chainIds`), `ChainTreeRounds`
@@ -1112,8 +1112,34 @@ selectors — validated against real-world vectors). Deferred:
 - GOTCHA: a genesis assembled without a committed blueprint is not a BFT
   chain (`certify` fails with "engine is not BFT"); commit
   `makeBlueprint(consensus: 'bft', stateModel: 'account')` explicitly.
-- OPEN: `https://github.com/Crdzbird/blockchainer` answers 404 anonymously
+- OPEN: `https://github.com/Crdzbird/aviary` answers 404 anonymously
   (private repository). pub.dev verifies the homepage, repository and
   documentation URLs with HEAD requests and withholds 10 points while they
   fail, so the repository must be public (or the URLs changed) before the
   packages can reach 160 on pub.dev.
+
+## Rename: blockchainer is now Aviary - DONE (2026-10-10)
+- **[x] Whole project renamed.** Mechanical, case preserving substitution of
+  blockchainer, Blockchainer and BLOCKCHAINER with aviary, Aviary and AVIARY
+  across 478 tracked text files (4592 occurrences) and 497 renamed paths. The
+  C++ namespace is `aviary`, the C ABI prefix `aviary_*`, the header
+  `bridge/aviary_c.h`, the CMake targets `aviary_core` and `aviary_c`, the
+  options `AVIARY_*`, the native library `libaviary_c`, the env override
+  `AVIARY_DYLIB`. Packages: pub `aviary_dart`, `aviary_lite`, `aviary`
+  (Dart class `Aviary`, entry points `AviaryLite` and `AviaryShared`); npm
+  `aviary-ledger` (plain `aviary` is taken on npm); Go module
+  `github.com/Crdzbird/Aviary/bridge/bindings/go`; JVM package `aviary`;
+  Swift package `Aviary` with the `AviaryC` binary target; Android plugin
+  `aviary-android`; Flutter demo `examples/aviary_demo`.
+- Consensus bytes are unchanged: the golden vectors only carried the name in
+  comments. The sealing and transport labels (`aviary.share.v1`,
+  `aviary.portable-account.v1`, `aviary.account.export.v1`,
+  `aviary.credential.v1`, `aviary-p2p-*-v1`, `aviary.remoteguard.*`) and the
+  Prometheus metric names (`aviary_chain_height`, ...) did change, so
+  envelopes and sessions produced before the rename do not open after it.
+  Nothing was released before it.
+- Every native artifact (bundled dylibs, both xcframeworks, both Android
+  `.so` sets) was rebuilt because they carry the symbol names.
+- The GitHub repository must be renamed to `aviary` by the owner (the Go
+  module path and the pubspec URLs already point there; GitHub redirects the
+  old name). The local checkout directory keeps its old name for now.

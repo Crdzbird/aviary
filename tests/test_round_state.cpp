@@ -12,12 +12,12 @@
 #include <tuple>
 #include <vector>
 
-#include "blockchainer/round_state.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/round_state.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::consensus;
+using namespace aviary;
+using namespace aviary::consensus;
 
 namespace {
 Hash value_for(std::uint32_t proposer) {

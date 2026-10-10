@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final class _AssuranceProfile implements AssuranceProfile {
   const _AssuranceProfile({

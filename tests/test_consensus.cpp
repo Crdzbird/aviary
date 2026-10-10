@@ -1,11 +1,11 @@
 #include <vector>
 
-#include "blockchainer/consensus.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/consensus.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::consensus;
+using namespace aviary;
+using namespace aviary::consensus;
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }

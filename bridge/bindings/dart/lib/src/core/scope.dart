@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 Pointer<Uint8> _allocBytes(Uint8List d) {
   final p = calloc<Uint8>(d.isEmpty ? 1 : d.length);
@@ -37,6 +37,6 @@ R _withU64s<R>(List<int> values, R Function(Pointer<Uint64>) body) {
 }
 
 Pointer<Void> _requireHandle(Pointer<Void> h, String what) {
-  if (h == nullptr) throw BlockchainerException('$what failed');
+  if (h == nullptr) throw AviaryException('$what failed');
   return h;
 }

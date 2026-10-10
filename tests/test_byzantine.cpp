@@ -13,15 +13,15 @@
 #include <tuple>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/ledger.hpp"
-#include "blockchainer/networked_node.hpp"
-#include "blockchainer/round_driver.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/ledger.hpp"
+#include "aviary/networked_node.hpp"
+#include "aviary/round_driver.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using namespace blockchainer::consensus;
+using namespace aviary;
+using namespace aviary::consensus;
 using p2p::NetworkedNode;
 
 namespace {

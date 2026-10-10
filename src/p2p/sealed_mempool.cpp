@@ -1,8 +1,8 @@
-#include "blockchainer/sealed_mempool.hpp"
+#include "aviary/sealed_mempool.hpp"
 
 #include <algorithm>
 
-namespace blockchainer::p2p {
+namespace aviary::p2p {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -86,4 +86,4 @@ void SealedMempool::remove(const std::vector<Bytes>& envelopes) {
   }
 }
 
-}  // namespace blockchainer::p2p
+}  // namespace aviary::p2p

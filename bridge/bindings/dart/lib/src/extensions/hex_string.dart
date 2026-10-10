@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 final RegExp _hexPattern = RegExp(r'^[0-9a-fA-F]*$');
 

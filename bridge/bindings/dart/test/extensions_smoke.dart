@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -16,13 +16,13 @@ bool fails(void Function() f) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   hexHelpers();
   nodeShortcuts(bc);
   chainShortcuts(bc);
   thresholdShortcut(bc);
   treeShortcuts(bc);
-  print('blockchainer dart extensions smoke: OK');
+  print('aviary dart extensions smoke: OK');
 }
 
 void hexHelpers() {
@@ -35,7 +35,7 @@ void hexHelpers() {
   expect('hi'.utf8Bytes.length == 2, 'utf8 bytes');
 }
 
-void nodeShortcuts(Blockchainer bc) {
+void nodeShortcuts(Aviary bc) {
   final node = bc.createNode(7);
   final alice = node.fundAccount(1000);
   final bob = node.fundAccount(0);
@@ -57,7 +57,7 @@ void nodeShortcuts(Blockchainer bc) {
   node.dispose();
 }
 
-void chainShortcuts(Blockchainer bc) {
+void chainShortcuts(Aviary bc) {
   final validator = bc.newValidator();
   expect(validator.public.length == 48, 'fresh BLS validator');
   expect(validator.entry(3).power == 3, 'validator entry');
@@ -78,7 +78,7 @@ void chainShortcuts(Blockchainer bc) {
   pos.free();
 }
 
-void thresholdShortcut(Blockchainer bc) {
+void thresholdShortcut(Aviary bc) {
   final shares = bc.createThresholdAccount(3, 2);
   final message = 'pay'.utf8Bytes;
   final sig = bc.signWithShares([shares[0], shares[2]], message);
@@ -86,7 +86,7 @@ void thresholdShortcut(Blockchainer bc) {
   expect(fails(() => bc.signWithShares([], message)), 'empty shares refused');
 }
 
-void treeShortcuts(Blockchainer bc) {
+void treeShortcuts(Aviary bc) {
   final v = bc.newValidator().treeValidator(1);
   final root = const TreeNode(chainId: 1, validators: [])
       .copyWith(validators: [v])

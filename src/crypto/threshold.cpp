@@ -1,4 +1,4 @@
-#include "blockchainer/threshold.hpp"
+#include "aviary/threshold.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -6,7 +6,7 @@
 
 #include "cryptolib_c.h"
 
-namespace blockchainer::custody {
+namespace aviary::custody {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -24,11 +24,11 @@ Bytes take(CryptoBufferResult r, const char* op) {
 
 Bytes copy_buf(const CryptoBuffer& b) { return Bytes(b.data, b.data + b.len); }
 
-// Sealed-share AAD: "blockchainer.share.v1" ‖ hex(group_pk) ‖ ":" ‖ index —
+// Sealed-share AAD: "aviary.share.v1" ‖ hex(group_pk) ‖ ":" ‖ index —
 // binds the envelope to one slot of one group.
 std::string share_aad(const Bytes& group_pk, std::uint16_t index) {
   static const char* kHex = "0123456789abcdef";
-  std::string s = "blockchainer.share.v1:";
+  std::string s = "aviary.share.v1:";
   for (std::uint8_t b : group_pk) {
     s.push_back(kHex[b >> 4]);
     s.push_back(kHex[b & 0x0F]);
@@ -224,4 +224,4 @@ Bytes SigningCeremony::aggregate(const std::vector<Bytes>& sig_shares) const {
               "frost aggregate");
 }
 
-}  // namespace blockchainer::custody
+}  // namespace aviary::custody

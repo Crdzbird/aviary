@@ -2,14 +2,14 @@
 // Verifies the security properties: both parts must pass, the scheme is
 // committed to (no downgrade), unknown schemes are rejected, and chain params
 // can require PQ. Version-1 (legacy Ed25519) transactions are unaffected.
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/ledger.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/ledger.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }

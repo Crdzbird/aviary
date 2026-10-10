@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// One participant's share of a threshold account. Persist [bytes] sealed.
 abstract final class ThresholdShare {

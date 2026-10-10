@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// The parent side of a chain: anchoring children and proving into them.
 extension ChainSubchains on Chain {
@@ -10,8 +10,7 @@ extension ChainSubchains on Chain {
       [blob],
       (p) => _bc._take(
         _bc.lib.lookupFunction<_ScChainAnchoredC, _ScChainAnchoredD>(
-                'blockchainer_chain_propose_anchored')(
-            _h, timestamp, p[0], blob.length),
+            'aviary_chain_propose_anchored')(_h, timestamp, p[0], blob.length),
         'chain_propose_anchored',
       ),
     );
@@ -23,18 +22,18 @@ extension ChainSubchains on Chain {
 
   /// The last anchored header of a child.
   Uint8List childTip(int childChainId) =>
-      _byChild('blockchainer_chain_child_tip', childChainId);
+      _byChild('aviary_chain_child_tip', childChainId);
 
   /// A proof hop from this parent's current registry into a child.
   Uint8List subchainHop(int childChainId) =>
-      _byChild('blockchainer_chain_subchain_hop', childChainId);
+      _byChild('aviary_chain_subchain_hop', childChainId);
 
   /// A state inclusion proof for an address on this account model chain.
   Uint8List proveAccount(Uint8List address) => _scoped(
         [address],
         (p) => _bc._take(
           _bc.lib.lookupFunction<_ScChainAddrC, _ScChainAddrD>(
-              'blockchainer_chain_prove_account')(_h, p[0]),
+              'aviary_chain_prove_account')(_h, p[0]),
           'chain_prove_account',
         ),
       );

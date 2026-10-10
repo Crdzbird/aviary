@@ -1,6 +1,6 @@
 # cryptolib primitives required for M6 interoperability
 
-> What blockchainer needs added to **cryptolib's C ABI** (`bridge/cryptolib_c.h`
+> What aviary needs added to **cryptolib's C ABI** (`bridge/cryptolib_c.h`
 > + impl) to support outbound EVM and Bitcoin interop. Solana needs nothing new
 > (Ed25519 + SHA-256 already present). Follows cryptolib's existing conventions:
 > `CryptoBuffer`/`CryptoBufferResult` (malloc'd, caller frees via
@@ -95,18 +95,18 @@ Bitcoin `HASH160(x) = ripemd160(sha256(x))` composes from this + the existing
 
 ---
 
-## What blockchainer derives from these (no further cryptolib help needed)
+## What aviary derives from these (no further cryptolib help needed)
 
 - **Ethereum address** = last 20 bytes of `keccak256(uncompressed_pubkey[1:])`
   (drop the `0x04` prefix). EIP-55 checksum via keccak256.
 - **Bitcoin P2PKH/P2WPKH** = `HASH160(compressed_pubkey)` + Base58Check / Bech32
-  (blockchainer implements Base58/Bech32).
-- **RLP**, **ABI encoding**, **JSON-RPC** — all in blockchainer.
+  (aviary implements Base58/Bech32).
+- **RLP**, **ABI encoding**, **JSON-RPC** — all in aviary.
 
 ## Binding note
 
 Expose the same functions in cryptolib's **Dart** binding too if you want
-client-side EVM/BTC crypto from Dart; blockchainer's core links the **C ABI**
+client-side EVM/BTC crypto from Dart; aviary's core links the **C ABI**
 directly, so the C functions above are the only hard requirement.
 
 ## Priority

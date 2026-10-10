@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _CredPolicyEncodeC = _BufResult Function(
     Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Uint8);

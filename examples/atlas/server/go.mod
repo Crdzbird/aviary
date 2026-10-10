@@ -3,7 +3,7 @@ module atlas
 go 1.24
 
 require (
-	github.com/Crdzbird/Blockchainer/bridge/bindings/go v0.0.0-00010101000000-000000000000
+	github.com/Crdzbird/Aviary/bridge/bindings/go v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.2
 )
@@ -17,6 +17,6 @@ require (
 )
 
 // Local sibling checkouts (neither published yet).
-replace github.com/Crdzbird/Blockchainer/bridge/bindings/go => ../../../bridge/bindings/go
+replace github.com/Crdzbird/Aviary/bridge/bindings/go => ../../../bridge/bindings/go
 
 replace github.com/Crdzbird/CryptoLib/bridge/bindings/go => ../../../../cryptolib/bridge/bindings/go

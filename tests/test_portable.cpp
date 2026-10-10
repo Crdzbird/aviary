@@ -4,13 +4,13 @@
 // fails closed on tamper / wrong key / wrong passphrase.
 #include <string>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/keyring.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/keyring.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using custody::KeyStore;
 using custody::PortableAccount;
 

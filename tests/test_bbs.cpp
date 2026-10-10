@@ -5,12 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/types.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/types.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -30,7 +30,7 @@ int main() {
   CHECK(crypto::bbs_keygen(view(ikm)).public_key == issuer.public_key);
 
   // ── A membership credential: {member_id, tier, region, not_after} ──────────
-  Bytes header = msg("blockchainer.credential.v1");
+  Bytes header = msg("aviary.credential.v1");
   std::vector<Bytes> attrs{msg("member-42"), msg("tier=3"), msg("region=eu"), msg("2030-01-01")};
   Bytes sig =
       crypto::bbs_sign(view(issuer.secret_key), view(issuer.public_key), view(header), attrs);

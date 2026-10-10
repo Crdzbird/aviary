@@ -1,10 +1,10 @@
-#include "blockchainer/remote_guard.hpp"
+#include "aviary/remote_guard.hpp"
 
 #include <stdexcept>
 
-#include "blockchainer/keyring.hpp"  // custody::Vault — committing AEAD for the capability
+#include "aviary/keyring.hpp"  // custody::Vault — committing AEAD for the capability
 
-namespace blockchainer::node {
+namespace aviary::node {
 
 namespace {
 crypto::ByteView cv(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
@@ -54,12 +54,12 @@ RemoteGuard::Granted RemoteGuard::login_finish(const std::string& cred_id,
 Bytes RemoteGuard::seal_capability(crypto::ByteView export_key, crypto::ByteView plaintext) {
   // OPAQUE export_key is 64 B; the committing AEAD keys on the first 32.
   custody::Vault vault(crypto::ByteView(export_key.data(), 32));
-  return vault.seal(plaintext, "blockchainer.remoteguard.capability");
+  return vault.seal(plaintext, "aviary.remoteguard.capability");
 }
 
 Bytes RemoteGuard::open_capability(crypto::ByteView export_key, crypto::ByteView sealed) {
   custody::Vault vault(crypto::ByteView(export_key.data(), 32));
-  return vault.open(Bytes(sealed.begin(), sealed.end()), "blockchainer.remoteguard.capability");
+  return vault.open(Bytes(sealed.begin(), sealed.end()), "aviary.remoteguard.capability");
 }
 
-}  // namespace blockchainer::node
+}  // namespace aviary::node

@@ -1,11 +1,11 @@
-# Blockchainer — Threat Model
+# Aviary — Threat Model
 
 > The adversary model, per-component threats with their mitigations and status,
 > the security arguments for the original constructions, and the residual-risk
 > register. Composes with cryptolib's own threat model
 > ([`../cryptolib/docs/THREAT_MODEL.md`](../../cryptolib/docs/THREAT_MODEL.md)) —
 > all cryptographic primitive security is delegated there; this document covers
-> how blockchainer *uses* them.
+> how aviary *uses* them.
 >
 > Status: **M7 living document.** Reflects the implemented system. Items marked
 > *(deferred)* are tracked in [`IMPROVEMENTS.md`](IMPROVEMENTS.md).
@@ -120,7 +120,7 @@ quorum (≥1/3 power) of colluding validators; physical key extraction.
 
 ### 4.6 Keys & crypto
 All primitive security (constant-time, side channels, KAT correctness) is
-**delegated to cryptolib**. blockchainer's responsibilities: domain-separated
+**delegated to cryptolib**. aviary's responsibilities: domain-separated
 hashing (distinct tags per structure), correct primitive selection per role, and
 the PQ-hybrid posture for long-lived value (hybrid Ed25519+ML-DSA signatures and
 X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
@@ -145,7 +145,7 @@ X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
 - **Fuzzing**: deterministic totality + round-trip fuzz over every decoder; an
   optional libFuzzer harness (`fuzz/`).
 - **Sanitizers**: ASan + UBSan clean across the whole suite
-  (`-DBLOCKCHAINER_SANITIZE=ON`).
+  (`-DAVIARY_SANITIZE=ON`).
 - **TSan**: not yet run — no multi-threaded code paths are exercised (metrics use
   atomics). Add when the async networking/event loop lands. *(deferred)*
 

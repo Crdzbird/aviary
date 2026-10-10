@@ -1,4 +1,4 @@
-#include "blockchainer/consensus.hpp"
+#include "aviary/consensus.hpp"
 
 #include <algorithm>
 #include <map>
@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace blockchainer::consensus {
+namespace aviary::consensus {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -362,4 +362,4 @@ std::optional<Evidence> detect_equivocation(std::uint64_t height, std::uint32_t 
   return std::nullopt;
 }
 
-}  // namespace blockchainer::consensus
+}  // namespace aviary::consensus

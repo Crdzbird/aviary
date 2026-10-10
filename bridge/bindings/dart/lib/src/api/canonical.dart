@@ -1,12 +1,12 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Canonical bytes that are identical across every binding.
-extension BlockchainerCanonical on Blockchainer {
+extension AviaryCanonical on Aviary {
   /// The 32 byte BLAKE3 digest of [msg].
   Uint8List hash(Uint8List msg) => _scoped(
         [msg],
         (p) => _take(
-          lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('blockchainer_hash')(
+          lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_hash')(
               p[0], msg.length),
           'hash',
         ),
@@ -23,15 +23,8 @@ extension BlockchainerCanonical on Blockchainer {
       _scoped(
         [body, author, signature],
         (p) => _take(
-          lib.lookupFunction<_TxidC, _TxidD>('blockchainer_txid')(
-              version,
-              chainId,
-              p[0],
-              body.length,
-              p[1],
-              author.length,
-              p[2],
-              signature.length),
+          lib.lookupFunction<_TxidC, _TxidD>('aviary_txid')(version, chainId,
+              p[0], body.length, p[1], author.length, p[2], signature.length),
           'txid',
         ),
       );
@@ -50,7 +43,7 @@ extension BlockchainerCanonical on Blockchainer {
       _scoped(
         [parentHash, txRoot, stateRoot, consensus],
         (p) => _take(
-          lib.lookupFunction<_HeaderC, _HeaderD>('blockchainer_header_hash')(
+          lib.lookupFunction<_HeaderC, _HeaderD>('aviary_header_hash')(
               version,
               chainId,
               height,

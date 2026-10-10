@@ -1,4 +1,4 @@
-# Blockchainer — Architecture & Design
+# Aviary — Architecture & Design
 
 > A **C++** distributed-ledger core (built on **cryptolib** for all crypto), exposed
 > through a **C ABI** with **Dart and Go bindings**, built to construct custom
@@ -15,7 +15,7 @@
 
 ## 0. What we are building
 
-Blockchainer is a **C++ library/toolkit**, not a single chain. A consumer assembles
+Aviary is a **C++ library/toolkit**, not a single chain. A consumer assembles
 a chain from parts:
 
 - a **state machine** (account *or* UTXO — chosen at genesis),
@@ -118,16 +118,16 @@ thin and the engine stays deterministic everywhere.
 
 We **do not implement crypto.** The C++ core links cryptolib's **prebuilt C ABI**
 (`cryptolib_c` — link `libcryptolib_c` + include `bridge/cryptolib_c.h`). A thin
-internal layer (`blockchainer::crypto`) wraps those C functions in
+internal layer (`aviary::crypto`) wraps those C functions in
 domain-separated, intent-named C++ operations (`hash_leaf`, `hash_node`,
 `hash_header`, `sign_tx`, `verify_tx`, `aggregate_votes`…) returning real C++ types.
 
 > **Linking choice (decision):** link the **self-contained `cryptolib_c` C ABI**,
-> not cryptolib's header-only C++ API. This decouples blockchainer's build from
+> not cryptolib's header-only C++ API. This decouples aviary's build from
 > cryptolib's transitive native-dep chain (libsodium / liboqs / blst / OpenSSL /
-> BLAKE3) — blockchainer needs only the prebuilt `libcryptolib_c` artifact + one
+> BLAKE3) — aviary needs only the prebuilt `libcryptolib_c` artifact + one
 > header. The tradeoff is a C-typed surface (lengths + out-pointers + buffer-free
-> calls) that `blockchainer::crypto` immediately wraps in RAII C++ types, so the C
+> calls) that `aviary::crypto` immediately wraps in RAII C++ types, so the C
 > shape never leaks past the seam. cryptolib's C ABI already guarantees exception
 > isolation, indistinguishable error returns, and bounds-checked length math.
 
@@ -157,14 +157,14 @@ path.
 
 > Separately, the cryptolib **Dart** binding was extended with `blake3` (+ `_keyed`,
 > `_derive_key`) and `blsAggregate`/`blsAggregateVerify`. Those are **not** on
-> blockchainer's core path (the core is C++), but remain useful for any client-side
+> aviary's core path (the core is C++), but remain useful for any client-side
 > Dart crypto (e.g. a wallet signing locally) and for cryptolib itself. Note that
 > determinism still requires consensus bytes to originate in the C++ core, so a
 > binding never canonicalizes-and-hashes on its own.
 
 ### 3.2 The crypto seam (C++)
 
-`blockchainer::crypto` exposes narrow C++ interfaces — `Hasher`, `Signer`,
+`aviary::crypto` exposes narrow C++ interfaces — `Hasher`, `Signer`,
 `Verifier`, `Aggregator`, `SecureChannel` — with cryptolib-backed implementations.
 This is **not** an abstraction tax to swap crypto libraries; it exists to (a) keep
 domain separation centralized, (b) let `ChainSpec` select a suite by name
@@ -179,7 +179,7 @@ cryptolib headers directly.
 
 ### Codec
 
-A custom, explicitly-specified **canonical binary codec** (`blockchainer_codec`).
+A custom, explicitly-specified **canonical binary codec** (`aviary_codec`).
 SSZ/RLP-inspired but minimal and our own, so the spec is ours and fully pinned:
 
 - **Integers:** fixed-width, **big-endian**, unsigned unless stated. Value/amount
@@ -201,7 +201,7 @@ The codec is the **most fuzzed** component in the system (§9).
 
 ### Hashing & domain separation
 
-All hashing goes through `blockchainer_crypto` with a **domain tag** so a leaf can
+All hashing goes through `aviary_crypto` with a **domain tag** so a leaf can
 never collide with an internal node or a header:
 
 ```
@@ -380,7 +380,7 @@ length math, no error oracles) governs the bridge surface.
 
 ## 9. Networking, mempool & streaming sync
 
-`blockchainer_p2p`:
+`aviary_p2p`:
 
 - **Transport:** authenticated, encrypted channels via **Noise XX** + **hybrid KEM**
   (cryptolib). Private mode adds a validator allow-list; permissionless mode adds
@@ -403,7 +403,7 @@ profiling demands it.
 
 ## 10. Verification & light client
 
-`blockchainer_client`:
+`aviary_client`:
 
 - **Full verification:** the §6 pipeline, used by full nodes and by an offline
   "verify this block/chain segment" API.
@@ -420,7 +420,7 @@ profiling demands it.
 
 Two directions:
 
-**Outbound — talk to existing chains** (`blockchainer_interop`, per the skill's
+**Outbound — talk to existing chains** (`aviary_interop`, per the skill's
 web3-interaction reference): JSON-RPC clients for **EVM** (eth JSON-RPC, ABI
 encode/decode), **Solana**, and **Bitcoin**; transaction construction, nonce/fee
 handling, on-chain reads, and event subscription. **All signing uses cryptolib**
@@ -438,7 +438,7 @@ security review — they are historically the highest-loss component in the ecos
 
 ## 12. Observability & event streaming
 
-`blockchainer_observability` — first-class, not bolted on:
+`aviary_observability` — first-class, not bolted on:
 
 - **Structured logging** with levels and context (height, round, peer, tx hash).
 - **Metrics:** counters/gauges/histograms (block time, mempool depth, peer count,
@@ -455,7 +455,7 @@ security review — they are historically the highest-loss component in the ecos
 
 ## 13. Storage
 
-`blockchainer_state` storage seam: a `StateStore` interface (KV with atomic batches
+`aviary_state` storage seam: a `StateStore` interface (KV with atomic batches
 and height-versioned snapshots) so the backend is swappable (embedded default;
 others later). Snapshots enable fast sync and clean rollback on a rejected block.
 Block store and indexes (by height, by hash, by tx) are separate from the state
@@ -469,10 +469,10 @@ A CMake C++ project mirroring cryptolib's structure, keeping consensus-critical 
 small and auditable:
 
 ```
-blockchainer/
+aviary/
   CMakeLists.txt              links crypto::cryptolib; builds core + C ABI + tests
   docs/                       ARCHITECTURE.md (this), THREAT_MODEL.md, CODEC_SPEC.md
-  include/blockchainer/       public C++ headers
+  include/aviary/       public C++ headers
   src/
     codec/        canonical serialization (the C++ home of the removed Dart codec)
     crypto/       cryptolib adapter — Hasher/Signer/Aggregator seam (§3.2)
@@ -485,8 +485,8 @@ blockchainer/
     interop/      EVM/Solana/Bitcoin clients + bridge primitives
     node/         assembles a runnable node from a ChainSpec
   bridge/
-    blockchainer_c.h          the C ABI every binding marshals over
-    blockchainer_c.cpp        exception isolation, bounds-checked length math
+    aviary_c.h          the C ABI every binding marshals over
+    aviary_c.cpp        exception isolation, bounds-checked length math
     bindings/
       dart/                   dart:ffi binding (+ pub package)
       go/                     cgo binding (+ module)
@@ -522,7 +522,7 @@ the C++ tests and each binding's test suite (§2).
 
 | M | Milestone | Exit criteria |
 |---|-----------|---------------|
-| **M0** | Foundations | This doc reviewed; **CMake C++ project scaffold linking `crypto::cryptolib`**; C ABI skeleton (`bridge/blockchainer_c.{h,cpp}`); empty Dart + Go binding stubs that load and call `version()`; CODEC_SPEC drafted; CI builds C++ + both bindings. |
+| **M0** | Foundations | This doc reviewed; **CMake C++ project scaffold linking `crypto::cryptolib`**; C ABI skeleton (`bridge/aviary_c.{h,cpp}`); empty Dart + Go binding stubs that load and call `version()`; CODEC_SPEC drafted; CI builds C++ + both bindings. |
 | **M1** | Core ledger (C++) | Canonical codec + `vectors/` golden vectors; block/tx model; Merkle; crypto seam wired to cryptolib C++; **account + UTXO** state machines behind the interface; single-node append + validate; full §6 pipeline; determinism + fuzz suites green; **golden vectors replayed through Dart & Go bindings**. |
 | **M2** | BFT consensus | `ConsensusEngine` + BFT reference; single- then multi-validator local net finalizing blocks; BLS-aggregated certificates; Byzantine-scenario tests. |
 | **M3** | Networking & sync | Noise-encrypted transport, gossip, mempool, fast/streaming sync; adversarial-peer tests. |

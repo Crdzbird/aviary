@@ -1,9 +1,9 @@
-#include "blockchainer/secure_session.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/secure_session.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
-using blockchainer::p2p::SecureSession;
+using namespace aviary;
+using aviary::p2p::SecureSession;
 
 namespace {
 Bytes bytes(const char* s) {

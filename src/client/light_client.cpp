@@ -1,8 +1,8 @@
-#include "blockchainer/light_client.hpp"
+#include "aviary/light_client.hpp"
 #include <vector>
 #include <string>
 
-namespace blockchainer::client {
+namespace aviary::client {
 
 LightClient::Result LightClient::accept(const BlockHeader& h,
                                         const consensus::CommitCertificate& cert) {
@@ -111,4 +111,4 @@ LightClient::Result LightClient::sync_to(
   return Result::success();
 }
 
-}  // namespace blockchainer::client
+}  // namespace aviary::client

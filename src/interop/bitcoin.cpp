@@ -1,11 +1,11 @@
-#include "blockchainer/interop/bitcoin.hpp"
+#include "aviary/interop/bitcoin.hpp"
 
 #include <stdexcept>
 
-#include "blockchainer/crypto.hpp"
-#include "blockchainer/interop/encoding.hpp"
+#include "aviary/crypto.hpp"
+#include "aviary/interop/encoding.hpp"
 
-namespace blockchainer::interop::bitcoin {
+namespace aviary::interop::bitcoin {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -267,4 +267,4 @@ Bytes serialize_segwit(const Tx& tx, const std::vector<std::pair<Bytes, Bytes>>&
   return out;
 }
 
-}  // namespace blockchainer::interop::bitcoin
+}  // namespace aviary::interop::bitcoin

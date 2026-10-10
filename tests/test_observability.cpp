@@ -1,13 +1,13 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/observability/event_bus.hpp"
-#include "blockchainer/observability/events.hpp"
-#include "blockchainer/observability/log.hpp"
-#include "blockchainer/observability/metrics.hpp"
+#include "aviary/observability/event_bus.hpp"
+#include "aviary/observability/events.hpp"
+#include "aviary/observability/log.hpp"
+#include "aviary/observability/metrics.hpp"
 #include "check.hpp"
 
-using namespace blockchainer::observe;
+using namespace aviary::observe;
 
 namespace {
 bool contains(const std::string& hay, const std::string& needle) {

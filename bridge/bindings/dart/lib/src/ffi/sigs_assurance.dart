@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _AsDescribeC = _BufResult Function(Uint16);
 typedef _AsDescribeD = _BufResult Function(int);

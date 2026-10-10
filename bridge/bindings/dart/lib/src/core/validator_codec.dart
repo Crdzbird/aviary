@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 List<ValidatorEntry> _decodeValidatorSet(Uint8List b) {
   final bd = ByteData.sublistView(b);

@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// The propose, justify and submit flow in one call.
 extension ChainBlocks on Chain {
@@ -14,7 +14,7 @@ extension ChainBlocks on Chain {
     final block = propose(timestamp);
     final justification = (justify ?? certify)(block);
     if (!submit(block, justification)) {
-      throw const BlockchainerException('block refused');
+      throw const AviaryException('block refused');
     }
     return block;
   }

@@ -3,11 +3,11 @@
 #include <filesystem>
 #include <string>
 
-#include "blockchainer/kvstore.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/kvstore.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using storage::LogKvStore;
 
 namespace {
@@ -21,7 +21,7 @@ codec::ByteView view(const Bytes& x) { return codec::ByteView(x.data(), x.size()
 
 int main() {
   init();
-  const std::filesystem::path path = std::filesystem::temp_directory_path() / "blockchainer_kv_test" / "log";
+  const std::filesystem::path path = std::filesystem::temp_directory_path() / "aviary_kv_test" / "log";
   std::filesystem::remove_all(path.parent_path());
 
   std::printf("== put / get / has / overwrite / erase ==\n");

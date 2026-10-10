@@ -8,17 +8,17 @@
 #include <string>
 #include <vector>
 
-#include "blockchainer/assurance.hpp"
-#include "blockchainer/chain_assembler.hpp"
-#include "blockchainer/chain_blueprint.hpp"
-#include "blockchainer/foreign_engine.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/pos_engine.hpp"
-#include "blockchainer/pow_engine.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/assurance.hpp"
+#include "aviary/chain_assembler.hpp"
+#include "aviary/chain_blueprint.hpp"
+#include "aviary/foreign_engine.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/pos_engine.hpp"
+#include "aviary/pow_engine.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using node::ChainAssembler;
 using node::ComponentRegistry;
 

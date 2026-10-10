@@ -1,10 +1,10 @@
 # Atlas Settlement Network
 
 A real-world demo: a **wholesale settlement & tokenized-asset network** built on
-Blockchainer, with a **Go gRPC server** and a **Flutter operator console**.
+Aviary, with a **Go gRPC server** and a **Flutter operator console**.
 
 ```
-Flutter console  ──gRPC──▶  Go server  ──cgo──▶  Blockchainer (C++ core)
+Flutter console  ──gRPC──▶  Go server  ──cgo──▶  Aviary (C++ core)
 ```
 
 The Flutter app is a thin gRPC client (no native blockchain code), so it runs on
@@ -31,7 +31,7 @@ any platform grpc-dart supports. All chain work happens server-side.
 ## Run
 
 ```bash
-# 1. Build the blockchainer host library
+# 1. Build the aviary host library
 ( cd ../.. && cmake -S . -B build && cmake --build build )
 
 # 2. Start the server + console (macOS desktop, iOS sim, or Android)
@@ -46,7 +46,7 @@ Or separately: `( cd server && go run . )` then `( cd app && flutter run )`.
 `proto/atlas.proto` — `Atlas` service: CreateChain, CreateWallet, IssueFunds,
 Settle, ProduceBlock, GetBalanceProof, BuildErc20Transfer, FunctionSelector,
 GetMetrics, and `StreamEvents` (server-streaming). The server (`server/`) uses the
-Blockchainer Go binding; the client (`app/`) uses generated grpc-dart stubs.
+Aviary Go binding; the client (`app/`) uses generated grpc-dart stubs.
 
 ## Governance tab (validator rotation + auditor light client)
 

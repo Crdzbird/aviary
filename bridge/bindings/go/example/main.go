@@ -1,4 +1,4 @@
-// Example: the Blockchainer Go binding driving a chain, alongside cryptolib's Go
+// Example: the Aviary Go binding driving a chain, alongside cryptolib's Go
 // binding for off-chain crypto — both from one dependency.
 //
 //	go run ./example
@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 	"github.com/Crdzbird/CryptoLib/bridge/bindings/go/cryptolib"
 )
 
@@ -17,10 +17,10 @@ func main() {
 	// self-initializes regardless, so you never have to wait on it.
 	bc.Preload()
 
-	fmt.Printf("blockchainer %s · crypto backend %s\n\n",
+	fmt.Printf("aviary %s · crypto backend %s\n\n",
 		bc.Version(), bc.CryptoBackendVersion())
 
-	// ── Off-chain crypto via cryptolib (the same backend blockchainer links) ──
+	// ── Off-chain crypto via cryptolib (the same backend aviary links) ──
 	doc := []byte("settlement-instruction:2026-06-08:EURx:1000000")
 	digest, _ := cryptolib.Blake3(doc, 32)
 	kp := cryptolib.Ed25519Keygen()
@@ -28,7 +28,7 @@ func main() {
 	fmt.Println("cryptolib BLAKE3(doc):", hex.EncodeToString(digest))
 	fmt.Println("cryptolib Ed25519 sig valid:", cryptolib.Ed25519Verify(digest, sig, kp.Public))
 
-	// ── On-chain ledger via blockchainer ──
+	// ── On-chain ledger via aviary ──
 	node := bc.NewNode(1)
 	defer node.Free()
 	aSec, _, aAddr, _ := node.NewAccount()

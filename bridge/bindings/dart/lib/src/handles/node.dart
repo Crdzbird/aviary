@@ -1,10 +1,10 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A running single validator chain node.
 final class Node {
   Node._(this._bc, this._h);
 
-  final Blockchainer _bc;
+  final Aviary _bc;
   final Pointer<Void> _h;
 
   DynamicLibrary get _lib => _bc.lib;
@@ -14,7 +14,7 @@ final class Node {
 
   /// A fresh Ed25519 account.
   Account newAccount() {
-    final secret = _bufOfNode('blockchainer_node_new_account', 'new_account');
+    final secret = _bufOfNode('aviary_node_new_account', 'new_account');
     final pub = Uint8List.sublistView(secret, 32, 64);
     return Account(secret, pub, accountAddress(pub));
   }
@@ -22,8 +22,8 @@ final class Node {
   /// A fresh hybrid post quantum account; spend it with
   /// [NodeTransfers.submitTransferHybrid].
   Account newAccountHybrid() {
-    final kp = _splitKeyBlob(_bufOfNode(
-        'blockchainer_node_new_account_hybrid', 'new_account_hybrid'));
+    final kp = _splitKeyBlob(
+        _bufOfNode('aviary_node_new_account_hybrid', 'new_account_hybrid'));
     return Account(kp.secret, kp.public, accountAddress(kp.public));
   }
 
@@ -32,7 +32,7 @@ final class Node {
         [publicKey],
         (p) => _bc._take(
           _lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-              'blockchainer_account_address')(p[0], publicKey.length),
+              'aviary_account_address')(p[0], publicKey.length),
           'account_address',
         ),
       );
@@ -40,12 +40,12 @@ final class Node {
   /// Credits an address at genesis. Throws once a block has been produced.
   void credit(Uint8List address, int amount) => _scoped([address], (p) {
         final rc = _lib.lookupFunction<_CreditC, _CreditD>(
-            'blockchainer_node_credit')(_h, p[0], amount);
+            'aviary_node_credit')(_h, p[0], amount);
         if (rc == 2) {
-          throw const BlockchainerException(
+          throw const AviaryException(
               'genesis is sealed; fund accounts with transfers');
         }
-        if (rc != 0) throw BlockchainerException('credit failed (status $rc)');
+        if (rc != 0) throw AviaryException('credit failed (status $rc)');
       });
 
   /// Produces the next block and returns its height.
@@ -53,8 +53,8 @@ final class Node {
     final out = calloc<Uint64>();
     try {
       final rc = _lib.lookupFunction<_ProduceC, _ProduceD>(
-          'blockchainer_node_produce_block')(_h, timestamp, out);
-      if (rc != 0) throw const BlockchainerException('produce_block failed');
+          'aviary_node_produce_block')(_h, timestamp, out);
+      if (rc != 0) throw const AviaryException('produce_block failed');
       return out.value;
     } finally {
       calloc.free(out);
@@ -62,8 +62,8 @@ final class Node {
   }
 
   /// Releases the native node.
-  void dispose() => _lib
-      .lookupFunction<_HandleFreeC, _HandleFreeD>('blockchainer_node_free')(_h);
+  void dispose() =>
+      _lib.lookupFunction<_HandleFreeC, _HandleFreeD>('aviary_node_free')(_h);
 
   /// Alias of [dispose].
   void free() => dispose();

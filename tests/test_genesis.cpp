@@ -3,15 +3,15 @@
 // same chain params; a produced block then extends that state.
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/assurance.hpp"
-#include "blockchainer/credential_gate.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/utxo_state.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/assurance.hpp"
+#include "aviary/credential_gate.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/utxo_state.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }

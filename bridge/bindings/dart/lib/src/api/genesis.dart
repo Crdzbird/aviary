@@ -1,7 +1,7 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Genesis construction and identity.
-extension BlockchainerGenesis on Blockchainer {
+extension AviaryGenesis on Aviary {
   /// A minimal genesis: chain params, posture, seeded state and validators.
   Uint8List buildGenesis({
     required int chainId,
@@ -19,7 +19,7 @@ extension BlockchainerGenesis on Blockchainer {
             [_concat(accounts.map((a) => a.address)), _publicKeys(validators)],
             (p) => _take(
               lib.lookupFunction<_GenesisBuildC, _GenesisBuildD>(
-                      'blockchainer_genesis_build')(
+                      'aviary_genesis_build')(
                   chainId,
                   timestamp,
                   assuranceLevel,
@@ -38,11 +38,11 @@ extension BlockchainerGenesis on Blockchainer {
 
   /// Commits a mixture into a genesis; the genesis hash changes.
   Uint8List commitBlueprint(Uint8List genesis, Blueprint bp) =>
-      _buf2Op('blockchainer_genesis_commit_blueprint', genesis, bp.encoded);
+      _buf2Op('aviary_genesis_commit_blueprint', genesis, bp.encoded);
 
   /// The 32 byte genesis hash, the chain identity.
   Uint8List genesisHash(Uint8List genesis) =>
-      _bufOp('blockchainer_genesis_hash', genesis);
+      _bufOp('aviary_genesis_hash', genesis);
 
   Uint8List _bufOp(String fn, Uint8List a) => _scoped(
         [a],

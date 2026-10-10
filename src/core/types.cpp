@@ -1,10 +1,10 @@
-#include "blockchainer/types.hpp"
+#include "aviary/types.hpp"
 
-#include "blockchainer/merkle.hpp"
+#include "aviary/merkle.hpp"
 
 #include <stdexcept>
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
@@ -304,4 +304,4 @@ bool verify_transaction_signature(const Transaction& tx) {
   }
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

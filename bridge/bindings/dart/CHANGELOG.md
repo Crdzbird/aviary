@@ -13,4 +13,4 @@
   accounts, auto nonce transfers and one call blocks on Node, single
   validator chain assembly, whole threshold ceremonies, fluent chain trees.
 - The CipherBird engine is bundled for macOS arm64; other hosts load the
-  library from BLOCKCHAINER_DYLIB.
+  library from AVIARY_DYLIB.

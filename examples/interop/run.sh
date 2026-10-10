@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Go↔Flutter interop check — start the Go server, then run the Flutter client.
-# Prereq: blockchainer host lib built (cd ../.. && cmake --build build) and the
+# Prereq: aviary host lib built (cd ../.. && cmake --build build) and the
 # sibling cryptolib checkout present.
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,9 +1,9 @@
-#include "blockchainer/chain_blueprint.hpp"
+#include "aviary/chain_blueprint.hpp"
 
-#include "blockchainer/codec.hpp"
-#include "blockchainer/genesis.hpp"
+#include "aviary/codec.hpp"
+#include "aviary/genesis.hpp"
 
-namespace blockchainer {
+namespace aviary {
 
 namespace {
 crypto::ByteView sview(const std::string& s) {
@@ -43,4 +43,4 @@ std::optional<ChainBlueprint> ChainBlueprint::from_genesis(const GenesisSpec& g)
   return decode_all(crypto::ByteView(g.chain_blueprint.data(), g.chain_blueprint.size()));
 }
 
-}  // namespace blockchainer
+}  // namespace aviary

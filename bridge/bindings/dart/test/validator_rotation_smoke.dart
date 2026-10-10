@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void expect(bool ok, String msg) {
   if (!ok) throw StateError('FAIL: $msg');
@@ -24,7 +24,7 @@ bool eq(Uint8List a, Uint8List b) {
 }
 
 void main() {
-  final bc = Blockchainer.instance;
+  final bc = Aviary.instance;
   final me = bc.newBLSValidator(fill(0x81)),
       other = bc.newBLSValidator(fill(0x82));
   final bft = bc.makeBlueprint(consensus: 'bft', stateModel: 'account');
@@ -84,5 +84,5 @@ void main() {
   chain.free();
   pc.free();
   print(
-      'blockchainer dart validator-rotation smoke: OK (grow, certify under each set, rotate out, PoS refuses)');
+      'aviary dart validator-rotation smoke: OK (grow, certify under each set, rotate out, PoS refuses)');
 }

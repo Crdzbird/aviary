@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 int _u32be(Uint8List b, int off) =>
     (b[off] << 24) | (b[off + 1] << 16) | (b[off + 2] << 8) | b[off + 3];

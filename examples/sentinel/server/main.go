@@ -1,11 +1,11 @@
-// Sentinel — device provenance ledger gRPC server, backed by Blockchainer.
+// Sentinel — device provenance ledger gRPC server, backed by Aviary.
 package main
 
 import (
 	"log"
 	"net"
 
-	bc "github.com/Crdzbird/Blockchainer/bridge/bindings/go/blockchainer"
+	bc "github.com/Crdzbird/Aviary/bridge/bindings/go/aviary"
 	pb "sentinel/gen"
 
 	"google.golang.org/grpc"
@@ -14,9 +14,9 @@ import (
 
 func main() {
 	if err := bc.Init(); err != nil {
-		log.Fatalf("blockchainer init: %v", err)
+		log.Fatalf("aviary init: %v", err)
 	}
-	log.Printf("Sentinel device provenance ledger — blockchainer %s (crypto %s)",
+	log.Printf("Sentinel device provenance ledger — aviary %s (crypto %s)",
 		bc.Version(), bc.CryptoBackendVersion())
 
 	addr := ":50052"

@@ -1,11 +1,11 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// A declared mixture of engine, state model and proposer ids plus params.
-/// Commit it with [BlockchainerGenesis.commitBlueprint].
+/// Commit it with [AviaryGenesis.commitBlueprint].
 final class Blueprint {
   Blueprint._(this._bc, this.encoded);
 
-  final Blockchainer _bc;
+  final Aviary _bc;
 
   /// The canonical bytes.
   final Uint8List encoded;
@@ -15,7 +15,7 @@ final class Blueprint {
         [encoded],
         (p) => _bc._take(
           _bc.lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-              'blockchainer_blueprint_hash')(p[0], encoded.length),
+              'aviary_blueprint_hash')(p[0], encoded.length),
           'blueprint_hash',
         ),
       );

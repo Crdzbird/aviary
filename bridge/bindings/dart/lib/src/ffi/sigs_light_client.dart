@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _LcNewC = Pointer<Void> Function(
     Uint64, Pointer<Uint8>, Size, Pointer<Uint8>, Size);

@@ -1,7 +1,7 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Key material as returned by the portable account open methods, or a
-/// hybrid KEM device key pair from [BlockchainerPortableSeal.hybridKemKeypair].
+/// hybrid KEM device key pair from [AviaryPortableSeal.hybridKemKeypair].
 abstract final class PortableAccount {
   /// Wraps a public and secret half.
   const factory PortableAccount(Uint8List public, Uint8List secret) =

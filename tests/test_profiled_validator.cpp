@@ -7,14 +7,14 @@
 #include <optional>
 #include <vector>
 
-#include "blockchainer/account_state.hpp"
-#include "blockchainer/assurance.hpp"
-#include "blockchainer/genesis.hpp"
-#include "blockchainer/profiled_validator.hpp"
-#include "blockchainer/version.hpp"
+#include "aviary/account_state.hpp"
+#include "aviary/assurance.hpp"
+#include "aviary/genesis.hpp"
+#include "aviary/profiled_validator.hpp"
+#include "aviary/version.hpp"
 #include "check.hpp"
 
-using namespace blockchainer;
+using namespace aviary;
 using node::ProfiledValidator;
 
 namespace {

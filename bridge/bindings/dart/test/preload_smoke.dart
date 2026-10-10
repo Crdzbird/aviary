@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:blockchainer_dart/blockchainer.dart';
+import 'package:aviary_dart/aviary.dart';
 
 void _expect(bool ok, String msg) {
   if (!ok) {
@@ -9,9 +9,9 @@ void _expect(bool ok, String msg) {
 }
 
 Future<void> main() async {
-  final v = Blockchainer.instance.version();
+  final v = Aviary.instance.version();
   _expect(v.isNotEmpty, 'version non-empty (got "$v")');
-  final node = Blockchainer.instance.createNode(42);
+  final node = Aviary.instance.createNode(42);
   final a = node.newAccount();
   node.credit(a.address, 1000);
   node.submitTransfer(
@@ -21,19 +21,19 @@ Future<void> main() async {
   node.dispose();
   print('  [1] sync API works with no preload - version=$v height=$h');
 
-  final ok = await Blockchainer.preload();
+  final ok = await Aviary.preload();
   _expect(ok, 'preload() returned true');
   print('  [2] preload() warmed off-isolate -> $ok');
 
-  _expect(await Blockchainer.preload(), 'preload idempotent');
-  final eth1 = Blockchainer.instance.ethAddress(_seed(0xab));
-  final eth2 = Blockchainer.instance.ethAddress(_seed(0xab));
+  _expect(await Aviary.preload(), 'preload idempotent');
+  final eth1 = Aviary.instance.ethAddress(_seed(0xab));
+  final eth2 = Aviary.instance.ethAddress(_seed(0xab));
   _expect(eth1 == eth2, 'deterministic ethAddress after preload');
   _expect(
       eth1.startsWith('0x') && eth1.length == 42, 'eth address shape ($eth1)');
   print('  [3] sync + deterministic after preload - eth=$eth1');
 
-  print('blockchainer preload smoke: OK');
+  print('aviary preload smoke: OK');
 }
 
 Uint8List _seed(int b) => Uint8List.fromList(List.filled(32, b));

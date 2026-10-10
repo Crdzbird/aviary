@@ -1,4 +1,4 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 typedef _ThCreateC = _BufResult Function(Uint16, Uint16);
 typedef _ThCreateD = _BufResult Function(int, int);

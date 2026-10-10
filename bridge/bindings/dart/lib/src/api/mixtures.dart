@@ -1,13 +1,13 @@
-part of '../../blockchainer.dart';
+part of '../../aviary.dart';
 
 /// Composable chains: mixtures, registry discovery and assembly.
-extension BlockchainerMixtures on Blockchainer {
+extension AviaryMixtures on Aviary {
   /// A validator BLS key pair from [keyMaterial].
   KeyPairBytes newBLSValidator(Uint8List keyMaterial) => _scoped(
         [keyMaterial],
         (p) => _splitKeyBlob(_take(
-          lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-              'blockchainer_bls_keygen')(p[0], keyMaterial.length),
+          lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_bls_keygen')(
+              p[0], keyMaterial.length),
           'bls_keygen',
         )),
       );
@@ -32,8 +32,7 @@ extension BlockchainerMixtures on Blockchainer {
               this,
               _take(
                 lib.lookupFunction<_BpEncodeC, _BpEncodeD>(
-                        'blockchainer_blueprint_encode')(
-                    cc, cs, cp, p[0], pr.length),
+                    'aviary_blueprint_encode')(cc, cs, cp, p[0], pr.length),
                 'blueprint_encode',
               ),
             ),
@@ -45,8 +44,8 @@ extension BlockchainerMixtures on Blockchainer {
 
   List<String> _registryIds(int kind) {
     final b = _take(
-      lib.lookupFunction<_RegistryIdsC, _RegistryIdsD>(
-          'blockchainer_registry_ids')(kind),
+      lib.lookupFunction<_RegistryIdsC, _RegistryIdsD>('aviary_registry_ids')(
+          kind),
       'registry_ids',
     );
     return [for (final id in _splitBlobList(b)) String.fromCharCodes(id)];
@@ -66,7 +65,7 @@ extension BlockchainerMixtures on Blockchainer {
           Uint8List genesis, int me, Uint8List blsPub, Uint8List blsSec) =>
       _scoped([genesis, blsPub, blsSec], (p) {
         final h = lib.lookupFunction<_ChainAssembleC, _ChainAssembleD>(
-                'blockchainer_chain_assemble')(
+                'aviary_chain_assemble')(
             p[0], genesis.length, me, p[1], blsPub.length, p[2], blsSec.length);
         if (h == nullptr) return null;
         return Chain._(this, h);
