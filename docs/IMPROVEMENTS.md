@@ -1574,3 +1574,19 @@ selectors — validated against real-world vectors). Deferred:
   with zero warnings (three pre-existing unresolved `[field]` references in
   record typedef docs became code spans).
 
+## Dart tests under the 100 line rule - DONE (2026-10-11)
+- **[x]** The eight suites over 100 lines are split by scenario, 23 suites
+  became 29: chain_blueprint and chain_blueprint_rejects, chain_tree and
+  chain_tree_rejects, credential_gate and credential_gate_rejects,
+  credential_pseudonym and credential_pseudonym_rejects (the 206 line
+  pseudonym suite), light_client_skip and light_client_limits, subchain and
+  subchain_proof, foreign_component with its engine moved out, and
+  validator_rotation trimmed. Shared setup lives in `test/support`: `bytes`
+  (fill, tampered), `tree_fixture`, `credential_fixture` (direct and blind
+  issuance, pseudonymous presentation), `rotation_fixture` (two BFT nodes
+  through a validator rotation with checkpoints), `subchain_fixture` (bound
+  child in a parent with produce and anchor helpers) and `dart_hash_engine`.
+  The per file `check`, `fill`, `eq` and `throws` copies are gone;
+  `throws` clashed with package:test's matcher, so `failsAnyhow` from
+  `support/check.dart` is the name.
+

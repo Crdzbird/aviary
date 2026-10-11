@@ -2,6 +2,7 @@
 
 ## 0.1.0
 
+- Tests: every suite under 100 lines, shared fixtures in `test/support`.
 - dartdoc categories: Ledger, Chains, Subchains and trees, Light clients,
   Networking, Custody, Assurance and credentials, Observability, Interop,
   Errors and helpers.

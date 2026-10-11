@@ -1,42 +1,9 @@
-import 'dart:typed_data';
 import 'package:aviary_dart/aviary.dart';
 import 'package:test/test.dart';
 
-void check(bool ok, String msg) {
-  if (!ok) throw StateError('FAIL: $msg');
-}
-
-Uint8List fill(int b, [int n = 32]) => Uint8List(n)..fillRange(0, n, b);
-bool eq(Uint8List a, Uint8List b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
-}
-
-class DartHashEngine extends ForeignEngine {
-  int justified = 0, verified = 0;
-  static Uint8List tag(Uint8List block) {
-    final n = block.length < 16 ? block.length : 16;
-    return Uint8List.fromList([
-      ...'dart-just:'.codeUnits,
-      ...block.sublist(0, n),
-    ]);
-  }
-
-  @override
-  Uint8List? justify(Uint8List block) {
-    justified++;
-    return tag(block);
-  }
-
-  @override
-  bool verify(Uint8List block, Uint8List justification) {
-    verified++;
-    return eq(justification, tag(block));
-  }
-}
+import 'support/bytes.dart';
+import 'support/check.dart';
+import 'support/dart_hash_engine.dart';
 
 void main() {
   test('foreign component', () {
@@ -52,32 +19,29 @@ void main() {
           bc.proposerIds().contains('dart-first'),
       'discoverable',
     );
-
     final v = bc.newBLSValidator(fill(0x60));
     final genesis = bc.buildGenesis(
       chainId: 7,
       accounts: [(address: fill(0x11), balance: 1000)],
       validators: [(publicKey: v.public, power: 1)],
     );
-    final chain = bc.assembleChain(
-      bc.commitBlueprint(
-        genesis,
-        bc.makeBlueprint(consensus: 'dart-engine', stateModel: 'account'),
-      ),
+    Chain assemble(Blueprint bp) => bc.assembleChain(
+      bc.commitBlueprint(genesis, bp),
       0,
       v.public,
       v.secret,
+    )!;
+    final chain = assemble(
+      bc.makeBlueprint(consensus: 'dart-engine', stateModel: 'account'),
     );
-    check(chain != null, 'Dart-engine chain assembles');
-    final blk = chain!.propose(2);
+    final blk = chain.propose(2);
     final just = chain.seal(blk);
     check(
       String.fromCharCodes(just.sublist(0, 10)) == 'dart-just:',
       'seal via Dart justify',
     );
-    final bad = Uint8List.fromList(just)..[just.length - 1] ^= 1;
     check(
-      !chain.submit(blk, bad) && chain.height == 0,
+      !chain.submit(blk, tampered(just)) && chain.height == 0,
       'tampered justification refused, ledger untouched',
     );
     check(
@@ -89,28 +53,19 @@ void main() {
       'callbacks crossed the boundary',
     );
     chain.free();
-
-    final pc = bc.assembleChain(
-      bc.commitBlueprint(
-        genesis,
-        bc.makeBlueprint(
-          consensus: 'pos',
-          stateModel: 'account',
-          proposer: 'dart-first',
-        ),
+    final pc = assemble(
+      bc.makeBlueprint(
+        consensus: 'pos',
+        stateModel: 'account',
+        proposer: 'dart-first',
       ),
-      0,
-      v.public,
-      v.secret,
-    )!;
+    );
     final pb = pc.propose(2);
     check(
       pc.submit(pb, pc.seal(pb)) && pc.height == 1,
       'PoS with a Dart proposer committed',
     );
     pc.free();
-    print(
-      'aviary dart foreign-component smoke: OK (Dart engine + proposer in the mixture)',
-    );
+    print('aviary dart foreign-component smoke: OK');
   });
 }

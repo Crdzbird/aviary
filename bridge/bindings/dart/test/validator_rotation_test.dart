@@ -1,28 +1,8 @@
-import 'dart:typed_data';
 import 'package:aviary_dart/aviary.dart';
 import 'package:test/test.dart';
 
-void check(bool ok, String msg) {
-  if (!ok) throw StateError('FAIL: $msg');
-}
-
-bool throws(void Function() f) {
-  try {
-    f();
-    return false;
-  } catch (_) {
-    return true;
-  }
-}
-
-Uint8List fill(int b) => Uint8List(32)..fillRange(0, 32, b);
-bool eq(Uint8List a, Uint8List b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
-}
+import 'support/bytes.dart';
+import 'support/check.dart';
 
 void main() {
   test('validator rotation', () {
@@ -45,7 +25,7 @@ void main() {
     )!;
     check(
       chain.validators().length == 1 &&
-          eq(chain.validators()[0].publicKey, me.public),
+          chain.validators()[0].publicKey.equalsBytes(me.public),
       'initial set',
     );
     final grown = [
@@ -57,7 +37,9 @@ void main() {
     check(chain.submit(b1, chain.certify(b1)), 'rotation block');
     final vs = chain.validators();
     check(
-      vs.length == 2 && vs[0].power == 3 && eq(vs[1].publicKey, other.public),
+      vs.length == 2 &&
+          vs[0].power == 3 &&
+          vs[1].publicKey.equalsBytes(other.public),
       'set after rotation',
     );
     final b2 = chain.propose(3);
@@ -66,8 +48,8 @@ void main() {
       'block under the new set',
     );
     check(
-      throws(() => chain.scheduleValidators([])) &&
-          throws(
+      failsAnyhow(() => chain.scheduleValidators([])) &&
+          failsAnyhow(
             () => chain.scheduleValidators([(publicKey: me.public, power: 0)]),
           ),
       'malformed sets refused',
@@ -79,7 +61,7 @@ void main() {
       'leaving block',
     );
     check(
-      throws(() => chain.certify(chain.propose(5))),
+      failsAnyhow(() => chain.certify(chain.propose(5))),
       'a node that left cannot certify',
     );
     final pc = bc.assembleChain(
@@ -99,11 +81,9 @@ void main() {
       me.public,
       me.secret,
     )!;
-    check(throws(() => pc.scheduleValidators(grown)), 'PoS refuses');
+    check(failsAnyhow(() => pc.scheduleValidators(grown)), 'PoS refuses');
     chain.free();
     pc.free();
-    print(
-      'aviary dart validator-rotation smoke: OK (grow, certify under each set, rotate out, PoS refuses)',
-    );
+    print('aviary dart validator-rotation smoke: OK');
   });
 }
