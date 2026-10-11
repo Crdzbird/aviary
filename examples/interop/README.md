@@ -1,45 +1,63 @@
-# Go <-> Flutter interoperability
+# Interop: Go and Flutter run the same ledger
 
-Proves the Aviary ledger is **byte-identical across language bindings**.
-A **Go** server (aviary Go binding, full node) and a **Flutter** client
-(`aviary`, native) each run the ledger independently and cross-check
-three directions:
+This example proves the engine is byte identical across bindings. A Go
+server (full node over the Go binding) and a Flutter client (the `aviary`
+package, native) each run the ledger independently and cross check each
+other in both directions. A mismatch anywhere would be a consensus fork
+between bindings.
+
+```
+Flutter client (native engine)  <--gRPC-->  Go server (:50053, native engine)
+```
+
+## What it shows
+
+**Ledger tab**
 
 | Direction | Check |
 |---|---|
-| **go <-> flutter** | Both compute the **same canonical bytes** - BLAKE3 hash, canonical txid, block-header hash - for identical inputs. A mismatch would be a consensus fork between bindings. |
-| **go -> flutter** | The Go node builds a chain and returns a light-client **proof**; the Flutter client **verifies it natively** against the state root. Both also apply the same deterministic scenario -> **state roots must match**. |
-| **flutter -> go** | The Flutter client produces a proof; the **Go node verifies it**. |
+| Go and Flutter | Both compute the same canonical bytes for identical inputs: BLAKE3 hash, canonical transaction id, block header hash. |
+| Go to Flutter | The Go node builds a chain and returns a light client proof; the Flutter client verifies it natively against the state root. Both apply the same deterministic scenario, so the state roots must match. |
+| Flutter to Go | The Flutter client produces a proof; the Go node verifies it. |
 
-Determinism is exact because the scenario shares the account secrets, and Ed25519
-signatures are deterministic - so identical inputs => identical txids, state roots,
-and proofs on both sides.
+Determinism is exact because the scenario shares the account secrets and
+Ed25519 signatures are deterministic: identical inputs give identical
+transaction ids, state roots and proofs on both sides. The client shows a
+green panel when every check passes.
+
+**Chain tree tab**
+
+Both sides build the same family (a root, a child subchain, a grandchild)
+with validator keys derived from one seed, run the same production schedule
+and compare: the chain ids and the root's subchain root must be byte
+identical; the client verifies Go's cross chain proof natively (`BuildTree`)
+and Go verifies the client's proof (`VerifyTreeProof`).
 
 ## Run
 
 ```bash
-# 1. build the native host lib (once)
+# 1. Build the Aviary host library (once, from the repository root)
 ( cd ../.. && cmake -S . -B build && cmake --build build )
 
-# 2. server + client
-./run.sh                       # client on macOS desktop (server on :50053)
-./run.sh -d <ios-simulator>    # iOS sim reaches the host's localhost directly
+# 2. Start the server and the client
+./run.sh                       # macOS desktop
+./run.sh -d <ios-simulator>    # the simulator reaches the host's localhost directly
 
-# Android device: route localhost to the host first, then run:
-#   adb reverse tcp:50053 tcp:50053
-#   ./run.sh -d <android-device-id>
+# Android device: route the port to the host first
+adb reverse tcp:50053 tcp:50053
+./run.sh -d <android-device-id>
+
+# Go only, no Flutter
+( cd server && go run ./cmd/probe )
 ```
 
-The Flutter client connects to `127.0.0.1:50053`, runs all three direction
-checks natively, and shows a green panel ("Ledger is byte-identical across Go and
-Flutter") when every check passes. `server/cmd/probe` runs the same checks
-Go-only.
+The client connects to `127.0.0.1:50053`.
 
-## Chain tree tab (Go <-> Flutter, cross-chain proofs)
+## Where to look
 
-Both sides build the **same family** - root <- child subchain <- grandchild, with
-validator keys derived from one seed - run the same production schedule, and
-compare: chain ids and the root's `subchain_root` must be byte-identical
-(**go <-> flutter**); the client verifies Go's cross-chain proof natively
-(**go -> flutter**, `BuildTree`); Go verifies the client's proof
-(**flutter -> go**, `VerifyTreeProof`). Shown on the **Chain tree** tab.
+| Piece | Path |
+|---|---|
+| Service definition | `proto/interop.proto` |
+| Go node, scenario, proof exchange | `server/main.go` |
+| Go side of the chain tree | `server/tree.go` |
+| Flutter client with both tabs | `app/lib/main.dart` |

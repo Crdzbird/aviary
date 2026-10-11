@@ -1,62 +1,71 @@
-# Atlas Settlement Network
+# Atlas: a wholesale settlement network
 
-A real-world demo: a **wholesale settlement & tokenized-asset network** built on
-Aviary, with a **Go gRPC server** and a **Flutter operator console**.
+Atlas is a settlement and tokenized asset network for institutions, built
+on Aviary. A Go gRPC server runs the chains through the Go binding; a
+Flutter operator console drives it over gRPC and holds no native code, so it
+runs anywhere grpc-dart does.
 
 ```
-Flutter console  --gRPC-->  Go server  --cgo-->  Aviary (C++ core)
+Flutter console  --gRPC-->  Go server (:50051)  --cgo-->  Aviary (C++ core)
 ```
 
-The Flutter app is a thin gRPC client (no native blockchain code), so it runs on
-any platform grpc-dart supports. All chain work happens server-side.
+## What it shows
 
-## What it demonstrates (real use cases, not toy transfers)
+**Settlement tab**
 
-- **Custom settlement chains** - launch a BFT, instant-finality rail per currency
-  (e.g. "EURx"), with a genesis reserve treasury.
-- **Institutional custodial wallets** - each institution gets a wallet with a
-  settlement-chain balance **and** cross-chain receive addresses
-  (Ethereum / Bitcoin / Solana) for bridging external assets in.
-- **Issuance & settlement with finality** - issue reserves to institutions,
-  settle institution-to-institution; transactions batch in the mempool and
-  finalize atomically when a block is produced (BFT).
-- **Cryptographic auditability** - get a **light-client balance proof** for any
-  wallet, re-verified against the chain's state root.
-- **EVM smart contracts** - build + **sign a real ERC-20 transfer** (e.g. USDC)
-  with a wallet's secp256k1 key, producing a raw tx ready for
-  `eth_sendRawTransaction`.
-- **Live ledger feed** - a server-streaming RPC pushes admissions / finalizations
-  to the console in real time.
+- **One BFT rail per currency.** `CreateChain` launches an instant finality
+  chain (for example "EURx") with a genesis reserve treasury.
+- **Institutional wallets.** `CreateWallet` gives each institution a
+  settlement balance and cross chain receive addresses on Ethereum, Bitcoin
+  and Solana derived from the same key, for bridging external assets in.
+- **Issuance and settlement with finality.** `IssueFunds` and `Settle` queue
+  transfers in the mempool; `ProduceBlock` finalizes them atomically in one
+  BFT round. Nothing is settled until it is final, and nothing final is ever
+  reverted.
+- **Auditable balances.** `GetBalanceProof` returns a light client state
+  inclusion proof for any wallet, re-verified against the chain's state
+  root.
+- **Real ERC-20 transfers.** `BuildErc20Transfer` ABI encodes and signs a
+  transfer (for example USDC) with the wallet's secp256k1 key; the raw
+  transaction is ready for `eth_sendRawTransaction`. `FunctionSelector`
+  shows the ABI selector computation.
+- **Live feed.** `StreamEvents` pushes admissions and finalizations to the
+  console as they happen; `GetMetrics` returns the Prometheus text.
+
+**Governance tab**
+
+- **A validator council.** The rail is governed by a BFT chain whose
+  validator set the operator rotates. `CouncilAction(COUNCIL_ADD_VALIDATOR)`
+  schedules the next set; the next block announces it and is certified by
+  the current set, so the change is itself finalized and the new set rules
+  from the following block.
+- **An auditor light client.** `COUNCIL_AUDITOR_SYNC` runs a light client
+  that only ever trusted the genesis set. It accepts a far header when that
+  header's own set certifies it and the signers hold more than a third of
+  the set it trusts (the overlap rule), bisecting through rotation headers
+  when the overlap is too thin. `GetCouncil` returns the set in force, the
+  auditor's trusted height and a step log, which the tab renders.
 
 ## Run
 
 ```bash
-# 1. Build the aviary host library
+# 1. Build the Aviary host library (once, from the repository root)
 ( cd ../.. && cmake -S . -B build && cmake --build build )
 
-# 2. Start the server + console (macOS desktop, iOS sim, or Android)
-./run.sh                 # defaults to -d macos
-./run.sh -d <device-id>  # e.g. an iOS simulator (reaches the host's localhost)
+# 2. Start the server and the console
+./run.sh                 # macOS desktop
+./run.sh -d <device-id>  # an iOS simulator reaches the host's localhost directly
 ```
 
 Or separately: `( cd server && go run . )` then `( cd app && flutter run )`.
+The server listens on `:50051`.
 
-## API
+## Where to look
 
-`proto/atlas.proto` - `Atlas` service: CreateChain, CreateWallet, IssueFunds,
-Settle, ProduceBlock, GetBalanceProof, BuildErc20Transfer, FunctionSelector,
-GetMetrics, and `StreamEvents` (server-streaming). The server (`server/`) uses the
-Aviary Go binding; the client (`app/`) uses generated grpc-dart stubs.
-
-## Governance tab (validator rotation + auditor light client)
-
-The settlement rail is governed by a **validator council** - a BFT chain whose
-validator set the operator rotates: `CouncilAction(COUNCIL_ADD_VALIDATOR)`
-schedules the next set, the next block **announces** it and is certified by the
-*current* set, so the change is itself finalized and the new set rules from the
-following block. `COUNCIL_AUDITOR_SYNC` runs an **auditor light client** that
-only ever trusted the genesis set: it accepts a far header when that header's
-own set certifies it *and* the signers hold more than 1/3 of the set the auditor
-trusts (the overlap rule), bisecting through rotation headers when the overlap is
-too thin - no header replay. `GetCouncil` returns the set in force, the auditor's
-trusted height and a step log; the app shows it all on the **Governance** tab.
+| Piece | Path |
+|---|---|
+| Service definition | `proto/atlas.proto` (`Atlas` service) |
+| Chains, wallets, settlement, proofs, ERC-20 | `server/server.go` |
+| Council rotation and the auditor light client | `server/council.go` |
+| Operator console (Settlement and Governance tabs) | `app/lib/main.dart` |
+| Generated stubs | `server/gen`, `app/lib/gen` |

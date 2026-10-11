@@ -1,68 +1,72 @@
-# Sentinel - Device Provenance Ledger
+# Sentinel: a device provenance ledger
 
-A tamper-evident **provenance ledger for device-captured data**, built on
-Aviary with a **Go gRPC server** and a **Flutter device recorder**.
+Sentinel is a tamper evident provenance ledger for data captured by devices:
+bodycam and dashcam footage, field sensor readings, supply chain telemetry,
+mobile device attestation. A Go gRPC server runs the chains through the Go
+binding; a Flutter recorder streams data to it and holds no native code.
 
 ```
-Flutter recorder --gRPC (bidi stream)-->  Go server  --cgo-->  Aviary (C++ core)
+Flutter recorder  --gRPC (bidi stream)-->  Go server (:50052)  --cgo-->  Aviary (C++ core)
 ```
 
-A device **enrolls** by sending its hardware info + a credential; the server derives
-a chain whose **genesis/origin block is cryptographically bound to that exact device**
-(its on-chain birth certificate). The device then **streams data** - photos, video
-chunks, GPS locations, sensor readings - and each item's BLAKE3 content hash is
-**anchored** on the device's own chain with BFT finality. The raw media never goes
-on-chain; only its hash + metadata are anchored, so anyone can later prove a given
-photo/clip/reading **existed at a point in time and has not been altered**.
+## What it shows
 
-Real use cases: bodycam/dashcam evidence integrity, field-sensor audit trails,
-supply-chain telemetry, mobile-device attestation.
+**Recorder tab**
 
-## How anchoring works (no special on-chain opcode needed)
+- **A chain born from the device.** `ProvisionDevice` takes the hardware
+  info and a credential and derives a chain whose genesis is bound to that
+  exact device: its on-chain birth certificate.
+- **Anchoring with finality.** The device streams photos, video chunks, GPS
+  locations and sensor readings over `StreamData`. Each item's BLAKE3
+  content hash is anchored on the device's chain and the server streams back
+  an `AnchorReceipt` that moves from pending to finalized when the BFT
+  block seals. Raw media never goes on chain; only the hash and metadata do.
+- **Proof of existence.** `VerifyRecord` re-hashes the original bytes and
+  checks a light client state inclusion proof against the chain root, which
+  proves the item existed at that point and has not been altered.
+- **Ledger view.** `GetLedger` returns the height, the record counts by kind
+  and the state root.
 
-Anchoring reuses the account state machine: the server submits a 1-unit transfer
-whose **recipient address *is* the data's 32-byte BLAKE3 hash**. After a block seals,
-the chain state contains an account at `address = hash`, and a **light-client
-state-inclusion proof** for that address proves the data was anchored. Verification
-re-hashes the original bytes and checks the proof against the chain root.
+Anchoring needs no special opcode: the server submits a one unit transfer
+whose recipient address is the data's 32 byte hash. After the block seals,
+the chain state holds an account at that address, and the ordinary account
+proof proves the anchor. Media hashes are `BLAKE3(payload)`, so anyone can
+recompute them from the file; location and sensor records hash their
+canonical metadata (sorted keys, deterministic bytes).
 
-- Media (`PHOTO`/`VIDEO`): the anchored hash is `BLAKE3(payload)` - independently
-  recomputable by hashing the file.
-- `LOCATION`/`SENSOR`: the anchored hash is `BLAKE3(canonical metadata)` (sorted
-  keys -> deterministic).
+**Fleet tab**
 
-## RPCs (`proto/sentinel.proto`)
-
-| RPC | Purpose |
-|---|---|
-| `ProvisionDevice` | Device info + credential -> genesis/origin block; returns the device chain |
-| `StreamData` (bidi stream) | Device streams `DataRecord`s; server streams back `AnchorReceipt`s (pending -> finalized) |
-| `VerifyRecord` | Prove a content hash is committed in the chain (anchored + verified) |
-| `GetLedger` | Height, record counts by kind, state root |
+- **A fleet as a chain tree.** `BuildFleet(labels)` declares a root chain
+  plus one BFT subchain per device, each funding an identity account at
+  `BLAKE3(label)`, and builds the whole tree at once.
+- **Anchoring upward.** `FleetProduce(chain)` finalizes a block on a device
+  chain or on the root; a root block anchors every device's finalized
+  headers.
+- **Cross chain proof.** `FleetProveDevice(chain)` proves a device's identity
+  from the fleet root header, verified against the root's subchain root.
 
 ## Run
 
 ```bash
-# 1. Build the aviary host library
+# 1. Build the Aviary host library (once, from the repository root)
 ( cd ../.. && cmake -S . -B build && cmake --build build )
 
-# 2. Start the server + recorder (macOS desktop, iOS sim, or Android)
-./run.sh                 # defaults to -d macos
-./run.sh -d <device-id>  # e.g. an iOS simulator (reaches the host's 127.0.0.1)
+# 2. Start the server and the recorder
+./run.sh                 # macOS desktop
+./run.sh -d <device-id>  # an iOS simulator reaches the host's 127.0.0.1 directly
 
-# Quick end-to-end check without Flutter (provision -> stream -> verify):
+# End to end without Flutter: provision, stream, verify
 ( cd server && go run ./cmd/probe )
 ```
 
-The server listens on `:50052`. The Flutter client is a thin gRPC client (no native
-blockchain code), so it runs anywhere grpc-dart does; all ledger work is server-side.
+The server listens on `:50052`.
 
-## Fleet tab (chain tree: a fleet root anchoring one subchain per device)
+## Where to look
 
-`BuildFleet(labels)` declares the whole fleet at once - a root chain plus a BFT
-**subchain per device** whose genesis funds an identity account at
-`BLAKE3(label)` - and builds it in one go (genesis bottom-up, bindings top-down).
-`FleetProduce(chain)` finalizes a block on a device chain or on the root; a root
-block **anchors** every device's finalized headers. `FleetProveDevice(chain)` is
-a cross-chain proof of the device's identity **from the fleet root header**,
-verified against its `subchain_root`. The app's **Fleet** tab drives it.
+| Piece | Path |
+|---|---|
+| Service definition | `proto/sentinel.proto` |
+| Provisioning, anchoring, receipts, verification | `server/server.go` |
+| Fleet chain tree | `server/fleet.go` |
+| Headless end to end check | `server/cmd/probe/main.go` |
+| Recorder and Fleet tabs | `app/lib/main.dart` |

@@ -1,43 +1,56 @@
-# Aviary demo (Flutter)
+# Aviary dashboard (Flutter)
 
-A desktop Flutter dashboard that drives the **entire** Aviary stack through
-the C ABI - one screen showing every capability live:
+A desktop Flutter app that drives the entire engine directly through the
+Dart binding, with no server: one screen showing every capability live.
 
-- **Chain creation** - an in-memory single-validator account chain; funds Alice.
-- **Transactions & consensus** - send Alice -> Bob, then produce + finalize a block
-  (BFT instant finality). "Auto-mine" finalizes blocks as transactions arrive.
-- **Live event stream** - BlockFinalized / TxAdmitted / TxRemoved events streamed
-  off the chain's event bus as they happen.
-- **Observability** - Prometheus metrics (height, blocks, transactions, mempool)
-  updating live.
-- **Verification** - a light-client state-inclusion proof for Alice, verified
-  against the chain's state root.
-- **Multi-chain interop** - Ethereum, Bitcoin, and Solana addresses derived from
-  keys by the in-process interop layer.
+## What it shows
 
-The Flutter UI calls the high-level Dart binding
-(`package:aviary_dart/aviary.dart`), which marshals over the C ABI
-(`libaviary_c`) into the C++ core.
+- **Chain and accounts.** An in-memory single validator account chain with
+  Alice funded at start.
+- **Transactions and consensus.** Send from Alice to Bob, then produce and
+  finalize a block in one BFT round. "Auto-mine" finalizes a block as soon as
+  a transaction arrives.
+- **Live event stream.** `BlockFinalized`, `TxAdmitted` and `TxRemoved`
+  events arrive through the typed event stream as they happen.
+- **Metrics.** Height, blocks, transactions and mempool size from the
+  Prometheus text, updating live.
+- **Prove and verify.** A light client state inclusion proof for Alice,
+  verified against the chain's state root; a tampered proof fails.
+- **Interop addresses.** Ethereum, Bitcoin and Solana addresses derived
+  from Alice's key by the in-process interop layer.
+- **Mixture demo.** Assembles PoS and PoW chains from blueprints and commits
+  a block on each, then shows the fail closed rejects.
+- **Subchain demo.** A BFT child anchored by a parent and a cross chain
+  proof verified from the parent header.
+- **Membership demo.** Anonymous credentials: issue, present, admit, the
+  pseudonymous Sybil cap and revocation.
 
-## Run it
+## Run
 
-1. Build the native library from the repo root:
-   `cd ../.. && cmake -S . -B build && cmake --build build`
-   (Prereq: cryptolib's `cryptolib_c` built - see the top-level README.)
-2. Run on macOS desktop:
-   `flutter pub get && flutter run -d macos`
+```bash
+# 1. Build the native library (once, from the repository root)
+( cd ../.. && cmake -S . -B build && cmake --build build )
 
-The app finds `libaviary_c.dylib` in the repo `build/` dir, or set
-`AVIARY_LIB`. The macOS sandbox is disabled here so the dev dylib loads by
-path; a production app would bundle the binary as a plugin.
+# 2. Run on macOS desktop
+flutter pub get && flutter run -d macos
+```
 
-## How it maps to the library
+The app resolves `aviary_dart` from this repository through
+`pubspec_overrides.yaml` and finds `libaviary_c.dylib` in the repository's
+`build/` directory, or wherever `AVIARY_DYLIB` points. The macOS sandbox is
+disabled in this example so the development dylib loads by path; a shipped
+app uses the `aviary_lite` or `aviary` plugin instead.
 
-| UI section | Library layer |
+## How the screen maps to the library
+
+| Section | Library |
 |---|---|
-| Chain / accounts | DemoNode -> Ledger + account StateMachine |
-| Produce block | BftEngine (BLS-aggregated commit) |
-| Live events | observe::EventBus |
-| Metrics | observe::MetricsRegistry (Prometheus) |
-| Prove & verify | prove_account + verify_state_proof (light client) |
-| Interop addresses | interop::evm / bitcoin / solana |
+| Chain and accounts | `Node`, `fundAccount`, `sendTo` |
+| Produce block | `commit` (BFT round with a BLS aggregated certificate) |
+| Live events | `eventStream` |
+| Metrics | `metricValues` |
+| Prove and verify | `proveAccount`, `verifyAccountProof` |
+| Interop addresses | `ethAddress`, `btcAddress`, `solAddress` |
+| Mixture demo | `makeBlueprint`, `commitBlueprint`, `assembleChain` |
+| Subchain demo | `commitSubchainPolicy`, `proposeAnchored`, `verifySubchainProof` |
+| Membership demo | `newBBSIssuer`, `makeCredentialPolicy`, `makeCredentialGate` |
