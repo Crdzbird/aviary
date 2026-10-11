@@ -8,40 +8,40 @@
 > `int` 1/0, inputs are borrowed const pointers.
 >
 > **Recommended upstream:** vendor **libsecp256k1** (bitcoin-core) for all EC
-> operations — audited, constant-time, includes RFC6979 deterministic nonces,
+> operations - audited, constant-time, includes RFC6979 deterministic nonces,
 > low-S normalization, and the public-key recovery module. Keccac-256 and
 > RIPEMD-160 are small standalone additions.
 
 ---
 
-## 1. secp256k1 ECDSA — EVM + Bitcoin signing
+## 1. secp256k1 ECDSA - EVM + Bitcoin signing
 
 ECDSA over secp256k1 signs a **32-byte message digest** (not the message). For
 Ethereum the signature must be **recoverable** (carry a recovery id `v`) and
 **low-S normalized** (EIP-2); Bitcoin also requires low-S (BIP-62).
 
 ```c
-/** secp256k1 keypair. sk = 32 bytes; pk = 65 bytes uncompressed (0x04 ‖ X ‖ Y). */
+/** secp256k1 keypair. sk = 32 bytes; pk = 65 bytes uncompressed (0x04 || X || Y). */
 CRYPTO_API CryptoKeyPair cryptolib_secp256k1_keygen(void);
 
 /** Derive the public key from a 32-byte secret key.
- *  compressed: 1 → 33 bytes (0x02/0x03 ‖ X), 0 → 65 bytes (0x04 ‖ X ‖ Y). */
+ *  compressed: 1 -> 33 bytes (0x02/0x03 || X), 0 -> 65 bytes (0x04 || X || Y). */
 CRYPTO_API CryptoBufferResult cryptolib_secp256k1_pubkey(
     const uint8_t* secret_key, size_t sk_len, int compressed);
 
 /** Sign a 32-byte digest. RFC6979 deterministic nonce, low-S normalized.
- *  Returns 65 bytes: r(32) ‖ s(32) ‖ recovery_id(1, value 0..3). */
+ *  Returns 65 bytes: r(32) || s(32) || recovery_id(1, value 0..3). */
 CRYPTO_API CryptoBufferResult cryptolib_secp256k1_sign(
     const uint8_t* digest32, const uint8_t* secret_key, size_t sk_len);
 
-/** Verify. sig is 64 bytes (r ‖ s); pk is 33 or 65 bytes. Returns 1 if valid. */
+/** Verify. sig is 64 bytes (r || s); pk is 33 or 65 bytes. Returns 1 if valid. */
 CRYPTO_API int cryptolib_secp256k1_verify(
     const uint8_t* digest32,
     const uint8_t* sig, size_t sig_len,
     const uint8_t* public_key, size_t pk_len);
 
 /** Recover the public key (65-byte uncompressed) from a 32-byte digest and a
- *  65-byte recoverable signature (r ‖ s ‖ recovery_id). This is Ethereum's
+ *  65-byte recoverable signature (r || s || recovery_id). This is Ethereum's
  *  ecrecover and is how a sender address is derived from a signed tx. */
 CRYPTO_API CryptoBufferResult cryptolib_secp256k1_recover(
     const uint8_t* digest32, const uint8_t* sig65);
@@ -55,17 +55,17 @@ Notes:
 - **Recovery id** for Ethereum: the tx `v` is derived from it (legacy:
   `v = recovery_id + 27`, or `recovery_id + 35 + 2*chain_id` for EIP-155).
 
-KAT (high confidence — the secp256k1 generator point):
-- `secret_key = 0x00…01` → uncompressed pubkey
+KAT (high confidence - the secp256k1 generator point):
+- `secret_key = 0x00...01` -> uncompressed pubkey
   `04 79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
       483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8`
 - For ECDSA sign/recover, validate against **libsecp256k1's own test suite** and
-  **RFC 6979 §A.2.5** (secp256k1, SHA-256) rather than a hand-picked vector.
+  **RFC 6979 section A.2.5** (secp256k1, SHA-256) rather than a hand-picked vector.
 
-## 2. Keccak-256 — Ethereum
+## 2. Keccak-256 - Ethereum
 
 Ethereum uses **original Keccak** (padding byte `0x01`), **not** NIST SHA3-256
-(padding `0x06`). They produce different outputs — this distinction is critical.
+(padding `0x06`). They produce different outputs - this distinction is critical.
 
 ```c
 /** Keccak-256 (original padding). 32-byte output. NOT NIST SHA3-256. */
@@ -79,7 +79,7 @@ KAT (verifiable, widely published):
 Used for: tx hashing, contract address derivation, ABI 4-byte selectors,
 event topic hashing, and EIP-55 address checksums.
 
-## 3. RIPEMD-160 — Bitcoin
+## 3. RIPEMD-160 - Bitcoin
 
 ```c
 /** RIPEMD-160. 20-byte output. */
@@ -101,7 +101,7 @@ Bitcoin `HASH160(x) = ripemd160(sha256(x))` composes from this + the existing
   (drop the `0x04` prefix). EIP-55 checksum via keccak256.
 - **Bitcoin P2PKH/P2WPKH** = `HASH160(compressed_pubkey)` + Base58Check / Bech32
   (aviary implements Base58/Bech32).
-- **RLP**, **ABI encoding**, **JSON-RPC** — all in aviary.
+- **RLP**, **ABI encoding**, **JSON-RPC** - all in aviary.
 
 ## Binding note
 
@@ -111,5 +111,5 @@ directly, so the C functions above are the only hard requirement.
 
 ## Priority
 
-`keccak256` + `secp256k1` (sign/pubkey/recover) unblock **EVM** — the highest-value
+`keccak256` + `secp256k1` (sign/pubkey/recover) unblock **EVM** - the highest-value
 target. `ripemd160` unblocks **Bitcoin** addresses. Solana needs none of this.

@@ -1,4 +1,4 @@
-# Go ↔ Flutter interoperability
+# Go <-> Flutter interoperability
 
 Proves the Aviary ledger is **byte-identical across language bindings**.
 A **Go** server (aviary Go binding, full node) and a **Flutter** client
@@ -7,12 +7,12 @@ three directions:
 
 | Direction | Check |
 |---|---|
-| **go ↔ flutter** | Both compute the **same canonical bytes** — BLAKE3 hash, canonical txid, block-header hash — for identical inputs. A mismatch would be a consensus fork between bindings. |
-| **go → flutter** | The Go node builds a chain and returns a light-client **proof**; the Flutter client **verifies it natively** against the state root. Both also apply the same deterministic scenario → **state roots must match**. |
-| **flutter → go** | The Flutter client produces a proof; the **Go node verifies it**. |
+| **go <-> flutter** | Both compute the **same canonical bytes** - BLAKE3 hash, canonical txid, block-header hash - for identical inputs. A mismatch would be a consensus fork between bindings. |
+| **go -> flutter** | The Go node builds a chain and returns a light-client **proof**; the Flutter client **verifies it natively** against the state root. Both also apply the same deterministic scenario -> **state roots must match**. |
+| **flutter -> go** | The Flutter client produces a proof; the **Go node verifies it**. |
 
 Determinism is exact because the scenario shares the account secrets, and Ed25519
-signatures are deterministic — so identical inputs ⇒ identical txids, state roots,
+signatures are deterministic - so identical inputs => identical txids, state roots,
 and proofs on both sides.
 
 ## Run
@@ -35,11 +35,11 @@ checks natively, and shows a green panel ("Ledger is byte-identical across Go an
 Flutter") when every check passes. `server/cmd/probe` runs the same checks
 Go-only.
 
-## Chain tree tab (Go ↔ Flutter, cross-chain proofs)
+## Chain tree tab (Go <-> Flutter, cross-chain proofs)
 
-Both sides build the **same family** — root ← child subchain ← grandchild, with
-validator keys derived from one seed — run the same production schedule, and
+Both sides build the **same family** - root <- child subchain <- grandchild, with
+validator keys derived from one seed - run the same production schedule, and
 compare: chain ids and the root's `subchain_root` must be byte-identical
-(**go ↔ flutter**); the client verifies Go's cross-chain proof natively
-(**go → flutter**, `BuildTree`); Go verifies the client's proof
-(**flutter → go**, `VerifyTreeProof`). Shown on the **Chain tree** tab.
+(**go <-> flutter**); the client verifies Go's cross-chain proof natively
+(**go -> flutter**, `BuildTree`); Go verifies the client's proof
+(**flutter -> go**, `VerifyTreeProof`). Shown on the **Chain tree** tab.

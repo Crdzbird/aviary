@@ -1,6 +1,6 @@
 # aviary (Node.js)
 
-Aviary for Node.js via [koffi](https://koffi.dev) FFI — a full DLT (ledger,
+Aviary for Node.js via [koffi](https://koffi.dev) FFI - a full DLT (ledger,
 BFT consensus, mempool, observability, light-client verification) plus
 EVM/Bitcoin/Solana interop.
 
@@ -15,8 +15,8 @@ const a = node.newAccount();
 const b = node.newAccount();
 node.credit(a.address, 1_000_000n);
 node.submitTransfer(a.secret, b.address, 250_000n, node.nonce(a.address));
-node.produceBlock(1n);              // → 1  (finalized)
-node.balance(b.address);           // → 250000
+node.produceBlock(1n);              // -> 1  (finalized)
+node.balance(b.address);           // -> 250000
 
 // Light-client proof
 bc.verifyStateProof(node.stateRoot(), node.proveAccount(b.address)); // true
@@ -31,7 +31,7 @@ bc.signLegacyTx({ to, value: 0n, data: bc.erc20TransferCalldata(to, 1n), secret 
 `preload()` spawns a short-lived `worker_thread` that loads the shared libraries
 and runs the one-time crypto-backend init. Because `dlopen` mapping + backend
 init are process-global, this warms the path for the main thread's later lazy
-load — the first synchronous call then pays no load cost. It is **optional and
+load - the first synchronous call then pays no load cost. It is **optional and
 fire-and-forget**: the synchronous API works identically whether or not you call
 it, and never requires `await`.
 

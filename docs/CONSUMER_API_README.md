@@ -1,6 +1,6 @@
 # Aviary API
 
-A small, production-shaped **HTTP/JSON API** over [Aviary](https://github.com/Crdzbird/aviary) —
+A small, production-shaped **HTTP/JSON API** over [Aviary](https://github.com/Crdzbird/aviary) - 
 a distributed-ledger core (ledger, BFT consensus, mempool, observability,
 light-client verification) plus EVM/Bitcoin/Solana interop. This service embeds
 the Aviary **Go binding** (cgo) and exposes it as a stateless-ish REST API:
@@ -8,22 +8,22 @@ create chains, manage accounts, submit transfers, finalize blocks, serve
 light-client proofs, and derive/sign cross-chain transactions.
 
 ```
-HTTP client ──REST/JSON──▶ aviary-api (Go) ──cgo──▶ libaviary_c
-                                                            └─▶ libcryptolib_c
+HTTP client --REST/JSON--> aviary-api (Go) --cgo--> libaviary_c
+                                                            `--> libcryptolib_c
 ```
 
 ---
 
 ## Features
 
-- **Chains & accounts** — create in-memory chains, generate Ed25519 accounts.
-- **Transactions & finality** — submit signed transfers, produce blocks (BFT).
-- **Light-client proofs** — state-inclusion / tx-inclusion / commit verification.
-- **Observability** — per-chain event stream + Prometheus metrics; service-level
+- **Chains & accounts** - create in-memory chains, generate Ed25519 accounts.
+- **Transactions & finality** - submit signed transfers, produce blocks (BFT).
+- **Light-client proofs** - state-inclusion / tx-inclusion / commit verification.
+- **Observability** - per-chain event stream + Prometheus metrics; service-level
   `/metrics` and health probes.
-- **Interop** — derive Ethereum / Bitcoin / Solana addresses; build + **sign
+- **Interop** - derive Ethereum / Bitcoin / Solana addresses; build + **sign
   ERC-20 / legacy EVM transactions** server-side.
-- **Deterministic** — canonical bytes (hash, txid, header hash) are byte-identical
+- **Deterministic** - canonical bytes (hash, txid, header hash) are byte-identical
   to every other Aviary binding (Dart/Flutter, Node, Swift).
 
 ---
@@ -33,7 +33,7 @@ HTTP client ──REST/JSON──▶ aviary-api (Go) ──cgo──▶ libaviar
 | | |
 |---|---|
 | Go | 1.24+ |
-| cgo | **`CGO_ENABLED=1`** (default unless cross-compiling) — this service links C |
+| cgo | **`CGO_ENABLED=1`** (default unless cross-compiling) - this service links C |
 | Toolchain | a C/C++ toolchain (clang/gcc) and `cmake`/`ninja` to build the native libs |
 | Native libs | `libaviary_c` + `libcryptolib_c` (built once; see below) |
 
@@ -44,9 +44,9 @@ Lay the repos out side by side:
 
 ```
 ~/code/
-├── aviary/        # github.com/Crdzbird/aviary
-├── cryptolib/           # the cryptolib repo (private/sibling)
-└── aviary-api/    # THIS service
+|-- aviary/        # github.com/Crdzbird/aviary
+|-- cryptolib/           # the cryptolib repo (private/sibling)
+`-- aviary-api/    # THIS service
 ```
 
 ---
@@ -129,29 +129,29 @@ addressed by its `chainId` (uint64).
 
 ### Chains & accounts
 
-| Method | Path | Body → Response |
+| Method | Path | Body -> Response |
 |---|---|---|
-| `POST` | `/v1/chains` | `{chainId}` → `{chainId}` |
-| `GET`  | `/v1/chains/{chainId}` | → `{height, mempool, stateRoot}` |
-| `POST` | `/v1/chains/{chainId}/accounts` | → `{secret, publicKey, address}` (hex) |
-| `POST` | `/v1/chains/{chainId}/credit` | `{address, amount}` → `204` *(genesis only, before the first block)* |
-| `GET`  | `/v1/chains/{chainId}/accounts/{address}` | → `{balance, nonce}` |
+| `POST` | `/v1/chains` | `{chainId}` -> `{chainId}` |
+| `GET`  | `/v1/chains/{chainId}` | -> `{height, mempool, stateRoot}` |
+| `POST` | `/v1/chains/{chainId}/accounts` | -> `{secret, publicKey, address}` (hex) |
+| `POST` | `/v1/chains/{chainId}/credit` | `{address, amount}` -> `204` *(genesis only, before the first block)* |
+| `GET`  | `/v1/chains/{chainId}/accounts/{address}` | -> `{balance, nonce}` |
 
 ### Transactions & finality
 
-| Method | Path | Body → Response |
+| Method | Path | Body -> Response |
 |---|---|---|
-| `POST` | `/v1/chains/{chainId}/transfers` | `{secret, to, amount, nonce}` → `{txid}` |
-| `POST` | `/v1/chains/{chainId}/blocks` | `{timestamp}` → `{height, stateRoot}` |
+| `POST` | `/v1/chains/{chainId}/transfers` | `{secret, to, amount, nonce}` -> `{txid}` |
+| `POST` | `/v1/chains/{chainId}/blocks` | `{timestamp}` -> `{height, stateRoot}` |
 
 ### Proofs & verification
 
-| Method | Path | Body → Response |
+| Method | Path | Body -> Response |
 |---|---|---|
-| `GET`  | `/v1/chains/{chainId}/accounts/{address}/proof` | → `{stateRoot, proof, verified}` |
-| `POST` | `/v1/verify/state` | `{stateRoot, proof}` → `{ok}` |
-| `POST` | `/v1/verify/tx` | `{txRoot, proof}` → `{ok}` |
-| `POST` | `/v1/verify/commit` | `{chainId, validatorSet, cert}` → `{ok}` |
+| `GET`  | `/v1/chains/{chainId}/accounts/{address}/proof` | -> `{stateRoot, proof, verified}` |
+| `POST` | `/v1/verify/state` | `{stateRoot, proof}` -> `{ok}` |
+| `POST` | `/v1/verify/tx` | `{txRoot, proof}` -> `{ok}` |
+| `POST` | `/v1/verify/commit` | `{chainId, validatorSet, cert}` -> `{ok}` |
 
 ### Observability
 
@@ -162,11 +162,11 @@ addressed by its `chainId` (uint64).
 
 ### Interop (addresses + EVM contracts)
 
-| Method | Path | Body → Response |
+| Method | Path | Body -> Response |
 |---|---|---|
-| `POST` | `/v1/interop/addresses` | `{secret}` → `{eth, btc, sol}` |
-| `POST` | `/v1/interop/eth/selector` | `{signature}` → `{selector}` |
-| `POST` | `/v1/interop/eth/erc20-transfer` | `{token, to, amount, nonce, gasPrice, gasLimit, chainId, secret}` → `{rawTx, calldata}` |
+| `POST` | `/v1/interop/addresses` | `{secret}` -> `{eth, btc, sol}` |
+| `POST` | `/v1/interop/eth/selector` | `{signature}` -> `{selector}` |
+| `POST` | `/v1/interop/eth/erc20-transfer` | `{token, to, amount, nonce, gasPrice, gasLimit, chainId, secret}` -> `{rawTx, calldata}` |
 
 ### Examples
 
@@ -180,15 +180,15 @@ ALICE_SECRET=$(jq -r .secret <<<"$ACC"); ALICE=$(jq -r .address <<<"$ACC")
 curl -s -XPOST localhost:8080/v1/chains/42/credit   -d "{\"address\":\"$ALICE\",\"amount\":1000000}"
 curl -s -XPOST localhost:8080/v1/chains/42/transfers -d "{\"secret\":\"$ALICE_SECRET\",\"to\":\"$BOB\",\"amount\":250000,\"nonce\":0}"
 curl -s -XPOST localhost:8080/v1/chains/42/blocks    -d '{"timestamp":1}'
-# {"height":1,"stateRoot":"7d7f97bc…"}
+# {"height":1,"stateRoot":"7d7f97bc..."}
 
 # light-client proof (server verifies it for you)
 curl -s localhost:8080/v1/chains/42/accounts/$BOB/proof
-# {"stateRoot":"7d7f97bc…","proof":"…","verified":true}
+# {"stateRoot":"7d7f97bc...","proof":"...","verified":true}
 
 # sign an ERC-20 transfer (USDC), ready for eth_sendRawTransaction
 curl -s -XPOST localhost:8080/v1/interop/eth/erc20-transfer \
-  -d '{"token":"0xA0b8…","to":"0x…","amount":250000000,"nonce":0,"gasPrice":30000000000,"gasLimit":60000,"chainId":1,"secret":"…"}'
+  -d '{"token":"0xA0b8...","to":"0x...","amount":250000000,"nonce":0,"gasPrice":30000000000,"gasLimit":60000,"chainId":1,"secret":"..."}'
 ```
 
 ---
@@ -196,7 +196,7 @@ curl -s -XPOST localhost:8080/v1/interop/eth/erc20-transfer \
 ## Wiring it up (handler sketch)
 
 The binding self-initializes on first use; call `Preload()` at startup to warm
-it off the request path. **Each node is not safe for concurrent use** — guard it
+it off the request path. **Each node is not safe for concurrent use** - guard it
 with a mutex (one per chain).
 
 ```go
@@ -231,7 +231,7 @@ func main() {
 		})
 	})
 	mux.HandleFunc("POST /v1/chains/{id}/blocks", s.produceBlock)
-	// … register the rest …
+	// ... register the rest ...
 
 	http.ListenAndServe(":8080", mux)
 }
@@ -241,7 +241,7 @@ func (s *server) produceBlock(w http.ResponseWriter, r *http.Request) {
 	c.mu.Lock()                   // serialize all native calls on this node
 	defer c.mu.Unlock()
 	height, err := c.node.ProduceBlock(timestamp(r))
-	// … marshal {height, stateRoot:hex(c.node.StateRoot())} …
+	// ... marshal {height, stateRoot:hex(c.node.StateRoot())} ...
 }
 ```
 
@@ -250,7 +250,7 @@ func (s *server) produceBlock(w http.ResponseWriter, r *http.Request) {
 > parallel. Never share a node pointer across a write without the lock.
 
 > **Genesis ordering:** `Credit` is only valid **before the first block and
-> before any state read** on a fresh chain — the node's lazy genesis is finalized
+> before any state read** on a fresh chain - the node's lazy genesis is finalized
 > by the first read (`Height`/`Balance`/`StateRoot`) or block, after which credits
 > are silently dropped. So fund all genesis accounts first, then read/produce
 > blocks; afterwards, fund via `transfers`. The ledger layer enforces this:
@@ -269,7 +269,7 @@ CGO_ENABLED=1 go build -o aviary-api ./cmd/server
 Ship `libaviary_c` + `libcryptolib_c` alongside, or rely on the baked dev
 rpaths / set `LD_LIBRARY_PATH`.
 
-### Static (recommended for containers) — one self-contained binary
+### Static (recommended for containers) - one self-contained binary
 
 Build the merged static archives once, then link them in:
 
@@ -281,12 +281,12 @@ CGO_ENABLED=1 go build -tags "aviary_static cryptolib_static" -o aviary-api ./cm
 ```
 
 The result has **no `libaviary_c` / `libcryptolib_c` shared-library
-dependency** — nothing to ship, no rpath, no `LD_LIBRARY_PATH` (only the system
+dependency** - nothing to ship, no rpath, no `LD_LIBRARY_PATH` (only the system
 C++ runtime). Verify:
 
 ```bash
-otool -L aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ✓"   # macOS
-ldd      aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ✓"   # Linux
+otool -L aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ok"   # macOS
+ldd      aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ok"   # Linux
 ```
 
 ### Docker (multi-stage, static)
@@ -312,13 +312,13 @@ ENTRYPOINT ["aviary-api"]
 
 ```
 aviary-api/
-├── cmd/server/main.go     # wiring, http.Server, graceful shutdown
-├── internal/api/          # handlers, routing, request/response types
-├── internal/ledger/       # thin service over *bc.Node (mutex-guarded registry)
-├── internal/obs/          # Prometheus, structured logging
-├── go.mod
-├── Makefile
-└── README.md
+|-- cmd/server/main.go     # wiring, http.Server, graceful shutdown
+|-- internal/api/          # handlers, routing, request/response types
+|-- internal/ledger/       # thin service over *bc.Node (mutex-guarded registry)
+|-- internal/obs/          # Prometheus, structured logging
+|-- go.mod
+|-- Makefile
+`-- README.md
 ```
 
 ---
@@ -327,7 +327,7 @@ aviary-api/
 
 - **Determinism is consensus.** The canonical bytes this service returns (txids,
   state roots, header hashes) are byte-identical across every Aviary
-  binding — don't post-process them; pass them through verbatim.
+  binding - don't post-process them; pass them through verbatim.
 - **Secrets.** Transfer/signing endpoints accept raw private keys for demo
   ergonomics. In production, keep keys server-side (a custodial keyring or HSM)
   and never accept or log them over the wire.

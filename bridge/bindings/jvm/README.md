@@ -1,8 +1,8 @@
 # Aviary JVM binding (Java / Kotlin)
 
 A Java Foreign Function & Memory (FFM / Panama) binding over the Aviary C
-ABI. Drives the full node — create a chain, accounts, transfers, produce blocks
-(BFT), stream events, read metrics, verify light-client proofs — plus
+ABI. Drives the full node - create a chain, accounts, transfers, produce blocks
+(BFT), stream events, read metrics, verify light-client proofs - plus
 EVM/Bitcoin/Solana interop. Callable from **Java and Kotlin**.
 
 Requires JDK 22+ (FFM is stable since 22).
@@ -29,9 +29,9 @@ automatically; a packaged JAR should ship both natives side by side.
 
 ## Surface
 
-`Aviary` (AutoCloseable) → `version`, `cryptoBackend`, `createNode`,
+`Aviary` (AutoCloseable) -> `version`, `cryptoBackend`, `createNode`,
 `ethAddress`/`btcAddress`/`solAddress`, `verifyStateProof`. `Aviary.Node`
-→ `newAccount`, `credit`, `submitTransfer`, `produceBlock`, `height`/`balance`/
+-> `newAccount`, `credit`, `submitTransfer`, `produceBlock`, `height`/`balance`/
 `nonce`/`mempoolSize`, `stateRoot`, `drainEvents`, `metrics`, `proveAccount`.
 
 ## Events, persistence, custody signing and networking

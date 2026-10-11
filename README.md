@@ -1,31 +1,29 @@
 # Aviary
 
-A **C++** distributed-ledger toolkit — build custom chains, run them privately or
-permissionlessly, connect to other chains, and stream/observe/verify everything —
-exposed through a **C ABI** with Dart, Go, npm, Swift and JVM bindings. All
-cryptography comes from [CipherBird](https://github.com/Crdzbird/CipherBird)
-(formerly cryptolib, still at `../cryptolib` locally); consensus logic lives once,
-in C++, and the bindings only marshal.
+A C++20 distributed ledger toolkit: build custom chains, run them privately
+or permissionlessly, connect them to other chains, and stream, observe and
+verify everything. One C ABI carries the whole engine to Dart, Flutter, Go,
+npm, JVM and Swift; consensus logic lives once, in C++, and the bindings only
+marshal. All cryptography comes from
+[CipherBird](https://github.com/Crdzbird/CipherBird), the sibling library
+checked out at `../cryptolib`.
 
-> Status: **M0–M2 complete + M3 networking core.** A canonical codec, Merkle
-> tree, block/tx model with Ed25519 signing, pluggable account **and** UTXO state
-> machines, a single-node validate/apply pipeline, a Tendermint-style BFT engine
-> with BLS-aggregated commit certificates and deterministic instant finality, and
-> a networking core (mempool, wire protocol, a PQ-hybrid forward-secret secure
-> session, and two-node gossip + sync), an observability core (typed event bus,
-> Prometheus metrics, structured logging), and a verification core (light client,
-> state + transaction inclusion proofs, C-ABI verification) — all in C++, with
-> golden vectors (including state-proof verification) round-tripping identically
-> through C++, Dart, and Go, and sanitizer-clean fuzzed decoders. Plus EVM interop,
-> read and write (Keccak-256/secp256k1 via CipherBird, RLP, EIP-155 transaction
-> signing + ecrecover, ABI encoding, and a JSON-RPC `eth_*` client over a
-> pluggable transport), Solana transfers (Ed25519, Base58, message format + RPC
-> client), and Bitcoin (Base58Check, Bech32, P2PKH/P2WPKH addresses + BIP143
-> SegWit transaction signing) — all validated against real on-chain vectors, plus a
-> federated cross-chain bridge (BLS-attested lock-mint / burn-release). See
-> [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and roadmap,
+> Status: the core is complete through BFT finality with BLS commit
+> certificates, account and UTXO state machines, composable chains (engine,
+> state model and proposer mixtures, foreign components written in the
+> binding language), subchains with cross chain proofs, validator rotation,
+> light clients with the overlap rule and bisection, chain trees, a networked
+> node over an application owned transport with post quantum hybrid secure
+> sessions, custody (key stores, portable and threshold accounts), assurance
+> postures, sealed mempools, anonymous membership credentials, checkpointed
+> snapshots, typed events and Prometheus metrics. Golden vectors round trip
+> identically through C++, Dart and Go, the decoders are fuzzed, and the
+> shipped engines are trimmed (Linux 7 MB, Android 6 MB). EVM, Solana and
+> Bitcoin interop (addresses, transfers, signatures, RPC clients) is
+> validated against real on-chain vectors. See
+> [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design,
 > [`docs/CODEC_SPEC.md`](docs/CODEC_SPEC.md) for the canonical codec, and
-> [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md) for the deferred-work backlog.
+> [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md) for the running backlog.
 
 ## Layout
 

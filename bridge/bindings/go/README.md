@@ -1,4 +1,4 @@
-# Aviary — Go binding
+# Aviary - Go binding
 
 Idiomatic Go bindings for Aviary, a distributed-ledger core (ledger, BFT
 consensus, mempool, observability, light-client verification) plus
@@ -8,7 +8,7 @@ EVM/Bitcoin/Solana interop, over a stable C ABI (`libaviary_c`) via cgo.
 import bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 
 func main() {
-    bc.Preload()                 // optional background warm-up — returns at once
+    bc.Preload()                 // optional background warm-up - returns at once
 
     node := bc.NewNode(1)        // self-initializes; no Init() needed
     defer node.Free()
@@ -16,34 +16,34 @@ func main() {
     _, _, bAddr, _ := node.NewAccount()
     node.Credit(aAddr, 1_000_000)
     node.SubmitTransfer(aSec, bAddr, 250_000, node.Nonce(aAddr))
-    node.ProduceBlock(1)         // BFT finalize → height 1
+    node.ProduceBlock(1)         // BFT finalize -> height 1
 
     // Light-client proof
     bc.VerifyStateProof(node.StateRoot(), node.ProveAccount(bAddr)) // true
 }
 ```
 
-## Initialization — lazy, with an optional background warm-up
+## Initialization - lazy, with an optional background warm-up
 
 The native backend initializes **lazily on first use**, so you never have to
 remember `Init()`. To move that one-time work off the calling goroutine, call
-`Preload()` near program start — the Go analog of the Flutter/Node fire-and-forget
+`Preload()` near program start - the Go analog of the Flutter/Node fire-and-forget
 preload:
 
 | API | Blocks? | Use |
 |---|---|---|
 | `bc.Preload()` | no | Background warm-up (`go ensure()`); returns immediately. |
-| `bc.NewNode(...)` / `bc.Hash(...)` / … | no | Self-initializing; works with or without `Preload()`. |
+| `bc.NewNode(...)` / `bc.Hash(...)` / ... | no | Self-initializing; works with or without `Preload()`. |
 | `bc.Init() error` | yes (once) | Optional; runs init synchronously and surfaces any error. |
-| `bc.Initialized() bool` | — | `true` once the backend is ready. |
+| `bc.Initialized() bool` | - | `true` once the backend is ready. |
 
-`aviary_init` → `cryptolib_init`, which is idempotent; init runs exactly
+`aviary_init` -> `cryptolib_init`, which is idempotent; init runs exactly
 once (`sync.Once`), concurrency-safe.
 
 ## Crypto backend: cryptolib (depended on, not bundled)
 
 Aviary's crypto backend is **cryptolib**, whose Go binding is a dependency
-of this module — so the full crypto surface (hashing, AEAD, Ed25519/X25519,
+of this module - so the full crypto surface (hashing, AEAD, Ed25519/X25519,
 post-quantum ML-KEM/ML-DSA, BLS, vaults, keyring, EVM/Bitcoin primitives) is
 available alongside the ledger, from one `go get`:
 
@@ -67,14 +67,14 @@ version (`3.0.0`), proving the link end to end.
 
 Requires `CGO_ENABLED=1` and the prebuilt native libraries.
 
-- **Local (default)** — `cgo_local.go` links `libaviary_c` from the repo
+- **Local (default)** - `cgo_local.go` links `libaviary_c` from the repo
   `build/` dir and bakes an rpath to it; cryptolib's own Go binding bakes the
   rpath to its `build/release`. So in-repo binaries run with no environment
-  setup — just check out `cryptolib` next to `aviary`.
-- **Static (`-tags "aviary_static cryptolib_static"`)** — the "just works
+  setup - just check out `cryptolib` next to `aviary`.
+- **Static (`-tags "aviary_static cryptolib_static"`)** - the "just works
   everywhere" option: links the merged `build/static/libaviary_c.a` plus
   cryptolib's static archive. The binary has **no `libaviary_c` /
-  `libcryptolib_c` shared-library dependency** — nothing to ship, no rpath, no
+  `libcryptolib_c` shared-library dependency** - nothing to ship, no rpath, no
   `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`. Build the archives once:
 
   ```bash
@@ -82,7 +82,7 @@ Requires `CGO_ENABLED=1` and the prebuilt native libraries.
   scripts/build_static_archive.sh                          # aviary archive
   ( cd bridge/bindings/go && go build -tags "aviary_static cryptolib_static" ./... )
   ```
-- **Installed (`-tags aviary_pkgconfig`)** — resolves flags from a
+- **Installed (`-tags aviary_pkgconfig`)** - resolves flags from a
   `aviary_c.pc` on `PKG_CONFIG_PATH` (template: `aviary_c.pc.in`).
   Set `CGO_LDFLAGS`/`DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH` to your install.
 
