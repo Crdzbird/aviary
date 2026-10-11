@@ -1521,6 +1521,9 @@ selectors — validated against real-world vectors). Deferred:
   an ecmult window of 12 and a 22 KiB generator table on Linux, Android and
   iOS. Android libcrypto text 3.7 MB to 1.8 MB, libsecp256k1 1.34 MB to
   0.36 MB. Documented in CipherBird's `docs/SELF_CONTAINMENT.md`.
+  One trap: OpenSSL's configure cascades `no-cmac` into `no-siv`, which takes
+  AES-GCM-SIV with it and broke every sealing path on the first Linux run;
+  CMAC stays in.
 - **[x] Aviary CMake:** `AVIARY_LTO` (default on when the test suite is off,
   so for every distribution build) applies interprocedural optimization to
   the core and the C ABI library; `AVIARY_GC_SECTIONS` (default on) compiles
@@ -1529,7 +1532,7 @@ selectors — validated against real-world vectors). Deferred:
   added to the Native Linux apt list) so LTO and identical code folding apply
   there too. The default is computed after the cross compile block that forces
   tests off, otherwise Android would have kept LTO off.
-- **[x] Results:** Android arm64 lite 9.0 MB to 5.7 MB, x86_64 9.8 MB to
+- **[x] Results:** Android arm64 lite 9.0 MB to 5.8 MB, x86_64 9.8 MB to
   7.1 MB; the iOS and macOS lite slices and the Linux engines follow from the
   rebuilt CipherBird slices and the Native Linux workflow (numbers in the
   follow up commit).
