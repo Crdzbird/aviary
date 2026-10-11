@@ -20,13 +20,12 @@ extension NodeFunding on Node {
 
 /// Transfers that pick the nonce and the signature scheme for you.
 extension NodeSending on Node {
-  /// Sends [amount] from [from] to the address [to]. The nonce is read from
-  /// the chain, so submit one transfer per account per block this way; use
-  /// [NodeTransfers.submitTransfer] with explicit nonces for more. The
-  /// signature scheme follows the account; hybrid accounts carry no [fee].
-  /// Returns the transaction id.
+  /// Sends [amount] from [from] to the address [to]. The nonce comes from
+  /// [NodeQueries.nextNonce], so several transfers from one account may be
+  /// queued before a block. The signature scheme follows the account; hybrid
+  /// accounts carry no [fee]. Returns the transaction id.
   Uint8List send(Account from, Uint8List to, int amount, {int fee = 0}) {
-    final next = nonce(from.address);
+    final next = nextNonce(from.address);
     if (from.isHybrid) {
       if (fee != 0) {
         throw ArgumentError.value(fee, 'fee', 'hybrid transfers carry no fee');
@@ -43,8 +42,8 @@ extension NodeSending on Node {
     return submitTransfer(from.secret, to, amount, next);
   }
 
-  /// Sends [amount] from the key store account at [from] with the nonce read
-  /// from the chain; the secret never leaves the engine.
+  /// Sends [amount] from the key store account at [from] with the nonce from
+  /// [NodeQueries.nextNonce]; the secret never leaves the engine.
   Uint8List sendFromStore(
     KeyStore store,
     Uint8List from,

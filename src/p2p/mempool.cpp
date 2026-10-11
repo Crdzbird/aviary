@@ -1,5 +1,7 @@
 #include "aviary/mempool.hpp"
 
+#include "aviary/account_state.hpp"
+
 #include <algorithm>
 #include <optional>
 #include <set>
@@ -148,6 +150,20 @@ void Mempool::remove(const std::vector<Hash>& txids) {
     pool_.erase(it);
     if (bus_) bus_->publish(observe::TxRemoved{id, pool_.size()});
   }
+}
+
+std::optional<std::uint64_t> Mempool::highest_pending_nonce(const Hash& sender) const {
+  std::optional<std::uint64_t> best;
+  for (const auto& [id, tx] : pool_) {
+    if (tx.author.empty()) continue;
+    if (crypto::address_of(codec::ByteView(tx.author.data(), tx.author.size())) != sender) continue;
+    try {
+      const std::uint64_t n = AccountStateMachine::decode_transfer(tx.body).nonce;
+      if (!best || n > *best) best = n;
+    } catch (const std::exception&) {
+    }
+  }
+  return best;
 }
 
 }  // namespace aviary

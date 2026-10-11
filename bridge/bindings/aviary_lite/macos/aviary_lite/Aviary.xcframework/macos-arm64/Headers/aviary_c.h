@@ -169,6 +169,9 @@ AVIARY_API int aviary_node_produce_block(AviaryNode node,
 AVIARY_API uint64_t aviary_node_height(AviaryNode node);
 AVIARY_API uint64_t aviary_node_balance(AviaryNode node, const uint8_t* address);
 AVIARY_API uint64_t aviary_node_nonce(AviaryNode node, const uint8_t* address);
+/** The nonce the next transfer from [address] must carry: the account nonce
+ *  advanced past every transfer from it already pending in the mempool. */
+AVIARY_API uint64_t aviary_node_next_nonce(AviaryNode node, const uint8_t* address);
 AVIARY_API uint64_t aviary_node_mempool_size(AviaryNode node);
 AVIARY_API AviaryBufferResult aviary_node_state_root(AviaryNode node);
 /** Drain collected chain events as a JSON array string (the streaming surface). */
@@ -179,9 +182,13 @@ AVIARY_API AviaryBufferResult aviary_node_submit_tx(AviaryNode node, const uint8
 /** Persistence: the whole chain (chain id, genesis credits, every finalized
  *  block with its certificate) as one blob. The mempool is not included. */
 AVIARY_API AviaryBufferResult aviary_node_snapshot(AviaryNode node);
-/** Rebuilds a node from aviary_node_snapshot, replaying every block through
- *  consensus so certificates are verified. NULL on a malformed blob. */
+/** Rebuilds a node from aviary_node_snapshot. A current snapshot carries the
+ *  ledger state and resumes from the tip in constant time; an older one replays
+ *  every block through consensus. NULL on a malformed blob. */
 AVIARY_API AviaryNode aviary_node_restore(const uint8_t* blob, size_t len);
+/** Like aviary_node_restore but always replays the archived blocks through
+ *  consensus, verifying every certificate (slow; for audits and tests). */
+AVIARY_API AviaryNode aviary_node_restore_replay(const uint8_t* blob, size_t len);
 /** The encoded finalized block at [height] (1 based); an error when absent. */
 AVIARY_API AviaryBufferResult aviary_node_block_at(AviaryNode node, uint64_t height);
 /** Push observer: one JSON object per chain event, delivered synchronously from

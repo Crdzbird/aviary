@@ -47,7 +47,9 @@ void main() {
 
 Every call above has an explicit counterpart (`newAccount` plus `credit`,
 `submitTransfer` with a nonce, `produceBlock` with a timestamp) for code
-that needs full control.
+that needs full control. `sendTo` takes its nonce from `nextNonce`, which
+counts transfers still waiting in the mempool, so several transfers from one
+account can be queued before a block.
 
 ## Shortcuts
 
@@ -58,7 +60,7 @@ Extensions that collapse the common flows into one call:
 | `Uint8List` | `hex`, `shortHex`, `equalsBytes` |
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
-| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (auto nonce, scheme follows the account), `sendFromStore`, `submitTx`, `submitTransferFromStore`, `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
+| `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (nonce from `nextNonce`, scheme follows the account), `sendFromStore`, `submitTx`, `submitTransferFromStore`, `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
 | `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `newNetNode`, `generateSecureIdentity`, `initiateSecureSession`, `acceptSecureSession`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
 | `Chain` | `produceBlock(timestamp, justify:)` |
@@ -174,9 +176,11 @@ peer that connects after consensus started.
 
 A node's whole chain travels as one blob: `node.snapshot()` holds the chain
 id, the genesis credits and every finalized block with its certificate.
-`bc.restoreNode(bytes)` rebuilds the node by replaying the blocks through
-consensus, so every certificate is verified on the way back in, and the
-restored node keeps producing. `saveTo(path)` writes the blob atomically and
+`bc.restoreNode(bytes)` rebuilds the node from the ledger state the snapshot
+carries and resumes from the tip at once, however long the chain is;
+`restoreNode(bytes, replay: true)` replays every block through consensus
+instead, verifying each certificate, which audits the archive at the cost of
+startup time. Both yield the same node, byte for byte. `saveTo(path)` writes the blob atomically and
 `restoreNodeFrom(path)` reads it back, returning null when no file exists.
 Pending mempool transactions are not part of a snapshot. `blockAt(height)`
 returns any archived block.

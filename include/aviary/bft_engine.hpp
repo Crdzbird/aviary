@@ -32,6 +32,14 @@ class BftEngine : public ConsensusEngine {
       : vset_(vset), prev_vset_(std::move(vset)), ledger_(std::move(ledger)) {}
 
   const Ledger& ledger() const override { return *ledger_; }
+  /// Resumes an engine built over a restored Ledger: [tip_commit] is the
+  /// certificate that finalized the ledger's current tip, so the next proposal
+  /// carries a valid last commit. The validator set is taken as unchanged
+  /// since that tip.
+  void resume(CommitCertificate tip_commit) {
+    last_commit_ = std::move(tip_commit);
+    prev_vset_ = vset_;
+  }
   /// The set in force for the next block (follows finalized rotations).
   const ValidatorSet& validators() const { return vset_; }
   /// The set that certified the current tip.

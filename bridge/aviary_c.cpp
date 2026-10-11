@@ -514,6 +514,10 @@ uint64_t aviary_node_balance(AviaryNode node, const uint8_t* address) {
 uint64_t aviary_node_nonce(AviaryNode node, const uint8_t* address) {
   try { return as_node(node)->nonce(to_hash32(address)); } catch (...) { return 0; }
 }
+uint64_t aviary_node_next_nonce(AviaryNode node, const uint8_t* address) {
+  if (!node || !address) return 0;
+  return as_node(node)->next_nonce(to_hash32(address));
+}
 uint64_t aviary_node_mempool_size(AviaryNode node) {
   try { return as_node(node)->mempool_size(); } catch (...) { return 0; }
 }
@@ -554,6 +558,11 @@ AviaryBufferResult aviary_node_snapshot(AviaryNode node) {
 AviaryNode aviary_node_restore(const uint8_t* blob, size_t len) {
   if (!blob) return nullptr;
   try { return aviary::node::DemoNode::restore(aviary::codec::ByteView(blob, len)).release(); }
+  catch (...) { return nullptr; }
+}
+AviaryNode aviary_node_restore_replay(const uint8_t* blob, size_t len) {
+  if (!blob) return nullptr;
+  try { return aviary::node::DemoNode::restore(aviary::codec::ByteView(blob, len), true).release(); }
   catch (...) { return nullptr; }
 }
 AviaryBufferResult aviary_node_block_at(AviaryNode node, uint64_t height) {

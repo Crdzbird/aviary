@@ -42,7 +42,7 @@ public final class Aviary implements AutoCloseable {
             lcNew, lcAccept, lcAcceptSkipping, lcHeight, lcTip, lcValidators, lcSetTrust, lcSetMaxSkip, lcFree,
             treeNodeEncode, treeSpecError, treeBuild, treeChainIds, treeHeight, treeGenesis, treeTip, treePending, treeProduce,
             treeProve, treeVerify, treeSetTxSource, treeSetFinalized, treeFree;
-    private final MethodHandle nodeSetEventHook, nodeSnapshot, nodeRestore, nodeBlockAt, nodeSubmitTx, nodeSubmitKs,
+    private final MethodHandle nodeSetEventHook, nodeSnapshot, nodeRestore, nodeRestoreReplay, nodeNextNonce, nodeBlockAt, nodeSubmitTx, nodeSubmitKs,
             ksSign, ksPublicKey, ksHas, ksAddresses, ksLock,
             netNew, netAddPeer, netSetTxs, netStart, netOnGossip, netOnTimeout, netAdvance, netCommitted, netHeight,
             netPeerBanned, netReplayLog, netTip, netStateRoot, netBalance, netProve, netFree,
@@ -188,6 +188,8 @@ public final class Aviary implements AutoCloseable {
         nodeSetEventHook = h("aviary_node_set_event_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
         nodeSnapshot = h("aviary_node_snapshot", FunctionDescriptor.of(RES, ADDRESS));
         nodeRestore = h("aviary_node_restore", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG));
+        nodeRestoreReplay = h("aviary_node_restore_replay", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG));
+        nodeNextNonce = h("aviary_node_next_nonce", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
         nodeBlockAt = h("aviary_node_block_at", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
         nodeSubmitTx = h("aviary_node_submit_tx", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
         nodeSubmitKs = h("aviary_node_submit_transfer_keystore", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, JAVA_LONG, JAVA_LONG));
@@ -1057,6 +1059,8 @@ public final class Aviary implements AutoCloseable {
         public long mempoolSize() { return u64(mempool); }
         public long balance(byte[] a) { return u64a(balance, a); }
         public long nonce(byte[] a)   { return u64a(nonce, a); }
+        /** The committed nonce advanced past every pending transfer from the address. */
+        public long nextNonce(byte[] a) { return u64a(nodeNextNonce, a); }
         public byte[] stateRoot()  { return consume(invokeRes(stateRoot, node)); }
         public String drainEvents(){ return new String(consume(invokeRes(drain, node)), StandardCharsets.UTF_8); }
         public String metrics()    { return new String(consume(invokeRes(metrics, node)), StandardCharsets.UTF_8); }
@@ -1094,9 +1098,11 @@ public final class Aviary implements AutoCloseable {
 
     // -- Persistence, networking and secure sessions --
     /** Rebuilds a node from Node#snapshot, replaying every block through consensus. Throws on a malformed blob. */
-    public Node restoreNode(byte[] snapshot) {
+    public Node restoreNode(byte[] snapshot) { return restoreNode(snapshot, false); }
+    /** Like restoreNode; with replay every archived block goes through consensus again (slow; audits the archive). */
+    public Node restoreNode(byte[] snapshot, boolean replay) {
         try {
-            MemorySegment h = (MemorySegment) nodeRestore.invoke(seg(snapshot), (long) snapshot.length);
+            MemorySegment h = (MemorySegment) (replay ? nodeRestoreReplay : nodeRestore).invoke(seg(snapshot), (long) snapshot.length);
             if (h.address() == 0) throw new IllegalArgumentException("node restore refused (malformed snapshot)");
             return new Node(h);
         } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }

@@ -1450,3 +1450,24 @@ selectors — validated against real-world vectors). Deferred:
   core and weekly, and uploads the corpus and any crash.
 - GOTCHA: the fuzz section of CMakeLists sits after the `AVIARY_BUILD_TESTS`
   early return, so configure with tests on when building fuzzers.
+
+## Checkpointed restore and mempool aware nonces - DONE (2026-10-11)
+- **[x] Snapshot v2** = magic `AVSN`, version byte 2, chain id, genesis
+  credits, block archive, and the `Ledger::snapshot()` of the live engine.
+  `DemoNode::restore(bytes, replay)` on a v2 blob builds the engine over
+  `Ledger::restore` and calls the new `BftEngine::resume(tip_commit)` (sets
+  `last_commit_` and `prev_vset_` so the next proposal carries a valid last
+  commit); it checks the archive tip height against the restored ledger. A
+  v1 blob (no magic) or `replay = true` takes the old path: credits plus
+  `finalize` of every archived block. `test_demo_node` proves the live node,
+  the fast restore and the replayed restore produce byte identical block 3
+  and identical snapshots afterwards.
+- **[x] Mempool aware nonce:** `Mempool::highest_pending_nonce(sender)` (scans
+  the pool, account model bodies only, author address via `address_of`) and
+  `DemoNode::next_nonce(address)` = max(committed, pending + 1). C ABI
+  `aviary_node_next_nonce` and `aviary_node_restore_replay`. Dart `nextNonce`
+  (used by `send`, `sendTo`, `sendFromStore`) and `restoreNode(replay:)`;
+  Go `NextNonce`/`RestoreNodeReplay`; npm `nextNonce`/`restoreNode(.., {replay})`;
+  JVM `nextNonce`/`restoreNode(bytes, replay)`; Swift
+  `nextNonce(address:)`/`restoreNode(_, replay:)`. Every binding test queues
+  two transfers before a block and compares the audited restore.

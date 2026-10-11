@@ -386,7 +386,12 @@ do {
     let back = try Aviary.restoreNode(try src.snapshot())
     precondition(back.height == 2 && back.balance(address: b.address) == 150 && back.nonce(address: a.address) == 2, "restored state")
     try ensure("restored roots") { try back.stateRoot() == src.stateRoot() && back.blockAt(1) == src.blockAt(1) }
-    try back.submitTransfer(secret: a.secret, to: b.address, amount: 1, nonce: 2)
+    let audited = try Aviary.restoreNode(try src.snapshot(), replay: true)
+    try ensure("replayed restore agrees") { try audited.stateRoot() == back.stateRoot() }
+    precondition(back.nextNonce(address: a.address) == 2, "next nonce")
+    try back.submitTransfer(secret: a.secret, to: b.address, amount: 1, nonce: back.nextNonce(address: a.address))
+    precondition(back.nextNonce(address: a.address) == 3, "next nonce advances past pending")
+    try back.submitTransfer(secret: a.secret, to: b.address, amount: 1, nonce: back.nextNonce(address: a.address))
     try ensure("restored node keeps producing") { try back.produceBlock(timestamp: 3) == 3 }
     precondition((try? Aviary.restoreNode(Data([1, 2, 3]))) == nil, "garbage snapshot refused")
 }

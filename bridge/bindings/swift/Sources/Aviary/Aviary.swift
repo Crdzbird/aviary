@@ -992,6 +992,8 @@ public final class Node {
     public var mempoolSize: UInt64 { aviary_node_mempool_size(h) }
     public func balance(address: Data) -> UInt64 { address.withC { p, _ in aviary_node_balance(h, p) } }
     public func nonce(address: Data) -> UInt64 { address.withC { p, _ in aviary_node_nonce(h, p) } }
+    /// The committed nonce advanced past every pending transfer from the address.
+    public func nextNonce(address: Data) -> UInt64 { address.withC { p, _ in aviary_node_next_nonce(h, p) } }
     public func stateRoot() throws -> Data { try consume(aviary_node_state_root(h), "state_root") }
     public func drainEvents() throws -> String { String(decoding: try consume(aviary_node_drain_events(h), "drain_events"), as: UTF8.self) }
     public func metrics() throws -> String { String(decoding: try consume(aviary_node_metrics(h), "metrics"), as: UTF8.self) }
@@ -1101,10 +1103,11 @@ extension KeyStore {
 }
 
 extension Aviary {
-    /// Rebuilds a node from `Node.snapshot()`, replaying every block through consensus.
-    public static func restoreNode(_ snapshot: Data) throws -> Node {
+    /// Rebuilds a node from `Node.snapshot()`. A current snapshot resumes from the tip at once;
+    /// `replay` forces every block through consensus again (slow; audits the archive).
+    public static func restoreNode(_ snapshot: Data, replay: Bool = false) throws -> Node {
         ensureReady()
-        guard let raw = snapshot.withC({ p, l in aviary_node_restore(p, l) }) else {
+        guard let raw = snapshot.withC({ p, l in replay ? aviary_node_restore_replay(p, l) : aviary_node_restore(p, l) }) else {
             throw AviaryError(message: "node restore refused (malformed snapshot)") }
         return Node(handle: raw)
     }

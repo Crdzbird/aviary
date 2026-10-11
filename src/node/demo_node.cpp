@@ -32,11 +32,13 @@ DemoNode::DemoNode(std::uint64_t chain_id) : chain_id_(chain_id) {
 
 void DemoNode::ensure_started() {
   if (engine_) return;
+  start_engine(std::make_unique<Ledger>(ChainSpec{chain_id_, StateModel::kAccount},
+                                        std::unique_ptr<StateMachine>(genesis_.release())));
+}
+
+void DemoNode::start_engine(std::unique_ptr<Ledger> ledger) {
   consensus::ValidatorSet vset(
       std::vector<consensus::Validator>{{validator_.public_key, 1}});  // quorum 1
-  auto ledger = std::make_unique<Ledger>(
-      ChainSpec{chain_id_, StateModel::kAccount},
-      std::unique_ptr<StateMachine>(genesis_.release()));
   engine_ = std::make_unique<consensus::BftEngine>(std::move(vset), std::move(ledger));
   engine_->set_observability(&bus_, &metrics_);
   mempool_.set_event_bus(&bus_);
@@ -189,8 +191,15 @@ std::uint64_t DemoNode::produce_block(std::uint64_t timestamp) {
   return engine_->height();
 }
 
+namespace {
+constexpr std::uint8_t kSnapshotMagic[4] = {'A', 'V', 'S', 'N'};
+constexpr std::uint8_t kSnapshotVersion = 2;
+}  // namespace
+
 Bytes DemoNode::snapshot() const {
   codec::CodecWriter w;
+  for (std::uint8_t b : kSnapshotMagic) w.write_u8(b);
+  w.write_u8(kSnapshotVersion);
   w.write_u64(chain_id_);
   w.write_u32(static_cast<std::uint32_t>(credits_.size()));
   for (const auto& [address, amount] : credits_) {
@@ -199,11 +208,19 @@ Bytes DemoNode::snapshot() const {
   }
   const Bytes archive = archive_.serialize();
   w.write_bytes(view(archive));
+  const Bytes state = engine_ ? engine_->ledger().snapshot() : Bytes{};
+  w.write_bytes(view(state));
   return w.take();
 }
 
-std::unique_ptr<DemoNode> DemoNode::restore(codec::ByteView bytes) {
+std::unique_ptr<DemoNode> DemoNode::restore(codec::ByteView bytes, bool replay) {
   codec::CodecReader r(bytes);
+  bool versioned = bytes.size() >= 5;
+  for (std::size_t i = 0; versioned && i < 4; ++i) versioned = bytes[i] == kSnapshotMagic[i];
+  if (versioned) {
+    for (int i = 0; i < 4; ++i) (void)r.read_u8();
+    if (r.read_u8() != kSnapshotVersion) throw std::runtime_error("demo_node: unknown snapshot version");
+  }
   auto node = std::make_unique<DemoNode>(r.read_u64());
   const std::uint32_t credits = r.read_u32();
   for (std::uint32_t i = 0; i < credits; ++i) {
@@ -213,9 +230,22 @@ std::unique_ptr<DemoNode> DemoNode::restore(codec::ByteView bytes) {
     node->credit(address, r.read_u128());
   }
   const Bytes archive_bytes = r.read_bytes();
+  Bytes state;
+  if (versioned) state = r.read_bytes();
   if (r.remaining() != 0) throw std::runtime_error("demo_node: trailing bytes in snapshot");
   BlockStore archive = BlockStore::load(view(archive_bytes));
   if (archive.empty()) return node;
+  if (!replay && !state.empty()) {
+    node->start_engine(Ledger::restore(ChainSpec{node->chain_id_, StateModel::kAccount}, view(state)));
+    if (node->engine_->height() != archive.tip_height()) {
+      throw std::runtime_error("demo_node: snapshot state and archive disagree on the height");
+    }
+    node->engine_->resume(archive.by_height(archive.tip_height()).commit);
+    node->archive_ = std::move(archive);
+    node->genesis_.reset();
+    node->events_.clear();
+    return node;
+  }
   node->ensure_started();
   for (std::uint64_t h = 1; h <= archive.tip_height(); ++h) {
     const StoredBlock& sb = archive.by_height(h);
@@ -235,6 +265,11 @@ codec::u128 DemoNode::balance(const Hash& address) const {
 }
 std::uint64_t DemoNode::nonce(const Hash& address) const {
   return read_state().account(address).nonce;
+}
+std::uint64_t DemoNode::next_nonce(const Hash& address) const {
+  const std::uint64_t committed = nonce(address);
+  const std::optional<std::uint64_t> pending = mempool_.highest_pending_nonce(address);
+  return pending && *pending + 1 > committed ? *pending + 1 : committed;
 }
 Hash DemoNode::state_root() const { return read_state().state_root(); }
 

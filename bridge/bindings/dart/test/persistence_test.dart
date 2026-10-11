@@ -23,6 +23,9 @@ void main() {
 
     final snap = node.snapshot();
     final back = bc.restoreNode(snap);
+    final audited = bc.restoreNode(snap, replay: true);
+    check(audited.stateRoot().equalsBytes(back.stateRoot()), 'replay agrees');
+    audited.dispose();
     check(back.height() == 2, 'height restored');
     check(back.balance(bob.address) == 150, 'balances restored');
     check(back.nonce(alice.address) == 2, 'nonce restored');

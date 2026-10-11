@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <vector>
 
 #include "aviary/state.hpp"
@@ -78,6 +79,9 @@ class Mempool {
 
   /// Remove transactions by id (e.g. after a block commits).
   void remove(const std::vector<Hash>& txids);
+  /// The highest nonce among the account model transfers pending from the
+  /// account at [sender], or nullopt when none is pending.
+  std::optional<std::uint64_t> highest_pending_nonce(const Hash& sender) const;
 
   /// Attach an event bus (nullable). Publishes TxAdmitted/TxRemoved.
   void set_event_bus(observe::EventBus* bus) { bus_ = bus; }

@@ -37,6 +37,8 @@ export class Node {
   mempoolSize(): number;
   balance(address: Buffer | Uint8Array): number;
   nonce(address: Buffer | Uint8Array): number;
+  /** The committed nonce advanced past every pending transfer from the address. */
+  nextNonce(address: Buffer | Uint8Array): number;
   stateRoot(): Buffer;
   drainEvents(): string;
   metrics(): string;
@@ -112,7 +114,7 @@ export class SecureSession {
 export function generateSecureIdentity(): SecureIdentity;
 export function initiateSecureSession(responderKemPublic: Buffer | Uint8Array, sig: KeyPair): SecureSession;
 export function acceptSecureSession(identity: SecureIdentity, firstMessage: Buffer | Uint8Array): SecureSession;
-export function restoreNode(snapshot: Buffer | Uint8Array): Node;
+export function restoreNode(snapshot: Buffer | Uint8Array, opts?: { replay?: boolean }): Node;
 export function newKeyStore(passphrase: string): KeyStore;
 export function loadKeyStore(blob: Buffer | Uint8Array): KeyStore;
 

@@ -75,6 +75,9 @@ class DemoNode {
   std::uint64_t height() const;
   codec::u128 balance(const Hash& address) const;
   std::uint64_t nonce(const Hash& address) const;
+  /// The nonce the next transfer from [address] must carry: the account nonce
+  /// advanced past every transfer from it already pending in the mempool.
+  std::uint64_t next_nonce(const Hash& address) const;
   Hash state_root() const;
   std::size_t mempool_size() const { return mempool_.size(); }
 
@@ -94,10 +97,14 @@ class DemoNode {
   /// The whole chain as one blob: chain id, genesis credits, and every
   /// finalized block with its commit certificate. The mempool is not included.
   Bytes snapshot() const;
-  /// Rebuilds a node from snapshot(): recreates the genesis credits, then
-  /// replays every block through consensus so each certificate is verified.
-  /// Throws std::runtime_error on a malformed blob or a block that fails.
-  static std::unique_ptr<DemoNode> restore(codec::ByteView bytes);
+  /// Rebuilds a node from snapshot(). A current snapshot carries the ledger
+  /// state, so the node resumes from the tip in constant time; the block
+  /// archive is kept for block_at. [replay] forces the slow path instead:
+  /// recreate the genesis credits and replay every block through consensus,
+  /// verifying each certificate. A snapshot from before the ledger state was
+  /// included always replays. Throws std::runtime_error on a malformed blob
+  /// or a block that fails.
+  static std::unique_ptr<DemoNode> restore(codec::ByteView bytes, bool replay = false);
   /// The finalized block at [height] (1 based). Throws std::out_of_range if
   /// absent.
   const Block& block_at(std::uint64_t height) const { return archive_.by_height(height).block; }
@@ -109,6 +116,7 @@ class DemoNode {
 
  private:
   void ensure_started();
+  void start_engine(std::unique_ptr<Ledger> ledger);
   /// The current account state for READS: the engine's once started, otherwise
   /// the (still-mutable) genesis state. Never starts the engine.
   const AccountStateMachine& read_state() const;

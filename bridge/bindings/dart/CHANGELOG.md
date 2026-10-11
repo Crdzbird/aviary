@@ -24,9 +24,11 @@
 - Networking: `NetNode` runs BFT consensus over a gossip mesh with the app
   owning sockets and timers (`start`, `onGossip`, `onTimeout`, `advance`,
   `setTransactions`, `replayLog`); `SecureSession` protects each link.
-- Persistence: `snapshot`, `restoreNode`, `saveTo`, `restoreNodeFrom` and
-  `blockAt`. A restored node replays its blocks through consensus and keeps
-  producing.
+- Persistence: `snapshot`, `restoreNode` (constant time from the carried
+  ledger state, or `replay: true` to audit the archive), `saveTo`,
+  `restoreNodeFrom` and `blockAt`.
+- `nextNonce` counts pending transfers; `send`, `sendTo` and `sendFromStore`
+  use it, so several transfers per account can be queued before a block.
 - Typed chain events (`BlockFinalized`, `BlockRejected`, `TxAdmitted`,
   `TxRemoved`, `UnknownEvent`) from `events()` and the push based
   `eventStream`, fed by a native hook instead of polling.

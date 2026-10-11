@@ -214,6 +214,8 @@ function ensureLoaded() {
     nodeSetEventHook: f('void aviary_node_set_event_hook(void*, AviaryEventFn*, void*)'),
     nodeSnapshot: f('AviaryBufferResult aviary_node_snapshot(void*)'),
     nodeRestore: f('void *aviary_node_restore(uint8_t*, size_t)'),
+    nodeRestoreReplay: f('void *aviary_node_restore_replay(uint8_t*, size_t)'),
+    nextNonce: f('uint64_t aviary_node_next_nonce(void*, uint8_t*)'),
     nodeBlockAt: f('AviaryBufferResult aviary_node_block_at(void*, uint64_t)'),
     nodeSubmitTx: f('AviaryBufferResult aviary_node_submit_tx(void*, uint8_t*, size_t)'),
     nodeSubmitKs: f('AviaryBufferResult aviary_node_submit_transfer_keystore(void*, void*, uint8_t*, uint8_t*, uint64_t, uint64_t, uint64_t)'),
@@ -387,6 +389,8 @@ class Node {
   mempoolSize() { return Number(fn.mempool(this._h)); }
   balance(address) { return Number(fn.balance(this._h, u8(address))); }
   nonce(address) { return Number(fn.nonce(this._h, u8(address))); }
+  /** The nonce the next transfer from address must carry: the committed nonce advanced past every pending transfer from it. */
+  nextNonce(address) { return Number(fn.nextNonce(this._h, u8(address))); }
   stateRoot() { return consume(fn.stateRoot(this._h), 'state_root'); }
   drainEvents() { return consume(fn.drainEvents(this._h), 'drain_events').toString('utf8'); }
   metrics() { return consume(fn.metrics(this._h), 'metrics').toString('utf8'); }
@@ -878,8 +882,8 @@ class SecureSession {
   free() { if (this._h) { fn.secFree(this._h); this._h = null; } }
 }
 /** Rebuild a node from Node#snapshot(); every block is replayed through consensus. Throws on a malformed blob. */
-function restoreNode(snapshot) {
-  const b = u8(snapshot); const h = fn.nodeRestore(b, b.length);
+function restoreNode(snapshot, { replay = false } = {}) {
+  const b = u8(snapshot); const h = (replay ? fn.nodeRestoreReplay : fn.nodeRestore)(b, b.length);
   if (!h) throw new Error('node restore refused (malformed snapshot)');
   return Node._wrap(h);
 }

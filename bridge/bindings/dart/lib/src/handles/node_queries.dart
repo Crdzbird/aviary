@@ -18,8 +18,13 @@ extension NodeQueries on Node {
   /// The balance of an address.
   int balance(Uint8List address) => _u64Addr('aviary_node_balance', address);
 
-  /// The next nonce of an address.
+  /// The committed nonce of an address.
   int nonce(Uint8List address) => _u64Addr('aviary_node_nonce', address);
+
+  /// The nonce the next transfer from [address] must carry: the committed
+  /// nonce advanced past every transfer from it still pending in the mempool.
+  int nextNonce(Uint8List address) =>
+      _u64Addr('aviary_node_next_nonce', address);
 
   /// The 32 byte state root.
   Uint8List stateRoot() => _bufOfNode('aviary_node_state_root', 'state_root');

@@ -56,22 +56,27 @@ extension NodeStorage on Node {
 
 /// Rebuilding nodes from durable state.
 extension AviaryNodeStorage on Aviary {
-  /// A node rebuilt from [snapshot]. Every block is replayed through
-  /// consensus, so each certificate is verified; a malformed blob throws
-  /// with [AviaryStatus.badInput].
-  Node restoreNode(Uint8List snapshot) => _scoped([snapshot], (p) {
-    final h = lib.lookupFunction<_KsLoadC, _KsLoadD>('aviary_node_restore')(
-      p[0],
-      snapshot.length,
-    );
-    if (h == nullptr) {
-      throw const AviaryException(
-        'node restore refused',
-        AviaryStatus.badInput,
-      );
-    }
-    return Node._(this, h);
-  });
+  /// A node rebuilt from [snapshot]. A current snapshot carries the ledger
+  /// state and resumes from the tip at once; [replay] forces every block
+  /// through consensus instead, verifying each certificate, which is slow but
+  /// audits the archive. A malformed blob throws with [AviaryStatus.badInput].
+  Node restoreNode(Uint8List snapshot, {bool replay = false}) =>
+      _scoped([snapshot], (p) {
+        final symbol = replay
+            ? 'aviary_node_restore_replay'
+            : 'aviary_node_restore';
+        final h = lib.lookupFunction<_KsLoadC, _KsLoadD>(symbol)(
+          p[0],
+          snapshot.length,
+        );
+        if (h == nullptr) {
+          throw const AviaryException(
+            'node restore refused',
+            AviaryStatus.badInput,
+          );
+        }
+        return Node._(this, h);
+      });
 
   /// [restoreNode] from the file at [path], or null when there is no file.
   Future<Node?> restoreNodeFrom(String path) async {

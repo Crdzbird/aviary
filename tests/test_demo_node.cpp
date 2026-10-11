@@ -104,6 +104,40 @@ int main() {
     CHECK(sealed_node.balance(dave_addr) == 10);  // unchanged
   }
 
+  {
+    // Checkpointed restore equals replayed restore equals the live node, byte for byte.
+    DemoNode live(79);
+    auto a = live.new_account();
+    auto b = live.new_account();
+    live.credit(addr_of(a), 500);
+    live.submit_transfer(view(a.secret_key), addr_of(b), 10, 0);
+    CHECK(live.produce_block(1) == 1);
+    live.submit_transfer(view(a.secret_key), addr_of(b), 20, 1);
+    CHECK(live.produce_block(2) == 2);
+    const Bytes snap = live.snapshot();
+    auto fast = DemoNode::restore(view(snap));
+    auto slow = DemoNode::restore(view(snap), true);
+    CHECK(fast->height() == 2 && slow->height() == 2);
+    CHECK(fast->state_root() == live.state_root() && slow->state_root() == live.state_root());
+    CHECK(fast->block_at(2).encode() == live.block_at(2).encode());
+    for (DemoNode* n : {&live, fast.get(), slow.get()}) {
+      n->submit_transfer(view(a.secret_key), addr_of(b), 30, 2);
+      CHECK(n->produce_block(3) == 3);
+    }
+    CHECK(fast->block_at(3).encode() == live.block_at(3).encode());
+    CHECK(slow->block_at(3).encode() == live.block_at(3).encode());
+    CHECK(fast->state_root() == slow->state_root());
+    CHECK(fast->snapshot() == live.snapshot());
+    // Mempool aware nonce: two transfers before a block.
+    CHECK(live.next_nonce(addr_of(a)) == 3);
+    live.submit_transfer(view(a.secret_key), addr_of(b), 1, live.next_nonce(addr_of(a)));
+    CHECK(live.next_nonce(addr_of(a)) == 4);
+    live.submit_transfer(view(a.secret_key), addr_of(b), 1, live.next_nonce(addr_of(a)));
+    CHECK(live.mempool_size() == 2 && live.next_nonce(addr_of(a)) == 5);
+    CHECK(live.produce_block(4) == 4);
+    CHECK(live.balance(addr_of(b)) == 62 && live.next_nonce(addr_of(a)) == 5);
+    CHECK(live.next_nonce(addr_of(b)) == 0);
+  }
   return bctest::summary();  {
     // Persistence: snapshot, restore, and keep producing on the restored node.
     DemoNode src(77);

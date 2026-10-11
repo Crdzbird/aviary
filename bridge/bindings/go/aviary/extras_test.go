@@ -50,7 +50,19 @@ func TestPersistenceSnapshotRestore(t *testing.T) {
 	if !bytes.Equal(must(back.BlockAt(1)), must(n.BlockAt(1))) {
 		t.Fatal("archived block differs")
 	}
-	must(back.SubmitTransfer(aSec, bAddr, 1, 2))
+	audited, err := bc.RestoreNodeReplay(snap)
+	if err != nil || !bytes.Equal(audited.StateRoot(), back.StateRoot()) {
+		t.Fatal("replayed restore disagrees")
+	}
+	audited.Free()
+	if back.NextNonce(aAddr) != 2 {
+		t.Fatal("next nonce before queueing")
+	}
+	must(back.SubmitTransfer(aSec, bAddr, 1, back.NextNonce(aAddr)))
+	if back.NextNonce(aAddr) != 3 {
+		t.Fatal("next nonce must advance past the pending transfer")
+	}
+	must(back.SubmitTransfer(aSec, bAddr, 1, back.NextNonce(aAddr)))
 	if h, _ := back.ProduceBlock(3); h != 3 {
 		t.Fatalf("restored node did not keep producing: %d", h)
 	}

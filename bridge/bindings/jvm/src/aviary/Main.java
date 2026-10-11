@@ -381,7 +381,13 @@ public final class Main {
                 try (Aviary.Node back = bc.restoreNode(src.snapshot())) {
                     if (back.height() != 2 || back.balance(b.address()) != 150 || back.nonce(a.address()) != 2) throw new IllegalStateException("restored state");
                     if (!java.util.Arrays.equals(back.stateRoot(), src.stateRoot()) || !java.util.Arrays.equals(back.blockAt(1), src.blockAt(1))) throw new IllegalStateException("restored roots");
-                    back.submitTransfer(a.secret(), b.address(), 1, 2);
+                    try (Aviary.Node audited = bc.restoreNode(src.snapshot(), true)) {
+                        if (!java.util.Arrays.equals(audited.stateRoot(), back.stateRoot())) throw new IllegalStateException("replayed restore agrees");
+                    }
+                    if (back.nextNonce(a.address()) != 2) throw new IllegalStateException("next nonce");
+                    back.submitTransfer(a.secret(), b.address(), 1, back.nextNonce(a.address()));
+                    if (back.nextNonce(a.address()) != 3) throw new IllegalStateException("next nonce advances past pending");
+                    back.submitTransfer(a.secret(), b.address(), 1, back.nextNonce(a.address()));
                     if (back.produceBlock(3) != 3) throw new IllegalStateException("restored node keeps producing");
                 }
                 try { bc.restoreNode(new byte[]{1, 2, 3}); throw new IllegalStateException("garbage snapshot accepted"); } catch (IllegalArgumentException expected) {}
