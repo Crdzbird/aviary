@@ -63,7 +63,8 @@ Extensions that collapse the common flows into one call:
 | `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (nonce from `nextNonce`, scheme follows the account), `sendFromStore`, `submitTx`, `submitTransferFromStore`, `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
 | `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `newNetNode`, `generateSecureIdentity`, `initiateSecureSession`, `acceptSecureSession`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
-| `Chain` | `produceBlock(timestamp, justify:)` |
+| `Chain` | `produceBlock(timestamp, justify:)`, `events`, `eventStream`, `metrics`, `metricValues` |
+| `NetNode` | `events`, `eventStream`, `metrics`, `metricValues` |
 | `TreeNode` | `withChild`, `find`, `chainIds` |
 | `KeyStore` | `signTransfer`, `publicKey`, `has`, `addresses`, `lock` |
 | `ChainTree` | `produceRound` |
@@ -99,8 +100,11 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 
 Chain events are typed. `node.events()` drains the buffer as a
 `List<ChainEvent>`; `node.eventStream` is a broadcast `Stream<ChainEvent>`
-fed by a native hook, so nothing is polled. The sealed `ChainEvent` has five
-subtypes, so a switch is exhaustive:
+fed by a native hook, so nothing is polled. `Chain` and `NetNode` carry the
+same `events()`, `eventStream`, `metrics()` and `metricValues()`: a chain
+reports a `BlockFinalized` or `BlockRejected` per `submit`, a networked node a
+`BlockFinalized` per committed height plus gossip, timeout and ban counters.
+The sealed `ChainEvent` has five subtypes, so a switch is exhaustive:
 
 ```dart
 node.eventStream.listen((event) {

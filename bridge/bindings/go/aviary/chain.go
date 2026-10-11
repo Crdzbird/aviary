@@ -9,6 +9,7 @@ import "C"
 import (
 	"encoding/binary"
 	"errors"
+	"runtime/cgo"
 	"unsafe"
 )
 
@@ -174,7 +175,10 @@ func GenesisHash(genesis []byte) ([]byte, error) {
 
 // Chain is an assembled node: the engine its mixture named, behind the uniform
 // Propose → (Seal | Mine) → Submit flow.
-type Chain struct{ h C.AviaryChain }
+type Chain struct {
+	h      C.AviaryChain
+	handle cgo.Handle
+}
 
 // ErrRejected is returned when assembly is refused: an unknown component id, a
 // state id that does not match the genesis seeding, or an engine the assurance
@@ -190,7 +194,7 @@ func AssembleChain(genesis []byte, me uint32, blsPub, blsSec []byte) (*Chain, er
 	if h == nil {
 		return nil, ErrRejected
 	}
-	return &Chain{h}, nil
+	return &Chain{h: h}, nil
 }
 
 func (c *Chain) Free()          { C.aviary_chain_free(c.h) }

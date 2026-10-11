@@ -791,6 +791,11 @@ AVIARY_API int aviary_chain_tree_verify(AviaryChainTree t, const uint8_t* proof,
  *  1, or 0 to include none. Runs synchronously inside produce(). */
 typedef int (*AviaryTxSourceFn)(void* ctx, uint64_t chain_id, uint64_t timestamp,
                                       uint8_t* out, size_t out_cap, size_t* out_len);
+/** Events and metrics of an assembled chain: block_finalized / block_rejected
+ *  per submit, as the node's JSON event stream, plus Prometheus text. */
+AVIARY_API AviaryBufferResult aviary_chain_drain_events(AviaryChain c);
+AVIARY_API void aviary_chain_set_event_hook(AviaryChain c, AviaryEventFn fn, void* ctx);
+AVIARY_API AviaryBufferResult aviary_chain_metrics(AviaryChain c);
 /** Observer: a block was finalized on [chain_id]. */
 typedef void (*AviaryFinalizedFn)(void* ctx, uint64_t chain_id, const uint8_t* block, size_t block_len);
 #define AVIARY_MAX_TX_LIST (1u << 20)
@@ -836,6 +841,12 @@ AVIARY_API AviaryBufferResult aviary_net_node_tip(AviaryNetNode n);
 AVIARY_API AviaryBufferResult aviary_net_node_state_root(AviaryNetNode n);
 AVIARY_API uint64_t aviary_net_node_balance(AviaryNetNode n, const uint8_t* address);
 AVIARY_API AviaryBufferResult aviary_net_node_prove_account(AviaryNetNode n, const uint8_t* address);
+/** Events (block_finalized per committed height) and metrics (chain height,
+ *  blocks finalized, gossip received / relayed / dropped, timeouts, peers
+ *  banned) of a networked node, in the node's JSON and Prometheus formats. */
+AVIARY_API AviaryBufferResult aviary_net_node_drain_events(AviaryNetNode n);
+AVIARY_API void aviary_net_node_set_event_hook(AviaryNetNode n, AviaryEventFn fn, void* ctx);
+AVIARY_API AviaryBufferResult aviary_net_node_metrics(AviaryNetNode n);
 AVIARY_API void aviary_net_node_free(AviaryNetNode n);
 
 /* -- Secure session: the mutually authenticated, post-quantum hybrid link ----

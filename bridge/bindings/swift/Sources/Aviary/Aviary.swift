@@ -504,8 +504,24 @@ public enum Aviary {
             guard let r = raw else { return nil }
             h = OpaquePointer(r)
         }
-        deinit { aviary_chain_free(UnsafeMutableRawPointer(h)) }
+        deinit {
+            if nodeEventHooks[UnsafeMutableRawPointer(h)] != nil {
+                aviary_chain_set_event_hook(UnsafeMutableRawPointer(h), nil, nil)
+                nodeEventHooks[UnsafeMutableRawPointer(h)] = nil
+            }
+            aviary_chain_free(UnsafeMutableRawPointer(h))
+        }
         public var height: UInt64 { aviary_chain_height(UnsafeMutableRawPointer(h)) }
+        /// Buffered block events (block_finalized or block_rejected per submit) as a JSON
+        /// array; empty while a hook is set.
+        public func drainEvents() throws -> String { try consumeString(aviary_chain_drain_events(UnsafeMutableRawPointer(h)), "chain_drain_events") }
+        /// Receives every block event as one JSON object, synchronously from the submit that
+        /// caused it; nil removes the hook.
+        public func setEventHook(_ hook: ((String) -> Void)?) {
+            hookEvents(UnsafeMutableRawPointer(h), hook) { aviary_chain_set_event_hook($0, $1, $2) }
+        }
+        /// Prometheus text: chain height, blocks finalized and rejected, transactions applied.
+        public func metrics() throws -> String { try consumeString(aviary_chain_metrics(UnsafeMutableRawPointer(h)), "chain_metrics") }
         public func blueprint() throws -> Data { try consume(aviary_chain_blueprint(UnsafeMutableRawPointer(h)), "chain_blueprint") }
         public func propose(timestamp: UInt64) throws -> Data { try consume(aviary_chain_propose(UnsafeMutableRawPointer(h), timestamp), "chain_propose") }
         /// PoS / VRF justification; empty for engines that do not seal.
@@ -1047,19 +1063,23 @@ private func consumeString(_ result: AviaryBufferResult, _ op: String) throws ->
 // -- Events, persistence, custody signing --
 private var nodeEventHooks: [UnsafeMutableRawPointer: (String) -> Void] = [:]
 
+/// Points the native hook of handle h at hook (or clears it when nil) through setter.
+private func hookEvents(_ h: UnsafeMutableRawPointer, _ hook: ((String) -> Void)?,
+                        _ setter: (UnsafeMutableRawPointer, AviaryEventFn?, UnsafeMutableRawPointer?) -> Void) {
+    guard let hook else { setter(h, nil, nil); nodeEventHooks[h] = nil; return }
+    nodeEventHooks[h] = hook
+    let cb: AviaryEventFn = { ctx, json, len in
+        guard let ctx, let json, let hook = nodeEventHooks[ctx] else { return }
+        hook(String(decoding: Data(bytes: json, count: len), as: UTF8.self))
+    }
+    setter(h, cb, h)
+}
+
 extension Node {
     /// Receives every chain event as one JSON object, synchronously from the node call that
     /// caused it; nil removes the hook. While set, drainEvents() is empty.
     public func setEventHook(_ hook: ((String) -> Void)?) {
-        guard let hook else {
-            aviary_node_set_event_hook(h, nil, nil); nodeEventHooks[h] = nil; return
-        }
-        nodeEventHooks[h] = hook
-        let cb: AviaryEventFn = { ctx, json, len in
-            guard let ctx, let json, let hook = nodeEventHooks[ctx] else { return }
-            hook(String(decoding: Data(bytes: json, count: len), as: UTF8.self))
-        }
-        aviary_node_set_event_hook(h, cb, h)
+        hookEvents(h, hook) { aviary_node_set_event_hook($0, $1, $2) }
     }
     /// The whole chain as one blob: chain id, genesis credits and every finalized block with
     /// its certificate. Pending transactions are not included.
@@ -1154,8 +1174,22 @@ extension Aviary {
     public final class NetNode {
         private let h: UnsafeMutableRawPointer
         init(handle: UnsafeMutableRawPointer) { h = handle }
-        deinit { aviary_net_node_free(h) }
+        deinit {
+            if nodeEventHooks[h] != nil { aviary_net_node_set_event_hook(h, nil, nil); nodeEventHooks[h] = nil }
+            aviary_net_node_free(h)
+        }
         public func addPeer(_ peer: UInt32) { aviary_net_node_add_peer(h, peer) }
+        /// Buffered events (a block_finalized per committed height) as a JSON array; empty
+        /// while a hook is set.
+        public func drainEvents() throws -> String { try consumeString(aviary_net_node_drain_events(h), "net_node_drain_events") }
+        /// Receives every event as one JSON object, synchronously from the input that caused
+        /// it; nil removes the hook.
+        public func setEventHook(_ hook: ((String) -> Void)?) {
+            hookEvents(h, hook) { aviary_net_node_set_event_hook($0, $1, $2) }
+        }
+        /// Prometheus text: chain height, blocks finalized, gossip received, relayed and
+        /// dropped, timeouts fired, peers banned.
+        public func metrics() throws -> String { try consumeString(aviary_net_node_metrics(h), "net_node_metrics") }
         /// Encoded transactions this node proposes at the current height; cleared by `advance`.
         public func setTransactions(_ encodedTxs: [Data]) throws {
             let blob = Aviary.blobList(encodedTxs)

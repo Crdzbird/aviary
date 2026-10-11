@@ -12,9 +12,14 @@ import (
 
 //export aviaryGoEvent
 func aviaryGoEvent(ctx unsafe.Pointer, json *C.char, n C.size_t) {
-	node, ok := cgo.Handle(uintptr(ctx)).Value().(*Node)
-	if !ok || node.onEvent == nil {
-		return
+	switch v := cgo.Handle(uintptr(ctx)).Value().(type) {
+	case *Node:
+		if v.onEvent != nil {
+			v.onEvent(C.GoStringN(json, C.int(n)))
+		}
+	case *eventSink:
+		if v.fn != nil {
+			v.fn(C.GoStringN(json, C.int(n)))
+		}
 	}
-	node.onEvent(C.GoStringN(json, C.int(n)))
 }

@@ -60,3 +60,16 @@ extension AccountTools on Account {
   /// than the 64 bytes of an Ed25519 secret.
   bool get isHybrid => secret.length != 64;
 }
+
+int _jsonInt(Map<String, Object?> json, String key) {
+  final v = json[key];
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return 0;
+}
+
+Uint8List _jsonHex(Map<String, Object?> json, String key) {
+  final v = json[key];
+  if (v is String) return v.hexBytes;
+  return Uint8List(0);
+}

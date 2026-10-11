@@ -130,6 +130,7 @@ add_library(aviary_core STATIC
   src/p2p/noise_session.cpp
   src/p2p/wire.cpp
   src/observability/metrics.cpp
+  src/observability/event_log.cpp
   src/observability/log.cpp
   src/client/light_client.cpp
   src/client/proofs.cpp

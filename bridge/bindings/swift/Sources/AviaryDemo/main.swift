@@ -173,6 +173,12 @@ let powChain = Aviary.assembleChain(genesis: powGen, me: 0, blsPub: val.publicKe
 let cand = try powChain.propose(timestamp: 2)
 let solved = try powChain.mine(cand)
 precondition(powChain.submit(block: solved) && powChain.height == 1, "PoW block committed")
+try ensure("chain events") { try powChain.drainEvents().contains("block_finalized") }
+try ensure("chain metrics") { try powChain.metrics().contains("aviary_chain_height 1") }
+var powPushed: [String] = []
+powChain.setEventHook { powPushed.append($0) }
+precondition(!powChain.submit(block: Data([1, 2, 3])) && powPushed.isEmpty, "undecodable block never reaches the engine")
+powChain.setEventHook(nil)
 let badBp = try Aviary.Blueprint(consensus: "no-such-engine", stateModel: "account")
 let badGen = try Aviary.commitBlueprint(genesis: gen, blueprint: badBp)
 precondition(Aviary.assembleChain(genesis: badGen, me: 0, blsPub: val.publicKey, blsSec: val.secret) == nil, "unknown engine rejected")
@@ -464,6 +470,12 @@ do {
     for (i, n) in nodes.enumerated() { apply(i, try n.advance()) }
     try run()
     precondition(nodes.allSatisfy { $0.height == 2 }, "mesh height 2")
+    try ensure("net events") { try nodes[2].drainEvents().contains("block_finalized") }
+    try ensure("net metrics") { let m = try nodes[2].metrics(); return m.contains("aviary_gossip_received_total") && m.contains("aviary_chain_height 2") }
+    var pushed: [String] = []
+    nodes[0].setEventHook { pushed.append($0) }
+    nodes[0].setEventHook(nil)
+    precondition(pushed.isEmpty, "no event without input")
     precondition((try? nodes[0].setTransactions([Data([1, 2])])) == nil, "malformed tx refused")
 
     let ia = try Aviary.generateSecureIdentity(), ib = try Aviary.generateSecureIdentity()

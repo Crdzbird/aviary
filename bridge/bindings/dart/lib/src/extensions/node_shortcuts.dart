@@ -70,15 +70,18 @@ extension NodeViews on Node {
       _bc.verifyStateProof(stateRoot(), proof);
 
   /// Prometheus metric values keyed by sample name with its labels verbatim.
-  Map<String, double> metricValues() {
-    final out = <String, double>{};
-    for (final line in metrics().split('\n')) {
-      if (line.isEmpty || line.startsWith('#')) continue;
-      final space = line.lastIndexOf(' ');
-      if (space < 0) continue;
-      final value = double.tryParse(line.substring(space + 1));
-      if (value != null) out[line.substring(0, space)] = value;
-    }
-    return out;
+  Map<String, double> metricValues() => _parseMetrics(metrics());
+}
+
+/// Prometheus text to a map keyed by sample name with its labels verbatim.
+Map<String, double> _parseMetrics(String text) {
+  final out = <String, double>{};
+  for (final line in text.split('\n')) {
+    if (line.isEmpty || line.startsWith('#')) continue;
+    final space = line.lastIndexOf(' ');
+    if (space < 0) continue;
+    final value = double.tryParse(line.substring(space + 1));
+    if (value != null) out[line.substring(0, space)] = value;
   }
+  return out;
 }

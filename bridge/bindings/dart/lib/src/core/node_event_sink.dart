@@ -1,18 +1,5 @@
 part of '../../aviary.dart';
 
-int _jsonInt(Map<String, Object?> json, String key) {
-  final v = json[key];
-  if (v is int) return v;
-  if (v is num) return v.toInt();
-  return 0;
-}
-
-Uint8List _jsonHex(Map<String, Object?> json, String key) {
-  final v = json[key];
-  if (v is String) return v.hexBytes;
-  return Uint8List(0);
-}
-
 ChainEvent _chainEventFromJson(Map<String, Object?> json) {
   final type = json['type'];
   if (type is! String) return UnknownEvent('', json);
@@ -57,20 +44,31 @@ void _nodeEventTrampoline(Pointer<Void> ctx, Pointer<Utf8> json, int len) {
 
 /// The native hook and broadcast controller behind one node's event stream.
 final class _NodeEventSink {
-  _NodeEventSink._(this._lib, this._node, this.controller, this._callable);
+  _NodeEventSink._(
+    this._lib,
+    this._node,
+    this.controller,
+    this._callable,
+    this._symbol,
+  );
 
-  factory _NodeEventSink.attach(Aviary bc, Pointer<Void> node) {
+  factory _NodeEventSink.attach(
+    Aviary bc,
+    Pointer<Void> node, [
+    String symbol = 'aviary_node_set_event_hook',
+  ]) {
     final callable = NativeCallable<_NodeEventC>.isolateLocal(
       _nodeEventTrampoline,
     )..keepIsolateAlive = false;
     bc.lib.lookupFunction<_NodeSetEventC, _NodeSetEventD>(
-      'aviary_node_set_event_hook',
+      symbol,
     )(node, callable.nativeFunction, node);
     final sink = _NodeEventSink._(
       bc.lib,
       node,
       StreamController<ChainEvent>.broadcast(),
       callable,
+      symbol,
     );
     _nodeSinks[node.address] = sink;
     return sink;
@@ -80,11 +78,12 @@ final class _NodeEventSink {
   final Pointer<Void> _node;
   final StreamController<ChainEvent> controller;
   final NativeCallable<_NodeEventC> _callable;
+  final String _symbol;
 
   /// Detaches the hook before the node is freed and closes the stream.
   void close() {
     _lib.lookupFunction<_NodeSetEventC, _NodeSetEventD>(
-      'aviary_node_set_event_hook',
+      _symbol,
     )(_node, nullptr, nullptr);
     _callable.close();
     _nodeSinks.remove(_node.address);

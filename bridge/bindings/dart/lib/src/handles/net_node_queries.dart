@@ -7,11 +7,6 @@ extension NetNodeQueries on NetNode {
     'aviary_net_node_height',
   )(_h);
 
-  Uint8List _buf(String fn) => _bc._take(
-    _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
-    fn,
-  );
-
   /// The encoded tip header.
   Uint8List tip() => _buf('aviary_net_node_tip');
 

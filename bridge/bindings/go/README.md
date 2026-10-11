@@ -98,6 +98,11 @@ go run  ./cmd/demo           # cross-language golden-vector determinism check
   (npm), `node.setEventHook(Consumer<String>)` (JVM), `node.setEventHook { }`
   (Swift) receive each chain event as one JSON object; a nil hook restores
   buffering for the drain call.
+- The same events and metrics on an assembled chain and a networked node:
+  `Chain` and `NetNode` expose drain events, set event hook and metrics in
+  every binding. A chain reports block_finalized or block_rejected per submit;
+  a networked node reports block_finalized per committed height and counts
+  gossip received, relayed and dropped, timeouts fired and peers banned.
 - Persistence: `Snapshot` / `RestoreNode` / `BlockAt` rebuild a node from one
   blob by replaying its blocks through consensus.
 - Custody signing: `KeyStore.SignTransfer`, `Node.SubmitTransferFromStore` and

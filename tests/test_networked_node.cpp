@@ -180,6 +180,20 @@ int main() {
     CHECK(all_committed());
     for (std::uint32_t i = 0; i < 4; ++i) CHECK(net.nodes[i]->ledger().tip().height == 2);
     CHECK(net.nodes[1]->ledger().tip().encode() == net.nodes[3]->ledger().tip().encode());
+    const std::string ev = net.nodes[2]->drain_events_json();
+    CHECK(ev.find("\"type\":\"block_finalized\",\"height\":1") != std::string::npos);
+    CHECK(ev.find("\"height\":2") != std::string::npos);
+    CHECK(net.nodes[2]->drain_events_json() == "[]");
+    const std::string m = net.nodes[2]->metrics_text();
+    CHECK(m.find("aviary_chain_height 2") != std::string::npos);
+    CHECK(m.find("aviary_gossip_received_total") != std::string::npos);
+    CHECK(m.find("aviary_gossip_dropped_total") != std::string::npos);
+    (void)net.nodes[0]->drain_events_json();
+    int hooked = 0;
+    net.nodes[0]->set_event_hook([&](const std::string&) { ++hooked; });
+    for (std::uint32_t i = 0; i < 4; ++i) net.apply(i, net.nodes[i]->advance());
+    net.run(all_committed);
+    CHECK(hooked == 1 && net.nodes[0]->drain_events_json() == "[]");
   }
 
   return bctest::summary();

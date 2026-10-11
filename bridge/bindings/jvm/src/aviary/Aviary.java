@@ -33,7 +33,7 @@ public final class Aviary implements AutoCloseable {
             credPolicyEncodeEx, membershipCommit, blindIssue, finalizeMembership,
             credPresentPseud, credGateAdmitPseud, credGateRevokeNym, credGateNoteAdmission,
             blsKeygen, bpEncode, bpHash, registryIds, genesisBuild, genesisCommitBp, genesisHash,
-            chainAssemble, chainHeight, chainBlueprint, chainPropose, chainSeal, chainMine, chainSubmit, chainFree,
+            chainAssemble, chainHeight, chainBlueprint, chainPropose, chainSeal, chainMine, chainSubmit, chainFree, chainDrainEvents, chainSetEventHook, chainMetrics,
             regAddEngine, regAddProposer,
             genesisHeaderH, childRegEncode, subchainPolicyEncode, genesisCommitSubchains, genesisCommitBinding,
             blockHeaderH, headerSubchainRootH, certifiedHeaderEncode, anchorEncode, chainProposeAnchored, chainCertify,
@@ -45,7 +45,7 @@ public final class Aviary implements AutoCloseable {
     private final MethodHandle nodeSetEventHook, nodeSnapshot, nodeRestore, nodeRestoreReplay, nodeNextNonce, nodeBlockAt, nodeSubmitTx, nodeSubmitKs,
             ksSign, ksPublicKey, ksHas, ksAddresses, ksLock,
             netNew, netAddPeer, netSetTxs, netStart, netOnGossip, netOnTimeout, netAdvance, netCommitted, netHeight,
-            netPeerBanned, netReplayLog, netTip, netStateRoot, netBalance, netProve, netFree,
+            netPeerBanned, netReplayLog, netTip, netStateRoot, netBalance, netProve, netFree, netDrainEvents, netSetEventHook, netMetrics,
             secIdentity, secInitiate, secAccept, secHandshake, secComplete, secOpen, secPeer, secEncrypt, secDecrypt, secFree;
 
     public Aviary() {
@@ -142,6 +142,9 @@ public final class Aviary implements AutoCloseable {
         chainMine  = h("aviary_chain_mine", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
         chainSubmit = h("aviary_chain_submit", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         chainFree  = h("aviary_chain_free", FunctionDescriptor.ofVoid(ADDRESS));
+        chainDrainEvents = h("aviary_chain_drain_events", FunctionDescriptor.of(RES, ADDRESS));
+        chainSetEventHook = h("aviary_chain_set_event_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
+        chainMetrics = h("aviary_chain_metrics", FunctionDescriptor.of(RES, ADDRESS));
         regAddEngine = h("aviary_registry_add_engine", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_INT));
         regAddProposer = h("aviary_registry_add_proposer", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS));
         genesisHeaderH = h("aviary_genesis_header", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
@@ -214,6 +217,9 @@ public final class Aviary implements AutoCloseable {
         netBalance = h("aviary_net_node_balance", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
         netProve = h("aviary_net_node_prove_account", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
         netFree = h("aviary_net_node_free", FunctionDescriptor.ofVoid(ADDRESS));
+        netDrainEvents = h("aviary_net_node_drain_events", FunctionDescriptor.of(RES, ADDRESS));
+        netSetEventHook = h("aviary_net_node_set_event_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
+        netMetrics = h("aviary_net_node_metrics", FunctionDescriptor.of(RES, ADDRESS));
         secIdentity = h("aviary_secure_identity_generate", FunctionDescriptor.of(RES));
         secInitiate = h("aviary_secure_initiate", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         secAccept = h("aviary_secure_accept", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
@@ -628,7 +634,17 @@ public final class Aviary implements AutoCloseable {
             try { return (int) chainSubmit.invoke(h, seg(block), (long) block.length, seg(j), (long) j.length) == 1; }
             catch (Throwable e) { throw new RuntimeException(e); }
         }
-        @Override public void close() { try { chainFree.invoke(h); } catch (Throwable ignored) {} }
+        private long eventHandle;
+        /** Buffered block events (block_finalized or block_rejected per submit) as a JSON array; empty while a hook is set. */
+        public String drainEvents() { return new String(consume(invokeRes(chainDrainEvents, h)), StandardCharsets.UTF_8); }
+        /** Receives every block event as one JSON object, synchronously from the submit that caused it; null removes the hook. */
+        public void setEventHook(java.util.function.Consumer<String> hook) { eventHandle = hookEvents(chainSetEventHook, h, eventHandle, hook); }
+        /** Prometheus text: chain height, blocks finalized and rejected, transactions applied. */
+        public String metrics() { return new String(consume(invokeRes(chainMetrics, h)), StandardCharsets.UTF_8); }
+        @Override public void close() {
+            eventHandle = hookEvents(chainSetEventHook, h, eventHandle, null);
+            try { chainFree.invoke(h); } catch (Throwable ignored) {}
+        }
 
         // ── Subchains ──
         /** Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor. */
@@ -1108,6 +1124,17 @@ public final class Aviary implements AutoCloseable {
         } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
     }
     private static final java.util.Map<Long, java.util.function.Consumer<String>> NODE_EVENTS = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Points the native hook of handle h at hook (or clears it when null) and returns the new registry key, 0 when cleared. */
+    private long hookEvents(MethodHandle setter, MemorySegment h, long previous, java.util.function.Consumer<String> hook) {
+        try {
+            if (previous != 0) NODE_EVENTS.remove(previous);
+            if (hook == null) { if (previous != 0) setter.invoke(h, MemorySegment.NULL, MemorySegment.NULL); return 0; }
+            long key = NEXT_HANDLE.getAndIncrement();
+            NODE_EVENTS.put(key, hook);
+            setter.invoke(h, nodeEventStub, MemorySegment.ofAddress(key));
+            return key;
+        } catch (Throwable t) { throw new RuntimeException(t); }
+    }
     @SuppressWarnings("unused")
     private static void nodeEventUpcall(MemorySegment ctx, MemorySegment json, long len) {
         var c = NODE_EVENTS.get(ctx.address());
@@ -1168,7 +1195,17 @@ public final class Aviary implements AutoCloseable {
         public byte[] stateRoot() { return consume(invokeRes(netStateRoot, h)); }
         public long balance(byte[] address) { try { return (long) netBalance.invoke(h, seg(address)); } catch (Throwable t) { throw new RuntimeException(t); } }
         public byte[] proveAccount(byte[] address) { return call(netProve, h, seg(address)); }
-        public void close() { try { netFree.invoke(h); } catch (Throwable ignored) {} }
+        private long eventHandle;
+        /** Buffered events (a block_finalized per committed height) as a JSON array; empty while a hook is set. */
+        public String drainEvents() { return new String(consume(invokeRes(netDrainEvents, h)), StandardCharsets.UTF_8); }
+        /** Receives every event as one JSON object, synchronously from the input that caused it; null removes the hook. */
+        public void setEventHook(java.util.function.Consumer<String> hook) { eventHandle = hookEvents(netSetEventHook, h, eventHandle, hook); }
+        /** Prometheus text: chain height, blocks finalized, gossip received, relayed and dropped, timeouts fired, peers banned. */
+        public String metrics() { return new String(consume(invokeRes(netMetrics, h)), StandardCharsets.UTF_8); }
+        public void close() {
+            eventHandle = hookEvents(netSetEventHook, h, eventHandle, null);
+            try { netFree.invoke(h); } catch (Throwable ignored) {}
+        }
     }
     /** A consensus node for validator me of genesis, or an observer when me is NET_OBSERVER (bls key may then be null). */
     public NetNode newNetNode(byte[] genesis, int me, PortableAccount blsKey, long timestamp) {

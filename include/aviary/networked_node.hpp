@@ -6,6 +6,9 @@
 
 #include "aviary/consensus.hpp"
 #include "aviary/gossip.hpp"
+#include "aviary/observability/event_bus.hpp"
+#include "aviary/observability/event_log.hpp"
+#include "aviary/observability/metrics.hpp"
 #include "aviary/ledger.hpp"
 #include "aviary/round_driver.hpp"
 
@@ -85,6 +88,15 @@ class NetworkedNode {
   /// Tendermint can't even change rounds without 2f+1 crossing the cut. The
   /// receiver's dedup makes replay idempotent. Bounded: one height's messages.
   const std::vector<Bytes>& replay_log() const { return replay_; }
+  /// Chain events (block_finalized per committed height) as a JSON array,
+  /// emptying the buffer.
+  std::string drain_events_json() { return log_.drain_json(); }
+  /// Receives each event synchronously as it happens; while set, nothing is
+  /// buffered. An empty function restores buffering.
+  void set_event_hook(observe::JsonEventLog::Hook hook) { log_.set_hook(std::move(hook)); }
+  /// Prometheus text: chain height, blocks finalized, gossip received,
+  /// relayed and dropped, timeouts fired, peers banned.
+  std::string metrics_text();
 
  private:
   Outbound emit(const consensus::RoundDriver::Output& out);  // driver output → gossip + timeouts
@@ -93,6 +105,11 @@ class NetworkedNode {
   consensus::RoundDriver driver_;
   GossipOverlay gossip_;
   std::vector<Bytes> replay_;  // unique consensus payloads this height (catch-up)
+  void report_progress();
+  observe::EventBus bus_;
+  observe::MetricsRegistry metrics_;
+  observe::JsonEventLog log_{bus_};
+  std::uint64_t reported_height_ = 0;
 };
 
 }  // namespace aviary::p2p

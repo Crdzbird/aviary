@@ -1471,3 +1471,35 @@ selectors — validated against real-world vectors). Deferred:
   JVM `nextNonce`/`restoreNode(bytes, replay)`; Swift
   `nextNonce(address:)`/`restoreNode(_, replay:)`. Every binding test queues
   two transfers before a block and compares the audited restore.
+
+## Events and metrics on Chain and NetNode - DONE (2026-10-11)
+- **[x] Shared JSON event log:** `observe::JsonEventLog` (event_log.hpp)
+  subscribes to the four events on an `EventBus`, buffers them as JSON and
+  forwards them to a hook when one is set. `DemoNode` now uses it instead of
+  its private buffer, so the JSON contract has one implementation.
+- **[x] NetworkedNode observability:** an `EventBus`, a `MetricsRegistry` and
+  a log per node. `report_progress()` publishes `BlockFinalized` whenever the
+  tip height grows (after `start`, `on_gossip`, `on_timeout` and `advance`,
+  using the new `RoundDriver::committed_block()`); counters
+  `aviary_gossip_received_total`, `aviary_gossip_relayed_total`,
+  `aviary_gossip_dropped_total`, `aviary_consensus_timeouts_total`,
+  `aviary_peers_banned_total`, gauge `aviary_chain_height`.
+- **[x] Assembled chain observability:** the C ABI `ChainBox` owns a bus, a
+  registry and a log; `aviary_chain_submit` reports `BlockFinalized` or
+  `BlockRejected` and bumps the counters. A block that fails to decode is
+  refused before the engine and produces no event.
+- **[x] C ABI:** `aviary_chain_drain_events`, `aviary_chain_set_event_hook`,
+  `aviary_chain_metrics`, `aviary_net_node_drain_events`,
+  `aviary_net_node_set_event_hook`, `aviary_net_node_metrics`.
+- **[x] Bindings:** Dart `ChainObservability` and `NetNodeObservability`
+  extensions (`events`, `eventStream`, `metrics`, `metricValues`; the event
+  sink takes the hook symbol, `free` closes the stream); Go `SetEventHook`,
+  `DrainEvents`, `Metrics` on `Chain` and `NetNode` through one cgo export;
+  npm `onEvent`, `drainEvents`, `metrics`; JVM `setEventHook`, `drainEvents`,
+  `metrics` through a shared `hookEvents`; Swift the same through a shared
+  `hookEvents`. Tests: `test_networked_node`, Dart `observability_test`, Go
+  `TestChainObservability` and the mesh test, npm `observability.test.js`,
+  the JVM `Main` and Swift demo mesh sections.
+- **[ ] [L]** Only `BlockFinalized` and `BlockRejected` are emitted by chains
+  and networked nodes; transaction admission lives in the node's mempool.
+

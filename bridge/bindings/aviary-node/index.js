@@ -147,6 +147,9 @@ function ensureLoaded() {
     chainMine: f('AviaryBufferResult aviary_chain_mine(void*, uint8_t*, size_t)'),
     chainSubmit: f('int aviary_chain_submit(void*, uint8_t*, size_t, uint8_t*, size_t)'),
     chainFree: f('void aviary_chain_free(void*)'),
+    chainDrainEvents: f('AviaryBufferResult aviary_chain_drain_events(void*)'),
+    chainSetEventHook: f('void aviary_chain_set_event_hook(void*, AviaryEventFn*, void*)'),
+    chainMetrics: f('AviaryBufferResult aviary_chain_metrics(void*)'),
     // Subchains (a parent block anchors a child chain's finalized headers)
     genesisHeader: f('AviaryBufferResult aviary_genesis_header(uint8_t*, size_t)'),
     childRegEncode: f('AviaryBufferResult aviary_child_registration_encode(uint64_t, uint8_t*, size_t, uint8_t*, uint64_t*, size_t, uint8_t)'),
@@ -241,6 +244,9 @@ function ensureLoaded() {
     netBalance: f('uint64_t aviary_net_node_balance(void*, uint8_t*)'),
     netProve: f('AviaryBufferResult aviary_net_node_prove_account(void*, uint8_t*)'),
     netFree: f('void aviary_net_node_free(void*)'),
+    netDrainEvents: f('AviaryBufferResult aviary_net_node_drain_events(void*)'),
+    netSetEventHook: f('void aviary_net_node_set_event_hook(void*, AviaryEventFn*, void*)'),
+    netMetrics: f('AviaryBufferResult aviary_net_node_metrics(void*)'),
     secIdentity: f('AviaryBufferResult aviary_secure_identity_generate()'),
     secInitiate: f('void *aviary_secure_initiate(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
     secAccept: f('void *aviary_secure_accept(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
@@ -572,8 +578,14 @@ class Blueprint {
   hash() { return consume(fn.bpHash(this.encoded, this.encoded.length), 'blueprint_hash'); }
 }
 // Assembled node: the engine the mixture named, behind propose → (seal|mine) → submit.
+function hookEvents(setter, h, previous, cb) {
+  if (!cb) { setter(h, null, null); return null; }
+  const reg = koffi.register((_ctx, json, len) => { try { cb(Buffer.from(koffi.decode(json, 'uint8_t', Number(len))).toString('utf8')); } catch (_) {} }, koffi.pointer('AviaryEventFn'));
+  setter(h, reg, null);
+  return reg;
+}
 class Chain {
-  constructor(h) { this._h = h; }
+  constructor(h) { this._h = h; this._event = null; }
   get height() { return Number(fn.chainHeight(this._h)); }
   blueprint() { return consume(fn.chainBlueprint(this._h), 'chain_blueprint'); }
   propose(timestamp) { return consume(fn.chainPropose(this._h, BigInt(timestamp)), 'chain_propose'); }
@@ -582,7 +594,15 @@ class Chain {
   submit(block, justification = Buffer.alloc(0)) {
     return fn.chainSubmit(this._h, u8(block), u8(block).length, u8(justification), u8(justification).length) === 1;
   }
-  free() { fn.chainFree(this._h); }
+  free() {
+    if (this._h) { if (this._event) { fn.chainSetEventHook(this._h, null, null); this._event = null; } fn.chainFree(this._h); this._h = null; }
+  }
+  /** Buffered block events (block_finalized or block_rejected per submit) as a JSON array; empty while onEvent is set. */
+  drainEvents() { return consume(fn.chainDrainEvents(this._h), 'chain_drain_events').toString('utf8'); }
+  /** cb(json) for every block event, synchronously from the submit that caused it; null removes the hook. */
+  onEvent(cb) { this._event = hookEvents(fn.chainSetEventHook, this._h, this._event, cb); }
+  /** Prometheus text: chain height, blocks finalized and rejected, transactions applied. */
+  metrics() { return consume(fn.chainMetrics(this._h), 'chain_metrics').toString('utf8'); }
 
   // ── Subchains ──
   /** Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor. */
@@ -847,7 +867,15 @@ class NetNode {
   stateRoot() { return consume(fn.netStateRoot(this._h), 'net_node_state_root'); }
   balance(address) { return Number(fn.netBalance(this._h, u8(address))); }
   proveAccount(address) { return consume(fn.netProve(this._h, u8(address)), 'net_node_prove_account'); }
-  free() { if (this._h) { fn.netFree(this._h); this._h = null; } }
+  /** Buffered events (a block_finalized per committed height) as a JSON array; empty while onEvent is set. */
+  drainEvents() { return consume(fn.netDrainEvents(this._h), 'net_node_drain_events').toString('utf8'); }
+  /** cb(json) for every event, synchronously from the input that caused it; null removes the hook. */
+  onEvent(cb) { this._event = hookEvents(fn.netSetEventHook, this._h, this._event, cb); }
+  /** Prometheus text: chain height, blocks finalized, gossip received, relayed and dropped, timeouts fired, peers banned. */
+  metrics() { return consume(fn.netMetrics(this._h), 'net_node_metrics').toString('utf8'); }
+  free() {
+    if (this._h) { if (this._event) { fn.netSetEventHook(this._h, null, null); this._event = null; } fn.netFree(this._h); this._h = null; }
+  }
 }
 /** A fresh long term identity: { kem: {public, secret}, sig: {public, secret} }. */
 function generateSecureIdentity() {

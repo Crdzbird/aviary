@@ -12,6 +12,7 @@
 #include "aviary/block_store.hpp"
 #include "aviary/mempool.hpp"
 #include "aviary/observability/event_bus.hpp"
+#include "aviary/observability/event_log.hpp"
 #include "aviary/observability/metrics.hpp"
 #include "aviary/proofs.hpp"
 
@@ -130,9 +131,7 @@ class DemoNode {
   std::vector<std::pair<Hash, codec::u128>> credits_;  // genesis credits, in order
   observe::EventBus bus_;
   observe::MetricsRegistry metrics_;
-  void emit(std::string json);
-  std::vector<std::string> events_;  // JSON fragments collected from the bus
-  EventHook hook_;
+  observe::JsonEventLog log_{bus_};
 };
 
 }  // namespace aviary::node

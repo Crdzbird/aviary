@@ -271,6 +271,12 @@ func TestNetMeshAndSecureSession(t *testing.T) {
 	if m.nodes[3].Height() != 2 || obs.Height() != 2 {
 		t.Fatal("second height not reached")
 	}
+	if ev, _ := m.nodes[2].DrainEvents(); !strings.Contains(ev, "block_finalized") {
+		t.Fatalf("net events: %s", ev)
+	}
+	if mt, _ := m.nodes[2].Metrics(); !strings.Contains(mt, "aviary_gossip_received_total") || !strings.Contains(mt, "aviary_chain_height 2") {
+		t.Fatalf("net metrics: %s", mt)
+	}
 	if err := m.nodes[0].SetTransactions([][]byte{{1, 2}}); err == nil {
 		t.Fatal("malformed transaction accepted")
 	}
@@ -310,5 +316,34 @@ func TestNetMeshAndSecureSession(t *testing.T) {
 	}
 	if _, err := bc.AcceptSecureSession(a, msg1); err == nil {
 		t.Fatal("wrong responder identity accepted")
+	}
+}
+
+func TestChainObservability(t *testing.T) {
+	must := ok(t)
+	v, _ := bc.NewBLSValidator(bytes.Repeat([]byte{0x70}, 32))
+	bft, _ := bc.NewBlueprint("bft", "account", "", nil)
+	genesis := must(bc.CommitBlueprint(must(bc.BuildGenesis(9, 1, 1, 0, nil, []bc.GenesisValidator{{PublicKey: v.Public, Power: 1}})), bft))
+	chain, err := bc.AssembleChain(genesis, 0, v.Public, v.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer chain.Free()
+	var hooked []string
+	chain.SetEventHook(func(j string) { hooked = append(hooked, j) })
+	blk := must(chain.Propose(2))
+	if !chain.Submit(blk, must(chain.Certify(blk))) {
+		t.Fatal("submit")
+	}
+	if len(hooked) != 1 || !strings.Contains(hooked[0], "block_finalized") {
+		t.Fatalf("hook: %v", hooked)
+	}
+	chain.SetEventHook(nil)
+	if !chain.Submit([]byte{1, 2, 3}, nil) == false {
+		t.Fatal("garbage must be refused")
+	}
+	mt, _ := chain.Metrics()
+	if !strings.Contains(mt, "aviary_chain_height 1") || !strings.Contains(mt, "aviary_blocks_finalized_total 1") {
+		t.Fatalf("metrics: %s", mt)
 	}
 }

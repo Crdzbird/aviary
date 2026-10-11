@@ -9,6 +9,7 @@ import "C"
 import (
 	"encoding/binary"
 	"errors"
+	"runtime/cgo"
 )
 
 // Observer is the validator index of a node that follows a chain without voting.
@@ -44,7 +45,10 @@ type Outbound struct {
 // with no socket and no clock of its own. Every input returns an Outbound; the
 // application sends the relays over its own transport, arms the timeouts, and
 // feeds what arrives back through OnGossip and OnTimeout.
-type NetNode struct{ h C.AviaryNetNode }
+type NetNode struct {
+	h      C.AviaryNetNode
+	handle cgo.Handle
+}
 
 // NewNetNode creates validator me of genesis (or an observer when me is
 // Observer; bls keys may then be nil).
@@ -55,10 +59,17 @@ func NewNetNode(genesis []byte, me uint32, blsPublic, blsSecret []byte, timestam
 	if h == nil {
 		return nil, errors.New("net node: malformed genesis or key")
 	}
-	return &NetNode{h}, nil
+	return &NetNode{h: h}, nil
 }
 
-func (n *NetNode) Free() { C.aviary_net_node_free(n.h) }
+func (n *NetNode) Free() {
+	if n.handle != 0 {
+		C.aviary_net_node_set_event_hook(n.h, nil, nil)
+		n.handle.Delete()
+		n.handle = 0
+	}
+	C.aviary_net_node_free(n.h)
+}
 
 // AddPeer adds a mesh neighbour.
 func (n *NetNode) AddPeer(peer uint32) { C.aviary_net_node_add_peer(n.h, C.uint32_t(peer)) }

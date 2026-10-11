@@ -468,6 +468,12 @@ public final class Main {
                 drain.run();
                 if (nodes.stream().anyMatch(nn -> nn.height() != 2)) throw new IllegalStateException("mesh height 2");
                 try { nodes.get(0).setTransactions(new byte[][]{{1, 2}}); throw new IllegalStateException("malformed tx accepted"); } catch (IllegalArgumentException expected) {}
+                if (!nodes.get(2).drainEvents().contains("block_finalized")) throw new IllegalStateException("net events");
+                String nm = nodes.get(2).metrics();
+                if (!nm.contains("aviary_gossip_received_total") || !nm.contains("aviary_chain_height")) throw new IllegalStateException("net metrics " + nm);
+                var pushed = new java.util.ArrayList<String>();
+                nodes.get(0).setEventHook(pushed::add);
+                nodes.get(0).setEventHook(null);
                 nodes.forEach(Aviary.NetNode::close);
 
                 Aviary.SecureIdentity ia = bc.generateSecureIdentity(), ib = bc.generateSecureIdentity();

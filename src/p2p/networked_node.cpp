@@ -1,5 +1,7 @@
 #include "aviary/networked_node.hpp"
 
+#include "aviary/observability/events.hpp"
+
 #include <deque>
 
 #include "aviary/wire.hpp"
@@ -37,18 +39,49 @@ NetworkedNode::Outbound NetworkedNode::emit(const consensus::RoundDriver::Output
   return o;
 }
 
-NetworkedNode::Outbound NetworkedNode::start() { return emit(driver_.start()); }
+void NetworkedNode::report_progress() {
+  const BlockHeader& tip = ledger_->tip();
+  if (tip.height <= reported_height_) return;
+  reported_height_ = tip.height;
+  std::uint64_t txs = 0;
+  if (driver_.certificate()) {
+    if (const Block* b = driver_.committed_block()) txs = b->transactions.size();
+  }
+  bus_.publish(observe::BlockFinalized{tip.height, tip.hash(), tip.state_root, txs});
+  metrics_.gauge("aviary_chain_height", "current finalized height").set(static_cast<std::int64_t>(tip.height));
+  metrics_.counter("aviary_blocks_finalized_total", "blocks finalized").inc();
+  metrics_.counter("aviary_transactions_total", "transactions applied").inc(txs);
+}
+
+std::string NetworkedNode::metrics_text() {
+  metrics_.gauge("aviary_chain_height", "current finalized height").set(static_cast<std::int64_t>(ledger_->tip().height));
+  return metrics_.prometheus_text();
+}
+
+NetworkedNode::Outbound NetworkedNode::start() {
+  Outbound o = emit(driver_.start());
+  report_progress();
+  return o;
+}
 
 NetworkedNode::Outbound NetworkedNode::on_gossip(std::uint32_t from, const Bytes& payload) {
-  if (gossip_.banned(from)) return {};  // a banned peer is silenced entirely
+  metrics_.counter("aviary_gossip_received_total", "gossip payloads received").inc();
+  if (gossip_.banned(from)) {  // a banned peer is silenced entirely
+    metrics_.counter("aviary_gossip_dropped_total", "gossip payloads dropped (banned or seen)").inc();
+    return {};
+  }
 
   // Dedup at the overlay: a message that already flooded through here is dropped
   // (this is what bounds traffic and stops loops), so the driver sees each unique
   // message exactly once.
-  if (gossip_.seen(payload)) return {};
+  if (gossip_.seen(payload)) {
+    metrics_.counter("aviary_gossip_dropped_total", "gossip payloads dropped (banned or seen)").inc();
+    return {};
+  }
 
   Outbound o;
   o.relays = gossip_.on_receive(from, payload);  // marks seen; relays to peers != from
+  metrics_.counter("aviary_gossip_relayed_total", "gossip relays sent").inc(o.relays.size());
 
   // Decode and feed the consensus driver; any consensus it emits is gossiped.
   try {
@@ -62,17 +95,23 @@ NetworkedNode::Outbound NetworkedNode::on_gossip(std::uint32_t from, const Bytes
   } catch (...) {
     // Undecodable payload = misbehavior. It already deduped (won't re-flood), and
     // a peer that keeps sending garbage crosses the ban threshold and is cut off.
-    gossip_.penalize(from);
+    if (gossip_.penalize(from)) metrics_.counter("aviary_peers_banned_total", "peers banned").inc();
   }
+  report_progress();
   return o;
 }
 
 NetworkedNode::Outbound NetworkedNode::advance() {
   replay_.clear();
-  return emit(driver_.advance());
+  Outbound o = emit(driver_.advance());
+  report_progress();
+  return o;
 }
 NetworkedNode::Outbound NetworkedNode::on_timeout(consensus::Step step, std::uint32_t round) {
-  return emit(driver_.on_timeout(step, round));
+  metrics_.counter("aviary_consensus_timeouts_total", "consensus timeouts fired").inc();
+  Outbound o = emit(driver_.on_timeout(step, round));
+  report_progress();
+  return o;
 }
 
 }  // namespace aviary::p2p

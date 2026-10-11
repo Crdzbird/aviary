@@ -2,6 +2,8 @@
 
 ## 0.1.0
 
+- `Chain` and `NetNode` gain `drainEvents()`, `onEvent(cb)` and `metrics()`,
+  matching `Node`.
 - First release of aviary-ledger. The Aviary ledger (accounts, signed
   transfers, BFT finality, mempool, events, metrics, state and inclusion
   proofs), composable chains and foreign components, subchains, validator

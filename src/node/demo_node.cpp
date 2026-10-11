@@ -13,12 +13,6 @@ namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 codec::ByteView view(const Hash& h) { return codec::ByteView(h.data(), h.size()); }
 
-std::string hex(const Hash& h) {
-  static constexpr char k[] = "0123456789abcdef";
-  std::string s;
-  for (std::uint8_t b : h) { s.push_back(k[b >> 4]); s.push_back(k[b & 0xF]); }
-  return s;
-}
 }  // namespace
 
 DemoNode::DemoNode(std::uint64_t chain_id) : chain_id_(chain_id) {
@@ -43,43 +37,9 @@ void DemoNode::start_engine(std::unique_ptr<Ledger> ledger) {
   engine_->set_observability(&bus_, &metrics_);
   mempool_.set_event_bus(&bus_);
 
-  // Collect chain events as JSON fragments (the streaming surface).
-  bus_.subscribe<observe::BlockFinalized>([this](const observe::BlockFinalized& e) {
-    std::ostringstream os;
-    os << "{\"type\":\"block_finalized\",\"height\":" << e.height
-       << ",\"tx_count\":" << e.tx_count << ",\"block_id\":\"" << hex(e.block_id)
-       << "\",\"state_root\":\"" << hex(e.state_root) << "\"}";
-    emit(os.str());
-  });
-  bus_.subscribe<observe::BlockRejected>([this](const observe::BlockRejected& e) {
-    std::ostringstream os;
-    os << "{\"type\":\"block_rejected\",\"attempted_height\":" << e.attempted_height
-       << ",\"block_id\":\"" << hex(e.block_id) << "\"}";
-    emit(os.str());
-  });
-  bus_.subscribe<observe::TxAdmitted>([this](const observe::TxAdmitted& e) {
-    std::ostringstream os;
-    os << "{\"type\":\"tx_admitted\",\"txid\":\"" << hex(e.txid)
-       << "\",\"mempool_size\":" << e.mempool_size << "}";
-    emit(os.str());
-  });
-  bus_.subscribe<observe::TxRemoved>([this](const observe::TxRemoved& e) {
-    std::ostringstream os;
-    os << "{\"type\":\"tx_removed\",\"txid\":\"" << hex(e.txid)
-       << "\",\"mempool_size\":" << e.mempool_size << "}";
-    emit(os.str());
-  });
 }
 
-void DemoNode::emit(std::string json) {
-  if (hook_) {
-    hook_(json);
-    return;
-  }
-  events_.push_back(std::move(json));
-}
-
-void DemoNode::set_event_hook(EventHook hook) { hook_ = std::move(hook); }
+void DemoNode::set_event_hook(EventHook hook) { log_.set_hook(std::move(hook)); }
 
 const AccountStateMachine& DemoNode::read_state() const {
   if (engine_) {
@@ -243,7 +203,7 @@ std::unique_ptr<DemoNode> DemoNode::restore(codec::ByteView bytes, bool replay) 
     node->engine_->resume(archive.by_height(archive.tip_height()).commit);
     node->archive_ = std::move(archive);
     node->genesis_.reset();
-    node->events_.clear();
+    node->log_.clear();
     return node;
   }
   node->ensure_started();
@@ -254,7 +214,7 @@ std::unique_ptr<DemoNode> DemoNode::restore(codec::ByteView bytes, bool replay) 
     }
     node->archive_.put(sb.block, sb.commit);
   }
-  node->events_.clear();
+  node->log_.clear();
   return node;
 }
 
@@ -273,16 +233,7 @@ std::uint64_t DemoNode::next_nonce(const Hash& address) const {
 }
 Hash DemoNode::state_root() const { return read_state().state_root(); }
 
-std::string DemoNode::drain_events_json() {
-  std::string out = "[";
-  for (std::size_t i = 0; i < events_.size(); ++i) {
-    if (i) out.push_back(',');
-    out += events_[i];
-  }
-  out.push_back(']');
-  events_.clear();
-  return out;
-}
+std::string DemoNode::drain_events_json() { return log_.drain_json(); }
 
 std::string DemoNode::metrics_text() {
   // Non-sealing: a metrics scrape must never start the engine. Engine counters

@@ -33,6 +33,9 @@
 #endif
 #include <cstring>
 #include "aviary/custody_signing.hpp"
+#include "aviary/observability/event_log.hpp"
+#include "aviary/observability/events.hpp"
+#include "aviary/observability/metrics.hpp"
 #include "aviary/networked_node.hpp"
 #include "aviary/secure_session.hpp"
 #include "aviary/genesis.hpp"
@@ -214,6 +217,22 @@ struct ChainBox {
   aviary::node::AssembledChain chain;
   std::uint32_t me;
   aviary::crypto::KeyPair key;
+  aviary::observe::EventBus bus;
+  aviary::observe::MetricsRegistry metrics;
+  std::unique_ptr<aviary::observe::JsonEventLog> log;
+  ChainBox(aviary::node::AssembledChain c, std::uint32_t m, aviary::crypto::KeyPair k)
+      : chain(std::move(c)), me(m), key(std::move(k)), log(std::make_unique<aviary::observe::JsonEventLog>(bus)) {}
+  void report(const aviary::Block& b, bool applied) {
+    if (applied) {
+      bus.publish(aviary::observe::BlockFinalized{b.header.height, b.header.hash(), b.header.state_root, b.transactions.size()});
+      metrics.gauge("aviary_chain_height", "current finalized height").set(static_cast<std::int64_t>(b.header.height));
+      metrics.counter("aviary_blocks_finalized_total", "blocks finalized").inc();
+      metrics.counter("aviary_transactions_total", "transactions applied").inc(b.transactions.size());
+      return;
+    }
+    bus.publish(aviary::observe::BlockRejected{b.header.height, b.header.hash()});
+    metrics.counter("aviary_blocks_rejected_total", "blocks refused").inc();
+  }
 };
 ChainBox* as_box(AviaryChain c) { return static_cast<ChainBox*>(c); }
 aviary::node::AssembledChain* as_chain(AviaryChain c) { return &as_box(c)->chain; }
@@ -1358,7 +1377,7 @@ AviaryChain aviary_chain_assemble(const uint8_t* genesis, size_t genesis_len, ui
     aviary::crypto::KeyPair key{aviary::crypto::Bytes(bls_pub, bls_pub + pub_len),
                                       aviary::crypto::Bytes(bls_sec, bls_sec + sec_len)};
     auto chain = aviary::node::ChainAssembler::assemble(g, me, key);
-    return new ChainBox{std::move(chain), me, std::move(key)};
+    return new ChainBox(std::move(chain), me, std::move(key));
   } catch (...) {
     return nullptr;  // fail-closed: unknown id / forbidden mix / bad genesis
   }
@@ -1417,10 +1436,27 @@ int aviary_chain_submit(AviaryChain c, const uint8_t* block, size_t block_len,
   if (!c) return 0;
   try {
     aviary::Block b = aviary::Block::decode_all(cbv(block, block_len));
-    return as_chain(c)->engine->submit(b, cbv(justification, justification_len)).ok ? 1 : 0;
+    const bool ok = as_chain(c)->engine->submit(b, cbv(justification, justification_len)).ok;
+    as_box(c)->report(b, ok);
+    return ok ? 1 : 0;
   } catch (...) {
     return 0;
   }
+}
+AviaryBufferResult aviary_chain_drain_events(AviaryChain c) {
+  if (!c) return error_result("null chain");
+  return string_result(as_box(c)->log->drain_json());
+}
+void aviary_chain_set_event_hook(AviaryChain c, AviaryEventFn fn, void* ctx) {
+  if (!c) return;
+  if (!fn) { as_box(c)->log->set_hook(nullptr); return; }
+  as_box(c)->log->set_hook([fn, ctx](const std::string& json) { fn(ctx, json.data(), json.size()); });
+}
+AviaryBufferResult aviary_chain_metrics(AviaryChain c) {
+  if (!c) return error_result("null chain");
+  as_box(c)->metrics.gauge("aviary_chain_height", "current finalized height")
+      .set(static_cast<std::int64_t>(as_chain(c)->engine->height()));
+  return string_result(as_box(c)->metrics.prometheus_text());
 }
 
 void aviary_chain_free(AviaryChain c) { delete as_box(c); }
@@ -1926,6 +1962,19 @@ AviaryBufferResult aviary_net_node_prove_account(AviaryNetNode n, const uint8_t*
     if (!acc) return error_result("net node: not an account-model chain");
     return bytes_result(acc->prove_account(to_hash32(address)).encode());
   } catch (const std::exception& e) { return error_result(e.what()); }
+}
+AviaryBufferResult aviary_net_node_drain_events(AviaryNetNode n) {
+  if (!n) return error_result("null net node");
+  return string_result(as_net(n)->drain_events_json());
+}
+void aviary_net_node_set_event_hook(AviaryNetNode n, AviaryEventFn fn, void* ctx) {
+  if (!n) return;
+  if (!fn) { as_net(n)->set_event_hook(nullptr); return; }
+  as_net(n)->set_event_hook([fn, ctx](const std::string& json) { fn(ctx, json.data(), json.size()); });
+}
+AviaryBufferResult aviary_net_node_metrics(AviaryNetNode n) {
+  if (!n) return error_result("null net node");
+  return string_result(as_net(n)->metrics_text());
 }
 void aviary_net_node_free(AviaryNetNode n) { delete as_net(n); }
 

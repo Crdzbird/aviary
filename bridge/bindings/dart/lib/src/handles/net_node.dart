@@ -9,6 +9,11 @@ part of '../../aviary.dart';
 final class NetNode extends _NativeHandle {
   NetNode._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_net_node_free');
 
+  Uint8List _buf(String fn) => _bc._take(
+    _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
+    fn,
+  );
+
   Outbound _outbound(_BufResult r, String op) =>
       _decodeOutbound(_bc._take(r, op));
 
@@ -79,5 +84,8 @@ final class NetNode extends _NativeHandle {
       1;
 
   /// Releases the native node.
-  void free() => _release();
+  void free() {
+    _nodeSinks.remove(_h.address)?.close();
+    _release();
+  }
 }

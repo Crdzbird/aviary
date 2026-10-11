@@ -77,6 +77,12 @@ class RoundDriver {
   std::uint32_t round() const { return sm_.round(); }
   std::uint64_t height() const { return height_; }
   const std::optional<CommitCertificate>& certificate() const { return cert_; }
+  /// The block this height committed, or null before commit.
+  const Block* committed_block() const {
+    if (!cert_) return nullptr;
+    auto it = blocks_.find(cert_->block_id);
+    return it == blocks_.end() ? nullptr : &it->second;
+  }
 
  private:
   RoundStateMachine::Config make_config();

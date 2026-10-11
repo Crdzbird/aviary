@@ -2,6 +2,9 @@
 
 ## 0.1.0
 
+- Events and metrics on `Chain` and `NetNode`: `events()`, `eventStream`,
+  `metrics()` and `metricValues()`, matching `Node`. `Chain.free` and
+  `NetNode.free` close a live stream.
 - First release. The ledger (accounts, signed transfers, BFT finality,
   mempool, events, metrics, state and inclusion proofs), composable chains
   (mixtures of engine, state model and proposer; foreign components written

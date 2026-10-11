@@ -76,5 +76,8 @@ final class Chain extends _NativeHandle {
   );
 
   /// Releases the native chain.
-  void free() => _release();
+  void free() {
+    _nodeSinks.remove(_h.address)?.close();
+    _release();
+  }
 }
