@@ -99,6 +99,15 @@ resource in the manifests of both Flutter plugins and of the Swift binding),
 and the dynamic xcframework build embeds it in every `AviaryC.framework`
 slice. Edit the source file and copy it to the targets when it changes.
 
+## When the C ABI changes
+
+The Linux engines in `aviary_dart` are built by the Native Linux workflow, so
+an ABI addition lands in two commits: first the source change with the Apple
+and Android artifacts rebuilt locally, then, once that workflow has run, the
+downloaded Linux libraries and the restaged npm prebuilds. The Dart packages
+workflow's Linux leg is red in between, because it tests the committed Linux
+library against the new Dart code; it goes green on the second commit.
+
 ## Publishing notes
 
 - pub only ships git-tracked files and honors the root `.gitignore`, so the
