@@ -1533,9 +1533,10 @@ selectors — validated against real-world vectors). Deferred:
   there too. The default is computed after the cross compile block that forces
   tests off, otherwise Android would have kept LTO off.
 - **[x] Results:** Android arm64 lite 9.0 MB to 5.8 MB, x86_64 9.8 MB to
-  7.1 MB; the iOS and macOS lite slices and the Linux engines follow from the
-  rebuilt CipherBird slices and the Native Linux workflow (numbers in the
-  follow up commit).
+  7.1 MB; Linux x64 21 MB to 7.3 MB, Linux arm64 to 5.8 MB; the dynamic iOS
+  slice 1.1 MB to 0.87 MB; the lite static slices 14.2 MB to 13.3 MB (static
+  archives, so an app pays only for the objects it references). The Linux
+  Dart suite passes on the trimmed engines.
 - **[ ] [L]** The macOS slice of the lite archive still links Homebrew's full
   liboqs and secp256k1 through `build_static_archive.sh`; the Apple lite
   archives are static, so only what an app references reaches it, but a
