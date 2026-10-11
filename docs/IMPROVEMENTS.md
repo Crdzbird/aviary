@@ -1546,3 +1546,20 @@ selectors — validated against real-world vectors). Deferred:
   without `no-deprecated` style surgery; a provider-only build or a different
   AES-GCM-SIV implementation would be the next step.
 
+## Dart peer mesh - DONE (2026-10-11)
+- **[x] `PeerMesh`** in aviary_dart (api/peer_mesh.dart): a deterministic
+  in-memory mesh of `NetNode`s. `link`/`linkAll` wire neighbours, `start` and
+  `advance` fan the calls out, `deliver` hands the next relay to its peer,
+  `step` delivers a relay or fires the earliest armed timeout when none is
+  pending (timeouts are packed as `round << 24 | step << 16 | node` so a plain
+  sort orders them), `run(until)` steps with a budget, `settle` runs until the
+  given validators committed and then drains the relays so observers catch
+  up, leaving armed timeouts alone (a committed node keeps re-arming them, so
+  draining timeouts never ends). The hand written harness in
+  `test/support/mesh.dart` is gone; `network_mesh_test` covers a line mesh
+  with an observer and a full mesh. Documented in the README networking
+  section. The two observability extension parts were merged into
+  `handles/observability.dart` to free the part slot.
+- **[ ] [L]** The other bindings still carry their own mesh loops in tests; a
+  Go `PeerMesh` and an npm one would make their networking examples as short.
+

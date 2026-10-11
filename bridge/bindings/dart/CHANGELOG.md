@@ -2,6 +2,9 @@
 
 ## 0.1.0
 
+- `PeerMesh`: a deterministic in-memory mesh of `NetNode`s (`link`,
+  `linkAll`, `start`, `settle`, `advance`, `run`, `step`, `deliver`) for
+  tests, simulations and single process networks.
 - Events and metrics on `Chain` and `NetNode`: `events()`, `eventStream`,
   `metrics()` and `metricValues()`, matching `Node`. `Chain.free` and
   `NetNode.free` close a live stream.

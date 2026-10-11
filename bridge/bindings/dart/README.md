@@ -91,7 +91,8 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 - Subchains: registrations, policies, anchors, `verifySubchainProof`.
 - Validator rotation: `Chain.scheduleValidators`, `Chain.validators`.
 - Light clients: `newLightClient`, `acceptSkipping`, `syncTo`.
-- Networking: `newNetNode`, `NetNode`, `SecureSession`, `generateSecureIdentity`.
+- Networking: `newNetNode`, `NetNode`, `PeerMesh`, `SecureSession`,
+  `generateSecureIdentity`.
 - Chain trees: `TreeNode`, `buildChainTree`, `ChainTree`.
 - Custody: `KeyStore`, portable accounts, threshold accounts, `Ceremony`.
 - Assurance and sealed mempools; anonymous membership credentials.
@@ -165,6 +166,25 @@ void apply(Outbound out) {
 apply(node.start());
 // on a frame from peer p: apply(node.onGossip(p, sessions[p].decrypt(frame)));
 // once node.committed: apply(node.advance());
+```
+
+For tests, simulations and a single process network, `PeerMesh` is that
+loop: it delivers relays in order and fires a timeout only when no relay is
+pending, earliest round first, so the same inputs always reach the same
+commit. `settle` runs until the validators commit and then drains the mesh
+so observers catch up.
+
+```dart
+final mesh = PeerMesh([
+  for (var i = 0; i < 4; i++)
+    bc.newNetNode(genesis: genesis, me: i, blsKey: keys[i]),
+])..linkAll();
+mesh.start();
+mesh.settle();
+mesh.advance();
+mesh.settle();
+print(mesh.nodes.first.height); // 2
+mesh.free();
 ```
 
 Each link is protected by a `SecureSession`: a mutually authenticated, post

@@ -5,8 +5,6 @@ import 'package:test/test.dart';
 
 import 'support/check.dart';
 
-import 'support/mesh.dart';
-
 void main() {
   test('network mesh', () {
     mesh(Aviary.instance);
@@ -22,23 +20,19 @@ void mesh(Aviary bc) {
     accounts: [(address: alice, balance: 1000)],
     validators: [for (final k in keys) k.entry(1)],
   );
-  final nodes = [
+  final net = PeerMesh([
     for (var i = 0; i < 4; i++)
       bc.newNetNode(genesis: genesis, me: i, blsKey: keys[i]),
-    bc.newNetNode(genesis: genesis, me: AviaryNetwork.observer, peers: [3]),
-  ];
-  for (final (a, b) in [(0, 1), (1, 2), (2, 3), (3, 4)]) {
-    nodes[a].addPeer(b);
-    nodes[b].addPeer(a);
+    bc.newNetNode(genesis: genesis, me: AviaryNetwork.observer),
+  ]);
+  for (var i = 0; i < 4; i++) {
+    net.link(i, i + 1);
   }
-  final net = Mesh(nodes);
-  bool validatorsCommitted() => nodes.take(4).every((n) => n.committed);
-  for (var i = 0; i < nodes.length; i++) {
-    net.apply(i, nodes[i].start());
-  }
-  net.run(validatorsCommitted);
-  check(validatorsCommitted(), 'line mesh commits through relays');
-  net.run(() => false);
+  final nodes = net.nodes;
+  const validators = [0, 1, 2, 3];
+  net.start();
+  check(net.settle(validators: validators), 'line mesh commits via relays');
+  check(!net.deliver(), 'settle drains the relays');
   check(nodes.every((n) => n.height == 1), 'every node incl. observer at 1');
   check(nodes[0].tip().equalsBytes(nodes[4].tip()), 'observer has the tip');
   check(nodes[3].balance(alice) == 1000, 'genesis balance visible');
@@ -52,14 +46,11 @@ void mesh(Aviary bc) {
     bc.verifyStateProof(nodes[2].stateRoot(), nodes[2].proveAccount(alice)),
     'proof from a networked node verifies',
   );
-  for (var i = 0; i < nodes.length; i++) {
-    net.apply(i, nodes[i].advance());
-  }
+  net.advance();
   check(nodes[3].replayLog().isEmpty, 'advance restarts a follower log');
   check(nodes[0].replayLog().isNotEmpty, 'proposer logs its new proposal');
   check(!nodes[0].committed, 'new height is open');
-  net.run(validatorsCommitted);
-  net.run(() => false);
+  check(net.settle(validators: validators), 'second height commits');
   check(nodes.every((n) => n.height == 2), 'second height committed');
   var refused = false;
   try {
@@ -70,7 +61,13 @@ void mesh(Aviary bc) {
     refused = e.status == AviaryStatus.badInput;
   }
   check(refused, 'malformed transaction refused');
-  for (final n in nodes) {
-    n.free();
-  }
+  final full = PeerMesh([
+    for (var i = 0; i < 4; i++)
+      bc.newNetNode(genesis: genesis, me: i, blsKey: keys[i]),
+  ])..linkAll();
+  full.start();
+  check(full.settle() && full.nodes.every((n) => n.height == 1), 'full mesh');
+  check(!full.run(() => false, budget: 1), 'run reports a miss');
+  full.free();
+  net.free();
 }
