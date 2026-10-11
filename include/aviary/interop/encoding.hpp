@@ -4,14 +4,14 @@
 #include <string>
 #include <vector>
 
-/// Encodings used at interop boundaries (ARCHITECTURE §11): Base58 (Bitcoin/
+/// Encodings used at interop boundaries (ARCHITECTURE section 11): Base58 (Bitcoin/
 /// Solana alphabet), Base64 (RFC 4648, for Solana RPC), and compact-u16
 /// (Solana "shortvec" array-length encoding).
 namespace aviary::interop::encoding {
 
 using Bytes = std::vector<std::uint8_t>;
 
-/// Base58 with the Bitcoin/Solana alphabet. Leading zero bytes → leading '1's.
+/// Base58 with the Bitcoin/Solana alphabet. Leading zero bytes -> leading '1's.
 std::string base58_encode(const Bytes& bytes);
 Bytes base58_decode(const std::string& s);  // throws on invalid char
 

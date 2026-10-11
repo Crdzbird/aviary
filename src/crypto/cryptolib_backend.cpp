@@ -56,7 +56,7 @@ Hash hash_node(const Hash& left, const Hash& right) {
 
 Hash zero_hash() { return Hash{}; }
 
-// ── Signatures ───────────────────────────────────────────────────────────────
+// -- Signatures ---------------------------------------------------------------
 
 namespace {
 Bytes take_buffer(CryptoBuffer& b) {
@@ -108,7 +108,7 @@ Hash address_of(ByteView public_key) {
   return blake3_256(public_key.data(), public_key.size());
 }
 
-// ── Hybrid signature: Ed25519 + ML-DSA-65 ────────────────────────────────────
+// -- Hybrid signature: Ed25519 + ML-DSA-65 ------------------------------------
 
 KeyPair hybrid_sig_keygen() {
   CryptoKeyPair kp = cryptolib_hybrid_sig_keygen();
@@ -132,7 +132,7 @@ bool hybrid_sig_verify(ByteView msg, ByteView sig, ByteView public_key) {
                                      public_key.data(), public_key.size()) == 1;
 }
 
-// ── ECVRF (RFC 9381) ─────────────────────────────────────────────────────────
+// -- ECVRF (RFC 9381) ---------------------------------------------------------
 
 KeyPair ecvrf_keygen() {
   CryptoKeyPair kp = cryptolib_ecvrf_keygen();
@@ -175,12 +175,12 @@ std::optional<Bytes> ecvrf_verify(ByteView pk, ByteView alpha, ByteView pi) {
       cryptolib_ecvrf_verify(pk.data(), pk.size(), alpha.data(), alpha.size(), pi.data(), pi.size());
   if (r.buf.data == nullptr) {
     if (r.error) cryptolib_str_free(r.error);
-    return std::nullopt;  // invalid proof — never throws
+    return std::nullopt;  // invalid proof - never throws
   }
   return take_buffer(r.buf);
 }
 
-// ── PQ forward-secret ratchet (cryptolib Session) ────────────────────────────
+// -- PQ forward-secret ratchet (cryptolib Session) ----------------------------
 
 KeyPair Ratchet::generate_prekey() {
   CryptoKeyPair kp = cryptolib_session_generate_prekey();
@@ -254,7 +254,7 @@ Ratchet::~Ratchet() {
   if (h_) cryptolib_session_free(h_);
 }
 
-// ── Noise XX ─────────────────────────────────────────────────────────────────
+// -- Noise XX -----------------------------------------------------------------
 
 namespace {
 const std::uint8_t kNoiseEmpty = 0;
@@ -321,7 +321,7 @@ Noise::~Noise() {
   if (h_) cryptolib_noise_free(h_);
 }
 
-// ── SLH-DSA (FIPS 205) — fixed SLH-DSA-SHA2-128s profile ────────────────────
+// -- SLH-DSA (FIPS 205) - fixed SLH-DSA-SHA2-128s profile --------------------
 
 namespace {
 constexpr int kSlhLevel = 0;       // 128s: smallest signature, slowest signing
@@ -351,7 +351,7 @@ bool slh_dsa_verify(ByteView msg, ByteView sig, ByteView public_key) {
                                   kSlhHashFamily) == 1;
 }
 
-// ── OPAQUE aPAKE ─────────────────────────────────────────────────────────────
+// -- OPAQUE aPAKE -------------------------------------------------------------
 
 namespace {
 // Consume a CryptoBuffer field, throwing with [op] context if it's null.
@@ -453,11 +453,11 @@ Bytes opaque_server_finish(ByteView server_state, ByteView ke3) {
   return take_buffer(r.buf);
 }
 
-// ── BBS signatures ───────────────────────────────────────────────────────────
+// -- BBS signatures -----------------------------------------------------------
 
 namespace {
 // The parallel (pointers[], lengths[]) arrays cryptolib_bbs_* expect, built from
-// a vector of messages. Empty vector → count 0 (nullptr data is fine).
+// a vector of messages. Empty vector -> count 0 (nullptr data is fine).
 struct MsgArrays {
   std::vector<const std::uint8_t*> ptrs;
   std::vector<std::size_t> lens;
@@ -537,7 +537,7 @@ bool bbs_proof_verify(ByteView pk, ByteView proof, ByteView header, ByteView ph,
                                     disclosed_indexes.size()) == 1;
 }
 
-// ── BBS per-verifier pseudonyms + blind issuance ─────────────────────────────
+// -- BBS per-verifier pseudonyms + blind issuance -----------------------------
 
 namespace {
 // Split a flat buffer of concatenated 32-byte scalars into a vector of scalars.
@@ -676,7 +676,7 @@ Bytes bbs_random_scalar() {
   return take_buffer(r.buf);
 }
 
-// ── BLS12-381 ────────────────────────────────────────────────────────────────
+// -- BLS12-381 ----------------------------------------------------------------
 
 KeyPair bls_keygen_from_ikm(ByteView ikm) {
   CryptoKeyPair kp = cryptolib_bls_keygen_from_ikm(ikm.data(), ikm.size());
@@ -737,7 +737,7 @@ bool bls_aggregate_verify(const std::vector<Bytes>& msgs,
                                         agg_sig.size()) == 1;
 }
 
-// ── Hybrid KEM + SecretStream ────────────────────────────────────────────────
+// -- Hybrid KEM + SecretStream ------------------------------------------------
 
 Bytes derive_key(const std::string& context, ByteView ikm) {
   CryptoBufferResult r =
@@ -779,7 +779,7 @@ Bytes hybrid_kem_decapsulate(ByteView ciphertext, ByteView secret_key) {
   return take_buffer(r.buf);
 }
 
-// ── Recipient-bound PQ seals (cryptolib Suite) ───────────────────────────────
+// -- Recipient-bound PQ seals (cryptolib Suite) -------------------------------
 
 namespace {
 Bytes take_or_throw(CryptoBufferResult r, const char* op) {
@@ -824,7 +824,7 @@ Bytes pq_open_signed(ByteView envelope, ByteView recipient_kem_secret, ByteView 
       "pq_open_signed");
 }
 
-// ── Interop primitives ───────────────────────────────────────────────────────
+// -- Interop primitives -------------------------------------------------------
 
 namespace {
 Bytes require_buffer(CryptoBufferResult r, const char* what) {

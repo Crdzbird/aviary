@@ -22,7 +22,7 @@ const genesis = bc.buildGenesis({ chainId: 7, assuranceLevel: 1,
 const chain = bc.assembleChain(bc.commitBlueprint(genesis, new bc.Blueprint('js-engine', 'account')), 0, v.public, v.secret);
 assert(chain, 'JS-engine chain assembles');
 const blk = chain.propose(2);
-const just = chain.seal(blk); // → JS justify
+const just = chain.seal(blk); // -> JS justify
 assert(just.subarray(0, 8).toString() === 'js-just:', 'seal via JS justify');
 const bad = Buffer.from(just); bad[bad.length - 1] ^= 1;
 assert(!chain.submit(blk, bad) && chain.height === 0, 'tampered justification refused, ledger untouched');
@@ -40,6 +40,6 @@ pc.free();
 assert(bc.registerEngine('js-throws', { justify: (b) => tag(b), verify: () => { throw new Error('nope'); } }), 'register throwing engine');
 const tc = bc.assembleChain(bc.commitBlueprint(genesis, new bc.Blueprint('js-throws', 'account')), 0, v.public, v.secret);
 const tb = tc.propose(2);
-assert(!tc.submit(tb, tc.seal(tb)) && tc.height === 0, 'throwing verifier → refused, ledger untouched');
+assert(!tc.submit(tb, tc.seal(tb)) && tc.height === 0, 'throwing verifier -> refused, ledger untouched');
 tc.free();
 console.log('foreign-component test: OK (JS engine + proposer in the mixture)');

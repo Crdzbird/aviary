@@ -1,4 +1,4 @@
-// VRF-based PoS: leader eligibility is an ECVRF proof — unpredictable until the
+// VRF-based PoS: leader eligibility is an ECVRF proof - unpredictable until the
 // leader reveals it, un-grindable (the output is a function of (sk, alpha), not
 // a choice), and verifiable by everyone from the proof in the block.
 #include <memory>
@@ -21,7 +21,7 @@ crypto::KeyPair ed(std::uint8_t s) { Bytes seed(32, s); return crypto::ed25519_k
 
 // VRF keys from FIXED seeds, never ecvrf_keygen(): a VRF proof is deterministic
 // in (sk, alpha), so fixed seeds make every eligibility outcome in this test
-// reproducible run to run — the determinism mandate applies to tests too.
+// reproducible run to run - the determinism mandate applies to tests too.
 crypto::KeyPair vrf_key(std::uint8_t s) {
   Bytes seed(32, s);
   return crypto::KeyPair{crypto::ecvrf_public_key(view(seed)), seed};
@@ -38,7 +38,7 @@ int main() {
   init();
   const Hash alice = crypto::address_of(view(ed(1).public_key));
 
-  // 4 validators with unequal stake, each with a fixed-seed VRF key → the whole
+  // 4 validators with unequal stake, each with a fixed-seed VRF key -> the whole
   // test (which validator is eligible at which attempt) is reproducible.
   const std::uint32_t n = 4;
   std::vector<Validator> vs;
@@ -60,7 +60,7 @@ int main() {
   for (std::uint32_t i = 0; i < n; ++i) engines.push_back(make_engine(i));
 
   std::printf("== a VRF leader emerges and every engine accepts its block ==\n");
-  // Find the first (attempt, validator) that is eligible — what a live network
+  // Find the first (attempt, validator) that is eligible - what a live network
   // converges to as attempts tick.
   std::optional<std::uint32_t> leader;
   for (std::uint32_t attempt = 0; attempt < VrfPosEngine::kMaxAttempts && !leader; ++attempt) {

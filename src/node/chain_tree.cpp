@@ -25,7 +25,7 @@ Hash to_hash(const Bytes& b) { Hash h{}; for (std::size_t i = 0; i < 32 && i < b
 constexpr unsigned kMaxDepth = 8;
 }  // namespace
 
-// ── Spec codec ───────────────────────────────────────────────────────────────
+// -- Spec codec ---------------------------------------------------------------
 
 Bytes ChainTreeSpec::Node::encode() const {
   codec::CodecWriter w;
@@ -119,7 +119,7 @@ std::string ChainTreeSpec::validate() const {
   return err;
 }
 
-// ── Build ────────────────────────────────────────────────────────────────────
+// -- Build --------------------------------------------------------------------
 
 namespace {
 struct Draft {
@@ -196,7 +196,7 @@ std::unique_ptr<ChainTree> ChainTree::build(const ChainTreeSpec& spec) {
         for (std::uint32_t i = 0; i < n.validators.size(); ++i)
           if (!n.validators[i].bls_secret.empty()) { me = i; key = crypto::KeyPair{n.validators[i].bls_public, n.validators[i].bls_secret}; break; }
         if (key.public_key.empty()) key = crypto::KeyPair{n.validators[0].bls_public, {}};
-        AssembledChain chain = ChainAssembler::assemble(d.genesis, me, key);  // throws → fail-closed
+        AssembledChain chain = ChainAssembler::assemble(d.genesis, me, key);  // throws -> fail-closed
         std::vector<std::uint64_t> kids;
         for (const auto& c : n.children) kids.push_back(c.chain_id);
         Built b{n.chain_id, parent, d.depth, d.genesis, n.validators, std::move(chain), BlockStore{}, std::move(kids)};
@@ -209,7 +209,7 @@ std::unique_ptr<ChainTree> ChainTree::build(const ChainTreeSpec& spec) {
   return t;
 }
 
-// ── Queries ──────────────────────────────────────────────────────────────────
+// -- Queries ------------------------------------------------------------------
 
 std::vector<std::uint64_t> ChainTree::chain_ids() const { return order_; }
 
@@ -233,7 +233,7 @@ std::vector<Anchor> ChainTree::pending_anchors_for(std::uint64_t chain_id) const
   return pending_anchors(*reg, kids);
 }
 
-// ── Produce ──────────────────────────────────────────────────────────────────
+// -- Produce ------------------------------------------------------------------
 
 Block ChainTree::produce(std::uint64_t chain_id, std::uint64_t timestamp) {
   Built& n = mut(chain_id);
@@ -267,11 +267,11 @@ Block ChainTree::produce(std::uint64_t chain_id, std::uint64_t timestamp) {
   return b;
 }
 
-// ── Proofs ───────────────────────────────────────────────────────────────────
+// -- Proofs -------------------------------------------------------------------
 
 SubchainProof ChainTree::prove_account(std::uint64_t chain_id, const Hash& address) const {
   const Built& target = node(chain_id);
-  // Path root → target: collect ancestors, then hops from the top down.
+  // Path root -> target: collect ancestors, then hops from the top down.
   std::vector<std::uint64_t> path;
   for (std::uint64_t id = chain_id; id != 0; id = node(id).parent_id) path.push_back(id);
   SubchainProof p;

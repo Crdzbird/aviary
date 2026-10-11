@@ -15,7 +15,7 @@ import (
 
 // fleet is a CHAIN TREE: one fleet root chain anchoring a BFT subchain per
 // device. Each device chain's genesis funds an identity account whose address
-// is BLAKE3(label) — so "device X belongs to this fleet, at this state" is
+// is BLAKE3(label) - so "device X belongs to this fleet, at this state" is
 // provable from the fleet root's header alone (docs/design/SUBCHAINS.md).
 type fleet struct {
 	mu       sync.Mutex
@@ -75,7 +75,9 @@ func (s *server) BuildFleet(_ context.Context, in *pb.FleetSpec) (*pb.Fleet, err
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	f.tree = tree
-	tree.OnFinalized = func(chainID uint64, _ []byte) { f.note("finalized: %s (chain %d) → height %d", f.labels[chainID], chainID, tree.Height(chainID)) }
+	tree.OnFinalized = func(chainID uint64, _ []byte) {
+		f.note("finalized: %s (chain %d) -> height %d", f.labels[chainID], chainID, tree.Height(chainID))
+	}
 	f.note("fleet built: root %d + %d device subchains (genesis bottom-up, bindings top-down)", fleetRootID, len(in.DeviceLabels))
 	s.mu.Lock()
 	if s.fleet != nil {
@@ -163,7 +165,7 @@ func (s *server) FleetProveDevice(_ context.Context, r *pb.FleetRef) (*pb.FleetP
 	verified := f.tree.Verify(proof)
 	tip, _ := f.tree.Tip(f.rootID)
 	root, _ := bc.HeaderSubchainRoot(tip)
-	f.note("proof: %s's identity from the fleet root header → %s", f.labels[r.ChainId], map[bool]string{true: "verified", false: "NOT verified (root moved on or device never anchored)"}[verified])
+	f.note("proof: %s's identity from the fleet root header -> %s", f.labels[r.ChainId], map[bool]string{true: "verified", false: "NOT verified (root moved on or device never anchored)"}[verified])
 	return &pb.FleetProof{ChainId: r.ChainId, Verified: verified, ProofBytes: uint32(len(proof)),
 		RootSubchainRoot: hex.EncodeToString(root), IdentityAddress: hex.EncodeToString(identity)}, nil
 }

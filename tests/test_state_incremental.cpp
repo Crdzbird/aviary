@@ -5,8 +5,8 @@
 // the naive `compute_root` over the sorted account leaves for EVERY reachable
 // state, or nodes fork. So we cross-check the fast path against a naive
 // reference over long randomised op sequences that deliberately drive every
-// branch — the O(1) clean read, the O(K·log N) incremental update, the insert
-// rebuild, and the large-overlay seal — and confirm clones are independent.
+// branch - the O(1) clean read, the O(K-log N) incremental update, the insert
+// rebuild, and the large-overlay seal - and confirm clones are independent.
 
 #include <cstdint>
 #include <map>
@@ -50,7 +50,7 @@ Hash naive_root(const std::map<Hash, AccountStateMachine::Account>& accts) {
   return merkle::compute_root(leaves);
 }
 
-// ── MerkleIndex: root_with_updates == compute_root of the mutated leaves ──────
+// -- MerkleIndex: root_with_updates == compute_root of the mutated leaves ------
 void test_merkle_index() {
   std::mt19937_64 rng(0xC0FFEE);
   for (int trial = 0; trial < 200; ++trial) {
@@ -84,7 +84,7 @@ void test_merkle_index() {
   CHECK(empty.root() == merkle::compute_root({}));
 }
 
-// ── AccountStateMachine: fast root tracks the naive root through everything ───
+// -- AccountStateMachine: fast root tracks the naive root through everything ---
 void test_account_state_differential() {
   std::mt19937_64 rng(0xBADF00D);
   AccountStateMachine sm;
@@ -135,7 +135,7 @@ void test_account_state_differential() {
             "inclusion proof verifies against fast root");
 }
 
-// ── clone() is a copy-on-write snapshot: mutating one must not touch the other ─
+// -- clone() is a copy-on-write snapshot: mutating one must not touch the other -
 void test_clone_independence() {
   AccountStateMachine a;
   for (std::uint64_t i = 0; i < 500; ++i) a.credit_genesis(addr_from(i), 100);

@@ -154,7 +154,7 @@ void RoundStateMachine::try_transitions(std::vector<Action>& out) {
     }
 
     // Rule (line 34): 2f+1 prevotes (any value) in current round, while
-    // step = prevote, the first time → schedule the prevote timeout.
+    // step = prevote, the first time -> schedule the prevote timeout.
     if (step_ == Step::kPrevote && prevote_timeout_armed_.count(round_) == 0) {
       auto pit = prevotes_.find(round_);
       if (pit != prevotes_.end() && any_power(pit->second) >= quorum()) {
@@ -208,7 +208,7 @@ void RoundStateMachine::try_transitions(std::vector<Action>& out) {
     }
 
     // Rule (line 47): 2f+1 precommits (any value) in current round, the first
-    // time → schedule the precommit timeout.
+    // time -> schedule the precommit timeout.
     if (precommit_timeout_armed_.count(round_) == 0) {
       auto pit = precommits_.find(round_);
       if (pit != precommits_.end() && any_power(pit->second) >= quorum()) {
@@ -220,7 +220,7 @@ void RoundStateMachine::try_transitions(std::vector<Action>& out) {
     }
 
     // Rule (line 49): PROPOSAL at any round r AND 2f+1 precommits for id(v) at r,
-    // while not yet decided → decide v.
+    // while not yet decided -> decide v.
     if (!decision_.has_value()) {
       bool decided_now = false;
       for (const auto& [r, prop] : proposals_) {
@@ -247,7 +247,7 @@ void RoundStateMachine::try_transitions(std::vector<Action>& out) {
       }
     }
 
-    // Rule (line 55): f+1 messages from a round > current → skip to it.
+    // Rule (line 55): f+1 messages from a round > current -> skip to it.
     if (!decision_.has_value()) {
       for (const auto& [r, senders] : any_msg_) {
         if (r > round_ && power_of(senders) >= f_plus_1()) {

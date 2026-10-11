@@ -1,6 +1,6 @@
-# Aviary golden vectors — BLAKE3-256.
+# Aviary golden vectors - BLAKE3-256.
 #
-# Source of truth for cross-language determinism (ARCHITECTURE §2). Every
+# Source of truth for cross-language determinism (ARCHITECTURE section 2). Every
 # language (C++ core, Dart, Go) must reproduce these EXACTLY. A binding that
 # disagrees on any line fails CI.
 #

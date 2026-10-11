@@ -1,10 +1,10 @@
 // Interop client (Flutter side). Runs the Aviary ledger NATIVELY via
 // aviary and cross-checks it against the Go server over gRPC, in
 // three directions:
-//   • go ↔ flutter : identical canonical bytes (BLAKE3 / txid / header hash)
-//   • go → flutter : the client verifies a proof the GO node produced
-//   • flutter → go : the GO node verifies a proof the CLIENT produced
-//                    (+ both build the same scenario → state roots must match)
+//  - go <-> flutter : identical canonical bytes (BLAKE3 / txid / header hash)
+//  - go -> flutter : the client verifies a proof the GO node produced
+//  - flutter -> go : the GO node verifies a proof the CLIENT produced
+//                    (+ both build the same scenario -> state roots must match)
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -97,7 +97,7 @@ class _InteropScreenState extends State<InteropScreen> {
   late final List<_Direction> _treeDirs = [
     _Direction(
       'go <-> flutter',
-      'Same tree spec → same family, byte-identical roots',
+      'Same tree spec -> same family, byte-identical roots',
       Icons.park,
       [
         _Check('chain ids match (pre-order)'),
@@ -236,17 +236,17 @@ class _InteropScreenState extends State<InteropScreen> {
     _set(
       d.checks[0],
       _eq(localHash, co.hash),
-      'flutter ${_hex(localHash)}…  go ${_hex(co.hash)}…',
+      'flutter ${_hex(localHash)}...  go ${_hex(co.hash)}...',
     );
     _set(
       d.checks[1],
       _eq(localTxid, co.txid),
-      'flutter ${_hex(localTxid)}…  go ${_hex(co.txid)}…',
+      'flutter ${_hex(localTxid)}...  go ${_hex(co.txid)}...',
     );
     _set(
       d.checks[2],
       _eq(localHdr, co.headerHash),
-      'flutter ${_hex(localHdr)}…  go ${_hex(co.headerHash)}…',
+      'flutter ${_hex(localHdr)}...  go ${_hex(co.headerHash)}...',
     );
   }
 
@@ -287,7 +287,7 @@ class _InteropScreenState extends State<InteropScreen> {
     _set(
       d1.checks[0],
       _eq(localRoot, goRoot),
-      'flutter ${_hex(localRoot)}…  go ${_hex(goRoot)}…  (bob=${res.bobBalance})',
+      'flutter ${_hex(localRoot)}...  go ${_hex(goRoot)}...  (bob=${res.bobBalance})',
     );
     _set(
       d1.checks[1],
@@ -308,13 +308,13 @@ class _InteropScreenState extends State<InteropScreen> {
     );
 
     _serverInfo =
-        'chain 7 · height ${res.height} · alice ${res.aliceBalance} · bob ${res.bobBalance}';
+        'chain 7 - height ${res.height} - alice ${res.aliceBalance} - bob ${res.bobBalance}';
     node.dispose();
   }
 
-  // Chain tree: Go and Flutter each build root ← child ← grandchild from the
-  // same seed (validator keys derive from seed ‖ role), run the same production
-  // schedule, and cross-verify proofs. Identical specs ⇒ identical headers.
+  // Chain tree: Go and Flutter each build root <- child <- grandchild from the
+  // same seed (validator keys derive from seed || role), run the same production
+  // schedule, and cross-verify proofs. Identical specs => identical headers.
   Future<void> _runTree() async {
     final bc = Aviary.instance;
     final seed = Uint8List.fromList(
@@ -368,7 +368,7 @@ class _InteropScreenState extends State<InteropScreen> {
       _set(
         d0.checks[0],
         idsOk,
-        'Go ${go.chainIds.join(",")} · Flutter ${local.chainIds().join(",")}',
+        'Go ${go.chainIds.join(",")} - Flutter ${local.chainIds().join(",")}',
       );
       final goRoot = Uint8List.fromList(go.rootSubchainRoot);
       final rootsOk = _eq(goRoot, localRoot);
@@ -376,8 +376,8 @@ class _InteropScreenState extends State<InteropScreen> {
         d0.checks[1],
         rootsOk,
         rootsOk
-            ? '${_hex(localRoot).substring(0, 24)}… on both sides'
-            : 'Go ${_hex(goRoot).substring(0, 16)}… ≠ Flutter ${_hex(localRoot).substring(0, 16)}…',
+            ? '${_hex(localRoot).substring(0, 24)}... on both sides'
+            : 'Go ${_hex(goRoot).substring(0, 16)}... != Flutter ${_hex(localRoot).substring(0, 16)}...',
       );
       final goProof = Uint8List.fromList(go.proof);
       _set(
@@ -422,7 +422,7 @@ class _InteropScreenState extends State<InteropScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Aviary · Go <-> Flutter'),
+          title: const Text('Aviary - Go <-> Flutter'),
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.account_balance_wallet), text: 'Ledger'),
@@ -469,10 +469,10 @@ class _InteropScreenState extends State<InteropScreen> {
                             children: [
                               Text(
                                 !allDone
-                                    ? 'Running cross-binding checks…'
+                                    ? 'Running cross-binding checks...'
                                     : allOk
                                     ? 'Ledger is byte-identical across Go and Flutter'
-                                    : 'MISMATCH — bindings disagree',
+                                    : 'MISMATCH - bindings disagree',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -480,7 +480,7 @@ class _InteropScreenState extends State<InteropScreen> {
                               ),
                               if (_serverInfo.isNotEmpty)
                                 Text(
-                                  'Aviary ${Aviary.instance.version()} · $_serverInfo',
+                                  'Aviary ${Aviary.instance.version()} - $_serverInfo',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.white60,
@@ -528,7 +528,7 @@ class _InteropScreenState extends State<InteropScreen> {
                 const Padding(
                   padding: EdgeInsets.only(bottom: 4),
                   child: Text(
-                    'Both sides build the same family — a root, a child subchain and a grandchild — from one seed, produce blocks upward, and exchange cross-chain proofs.',
+                    'Both sides build the same family - a root, a child subchain and a grandchild - from one seed, produce blocks upward, and exchange cross-chain proofs.',
                     style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ),

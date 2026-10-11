@@ -53,7 +53,7 @@ int main() {
     CHECK(loaded.unlock_with_passphrase("correct horse") == m_pass);
   }
 
-  std::printf("== vault: seal → open round-trips; tamper + wrong-aad rejected ==\n");
+  std::printf("== vault: seal -> open round-trips; tamper + wrong-aad rejected ==\n");
   {
     Bytes master(32, 0x11);
     Vault v(view(master));
@@ -105,7 +105,7 @@ int main() {
     CHECK(!reloaded.unlocked());  // comes back locked
     CHECK(reloaded.has(a_addr));
     CHECK(reloaded.public_key(a_addr) == alice.public_key);  // public data available while locked
-    CHECK(::bctest::throws([&] { (void)reloaded.reveal_secret(a_addr); }));  // locked → cannot reveal
+    CHECK(::bctest::throws([&] { (void)reloaded.reveal_secret(a_addr); }));  // locked -> cannot reveal
 
     reloaded.unlock_with_passphrase("hunter2");
     CHECK(reloaded.unlocked());
@@ -117,14 +117,14 @@ int main() {
     CHECK(::bctest::throws([&] { r2.unlock_with_passphrase("nope"); }));
 
     std::printf("== a revealed secret actually signs a valid transaction ==\n");
-    // Custody → signing: reveal the sealed key and use it exactly like a raw one.
+    // Custody -> signing: reveal the sealed key and use it exactly like a raw one.
     Bytes secret = reloaded.reveal_secret(a_addr);
     Bytes msg = bytes("sign me");
     Bytes sig = crypto::ed25519_sign(view(msg), view(secret));
     CHECK(crypto::ed25519_verify(view(msg), view(sig), view(alice.public_key)));
   }
 
-  std::printf("== vault: molecular (cascade) seal — round-trip, tamper + wrong-aad rejected ==\n");
+  std::printf("== vault: molecular (cascade) seal - round-trip, tamper + wrong-aad rejected ==\n");
   {
     Bytes master(32, 0x42);
     Vault v(view(master));
@@ -148,7 +148,7 @@ int main() {
     } catch (const std::exception&) {
       threw = true;
     }
-    CHECK_MSG(threw, "the cascade commits to the AAD — relocation rejected");
+    CHECK_MSG(threw, "the cascade commits to the AAD - relocation rejected");
 
     Bytes other_master(32, 0x43);
     Vault w(view(other_master));
@@ -212,7 +212,7 @@ int main() {
     CHECK(re[0] == 2);
     KeyStore ks2 = KeyStore::load(view(re));
     ks2.unlock_with_passphrase("legacy-pass");
-    CHECK_MSG(ks2.reveal_secret(addr) == kp.secret_key, "v1→v2 migration preserves the entry");
+    CHECK_MSG(ks2.reveal_secret(addr) == kp.secret_key, "v1->v2 migration preserves the entry");
   }
 
   std::printf("== portable export/import: an account moves between stores under a passphrase ==\n");

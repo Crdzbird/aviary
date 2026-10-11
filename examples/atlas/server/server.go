@@ -99,7 +99,7 @@ func (c *chain) walletPB(w *wallet) *pb.Wallet {
 	}
 }
 
-// ── RPCs ──────────────────────────────────────────────────────────────────────
+// -- RPCs ----------------------------------------------------------------------
 
 func (s *server) CreateChain(_ context.Context, r *pb.CreateChainRequest) (*pb.Chain, error) {
 	s.mu.Lock()
@@ -350,7 +350,7 @@ func (c *chain) eventLoop() {
 	}
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// -- helpers -------------------------------------------------------------------
 
 func decodeAddr(s string) ([]byte, error) {
 	b, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))

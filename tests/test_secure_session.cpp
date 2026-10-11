@@ -71,8 +71,8 @@ int main() {
   {
     auto wrong = SecureSession::generate_identity();
     auto [Ix, msg1] = SecureSession::begin_initiator(responder.kem.public_key, initiator.sig);
-    // Responder uses the wrong KEM secret → different shared secret → the
-    // initiator's transcript signature fails to verify → abort (no bad channel).
+    // Responder uses the wrong KEM secret -> different shared secret -> the
+    // initiator's transcript signature fails to verify -> abort (no bad channel).
     CHECK_THROWS(SecureSession::accept_responder(wrong, msg1));
   }
 
@@ -96,7 +96,7 @@ int main() {
   std::printf("== an impostor initiator authenticates as ITS OWN key, not the victim's ==\n");
   {
     // A MITM presenting its own identity completes a handshake, but the
-    // responder sees the MITM's key — so allow-list pinning rejects it.
+    // responder sees the MITM's key - so allow-list pinning rejects it.
     auto mitm = SecureSession::generate_identity();
     auto [Im, msg1] = SecureSession::begin_initiator(responder.kem.public_key, mitm.sig);
     auto [Rm, msg2] = SecureSession::accept_responder(responder, msg1);
@@ -109,7 +109,7 @@ int main() {
     auto [Ia, Ra] = handshake(responder, initiator.sig);
     auto [Ib, Rb] = handshake(responder, initiator.sig);
     Bytes ct = Ia.encrypt(bytes("for Ra only"));
-    CHECK_THROWS(Rb.decrypt(ct));  // different ephemeral KEM → different keys
+    CHECK_THROWS(Rb.decrypt(ct));  // different ephemeral KEM -> different keys
   }
 
   return bctest::summary();

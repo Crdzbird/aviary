@@ -10,7 +10,7 @@
 #include "aviary/consensus.hpp"
 #include "aviary/crypto.hpp"
 
-/// Asynchronous Tendermint round state machine (ARCHITECTURE §7; the "latest
+/// Asynchronous Tendermint round state machine (ARCHITECTURE section 7; the "latest
 /// gossip on BFT consensus" Algorithm 1). This is the *liveness* machinery that
 /// sits on top of the safety-critical certificate core in `consensus.hpp`:
 /// propose / prevote / precommit steps, deterministic proposer rotation,
@@ -21,7 +21,7 @@
 /// clock, no randomness, no I/O, no crypto. It consumes already-authenticated
 /// messages and timeout events and returns the [Action]s the driver must carry
 /// out (broadcast a message, schedule a timeout, or decide). That keeps it
-/// deterministic and exhaustively testable — the same property the rest of the
+/// deterministic and exhaustively testable - the same property the rest of the
 /// consensus layer relies on. Signing, verification, and networking live in the
 /// driver above it.
 namespace aviary::consensus {
@@ -71,7 +71,7 @@ class RoundStateMachine {
     /// May this value be DECIDED once 2f+1 precommit it? Defaults to `valid`.
     /// Split so a node can refuse to vote for something (governance, e.g. an
     /// unscheduled validator-set change) yet still follow the network's
-    /// decision when a quorum certifies it — otherwise it would strand itself.
+    /// decision when a quorum certifies it - otherwise it would strand itself.
     std::function<bool(const Hash&)> finalizable;
   };
 
@@ -103,16 +103,16 @@ class RoundStateMachine {
   Value valid_value_{};
   std::int64_t valid_round_ = -1;
 
-  // Received messages, indexed for the "upon 2f+1 …" queries.
+  // Received messages, indexed for the "upon 2f+1 ..." queries.
   struct Proposal {
     Value value{};
     std::int64_t valid_round = -1;
     bool present = false;
   };
-  std::map<std::uint32_t, Proposal> proposals_;                        // round → proposer's proposal
-  std::map<std::uint32_t, std::map<Value, std::set<std::uint32_t>>> prevotes_;   // round → value → senders
-  std::map<std::uint32_t, std::map<Value, std::set<std::uint32_t>>> precommits_; // round → value → senders
-  std::map<std::uint32_t, std::set<std::uint32_t>> any_msg_;           // round → senders (round-skip)
+  std::map<std::uint32_t, Proposal> proposals_;                        // round -> proposer's proposal
+  std::map<std::uint32_t, std::map<Value, std::set<std::uint32_t>>> prevotes_;   // round -> value -> senders
+  std::map<std::uint32_t, std::map<Value, std::set<std::uint32_t>>> precommits_; // round -> value -> senders
+  std::map<std::uint32_t, std::set<std::uint32_t>> any_msg_;           // round -> senders (round-skip)
 
   // "for the first time" guards.
   std::set<std::uint32_t> prevote_timeout_armed_;

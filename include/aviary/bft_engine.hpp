@@ -15,10 +15,10 @@ class EventBus;
 class MetricsRegistry;
 }  // namespace aviary::observe
 
-/// Tendermint-style BFT engine (ARCHITECTURE §7): deterministic instant finality
+/// Tendermint-style BFT engine (ARCHITECTURE section 7): deterministic instant finality
 /// over a known validator set, driving the deterministic [Ledger] state layer.
 ///
-/// M2 scope is the safety-critical core — propose, precommit, aggregate a >2/3
+/// M2 scope is the safety-critical core - propose, precommit, aggregate a >2/3
 /// commit certificate, and finalize (verify the certificate, then apply the
 /// block). The full asynchronous round state machine (timeouts, prevotes,
 /// locking, proposer rotation) builds on this and is future work; the safety
@@ -45,12 +45,12 @@ class BftEngine : public ConsensusEngine {
   /// The set that certified the current tip.
   const ValidatorSet& tip_validators() const { return prev_vset_; }
 
-  // ── Validator-set changes (coordinated rotation) ───────────────────────────
+  // -- Validator-set changes (coordinated rotation) ---------------------------
   // Operators agree a new set out of band and each SCHEDULES it; the next block
   // this node proposes announces it, and this node only VOTES for a block whose
   // announced set equals what it scheduled (precommit refuses otherwise). Once
   // a rotation block is certified by >2/3 of the current set, finalize follows
-  // it regardless — voting is the governance act, finalization follows consensus.
+  // it regardless - voting is the governance act, finalization follows consensus.
   void schedule_validator_set(ValidatorSet next) { pending_ = std::move(next); }
   void cancel_scheduled_validator_set() { pending_.reset(); }
   const std::optional<ValidatorSet>& scheduled_validator_set() const { return pending_; }
@@ -62,7 +62,7 @@ class BftEngine : public ConsensusEngine {
 
   /// Proposer step: assemble the next block from [txs], stamping its
   /// consensus_data with the validator-set hash and the last commit (the
-  /// certificate that finalized the parent) — so the produced chain is
+  /// certificate that finalized the parent) - so the produced chain is
   /// self-certifying and bound to this validator set.
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override {
     return propose(std::move(txs), timestamp, {});
@@ -82,7 +82,7 @@ class BftEngine : public ConsensusEngine {
   }
 
   /// ConsensusEngine seam: the justification is an encoded CommitCertificate.
-  /// Decodes it and finalizes the block (verify certificate → apply).
+  /// Decodes it and finalizes the block (verify certificate -> apply).
   BlockError submit(const Block& b, codec::ByteView justification) override;
 
   /// A validator precommits a proposed block.
@@ -103,14 +103,14 @@ class BftEngine : public ConsensusEngine {
 
   /// Attach observability sinks (both nullable). The engine then publishes
   /// BlockFinalized/BlockRejected and updates chain metrics. Purely a
-  /// side-channel — never affects consensus or state.
+  /// side-channel - never affects consensus or state.
   void set_observability(observe::EventBus* bus, observe::MetricsRegistry* metrics);
 
-  // ── Equivocation evidence pool (S4) ────────────────────────────────────────
+  // -- Equivocation evidence pool (S4) ----------------------------------------
 
   /// Verify and record gossiped double-signing evidence. Returns true iff the
   /// evidence is a valid proof against this chain's validator set (and thus the
-  /// offender is now recorded). Idempotent — re-submitting the same offender is
+  /// offender is now recorded). Idempotent - re-submitting the same offender is
   /// a no-op that still returns true.
   bool record_evidence(const Evidence& ev);
 
@@ -127,7 +127,7 @@ class BftEngine : public ConsensusEngine {
   ValidatorSet prev_vset_;  // certified the tip
   std::optional<ValidatorSet> pending_;  // scheduled rotation (announced by our proposals)
   std::unique_ptr<Ledger> ledger_;
-  // The certificate that finalized the current tip — embedded as the next
+  // The certificate that finalized the current tip - embedded as the next
   // block's last commit. Absent until the first block finalizes.
   std::optional<CommitCertificate> last_commit_;
   std::set<std::uint32_t> equivocators_;  // proven double-signers

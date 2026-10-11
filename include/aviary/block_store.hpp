@@ -9,10 +9,10 @@
 #include "aviary/consensus.hpp"
 #include "aviary/types.hpp"
 
-/// Persistent, indexed block archive (ARCHITECTURE §13). Stores finalized blocks
+/// Persistent, indexed block archive (ARCHITECTURE section 13). Stores finalized blocks
 /// with their commit certificates, contiguous by height, and indexes them by
 /// block hash and by transaction id. Serializes to a byte blob so a node can
-/// persist its chain and reload it on restart — the block half of persistence
+/// persist its chain and reload it on restart - the block half of persistence
 /// (the state half is `Ledger::snapshot`).
 namespace aviary {
 
@@ -32,7 +32,7 @@ class BlockStore {
 
   /// Append a finalized block + its commit certificate. Heights must be
   /// contiguous (each one after the previous), and a height may not be stored
-  /// twice — returns false otherwise.
+  /// twice - returns false otherwise.
   bool put(const Block& block, const consensus::CommitCertificate& commit);
 
   bool empty() const { return by_height_.empty(); }

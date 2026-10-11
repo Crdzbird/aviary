@@ -7,29 +7,29 @@
 #include "aviary/types.hpp"
 
 /// A confidential, integrity-protected, post-quantum-hybrid, forward-secret,
-/// **mutually authenticated** peer session (ARCHITECTURE §9). Built from
+/// **mutually authenticated** peer session (ARCHITECTURE section 9). Built from
 /// cryptolib's hybrid KEM (X25519 + ML-KEM-768) for key agreement, SecretStream
 /// for the framed encrypted transport, and a hybrid signature (Ed25519 +
 /// ML-DSA-65) over the handshake transcript for identity authentication.
 ///
 /// Handshake (2 messages, SIGMA-style signed transcript):
-///   initiator → responder:  KEM ciphertext ‖ initiator stream header
-///                           ‖ initiator identity pk ‖ sig_I(transcript)
-///   responder → initiator:  responder stream header
-///                           ‖ responder identity pk ‖ sig_R(transcript)
+///   initiator -> responder:  KEM ciphertext || initiator stream header
+///                           || initiator identity pk || sig_I(transcript)
+///   responder -> initiator:  responder stream header
+///                           || responder identity pk || sig_R(transcript)
 /// Both sides derive two domain-separated directional keys from the KEM shared
 /// secret, so each direction is an independent forward-secure stream. Each side
 /// signs a transcript that binds the KEM ciphertext, both stream headers, both
-/// identity keys, and a *channel binder* derived from the shared secret — so a
+/// identity keys, and a *channel binder* derived from the shared secret - so a
 /// signature cannot be replayed onto a different session, and a party must have
 /// actually agreed the key to produce a valid one.
 ///
 /// Why this matters post-quantum: confidentiality survives a quantum adversary
-/// via ML-KEM, and **authentication survives via ML-DSA** — a "harvest now,
+/// via ML-KEM, and **authentication survives via ML-DSA** - a "harvest now,
 /// impersonate later" attacker who breaks X25519/Ed25519 still cannot forge the
 /// PQ half of the transcript signature, so it cannot MITM the channel.
 ///
-/// After the handshake each side exposes `peer_identity()` — the *authenticated*
+/// After the handshake each side exposes `peer_identity()` - the *authenticated*
 /// remote signing public key. Callers MUST check it against their expected peer
 /// / validator allow-list; the handshake proves the peer holds that key but not
 /// that it is the peer you wanted (classic Noise-XX identity pinning).
@@ -82,7 +82,7 @@ class SecureSession {
   SecureSession() = default;
 
   std::unique_ptr<crypto::StreamEncryptor> enc_;  // our send direction
-  std::unique_ptr<crypto::StreamDecryptor> dec_;  // peer → us direction
+  std::unique_ptr<crypto::StreamDecryptor> dec_;  // peer -> us direction
   Bytes pending_recv_key_;    // initiator: receive key, until msg2 arrives
   Bytes pending_transcript_;  // initiator: signed transcript core, until msg2
   Bytes peer_identity_;       // authenticated remote signing pk

@@ -1,4 +1,4 @@
-// Aviary for Node.js — koffi FFI bindings.
+// Aviary for Node.js - koffi FFI bindings.
 //
 // The native library is bundled in this package under prebuilds/<platform>-<arch>/
 // and loaded automatically; consumers never provide a path:
@@ -27,7 +27,7 @@ koffi.proto('int AviaryTxSourceFn(void* ctx, uint64_t chain_id, uint64_t ts, uin
 koffi.proto('void AviaryFinalizedFn(void* ctx, uint64_t chain_id, const uint8_t* block, size_t block_len)');
 koffi.proto('void AviaryEventFn(void* ctx, const uint8_t* json, size_t len)');
 
-// ── Resolve the bundled native libraries for this platform/arch ──────────────
+// -- Resolve the bundled native libraries for this platform/arch --------------
 function ext() {
   return process.platform === 'darwin' ? 'dylib' : process.platform === 'win32' ? 'dll' : 'so';
 }
@@ -46,9 +46,9 @@ function resolveCryptolib() {
   return fs.existsSync(sibling) ? sibling : path.join(dir, `libcryptolib_c.${ext()}`);
 }
 
-// ── Lazy native binding ──────────────────────────────────────────────────────
+// -- Lazy native binding ------------------------------------------------------
 // The native library loads on FIRST USE (or early via preload()), never at
-// require() time — importing this module is cheap and never blocks the event
+// require() time - importing this module is cheap and never blocks the event
 // loop. All public methods are synchronous; the first to run triggers the
 // (memoized) load. No `await` is ever required to call the ledger API.
 let _native = null;
@@ -265,7 +265,7 @@ function ensureLoaded() {
 }
 const fn = new Proxy({}, { get: (_t, p) => ensureLoaded()[p] });
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 const u8 = (x) => Buffer.isBuffer(x) ? x : Buffer.from(x);
 // Unpack the C ABI account blob [pub_len:4 BE][public][secret].
 const splitBlob = (blob) => {
@@ -278,7 +278,7 @@ function consume(r, op) {
   if ((!r.buf.data || Number(r.buf.len) === 0) && r.error) {
     // Read the NUL-terminated C string the error pointer holds (koffi: length -1
     // decodes to the terminator). Decoding it as 'char *' instead reads a pointer
-    // AT the address — a double-indirection that segfaults on the error path.
+    // AT the address - a double-indirection that segfaults on the error path.
     const m = koffi.decode(r.error, 'char', -1); fn.strFree(r.error); throw new Error(m);
   }
   if (!r.buf.data) throw new Error(`${op || 'call'} failed`);
@@ -321,7 +321,7 @@ function preload() {
   });
 }
 
-// ── A live in-memory chain node (ledger + BFT + mempool + observability) ──────
+// -- A live in-memory chain node (ledger + BFT + mempool + observability) ------
 class Node {
   constructor(chainId) {
     this._h = fn.nodeNew(BigInt(chainId));
@@ -360,7 +360,7 @@ class Node {
   }
 
   // Valid until the first block is produced (reads do NOT seal genesis);
-  // afterwards throws — never a silent no-op.
+  // afterwards throws - never a silent no-op.
   credit(address, amount) {
     const rc = fn.credit(this._h, u8(address), BigInt(amount));
     if (rc === 2) throw new Error('genesis is sealed (a block was produced); fund accounts with transfers');
@@ -414,7 +414,7 @@ class KeyStore {
     const b = u8(blob);
     const h = fn.ksLoad(b, b.length);
     if (!h) throw new Error('keystore load failed');
-    return KeyStore._wrap(h);  // LOCKED — call unlock()
+    return KeyStore._wrap(h);  // LOCKED - call unlock()
   }
   free() { if (this._h) { fn.ksFree(this._h); this._h = null; } }
   addAccount(publicKey, secret) {
@@ -439,7 +439,7 @@ class KeyStore {
   lock() { fn.ksLock(this._h); }
 }
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// -- Public API ---------------------------------------------------------------
 // An encrypted mempool (opaque handle). Submissions stay sealed to the proposer.
 class SealedMempool {
   constructor(capacity = 4096) { this._h = fn.smNew(capacity); }
@@ -479,7 +479,7 @@ class Ceremony {
   free() { fn.thCeremonyFree(this._h); }
 }
 
-// CredentialGate (anonymous membership admission, Option A — unlinkable). An
+// CredentialGate (anonymous membership admission, Option A - unlinkable). An
 // issuer signs a member's attributes as a BBS credential; a holder admits itself
 // to a role by proving in zero knowledge it holds an issuer-signed credential
 // whose tier clears the policy and whose expiry has not passed.
@@ -505,7 +505,7 @@ class CredentialPolicy {
       epoch, scope, u8(challenge), u8(challenge).length), 'credential_present');
   }
 
-  // ── Option B — pseudonymous (per-epoch Sybil resistance) ───────────────────
+  // -- Option B - pseudonymous (per-epoch Sybil resistance) -------------------
   // Holder step 1: derive a nym seed from memberSecret and blind-commit it. The
   // returned blob is holder-secret; extractCommitment(blob) is sent to the issuer.
   membershipCommit(memberSecret) {
@@ -537,7 +537,7 @@ function finalizeMembership(membershipCommit, blindIssuance) {
 class CredentialGate {
   constructor(policy) { this._h = fn.credGateNew(policy.encoded, policy.encoded.length); }
   revokeIssuerEpoch(epoch) { fn.credGateRevoke(this._h, epoch); }
-  // Verifier side: admit? Total 1/0 — a malformed presentation is a quiet false.
+  // Verifier side: admit? Total 1/0 - a malformed presentation is a quiet false.
   admit(epoch, scope, challenge, presentation, now) {
     return fn.credGateAdmit(this._h, epoch, scope, u8(challenge), u8(challenge).length,
       u8(presentation), u8(presentation).length, BigInt(now)) === 1;
@@ -548,9 +548,9 @@ class CredentialGate {
       u8(presentation), u8(presentation).length, BigInt(now)), 'admit_pseudonymous');
     return nym.length === 0 ? null : nym;
   }
-  // §6.2 targeted revocation of an exact pseudonym.
+  // section 6.2 targeted revocation of an exact pseudonym.
   revokeNym(nym) { fn.credGateRevokeNym(this._h, u8(nym), u8(nym).length); }
-  // §6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope).
+  // section 6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope).
   noteAdmission(epoch, scope, nym) {
     return fn.credGateNoteAdmission(this._h, epoch, scope, u8(nym), u8(nym).length) === 1;
   }
@@ -577,7 +577,7 @@ class Blueprint {
   }
   hash() { return consume(fn.bpHash(this.encoded, this.encoded.length), 'blueprint_hash'); }
 }
-// Assembled node: the engine the mixture named, behind propose → (seal|mine) → submit.
+// Assembled node: the engine the mixture named, behind propose -> (seal|mine) -> submit.
 function hookEvents(setter, h, previous, cb) {
   if (!cb) { setter(h, null, null); return null; }
   const reg = koffi.register((_ctx, json, len) => { try { cb(Buffer.from(koffi.decode(json, 'uint8_t', Number(len))).toString('utf8')); } catch (_) {} }, koffi.pointer('AviaryEventFn'));
@@ -604,7 +604,7 @@ class Chain {
   /** Prometheus text: chain height, blocks finalized and rejected, transactions applied. */
   metrics() { return consume(fn.chainMetrics(this._h), 'chain_metrics').toString('utf8'); }
 
-  // ── Subchains ──
+  // -- Subchains --
   /** Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor. */
   proposeAnchored(timestamp, anchors) {
     const blob = blobList(anchors);
@@ -618,7 +618,7 @@ class Chain {
     if (fn.chainScheduleValidators(this._h, pks, u64arr(validators.map((v) => v.power)), validators.length) !== 1)
       throw new Error('chain: cannot schedule validators (not BFT, or malformed set)');
   }
-  /** BFT: the validator set in force for the next block → [{publicKey, power}]. */
+  /** BFT: the validator set in force for the next block -> [{publicKey, power}]. */
   validators() { return decodeValidatorSet(consume(fn.chainValidators(this._h), 'chain_validators')); }
   /** A parent's last anchored header for a child. */
   childTip(childChainId) { return consume(fn.chainChildTip(this._h, BigInt(childChainId)), 'chain_child_tip'); }
@@ -627,7 +627,7 @@ class Chain {
   /** State-inclusion proof for a 32-byte address on this account-model chain. */
   proveAccount(address) { return consume(fn.chainProveAccount(this._h, u8(address)), 'chain_prove_account'); }
 }
-// The canonical ValidatorSet encoding: [count]([len][pk][power u64])×.
+// The canonical ValidatorSet encoding: [count]([len][pk][power u64])x.
 function decodeValidatorSet(b) {
   const n = b.readUInt32BE(0); const out = []; let off = 4;
   for (let i = 0; i < n; i++) { const l = b.readUInt32BE(off); off += 4; const pk = b.subarray(off, off + l); off += l; out.push({ publicKey: pk, power: Number(b.readBigUInt64BE(off)) }); off += 8; }
@@ -641,7 +641,7 @@ function encodeValidatorSet(vs) {
 /** Skip results of LightClient.acceptSkipping. */
 const SkipRefused = 0, SkipAccepted = 1, SkipInsufficientOverlap = 2;
 /** A light client: follows a header chain with certificates only. Sequential accept() plus the
- *  OVERLAP (skipping) rule — acceptSkipping({header, certificate, validators}) jumps to a far header
+ *  OVERLAP (skipping) rule - acceptSkipping({header, certificate, validators}) jumps to a far header
  *  when its own set certifies it and the signers hold more than the trust level (default 1/3) of the
  *  set the client already trusts; syncTo bisects when the overlap is too thin. */
 class LightClient {
@@ -660,7 +660,7 @@ class LightClient {
     const vs = encodeValidatorSet(validators);
     return fn.lcAcceptSkipping(this._h, u8(header), u8(header).length, u8(certificate), u8(certificate).length, vs, vs.length);
   }
-  /** Bisection: fetch(height) → checkpoint | null. Throws on a hard refusal / missing checkpoint. */
+  /** Bisection: fetch(height) -> checkpoint | null. Throws on a hard refusal / missing checkpoint. */
   syncTo(target, targetHeight, fetch) {
     const stack = [[target, targetHeight]];
     for (let n = 0; stack.length; n++) {
@@ -680,7 +680,7 @@ class LightClient {
   free() { if (this._h) { fn.lcFree(this._h); this._h = null; } }
 }
 
-// ── Chain tree: declare a FAMILY of chains (root, subchains, custom mixtures) and drive it ──
+// -- Chain tree: declare a FAMILY of chains (root, subchains, custom mixtures) and drive it --
 // node = { chainId, blueprint?: Blueprint (default bft/account), assuranceLevel?: 1, accounts?: [{address, balance}],
 //          validators: [{publicKey, secret?, power}], maxAnchorsPerBlock?, maxHeadersPerAnchor?, children?: [node] }
 function encodeTreeNode(node) {
@@ -721,7 +721,7 @@ class ChainTree {
     const reg = koffi.register((_ctx, chainId, block, len) => { try { cb(Number(chainId), Buffer.from(koffi.decode(block, 'uint8_t', Number(len)))); } catch (_) {} }, koffi.pointer('AviaryFinalizedFn'));
     treeKeep.push(reg); fn.treeSetFinalized(this._h, reg, null);
   }
-  /** fn(chainId, timestamp) → [encodedTx] to include when that chain produces. */
+  /** fn(chainId, timestamp) -> [encodedTx] to include when that chain produces. */
   txSource(cb) {
     const reg = koffi.register((_ctx, chainId, ts, out, cap, outLen) => {
       try { const blob = blobList(cb(Number(chainId), Number(ts)) || []); if (blob.length > cap) return 0; koffi.encode(out, 'uint8_t', blob, blob.length); koffi.encode(outLen, 'size_t', blob.length); return 1; } catch (_) { return 0; }
@@ -737,14 +737,14 @@ function splitBlobList(b) {
   for (let i = 0; i < n; i++) { const l = b.readUInt32BE(off); off += 4; out.push(Buffer.from(b.subarray(off, off + l))); off += l; }
   return out;
 }
-// [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
+// [count u32]([len u32][bytes])x - the C ABI's blob-list convention.
 function blobList(items) {
   const parts = [Buffer.alloc(4)];
   parts[0].writeUInt32BE(items.length);
   for (const it of items) { const l = Buffer.alloc(4); l.writeUInt32BE(u8(it).length); parts.push(l, u8(it)); }
   return Buffer.concat(parts);
 }
-// ── Subchains: a parent block anchors a child chain's finalized headers ───────
+// -- Subchains: a parent block anchors a child chain's finalized headers -------
 // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
 // genesis HEADER + fixed validator set; anchor its certified headers; prove a
 // state entry on a descendant from the parent's header. v1 anchors BFT children.
@@ -779,13 +779,13 @@ function buildGenesis({ chainId, timestamp = 1, assuranceLevel = 1, stateModel =
     addrs, u64arr(accounts.map((a) => a.balance)), accounts.length,
     pks, u64arr(validators.map((v) => v.power)), validators.length), 'genesis_build');
 }
-// ── Foreign components: engines / proposers implemented in JavaScript ─────────
+// -- Foreign components: engines / proposers implemented in JavaScript ---------
 // The consensus pipeline stays native (propose/apply go through the Ledger); JS
 // supplies the JUSTIFICATION policy (justify a proposed block / verify one) or
 // the proposer (leader-election) policy. Callbacks run synchronously inside
 // consensus: they MUST be deterministic (no clock, no randomness, no Math.random)
 // and must not call back into the chain. Registered callbacks live for the
-// process lifetime (chain identity — never rename an id).
+// process lifetime (chain identity - never rename an id).
 const MAX_JUSTIFICATION = 4096;
 const foreignKeep = [];
 // engine: { justify(block: Buffer): Buffer | null, verify(block: Buffer, justification: Buffer): boolean }

@@ -5,8 +5,8 @@
 
 #include "aviary/codec.hpp"
 
-/// Ethereum RLP (Recursive Length Prefix) encoding — the serialization EVM uses
-/// for transactions and more (ARCHITECTURE §11). An item is either a byte string
+/// Ethereum RLP (Recursive Length Prefix) encoding - the serialization EVM uses
+/// for transactions and more (ARCHITECTURE section 11). An item is either a byte string
 /// or a list of items. Distinct from aviary's own canonical codec; used
 /// only at the EVM interop boundary.
 namespace aviary::interop::rlp {
@@ -26,7 +26,7 @@ struct Item {
   bool is_list() const { return kind == Kind::kList; }
 };
 
-/// Minimal big-endian byte string for an unsigned integer (empty for 0) — the
+/// Minimal big-endian byte string for an unsigned integer (empty for 0) - the
 /// canonical RLP integer form (no leading zero bytes).
 Bytes uint_bytes(std::uint64_t v);
 Bytes uint_bytes_u128(codec::u128 v);

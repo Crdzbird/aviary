@@ -1,6 +1,6 @@
 // AssuranceProfile: one named posture that fixes a consistent security tier at
 // every seam, committed into the genesis hash so the whole network provably runs
-// the same configuration — no node can silently join with a weaker one.
+// the same configuration - no node can silently join with a weaker one.
 #include <vector>
 
 #include "aviary/assurance.hpp"

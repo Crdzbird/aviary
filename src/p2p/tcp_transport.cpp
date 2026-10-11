@@ -37,16 +37,16 @@ constexpr int kTimeoutMs = 200;
 // A node can't wait forever for a peer that will never connect (excluded by the
 // allow-list, partitioned, or simply down). Once every expected peer is up we
 // start immediately; otherwise we start anyway after this grace period and run
-// consensus with whoever connected — which still finalizes if that is a quorum.
+// consensus with whoever connected - which still finalizes if that is a quorum.
 constexpr int kConnectGraceMs = 1500;
 
 // Backoff between redial attempts to a peer whose connection dropped (or whose
-// listener isn't up yet — initial dial and reconnect share one path).
+// listener isn't up yet - initial dial and reconnect share one path).
 constexpr int kRedialBackoffMs = 50;
 
 // Cap on a connection's pending outbound bytes. A peer that stops reading (or
 // reads too slowly) past this is disconnected rather than allowed to grow the
-// queue without bound or wedge the reactor — gossip is best-effort, and a
+// queue without bound or wedge the reactor - gossip is best-effort, and a
 // dropped dialer link redials anyway.
 constexpr std::size_t kMaxOutboundBytes = 4u * 1024u * 1024u;
 
@@ -136,7 +136,7 @@ crypto::ByteView cv(const Bytes& b) { return crypto::ByteView(b.data(), b.size()
 // The ratcheted tier wraps each plaintext in a 1-byte control tag: 0x01 = a data
 // frame (consensus), 0x00 = a keepalive/priming frame (no payload). The tag lets
 // the initiator prime the responder's sending chain without injecting a bogus
-// consensus message — and cryptolib's AEAD rejects an empty plaintext, so the
+// consensus message - and cryptolib's AEAD rejects an empty plaintext, so the
 // keepalive must carry at least this byte.
 constexpr std::uint8_t kFrameData = 0x01;
 constexpr std::uint8_t kFrameKeepalive = 0x00;
@@ -195,14 +195,14 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   ::signal(SIGPIPE, SIG_IGN);  // never die because a peer vanished mid-send
   const Clock::time_point start = Clock::now();
 
-  // Reverse allow-list: authenticated signing key → validator id.
+  // Reverse allow-list: authenticated signing key -> validator id.
   std::map<Bytes, std::uint32_t> id_by_sig;
   if (secure)
     for (const auto& [id, pk] : secure->peer_sig_pk) id_by_sig[pk] = id;
   const bool ratcheted = secure && secure->tier == TransportTier::kRatcheted;
   const bool noise = secure && secure->tier == TransportTier::kNoiseXX;
   // Noise XX static: the configured one, else fresh for this boot (the node's
-  // identity is its hybrid sig key, proven per session — the static is not it).
+  // identity is its hybrid sig key, proven per session - the static is not it).
   NoiseSession::Identity noise_id;
   if (noise) {
     noise_id.sig = secure->identity.sig;
@@ -213,8 +213,8 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   int listener = make_listener(listen_port);
   if (listener < 0) return false;
 
-  std::map<std::uint32_t, int> fd_by_peer;  // ready validator id → socket
-  std::unordered_map<int, Conn> conns;      // socket → connection state
+  std::map<std::uint32_t, int> fd_by_peer;  // ready validator id -> socket
+  std::unordered_map<int, Conn> conns;      // socket -> connection state
   const std::size_t expected = peers.size();
 
   // Initial dial and reconnect share one path: peers we are responsible for
@@ -230,14 +230,14 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   }
 
   // Queue a frame for [fd] (4-byte BE length prefix + payload) and try to flush.
-  // Returns false — and drops nothing itself — only on overflow; callers drop.
+  // Returns false - and drops nothing itself - only on overflow; callers drop.
   auto flush = [&](int fd, Conn& c) -> bool {  // false = fatal socket error
     while (!c.out.empty()) {
       ssize_t w = ::send(fd, c.out.data(), c.out.size(), 0);
       if (w > 0) {
         c.out.erase(c.out.begin(), c.out.begin() + w);
       } else if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-        return true;  // kernel buffer full — POLLOUT will resume this
+        return true;  // kernel buffer full - POLLOUT will resume this
       } else if (w < 0 && errno == EINTR) {
         continue;
       } else {
@@ -251,7 +251,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     auto it = conns.find(fd);
     if (it == conns.end()) return;
     Conn& c = it->second;
-    // Only unmap the peer if this fd still IS its mapping — a redial may already
+    // Only unmap the peer if this fd still IS its mapping - a redial may already
     // have installed a fresh socket that must not be clobbered by stale cleanup.
     if (c.ready) {
       auto m = fd_by_peer.find(c.peer_id);
@@ -271,7 +271,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     Conn& c = it->second;
     const std::uint32_t len = static_cast<std::uint32_t>(payload.size());
     if (c.out.size() + 4 + payload.size() > kMaxOutboundBytes) {
-      drop(fd);  // backpressure overflow: the peer isn't reading — cut it off
+      drop(fd);  // backpressure overflow: the peer isn't reading - cut it off
       return;
     }
     c.out.push_back(static_cast<std::uint8_t>(len >> 24));
@@ -299,7 +299,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   bool started = false;
 
   // A link just became usable for consensus. If consensus already started, the
-  // peer may have missed messages (a redial after a drop, or a late joiner) —
+  // peer may have missed messages (a redial after a drop, or a late joiner) - 
   // gossip never re-floods what it already relayed, so without an explicit
   // replay a healed partition stays stalled. Replay our whole per-height log;
   // the peer's dedup discards what it already has.
@@ -307,7 +307,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     fd_by_peer[c.peer_id] = fd;
     if (!started) return true;
     for (const Bytes& payload : node.replay_log()) {
-      if (conns.find(fd) == conns.end()) return false;  // dropped (overflow) — caller must stop
+      if (conns.find(fd) == conns.end()) return false;  // dropped (overflow) - caller must stop
       send_payload(fd, payload);
     }
     return conns.count(fd) != 0;
@@ -329,8 +329,8 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
     c.peer_id = p.id;
     if (ratcheted) {
       // Ratchet initiator: encapsulate to the peer's published prekey, pin its
-      // identity. The channel opens immediately (no msg2 round), so — like the
-      // plaintext dialer — it is ready at once; the armored hello goes out ahead
+      // identity. The channel opens immediately (no msg2 round), so - like the
+      // plaintext dialer - it is ready at once; the armored hello goes out ahead
       // of any encrypted consensus frame.
       auto [chan, hello] = ArmoredChannel::initiate(cv(secure->peer_prekey.at(p.id)),
                                                     cv(secure->peer_sig_pk.at(p.id)),
@@ -381,7 +381,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   auto dispatch = [&](const NetworkedNode::Outbound& out) {
     for (const auto& r : out.relays) {
       auto it = fd_by_peer.find(r.to);
-      if (it == fd_by_peer.end()) continue;  // link down — gossip is best-effort
+      if (it == fd_by_peer.end()) continue;  // link down - gossip is best-effort
       const int fd = it->second;
       send_payload(fd, r.message);
     }
@@ -389,7 +389,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
   };
 
   while (now_ms(start) <= deadline_ms) {
-    // (Re)dial any due targets — initial connections and dropped links alike.
+    // (Re)dial any due targets - initial connections and dropped links alike.
     {
       const std::int64_t t = now_ms(start);
       std::vector<std::uint32_t> due;
@@ -438,7 +438,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
 
       if (!(pfds[i + 1].revents & (POLLIN | POLLHUP | POLLERR))) continue;
 
-      // Drain everything readable (non-blocking socket → loop to EAGAIN).
+      // Drain everything readable (non-blocking socket -> loop to EAGAIN).
       bool closed = false;
       std::uint8_t tmp[4096];
       for (;;) {
@@ -488,18 +488,18 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
                 c.send_backlog.clear();
               }
               // An empty plaintext is a transport priming/keepalive, not a
-              // consensus message — a real wire message is never zero-length.
+              // consensus message - a real wire message is never zero-length.
               if (!pt.empty()) pending.emplace_back(c.peer_id, std::move(pt));
             } catch (...) {
-              drop(fd);  // tamper / desync — cut the peer off (redial → fresh keys)
+              drop(fd);  // tamper / desync - cut the peer off (redial -> fresh keys)
               dropped = true;
             }
           } else {
             pending.emplace_back(c.peer_id, std::move(frame));
           }
         } else if (noise) {
-          // Noise XX: dialer = msg1 → (msg2 ‖ our proof), then the peer's proof;
-          // accepter = msg0 → msg1, msg2 → our proof, then the peer's proof.
+          // Noise XX: dialer = msg1 -> (msg2 || our proof), then the peer's proof;
+          // accepter = msg0 -> msg1, msg2 -> our proof, then the peer's proof.
           // Nobody is `ready` (no consensus byte flows) until the peer's
           // PQ identity proof verified for THIS session and pinned/allow-listed.
           bool waiting = false;  // handshake step done, more frames needed
@@ -549,7 +549,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
           }
         } else if (ratcheted) {
           // Ratchet responder consuming the armored hello: accept, map the
-          // authenticated initiator identity → validator id. No reply frame; the
+          // authenticated initiator identity -> validator id. No reply frame; the
           // channel is open and the next frames are encrypted consensus.
           try {
             c.chan = std::make_unique<ArmoredChannel>(
@@ -561,7 +561,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
           }
           auto found = id_by_sig.find(c.chan->peer_identity());
           if (found == id_by_sig.end()) {
-            drop(fd);  // unknown identity — not on the allow-list
+            drop(fd);  // unknown identity - not on the allow-list
             dropped = true;
             continue;
           }
@@ -592,7 +592,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
             continue;
           }
         } else if (secure) {
-          // Responder consuming msg1: reply msg2, map identity → validator id.
+          // Responder consuming msg1: reply msg2, map identity -> validator id.
           try {
             auto [s, msg2] = SecureSession::accept_responder(secure->identity, frame);
             c.sess = std::make_unique<SecureSession>(std::move(s));
@@ -604,7 +604,7 @@ bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,
           }
           auto found = id_by_sig.find(c.sess->peer_identity());
           if (found == id_by_sig.end()) {
-            drop(fd);  // unknown identity — not on the allow-list
+            drop(fd);  // unknown identity - not on the allow-list
             dropped = true;
             continue;
           }

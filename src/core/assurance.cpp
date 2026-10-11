@@ -55,7 +55,7 @@ AssuranceProfile AssuranceProfile::from_genesis(const GenesisSpec& g) {
                                std::to_string(g.assurance_profile));
   }
   AssuranceProfile p(level);
-  // The declared posture must match the genesis parameters it governs — a spec
+  // The declared posture must match the genesis parameters it governs - a spec
   // that claims a strong level while permitting weak signatures is a
   // misconfiguration, not a valid chain.
   if (g.accepted_sig_algos != p.required_sig_algos()) {

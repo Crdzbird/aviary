@@ -28,4 +28,4 @@ const bad = Buffer.from(proof); bad[bad.length - 1] ^= 1; assert(!tree.verify(ba
 assert(bc.genesisHeader(tree.genesis(42)).length > 0 && tree.tip(420).length > 0, 'genesis/tip');
 let calls = 0; tree.txSource(() => { calls++; return []; }); tree.produce(420, 4); assert(calls === 1, 'tx source from JS');
 tree.free();
-console.log('chain-tree test: OK (root ← child ← grandchild built together, produced upward, proven from the root, hooks from JS)');
+console.log('chain-tree test: OK (root <- child <- grandchild built together, produced upward, proven from the root, hooks from JS)');

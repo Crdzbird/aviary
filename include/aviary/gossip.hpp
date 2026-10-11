@@ -14,20 +14,20 @@ namespace aviary::consensus {
 class CredentialGate;
 }  // namespace aviary::consensus
 
-/// Gossip overlay (ARCHITECTURE §9). The wire protocol and secure sessions carry
+/// Gossip overlay (ARCHITECTURE section 9). The wire protocol and secure sessions carry
 /// messages between two peers; this is the mesh on top: each node dedups
 /// messages by content hash and floods a new one to its peers (except whoever
 /// sent it), so a message reaches every connected node exactly once, without
 /// loops or floods, over an arbitrary (partial) topology.
 ///
 /// Hardening (so an adversary can't exhaust memory or dominate the mesh):
-///   - the seen-set is **bounded** — a capacity-limited FIFO window, so it never
+///  - the seen-set is **bounded** - a capacity-limited FIFO window, so it never
 ///     grows without limit. Eviction is by insertion order (deterministic and
-///     clock-free — the core forbids wall-clock); the window must exceed the
+///     clock-free - the core forbids wall-clock); the window must exceed the
 ///     in-flight message count so a message fully propagates before it ages out.
-///   - peers are **scored**: the caller reports misbehavior (e.g. an undecodable
+///  - peers are **scored**: the caller reports misbehavior (e.g. an undecodable
 ///     or invalidly-signed payload) via `penalize`, and once a peer crosses the
-///     ban threshold it is dropped — no longer relayed to, and its messages are
+///     ban threshold it is dropped - no longer relayed to, and its messages are
 ///     ignored.
 ///
 /// Transport-agnostic and deterministic: the overlay returns the relays it wants
@@ -45,7 +45,7 @@ class GossipOverlay {
   explicit GossipOverlay(std::uint32_t self) : GossipOverlay(self, Config{}) {}
   GossipOverlay(std::uint32_t self, Config cfg) : self_(self), cfg_(cfg) {}
 
-  /// Add a peer to the mesh. This is the TRUSTED path — not membership-gated even
+  /// Add a peer to the mesh. This is the TRUSTED path - not membership-gated even
   /// when a gate is attached (use it for genesis-known / already-authenticated
   /// peers).
   void add_peer(std::uint32_t peer) {
@@ -63,7 +63,7 @@ class GossipOverlay {
   /// [challenge], [now]) or the peer is NOT added and this returns false. With no
   /// gate attached it is exactly [add_peer] and returns true (the presentation is
   /// ignored), so an ungated (permissionless) mesh is unaffected. The gate is a
-  /// *local* admission policy — [now] is caller-supplied, keeping this clock-free.
+  /// *local* admission policy - [now] is caller-supplied, keeping this clock-free.
   bool admit_peer(std::uint32_t peer, std::uint32_t epoch, crypto::ByteView challenge,
                   crypto::ByteView presentation, std::uint64_t now);
 
@@ -76,12 +76,12 @@ class GossipOverlay {
     Bytes message;
   };
 
-  /// Originate [message] from this node → relay it to every peer.
+  /// Originate [message] from this node -> relay it to every peer.
   std::vector<Relay> originate(const Bytes& message);
 
   /// Handle [message] received from peer [from]. If [from] is banned, drop it.
   /// If it is new, mark it seen and relay it to every peer except [from]
-  /// (returned); if already seen, return nothing (dedup — stops loops/floods).
+  /// (returned); if already seen, return nothing (dedup - stops loops/floods).
   std::vector<Relay> on_receive(std::uint32_t from, const Bytes& message);
 
   /// Whether this node has already processed [message] (within the window).
@@ -105,7 +105,7 @@ class GossipOverlay {
   std::set<std::uint32_t> peers_;
   std::set<Hash> seen_;          // content hashes within the window
   std::deque<Hash> seen_order_;  // insertion order for FIFO eviction
-  std::map<std::uint32_t, int> misbehavior_;           // peer → accumulated penalty weight
+  std::map<std::uint32_t, int> misbehavior_;           // peer -> accumulated penalty weight
   std::set<std::uint32_t> banned_;
   const consensus::CredentialGate* gate_ = nullptr;
 };

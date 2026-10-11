@@ -11,4 +11,4 @@ PRODUCT_NAME = interop_app
 PRODUCT_BUNDLE_IDENTIFIER = com.interop.interopApp
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.interop. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright (c) 2026 com.interop. All rights reserved.

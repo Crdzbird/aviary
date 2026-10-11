@@ -11,7 +11,7 @@
 #include "aviary/wire.hpp"
 
 /// Networked driver for the async Tendermint round state machine (ARCHITECTURE
-/// §7). It binds the pure [RoundStateMachine] to the real world: block
+/// section 7). It binds the pure [RoundStateMachine] to the real world: block
 /// production/validation/commit through the [Ledger], BLS vote signing and
 /// verification against the validator set, [CommitCertificate] aggregation on
 /// decide, and gossip via [wire::ConsensusMsg]. The state machine decides *what*
@@ -21,7 +21,7 @@
 /// SM [Action] into signed wire messages + timeout requests, and each inbound
 /// wire message (after signature verification) into an SM input. Timers and the
 /// network are the caller's: the driver returns the messages to gossip and the
-/// timeouts to arm, and the caller feeds back deliveries and fired timeouts —
+/// timeouts to arm, and the caller feeds back deliveries and fired timeouts - 
 /// keeping the whole thing deterministic and testable, exactly like the SM.
 namespace aviary::consensus {
 
@@ -102,14 +102,14 @@ class RoundDriver {
   std::uint64_t height_;  // the height being decided (tip + 1)
 
   RoundStateMachine sm_;
-  // The certificate that finalized the parent — embedded as this height's block's
+  // The certificate that finalized the parent - embedded as this height's block's
   // LastCommit. Absent for the first block after genesis.
   std::optional<CommitCertificate> last_commit_;
-  std::map<Hash, Block> blocks_;  // block id → block (self-produced or from a proposal)
+  std::map<Hash, Block> blocks_;  // block id -> block (self-produced or from a proposal)
   std::vector<Anchor> anchors_;   // subchain anchors to include in our next proposal (parent chains)
   ValidatorSet prev_vset_;        // the set that certified the tip
   std::optional<ValidatorSet> pending_;       // scheduled rotation
-  // Precommit signatures collected for cert building: round → value → validator → sig.
+  // Precommit signatures collected for cert building: round -> value -> validator -> sig.
   // A nil precommit uses the zero-hash sentinel value.
   std::map<std::uint32_t, std::map<Hash, std::map<std::uint32_t, Bytes>>> precommit_sigs_;
   bool committed_ = false;

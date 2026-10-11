@@ -3,7 +3,7 @@
 #
 # It merges aviary's core + C-ABI bridge objects into ONE .a. A consumer
 # linking it (e.g. the Go binding with `-tags aviary_static`) gets a
-# fully self-contained binary — no libaviary_c.dylib/.so to ship or locate
+# fully self-contained binary - no libaviary_c.dylib/.so to ship or locate
 # at run time. aviary's cryptolib_* symbols stay UNDEFINED here; they are
 # satisfied by cryptolib's own static archive (the cryptolib Go binding built
 # with `-tags cryptolib_static`):
@@ -20,7 +20,7 @@ OUT="${1:-build/static}"
 CRYPTOLIB_ROOT="${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}"
 mkdir -p "$OUT"
 
-# Build aviary_c as a STATIC archive (no cryptolib linked — symbols stay
+# Build aviary_c as a STATIC archive (no cryptolib linked - symbols stay
 # undefined, resolved later by cryptolib's static archive).
 cmake -S . -B build-static -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \

@@ -1,7 +1,7 @@
 // Peer discovery + address book: a canonical, mergeable directory of validators
 // that a joining node fills in by exchanging books with peers (PEX). Records are
-// SELF-SIGNED (hybrid sig over the domain-tagged canonical bytes): merge — the
-// PEX trust boundary — verifies every incoming record, so an attacker can't
+// SELF-SIGNED (hybrid sig over the domain-tagged canonical bytes): merge - the
+// PEX trust boundary - verifies every incoming record, so an attacker can't
 // invent or alter a record for a key it doesn't hold; first-writer-wins protects
 // already-known ids on top. Tests the codec, the signature, hostile merges,
 // convergence over a sparse topology, and composition with the transport config.
@@ -115,7 +115,7 @@ int main() {
     CHECK_MSG(mine.get(1)->port == 47001, "a validly-signed newer record still can't rebind mid-session");
   }
 
-  std::printf("== PEX convergence: sparse seeds → every node learns the whole set ==\n");
+  std::printf("== PEX convergence: sparse seeds -> every node learns the whole set ==\n");
   std::vector<AddressBook> books(n);
   for (std::uint32_t i = 0; i < n; ++i)
     books[i].add(make_record(i, ids[i]));  // each starts knowing only itself

@@ -1,8 +1,8 @@
 package aviary
 
 // Aviary's crypto backend is cryptolib. This package depends on cryptolib's
-// Go binding so the full crypto surface — hashing, AEAD, Ed25519/X25519,
-// post-quantum (ML-KEM/ML-DSA), BLS, vaults, keyring, EVM/Bitcoin primitives —
+// Go binding so the full crypto surface - hashing, AEAD, Ed25519/X25519,
+// post-quantum (ML-KEM/ML-DSA), BLS, vaults, keyring, EVM/Bitcoin primitives -
 // is available to consumers ALONGSIDE the ledger, from one dependency. Importing
 // cryptolib's package also links libcryptolib_c (which aviary_c needs),
 // the Go analog of how aviary_flutter depends on cryptolib_flutter.

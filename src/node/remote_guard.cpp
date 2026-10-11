@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include "aviary/keyring.hpp"  // custody::Vault — committing AEAD for the capability
+#include "aviary/keyring.hpp"  // custody::Vault - committing AEAD for the capability
 
 namespace aviary::node {
 
@@ -45,7 +45,7 @@ RemoteGuard::Granted RemoteGuard::login_finish(const std::string& cred_id,
                                                crypto::ByteView ke3) const {
   auto it = admins_.find(cred_id);
   if (it == admins_.end()) throw std::runtime_error("remote-guard: unknown admin credential");
-  // Throws on a wrong-password / bad-KE3 (client authentication failure) — the
+  // Throws on a wrong-password / bad-KE3 (client authentication failure) - the
   // capability is released ONLY past this line.
   Bytes session_key = crypto::opaque_server_finish(server_state, ke3);
   return Granted{std::move(session_key), it->second.sealed_capability};

@@ -9,7 +9,7 @@ namespace aviary::p2p {
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 
-// The transcript the initiator signs and the responder re-derives — binds the
+// The transcript the initiator signs and the responder re-derives - binds the
 // ratchet handshake, the responder's prekey, and both identity keys, so the
 // signature cannot be replayed onto a different channel and proves the initiator
 // meant to talk to THIS responder. Hashed (domain-tagged) then signed.

@@ -694,7 +694,7 @@ class VerifyResult extends $pb.GeneratedMessage {
   void clearOk() => $_clearField(1);
 }
 
-/// ── Chain tree ─────────────────────────────────────────────────────────────────
+/// -- Chain tree -----------------------------------------------------------------
 class TreeScenario extends $pb.GeneratedMessage {
   factory TreeScenario({
     $core.List<$core.int>? seed,

@@ -23,7 +23,7 @@ crypto::KeyPair key_from(std::uint8_t s) {
   return crypto::ed25519_keygen_from_seed(view(seed));
 }
 
-// Naive reference root: the pre-COW definition — compute_root over the sorted
+// Naive reference root: the pre-COW definition - compute_root over the sorted
 // UTXO leaves. The copy-on-write fast path must equal this for every state.
 Hash naive_utxo_root(const std::map<Outpoint, Output>& utxos) {
   std::vector<Hash> leaves;
@@ -113,19 +113,19 @@ int main() {
   CHECK_THROWS(ledger.build_block(
       {make_spend(alice, {to_bob}, {Output{alice_addr, 100}}, kChain)}, 2));
 
-  // Minting: outputs exceed inputs (spend 900 change, emit 1000). Rejected —
+  // Minting: outputs exceed inputs (spend 900 change, emit 1000). Rejected - 
   // a spend may burn value as a fee (in > out) but can never create it (out > in).
   CHECK_THROWS(ledger.build_block(
       {make_spend(alice, {alice_change}, {Output{bob_addr, 1000}}, kChain)}, 2));
 
-  // But spending 900 and emitting only 800 is now VALID — the 100 surplus is a
+  // But spending 900 and emitting only 800 is now VALID - the 100 surplus is a
   // burned fee (a feeless chain requires only out <= in). build_block accepts it
   // (throws only on an invalid tx); we don't commit it, to leave the chain at
   // height 1 for the cases below.
   {
     Block feeblk = ledger.build_block(
         {make_spend(alice, {alice_change}, {Output{bob_addr, 800}}, kChain)}, 2);
-    CHECK(feeblk.transactions.size() == 1);  // built ⇒ the in>out fee spend is valid
+    CHECK(feeblk.transactions.size() == 1);  // built => the in>out fee spend is valid
   }
 
   // Tampered state_root rejected; ledger unchanged.
@@ -155,11 +155,11 @@ int main() {
   {
     UtxoStateMachine s(/*flat_fee=*/10);
     Outpoint op = s.add_genesis_utxo(Output{alice_addr, 1000});
-    // in 1000, out 995 → fee 5 < 10 → rejected.
+    // in 1000, out 995 -> fee 5 < 10 -> rejected.
     CHECK(!s.validate(make_spend(alice, {op}, {Output{bob_addr, 995}}, kChain)).ok);
-    // in 1000, out 990 → fee 10 == minimum → accepted.
+    // in 1000, out 990 -> fee 10 == minimum -> accepted.
     CHECK(s.validate(make_spend(alice, {op}, {Output{bob_addr, 990}}, kChain)).ok);
-    // Exact conservation (fee 0) is below the minimum on a fee'd chain → rejected.
+    // Exact conservation (fee 0) is below the minimum on a fee'd chain -> rejected.
     CHECK(!s.validate(make_spend(alice, {op}, {Output{bob_addr, 1000}}, kChain)).ok);
     // Minting (out > in) is always rejected.
     CHECK(!s.validate(make_spend(alice, {op}, {Output{bob_addr, 1001}}, kChain)).ok);

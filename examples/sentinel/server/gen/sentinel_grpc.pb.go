@@ -4,12 +4,12 @@
 // - protoc             v7.36.1
 // source: sentinel.proto
 
-// Sentinel — a tamper-evident DEVICE PROVENANCE LEDGER built on Aviary.
+// Sentinel - a tamper-evident DEVICE PROVENANCE LEDGER built on Aviary.
 //
 // A device enrolls by sending its hardware information + a credential; the server
 // derives a chain whose GENESIS/ORIGIN block is cryptographically bound to that
 // exact device + credential (its "birth certificate"). Thereafter the device
-// streams data — photos, video chunks, GPS locations, sensor readings — and each
+// streams data - photos, video chunks, GPS locations, sensor readings - and each
 // item's BLAKE3 content hash is ANCHORED on the device's chain with BFT finality.
 //
 // The raw media never goes on-chain; only its hash + metadata are anchored, so
@@ -54,14 +54,14 @@ type SentinelClient interface {
 	// block; the returned chain is bound to this device for its lifetime.
 	ProvisionDevice(ctx context.Context, in *DeviceInfo, opts ...grpc.CallOption) (*Provenance, error)
 	// The live capture pipeline: the device streams data records, the server
-	// anchors each one and streams back anchoring receipts (pending → finalized).
+	// anchors each one and streams back anchoring receipts (pending -> finalized).
 	// Bidirectional so finality receipts arrive asynchronously as blocks seal.
 	StreamData(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[DataRecord, AnchorReceipt], error)
 	// Prove a previously-anchored item is committed in the chain (integrity check).
 	VerifyRecord(ctx context.Context, in *VerifyRequest, opts ...grpc.CallOption) (*VerifyReply, error)
 	// Ledger status + Prometheus-style metrics for the device chain.
 	GetLedger(ctx context.Context, in *DeviceRef, opts ...grpc.CallOption) (*LedgerStatus, error)
-	// ── Fleet: a CHAIN TREE — one fleet root anchoring a subchain per device;
+	// -- Fleet: a CHAIN TREE - one fleet root anchoring a subchain per device;
 	// a device's on-chain identity is provable from the fleet root header.
 	BuildFleet(ctx context.Context, in *FleetSpec, opts ...grpc.CallOption) (*Fleet, error)
 	GetFleet(ctx context.Context, in *FleetRef, opts ...grpc.CallOption) (*Fleet, error)
@@ -168,14 +168,14 @@ type SentinelServer interface {
 	// block; the returned chain is bound to this device for its lifetime.
 	ProvisionDevice(context.Context, *DeviceInfo) (*Provenance, error)
 	// The live capture pipeline: the device streams data records, the server
-	// anchors each one and streams back anchoring receipts (pending → finalized).
+	// anchors each one and streams back anchoring receipts (pending -> finalized).
 	// Bidirectional so finality receipts arrive asynchronously as blocks seal.
 	StreamData(grpc.BidiStreamingServer[DataRecord, AnchorReceipt]) error
 	// Prove a previously-anchored item is committed in the chain (integrity check).
 	VerifyRecord(context.Context, *VerifyRequest) (*VerifyReply, error)
 	// Ledger status + Prometheus-style metrics for the device chain.
 	GetLedger(context.Context, *DeviceRef) (*LedgerStatus, error)
-	// ── Fleet: a CHAIN TREE — one fleet root anchoring a subchain per device;
+	// -- Fleet: a CHAIN TREE - one fleet root anchoring a subchain per device;
 	// a device's on-chain identity is provable from the fleet root header.
 	BuildFleet(context.Context, *FleetSpec) (*Fleet, error)
 	GetFleet(context.Context, *FleetRef) (*Fleet, error)

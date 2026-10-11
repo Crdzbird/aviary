@@ -19,7 +19,7 @@ Hash to_hash(const Bytes& b) {
 }
 }  // namespace
 
-// ── ChildRegistration ────────────────────────────────────────────────────────
+// -- ChildRegistration --------------------------------------------------------
 
 Bytes ChildRegistration::encode() const {
   codec::CodecWriter w;
@@ -49,7 +49,7 @@ ChildRegistration ChildRegistration::decode(codec::CodecReader& r) {
   return c;
 }
 
-// ── SubchainPolicy ───────────────────────────────────────────────────────────
+// -- SubchainPolicy -----------------------------------------------------------
 
 Bytes SubchainPolicy::encode() const {
   codec::CodecWriter w;
@@ -112,7 +112,7 @@ std::optional<SubchainPolicy> SubchainPolicy::from_genesis(const GenesisSpec& g)
   return decode_all(crypto::ByteView(g.subchain_policy.data(), g.subchain_policy.size()));
 }
 
-// ── ParentBinding ────────────────────────────────────────────────────────────
+// -- ParentBinding ------------------------------------------------------------
 
 Bytes ParentBinding::encode() const {
   codec::CodecWriter w;
@@ -141,7 +141,7 @@ std::optional<ParentBinding> ParentBinding::from_genesis(const GenesisSpec& g) {
   return decode_all(crypto::ByteView(g.parent_binding.data(), g.parent_binding.size()));
 }
 
-// ── SubchainRegistry ─────────────────────────────────────────────────────────
+// -- SubchainRegistry ---------------------------------------------------------
 
 SubchainRegistry SubchainRegistry::from_policy(std::uint64_t own_chain_id, SubchainPolicy policy) {
   if (std::string e = policy.validate(own_chain_id); !e.empty()) throw std::invalid_argument(e);
@@ -150,7 +150,7 @@ SubchainRegistry SubchainRegistry::from_policy(std::uint64_t own_chain_id, Subch
   r.children_.reserve(r.policy_.children.size());
   for (const ChildRegistration& c : r.policy_.children) {
     // ValidatorSet's constructor rejects a malformed set (bad key length, no
-    // power) — surfaced here, at boot, never at anchor time.
+    // power) - surfaced here, at boot, never at anchor time.
     consensus::ValidatorSet vs(c.validators);
     r.children_.push_back(ChildEntry{c, vs, vs, c.genesis_header});
   }
@@ -164,7 +164,7 @@ const BlockHeader* SubchainRegistry::tip_of(std::uint64_t child_chain_id) const 
 }
 
 std::string SubchainRegistry::apply_anchors(const std::vector<Anchor>& anchors) {
-  // Cheap structural rules first (docs/design/SUBCHAINS.md §6 step 3b), so a
+  // Cheap structural rules first (docs/design/SUBCHAINS.md section 6 step 3b), so a
   // peer cannot make us do BLS work on a block that is malformed anyway.
   if (policy_.max_anchors_per_block != 0 && anchors.size() > policy_.max_anchors_per_block)
     return "too many anchors in block";
@@ -233,7 +233,7 @@ SubchainProof::Hop SubchainRegistry::hop(std::uint64_t child_chain_id) const {
   return SubchainProof::Hop{summaries(), child_chain_id};
 }
 
-// ── SubchainProof ────────────────────────────────────────────────────────────
+// -- SubchainProof ------------------------------------------------------------
 
 Bytes SubchainProof::Hop::encode() const {
   codec::CodecWriter w;
@@ -296,7 +296,7 @@ bool verify_subchain_proof(const Hash& parent_subchain_root, const SubchainProof
   Hash root = parent_subchain_root;
   const BlockHeader* tip = nullptr;
   for (const SubchainProof::Hop& h : p.hops) {
-    // The list must be canonical (ascending, unique) — otherwise two lists
+    // The list must be canonical (ascending, unique) - otherwise two lists
     // could not be told apart from the root alone.
     for (std::size_t i = 1; i < h.summaries.size(); ++i)
       if (!(h.summaries[i - 1].chain_id < h.summaries[i].chain_id)) return false;

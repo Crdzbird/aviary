@@ -1,5 +1,5 @@
 // Formal genesis: a GenesisSpec is a canonical, hashable description of a chain's
-// initial conditions. Same spec → same genesis hash, same initial state root,
+// initial conditions. Same spec -> same genesis hash, same initial state root,
 // same chain params; a produced block then extends that state.
 #include <vector>
 
@@ -42,7 +42,7 @@ GenesisSpec sample() {
 int main() {
   init();
 
-  std::printf("== deterministic: same spec → same hash, encoding, state root ==\n");
+  std::printf("== deterministic: same spec -> same hash, encoding, state root ==\n");
   {
     GenesisSpec a = sample();
     GenesisSpec b = sample();
@@ -144,7 +144,7 @@ int main() {
     CHECK(g2.hash() != g.hash());
   }
 
-  // ── Membership policy committed into the genesis hash (§10.4, orthogonal) ────
+  // -- Membership policy committed into the genesis hash (section 10.4, orthogonal) ----
   {
     GenesisSpec open = sample();  // permissionless: no membership policy
     CHECK(open.membership_policy.empty());
@@ -161,7 +161,7 @@ int main() {
     GenesisSpec gated = sample();
     policy.commit_to(gated);
 
-    // Committing membership changes chain identity (permissioned ≠ permissionless).
+    // Committing membership changes chain identity (permissioned != permissionless).
     CHECK(!gated.membership_policy.empty());
     CHECK(gated.hash() != open.hash());
     // It round-trips through the genesis codec, hash-stable.
@@ -174,7 +174,7 @@ int main() {
     consensus::CredentialGate gate(*back);
     CHECK(gate.policy().hash() == policy.hash());
 
-    // Orthogonal to the assurance posture (§10.4): the two axes are independent.
+    // Orthogonal to the assurance posture (section 10.4): the two axes are independent.
     // A fortress chain can be permissionless; a standard chain can be permissioned.
     GenesisSpec fortress_open = sample();
     AssuranceProfile::fortress().apply_to(fortress_open);

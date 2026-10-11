@@ -86,7 +86,7 @@ int main() {
     // Save to disk (files now exist on the filesystem).
     storage::save_chain(store, blocks, engine.ledger());
     CHECK(store.has(storage::kBlocksKey) && store.has(storage::kStateKey));
-    // engine + blocks go out of scope here — the chain lives only on disk.
+    // engine + blocks go out of scope here - the chain lives only on disk.
   }
 
   {

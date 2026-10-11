@@ -61,7 +61,7 @@ bool RoundDriver::applicable(const Hash& block_id) {
 bool RoundDriver::valid(const Hash& block_id) {
   if (!applicable(block_id)) return false;
   // Governance at vote time: only a validator-set change this node scheduled
-  // gets our vote. (A certified one is still FOLLOWED — see Config::finalizable.)
+  // gets our vote. (A certified one is still FOLLOWED - see Config::finalizable.)
   auto it = blocks_.find(block_id);
   if (auto next = announced_validator_set(it->second.header)) {
     if (!pending_ || pending_->hash() != next->hash()) return false;
@@ -138,7 +138,7 @@ RoundDriver::Output RoundDriver::deliver(const wire::ConsensusMsg& msg) {
         Block b = Block::decode_all(view(msg.block));
         if (b.header.hash() == msg.block_id) blocks_[msg.block_id] = std::move(b);
       } catch (...) {
-        return {};  // malformed block → ignore the proposal
+        return {};  // malformed block -> ignore the proposal
       }
     }
     cm.kind = ConsensusMessage::Kind::kProposal;
@@ -150,7 +150,7 @@ RoundDriver::Output RoundDriver::deliver(const wire::ConsensusMsg& msg) {
     const Bytes signing = vote_signing_bytes(chain_id_, height_, msg.round, bid, msg.sender);
     if (!crypto::bls_verify(view(signing), view(msg.signature),
                             view(vset_.at(msg.sender).bls_pubkey))) {
-      return {};  // bad signature → drop
+      return {};  // bad signature -> drop
     }
     if (precommit) precommit_sigs_[msg.round][bid][msg.sender] = msg.signature;
     cm.kind = precommit ? ConsensusMessage::Kind::kPrecommit : ConsensusMessage::Kind::kPrevote;
@@ -199,13 +199,13 @@ void RoundDriver::commit(std::uint32_t round, const Value& value) {
     committed_ = true;
     // A finalized rotation takes effect NOW for the next height: validators()
     // answers "in force next" immediately, and any late message for this
-    // (decided) height simply no longer verifies — harmless.
+    // (decided) height simply no longer verifies - harmless.
     prev_vset_ = vset_;  // this set certified the new tip
     if (auto next = announced_validator_set(bit->second.header)) {
       vset_ = std::move(*next);
       pending_.reset();
       auto idx = vset_.index_of(bls_.public_key);
-      me_ = idx ? *idx : kNotValidator;  // our index may have moved — or we may be out
+      me_ = idx ? *idx : kNotValidator;  // our index may have moved - or we may be out
     }
   }
 }

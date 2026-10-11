@@ -1753,7 +1753,7 @@ class Event extends $pb.GeneratedMessage {
   void clearUnixMillis() => $_clearField(8);
 }
 
-/// ── Governance ────────────────────────────────────────────────────────────────
+/// -- Governance ----------------------------------------------------------------
 class CouncilValidator extends $pb.GeneratedMessage {
   factory CouncilValidator({
     $core.String? publicKey,

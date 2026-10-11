@@ -1,4 +1,4 @@
-// Aviary — a Swift API over the Aviary C ABI.
+// Aviary - a Swift API over the Aviary C ABI.
 //
 // The native library initializes lazily and synchronously on first use, so
 // ledger/interop calls never require `await`. `Aviary.preload()` is an
@@ -27,7 +27,7 @@ public enum Aviary {
     ///
     /// Runs the one-time init on a background queue; because it is process-
     /// global, the main thread's later synchronous calls pay no init cost. Fire-
-    /// and-forget — you never need to wait on it. `completion` (if given) runs on
+    /// and-forget - you never need to wait on it. `completion` (if given) runs on
     /// the main queue once warm.
     public static func preload(completion: (() -> Void)? = nil) {
         DispatchQueue.global(qos: .userInitiated).async {
@@ -59,7 +59,7 @@ public enum Aviary {
         }
     }
 
-    // ── Interop address derivation ─────────────────────────────────────────────
+    // -- Interop address derivation ---------------------------------------------
     public static func ethAddress(secret32: Data) throws -> String {
         ensureReady()
         return try consumeString(secret32.withC { p, _ in aviary_eth_address(p) }, "eth_address")
@@ -73,7 +73,7 @@ public enum Aviary {
         return try consumeString(edSecret64.withC { p, _ in aviary_sol_address(p) }, "sol_address")
     }
 
-    // ── Portable account export (tiered encrypted backup) ──────────────────────
+    // -- Portable account export (tiered encrypted backup) ----------------------
 
     /// A hybrid-KEM device keypair for the recipient-bound export tiers.
     public static func hybridKemKeypair() throws -> PortableAccount {
@@ -81,8 +81,8 @@ public enum Aviary {
         return splitAccountBlob(try consume(aviary_hybrid_kem_keygen(), "hybrid_kem_keygen"))
     }
 
-    /// Tier 1 — seal an account under a passphrase (MolecularVault + Argon2id;
-    /// ops=mem=0 → SENSITIVE preset).
+    /// Tier 1 - seal an account under a passphrase (MolecularVault + Argon2id;
+    /// ops=mem=0 -> SENSITIVE preset).
     public static func sealAccountPassphrase(publicKey: Data, secret: Data, passphrase: String,
                                              ops: UInt64 = 0, mem: Int = 0) throws -> Data {
         ensureReady()
@@ -99,7 +99,7 @@ public enum Aviary {
         }, "portable_open_passphrase"))
     }
 
-    /// Tier 2 — recipient-bound (PQ): only the device's KEM secret opens it.
+    /// Tier 2 - recipient-bound (PQ): only the device's KEM secret opens it.
     public static func sealAccountTo(publicKey: Data, secret: Data, recipientKemPublic: Data) throws -> Data {
         ensureReady()
         return try consume(publicKey.withC { pp, pl in
@@ -117,7 +117,7 @@ public enum Aviary {
         }, "portable_open_to"))
     }
 
-    /// Tier 3 — signed-recipient (Fortress-grade): recipient-bound AND the
+    /// Tier 3 - signed-recipient (Fortress-grade): recipient-bound AND the
     /// receiver verifies the owner's hybrid signature.
     public static func sealAccountSignedTo(publicKey: Data, secret: Data,
                                            recipientKemPublic: Data, senderSigSecret: Data) throws -> Data {
@@ -144,7 +144,7 @@ public enum Aviary {
         }, "portable_open_signed_from"))
     }
 
-    // ── Threshold (FROST t-of-n) accounts ──────────────────────────────────────
+    // -- Threshold (FROST t-of-n) accounts --------------------------------------
 
     /// A participant's share of a threshold account (opaque bytes + identity fields).
     public struct ThresholdShare {
@@ -174,7 +174,7 @@ public enum Aviary {
         return out
     }
 
-    /// Seal a share card for rest (ops=mem=0 → SENSITIVE preset).
+    /// Seal a share card for rest (ops=mem=0 -> SENSITIVE preset).
     public static func sealShare(card: Data, passphrase: String, ops: UInt64 = 0, mem: Int = 0) throws -> Data {
         ensureReady()
         return try consume(card.withC { cp, cl in
@@ -223,7 +223,7 @@ public enum Aviary {
             publicShare.withC { pp, _ in sigShare.withC { sp, _ in
                 aviary_threshold_verify_share(UnsafeMutableRawPointer(h), id, pp, sp) == 1 } }
         }
-        /// Aggregate (id → 32-byte share) pairs into a 64-byte Ed25519 signature.
+        /// Aggregate (id -> 32-byte share) pairs into a 64-byte Ed25519 signature.
         public func aggregate(ids: [UInt16], sigShares: [Data]) throws -> Data {
             var flat = Data(); for s in sigShares { flat.append(s) }
             let res: AviaryBufferResult = ids.withUnsafeBufferPointer { idp in
@@ -239,7 +239,7 @@ public enum Aviary {
         return try Ceremony(groupPK: groupPK, message: message, commitments: commitments)
     }
 
-    // ── AssuranceProfile + SealedMempool ───────────────────────────────────────
+    // -- AssuranceProfile + SealedMempool ---------------------------------------
 
     /// The tiers a security posture mandates at every seam.
     public struct AssuranceProfile {
@@ -307,9 +307,9 @@ public enum Aviary {
         return SealedMempool(capacity: capacity)
     }
 
-    // ── CredentialGate (anonymous membership admission, Option A) ───────────────
+    // -- CredentialGate (anonymous membership admission, Option A) ---------------
 
-    /// A BBS issuer keypair (public 96 B, secret 32 B) — the chain's issuer identity.
+    /// A BBS issuer keypair (public 96 B, secret 32 B) - the chain's issuer identity.
     public static func newBBSIssuer(keyMaterial: Data) throws -> PortableAccount {
         ensureReady()
         return splitAccountBlob(try consume(keyMaterial.withC { p, l in
@@ -318,7 +318,7 @@ public enum Aviary {
 
     /// A membership policy. Its canonical `encoded` bytes drive the gate; its
     /// `hash()` is meant to be committed into genesis (like an AssuranceProfile).
-    /// Admission mode (§3): unlinkable = Option A, pseudonymous = Option B.
+    /// Admission mode (section 3): unlinkable = Option A, pseudonymous = Option B.
     public enum CredentialMode: UInt8 { case unlinkable = 0, pseudonymous = 1 }
 
     public struct CredentialPolicy {
@@ -356,7 +356,7 @@ public enum Aviary {
                 "credential_present")
         }
 
-        // ── Option B — pseudonymous ────────────────────────────────────────────
+        // -- Option B - pseudonymous --------------------------------------------
         /// Holder step 1: derive a nym seed from [memberSecret] and blind-commit it.
         /// The returned blob is holder-secret; `extractCommitment` gives the part to
         /// send to the issuer.
@@ -405,7 +405,7 @@ public enum Aviary {
         public func revokeIssuerEpoch(_ epoch: UInt32) {
             aviary_credential_gate_revoke_epoch(UnsafeMutableRawPointer(h), epoch)
         }
-        /// Admit? Runs the full checklist. Total — a malformed presentation is a quiet false.
+        /// Admit? Runs the full checklist. Total - a malformed presentation is a quiet false.
         public func admit(epoch: UInt32, scope: String, challenge: Data, presentation: Data, now: UInt64) -> Bool {
             challenge.withC { chp, chl in presentation.withC { pp, pl in
                 aviary_credential_gate_admit(UnsafeMutableRawPointer(h), epoch, scope, chp, chl, pp, pl, now) == 1 } }
@@ -417,11 +417,11 @@ public enum Aviary {
             let nym = try consume(res, "admit_pseudonymous")
             return nym.isEmpty ? nil : nym
         }
-        /// §6.2 targeted revocation of an exact pseudonym.
+        /// section 6.2 targeted revocation of an exact pseudonym.
         public func revokeNym(_ nym: Data) {
             nym.withC { np, nl in aviary_credential_gate_revoke_nym(UnsafeMutableRawPointer(h), np, nl) }
         }
-        /// §6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope).
+        /// section 6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope).
         public func noteAdmission(epoch: UInt32, scope: String, nym: Data) -> Bool {
             nym.withC { np, nl in
                 aviary_credential_gate_note_admission(UnsafeMutableRawPointer(h), epoch, scope, np, nl) == 1 }
@@ -432,7 +432,7 @@ public enum Aviary {
         return CredentialGate(policy: policy)
     }
 
-    // ── Composable chains (blueprint + registry discovery + assembly) ───────────
+    // -- Composable chains (blueprint + registry discovery + assembly) -----------
 
     /// A validator BLS keypair (public 48 B, secret 32 B).
     public static func newBLSValidator(keyMaterial: Data) throws -> PortableAccount {
@@ -495,7 +495,7 @@ public enum Aviary {
         try consume(genesis.withC { p, l in aviary_genesis_hash(p, l) }, "genesis_hash")
     }
 
-    /// An assembled node behind the uniform propose → (seal | mine) → submit flow.
+    /// An assembled node behind the uniform propose -> (seal | mine) -> submit flow.
     public final class Chain {
         private let h: OpaquePointer
         init?(genesis: Data, me: UInt32, blsPub: Data, blsSec: Data) {
@@ -537,7 +537,7 @@ public enum Aviary {
                 aviary_chain_submit(UnsafeMutableRawPointer(h), bp, bl, jp, jl) == 1 } }
         }
 
-        // ── Subchains ──
+        // -- Subchains --
         /// Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor.
         public func proposeAnchored(timestamp: UInt64, anchors: [Data]) throws -> Data {
             let blob = blobList(anchors)
@@ -574,7 +574,7 @@ public enum Aviary {
         }
     }
 
-    // ── Light client: follow a header chain with certificates only ────────────
+    // -- Light client: follow a header chain with certificates only ------------
 
     static func encodeValidatorSet(_ vs: [GenesisValidator]) -> Data {
         var d = Data(); d.append(contentsOf: withUnsafeBytes(of: UInt32(vs.count).bigEndian) { Data($0) })
@@ -622,7 +622,7 @@ public enum Aviary {
                 aviary_light_client_accept_skipping(UnsafeMutableRawPointer(h), hp, hl, cpp, cl, vp, vl) } } }
             return SkipResult(rawValue: r) ?? .refused
         }
-        /// Bisection: fetch(height) → checkpoint or nil. Throws on a hard refusal / missing checkpoint.
+        /// Bisection: fetch(height) -> checkpoint or nil. Throws on a hard refusal / missing checkpoint.
         public func syncTo(_ target: Checkpoint, targetHeight: UInt64, fetch: (UInt64) -> Checkpoint?) throws {
             var stack: [(Checkpoint, UInt64)] = [(target, targetHeight)]
             var n = 0
@@ -646,7 +646,7 @@ public enum Aviary {
         ensureReady(); return LightClient(chainID: chainID, validators: validators, trustedHeader: trustedHeader)
     }
 
-    // ── Chain tree: declare a FAMILY of chains and drive it together ──────────
+    // -- Chain tree: declare a FAMILY of chains and drive it together ----------
     /// A validator with the secret this process holds (nil = not held).
     public struct TreeValidator { public var publicKey: Data; public var secret: Data?; public var power: UInt64
         public init(publicKey: Data, secret: Data?, power: UInt64 = 1) { self.publicKey = publicKey; self.secret = secret; self.power = power } }
@@ -725,12 +725,12 @@ public enum Aviary {
     }
     public static func buildChainTree(_ root: TreeNode) throws -> ChainTree { ensureReady(); return try ChainTree(root: root) }
 
-    // ── Subchains: a parent block anchors a child chain's finalized headers ────
+    // -- Subchains: a parent block anchors a child chain's finalized headers ----
     // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
     // genesis HEADER + fixed validator set; anchor its certified headers; prove a
     // state entry on a descendant from the parent's header. v1 anchors BFT children.
 
-    /// [count u32]([len u32][bytes])× — the C ABI's blob-list convention.
+    /// [count u32]([len u32][bytes])x - the C ABI's blob-list convention.
     static func blobList(_ items: [Data]) -> Data {
         var d = Data(); d.append(contentsOf: withUnsafeBytes(of: UInt32(items.count).bigEndian) { Data($0) })
         for it in items { d.append(contentsOf: withUnsafeBytes(of: UInt32(it.count).bigEndian) { Data($0) }); d.append(it) }
@@ -751,7 +751,7 @@ public enum Aviary {
             return try consume(res, "child_registration_encode")
         }
     }
-    /// A genesis's genesis HEADER — the identity a parent registers a child by.
+    /// A genesis's genesis HEADER - the identity a parent registers a child by.
     public static func genesisHeader(_ genesis: Data) throws -> Data {
         ensureReady(); return try consume(genesis.withC { gp, gl in aviary_genesis_header(gp, gl) }, "genesis_header")
     }
@@ -781,7 +781,7 @@ public enum Aviary {
         ensureReady(); let blob = blobList(certifiedHeaders)
         return try consume(blob.withC { bp, bl in aviary_anchor_encode(childChainID, bp, bl) }, "anchor_encode")
     }
-    /// A cross-chain proof: hops (parent → … → the chain holding the entry) + that chain's state proof.
+    /// A cross-chain proof: hops (parent -> ... -> the chain holding the entry) + that chain's state proof.
     public static func encodeSubchainProof(hops: [Data], stateProof: Data) throws -> Data {
         ensureReady(); let blob = blobList(hops)
         return try consume(blob.withC { hp, hl in stateProof.withC { sp, sl in aviary_subchain_proof_encode(hp, hl, sp, sl) } }, "subchain_proof_encode")
@@ -797,21 +797,21 @@ public enum Aviary {
         return Chain(genesis: genesis, me: me, blsPub: blsPub, blsSec: blsSec)
     }
 
-    // ── Foreign components (engines / proposers implemented in Swift) ──────────
+    // -- Foreign components (engines / proposers implemented in Swift) ----------
 
     /// A consensus engine implemented in Swift, plugged into a mixture by id. The
     /// consensus pipeline stays native; Swift supplies the JUSTIFICATION policy.
     /// Both methods run synchronously inside consensus and MUST be deterministic
     /// (no clock, no randomness) and must not call back into the chain.
     public protocol ForeignEngine: AnyObject {
-        /// The justification for a block this node proposed (≤ 4096 B), or nil to refuse.
+        /// The justification for a block this node proposed (<= 4096 B), or nil to refuse.
         func justify(block: Data) -> Data?
         func verify(block: Data, justification: Data) -> Bool
     }
     private final class ProposerBox { let fn: (UInt64, UInt32) -> UInt32; init(_ f: @escaping (UInt64, UInt32) -> UInt32) { fn = f } }
     private static var retainedForeign: [AnyObject] = []  // kept alive for the process lifetime
 
-    /// Register a Swift [ForeignEngine] under [id] (chain identity — never rename).
+    /// Register a Swift [ForeignEngine] under [id] (chain identity - never rename).
     @discardableResult
     public static func registerEngine(id: String, _ engine: ForeignEngine, grindProof: Bool = false) -> Bool {
         ensureReady()
@@ -865,7 +865,7 @@ public enum Aviary {
         return KeyStore(handle: h)
     }
 
-    /// Load a serialised key store. It comes back LOCKED — call `unlock`.
+    /// Load a serialised key store. It comes back LOCKED - call `unlock`.
     public static func loadKeyStore(_ blob: Data) throws -> KeyStore {
         ensureReady()
         guard let h = blob.withC({ p, l in aviary_keystore_load(p, l) }) else {
@@ -905,7 +905,7 @@ public final class KeyStore {
         try consume(address.withC { p, _ in aviary_keystore_reveal(h, p) }, "keystore_reveal")
     }
 
-    /// The persistable (encrypted) blob — no plaintext key.
+    /// The persistable (encrypted) blob - no plaintext key.
     public func serialise() throws -> Data {
         try consume(aviary_keystore_serialise(h), "keystore_serialise")
     }
@@ -945,7 +945,7 @@ public final class Node {
     }
 
     /// Credit an address at genesis. Valid until the first block is produced
-    /// (reads do NOT seal genesis); throws afterwards — never a silent no-op.
+    /// (reads do NOT seal genesis); throws afterwards - never a silent no-op.
     public func credit(address: Data, amount: UInt64) throws {
         let rc = address.withC { p, _ in aviary_node_credit(h, p, amount) }
         if rc == 2 {
@@ -1018,7 +1018,7 @@ public final class Node {
     }
 }
 
-/// A signing account's material — public key and secret — as returned by the
+/// A signing account's material - public key and secret - as returned by the
 /// portable-account "open" calls (and the device key from `hybridKemKeypair`).
 public struct PortableAccount {
     public let publicKey: Data
@@ -1032,7 +1032,7 @@ private func splitAccountBlob(_ blob: Data) -> PortableAccount {
                            secret: blob.subdata(in: (4 + pl)..<blob.count))
 }
 
-// ── Buffer marshalling helpers ─────────────────────────────────────────────────
+// -- Buffer marshalling helpers -------------------------------------------------
 
 private extension Data {
     /// Call a C function with (const uint8_t* ptr, size_t len) over these bytes.

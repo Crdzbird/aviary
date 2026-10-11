@@ -1,6 +1,6 @@
 // Threshold custody: FROST t-of-n accounts where the secret key NEVER exists.
 // The aggregate is a standard Ed25519 signature, so a threshold-signed transfer
-// commits through the untouched SigAlgo::kEd25519 path — the chain can't even
+// commits through the untouched SigAlgo::kEd25519 path - the chain can't even
 // tell threshold custody was used.
 #include <memory>
 #include <vector>
@@ -39,7 +39,7 @@ int main() {
   std::printf("== a 2-of-3 ceremony signs a transfer the Ledger commits (kEd25519 path) ==\n");
   const Hash group_addr = crypto::address_of(view(cards[0].group_public_key));
   Transaction tx;
-  tx.version = 1;  // plain v1 envelope — threshold custody is invisible on-chain
+  tx.version = 1;  // plain v1 envelope - threshold custody is invisible on-chain
   tx.chain_id = 7;
   Hash to{};
   to[0] = 0xBB;
@@ -145,7 +145,7 @@ int main() {
     CHECK_MSG(threw, "wrong passphrase fails closed");
 
     Bytes moved = env;
-    moved[0] ^= 0x01;  // flip the cleartext index prefix → AAD mismatch
+    moved[0] ^= 0x01;  // flip the cleartext index prefix -> AAD mismatch
     threw = false;
     try {
       (void)ShareCard::unseal(view(moved), "share-pass");

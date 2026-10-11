@@ -1,4 +1,4 @@
-// probe — a throwaway client that exercises the StreamData bidi RPC end-to-end.
+// probe - a throwaway client that exercises the StreamData bidi RPC end-to-end.
 package main
 
 import (
@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("provisioned chain %d (genesis %s…)\n", prov.ChainId, prov.GenesisHash[:12])
+	fmt.Printf("provisioned chain %d (genesis %s...)\n", prov.ChainId, prov.GenesisHash[:12])
 
 	stream, err := c.StreamData(ctx)
 	if err != nil {
@@ -50,7 +50,7 @@ func main() {
 			if r.Finalized {
 				state = fmt.Sprintf("FINALIZED@%d", r.Height)
 			}
-			fmt.Printf("  receipt seq=%d %-8s %-10s %s… — %s\n", r.Sequence, r.Kind, state, r.ContentHash[:12], r.Summary)
+			fmt.Printf("  receipt seq=%d %-8s %-10s %s... - %s\n", r.Sequence, r.Kind, state, r.ContentHash[:12], r.Summary)
 			if r.ContentHash != "" {
 				lastHash = r.ContentHash
 			}
@@ -80,6 +80,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("verify %s… → anchored=%v verified=%v height=%d (%d-byte proof)\n",
+	fmt.Printf("verify %s... -> anchored=%v verified=%v height=%d (%d-byte proof)\n",
 		lastHash[:12], v.Anchored, v.Verified, v.Height, v.ProofBytes)
 }

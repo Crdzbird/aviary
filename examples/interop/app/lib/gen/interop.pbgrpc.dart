@@ -32,7 +32,7 @@ class InteropClient extends $grpc.Client {
 
   InteropClient(super.channel, {super.options, super.interceptors});
 
-  /// go ↔ flutter: compute canonical bytes for identical inputs (determinism).
+  /// go <-> flutter: compute canonical bytes for identical inputs (determinism).
   $grpc.ResponseFuture<$0.CanonicalOutput> computeCanonical(
     $0.CanonicalInput request, {
     $grpc.CallOptions? options,
@@ -40,7 +40,7 @@ class InteropClient extends $grpc.Client {
     return $createUnaryCall(_$computeCanonical, request, options: options);
   }
 
-  /// go → flutter: the server builds the scenario and returns a verifiable proof.
+  /// go -> flutter: the server builds the scenario and returns a verifiable proof.
   $grpc.ResponseFuture<$0.ChainResult> buildChain(
     $0.ChainScenario request, {
     $grpc.CallOptions? options,
@@ -48,7 +48,7 @@ class InteropClient extends $grpc.Client {
     return $createUnaryCall(_$buildChain, request, options: options);
   }
 
-  /// flutter → go: the server verifies a proof the client produced.
+  /// flutter -> go: the server verifies a proof the client produced.
   $grpc.ResponseFuture<$0.VerifyResult> verifyProof(
     $0.ProofBundle request, {
     $grpc.CallOptions? options,
@@ -56,7 +56,7 @@ class InteropClient extends $grpc.Client {
     return $createUnaryCall(_$verifyProof, request, options: options);
   }
 
-  /// ── Chain tree: Go builds a deterministic family (root ← child ← grandchild)
+  /// -- Chain tree: Go builds a deterministic family (root <- child <- grandchild)
   /// from shared seeds; Flutter builds the SAME tree natively. Roots must match,
   /// and each side verifies the other's cross-chain proof.
   $grpc.ResponseFuture<$0.TreeResult> buildTree(

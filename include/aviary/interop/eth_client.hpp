@@ -9,16 +9,16 @@
 #include "aviary/interop/evm.hpp"
 #include "aviary/interop/rpc.hpp"
 
-/// Typed EVM JSON-RPC client (ARCHITECTURE §11). Method names and semantics are
+/// Typed EVM JSON-RPC client (ARCHITECTURE section 11). Method names and semantics are
 /// the stable `eth_*` JSON-RPC surface; confirm against the target node's docs
 /// at integration. Built on the pluggable [RpcTransport].
 namespace aviary::interop {
 
 using Bytes = std::vector<std::uint8_t>;
 
-// ── Hex helpers (Ethereum "quantity" / "data" encodings) ────────────────────
+// -- Hex helpers (Ethereum "quantity" / "data" encodings) --------------------
 
-/// Minimal hex quantity, "0x"-prefixed (zero → "0x0").
+/// Minimal hex quantity, "0x"-prefixed (zero -> "0x0").
 std::string to_quantity(codec::u128 v);
 /// Parse a "0x"-prefixed hex quantity.
 codec::u128 parse_quantity(const std::string& hex);

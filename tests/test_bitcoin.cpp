@@ -31,17 +31,17 @@ int main() {
   CHECK(bitcoin::hash256(view(unhex("00"))).size() == 32);
 
   std::printf("== bech32 SegWit (BIP173 test vector) ==\n");
-  // Witness v0 program 751e…3bd6 → the canonical BIP173 P2WPKH address.
+  // Witness v0 program 751e...3bd6 -> the canonical BIP173 P2WPKH address.
   CHECK(bitcoin::bech32_segwit_encode("bc", 0, unhex("751e76e8199196d454941c45d1b3a323f1433bd6")) ==
         "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
 
   std::printf("== hash160(compressed G) is that program ==\n");
   {
     std::vector<std::uint8_t> sk(32, 0);
-    sk[31] = 1;  // privkey = 1 → pubkey = generator point
+    sk[31] = 1;  // privkey = 1 -> pubkey = generator point
     auto pk = crypto::secp256k1_pubkey(view(sk), /*compressed=*/true);
     CHECK(hex(bitcoin::hash160(view(pk))) == "751e76e8199196d454941c45d1b3a323f1433bd6");
-    // …so the derived P2WPKH address matches the BIP173 vector.
+    // ...so the derived P2WPKH address matches the BIP173 vector.
     CHECK(bitcoin::p2wpkh_address_from_secret(view(sk)) ==
           "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
   }

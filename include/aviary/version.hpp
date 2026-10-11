@@ -13,7 +13,7 @@ void init();
 std::string version();
 
 /// Version reported by the linked cryptolib crypto backend. A non-empty return
-/// proves the C++ core → cryptolib_c link is live end to end.
+/// proves the C++ core -> cryptolib_c link is live end to end.
 std::string crypto_backend_version();
 
 }  // namespace aviary

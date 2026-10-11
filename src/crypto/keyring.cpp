@@ -38,7 +38,7 @@ std::string aad_for(const Hash& address) {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 }  // namespace
 
-// ── Keyring ─────────────────────────────────────────────────────────────────
+// -- Keyring -----------------------------------------------------------------
 
 Keyring Keyring::create() {
   CryptoKeyringHandle h = cryptolib_keyring_create();
@@ -100,7 +100,7 @@ Bytes Keyring::unlock_with_passphrase(std::string_view passphrase) const {
               "keyring unlock (passphrase)");
 }
 
-// ── Vault (committing AEAD keyed by the master) ─────────────────────────────
+// -- Vault (committing AEAD keyed by the master) -----------------------------
 
 Vault::Vault(ByteView master_key) : master_(master_key.begin(), master_key.end()) {}
 
@@ -132,10 +132,10 @@ Bytes Vault::open_max(const SealedBlob& blob, std::string_view aad) const {
               "vault open (molecular)");
 }
 
-// ── PortableAccount (tiered account export) ─────────────────────────────────
+// -- PortableAccount (tiered account export) ---------------------------------
 
 namespace {
-// Fixed domain AAD — every tier binds it, so an envelope can't be reinterpreted
+// Fixed domain AAD - every tier binds it, so an envelope can't be reinterpreted
 // as a different context.
 constexpr const char* kPortableAad = "aviary.portable-account.v1";
 codec::ByteView portable_aad() {
@@ -202,7 +202,7 @@ PortableAccount PortableAccount::open_signed_from(codec::ByteView envelope,
       view(crypto::pq_open_signed(envelope, recipient_kem_secret, sender_sig_public, portable_aad())));
 }
 
-// ── KeyStore ────────────────────────────────────────────────────────────────
+// -- KeyStore ----------------------------------------------------------------
 
 KeyStore KeyStore::create_with_passphrase(std::string_view passphrase, bool sensitive) {
   Keyring kr = Keyring::create();
@@ -248,7 +248,7 @@ Bytes KeyStore::reveal_secret(const Hash& address) const {
 }
 
 // Portable export/import: the plaintext payload is {public_key, secret} in the
-// canonical codec, sealed by MolecularVault's passphrase mode (Argon2id → the
+// canonical codec, sealed by MolecularVault's passphrase mode (Argon2id -> the
 // cascade). The AAD is a fixed domain string so an envelope can't be replayed
 // into a different context; the address is recomputed from the public key.
 namespace {
@@ -313,7 +313,7 @@ Bytes KeyStore::serialise() const {
   w.write_u8(2);  // format v2: per-entry seal version
   w.write_bytes(view(keyring_blob));
   w.write_u32(static_cast<std::uint32_t>(entries_.size()));
-  for (const auto& [addr, e] : entries_) {  // map → deterministic, address-sorted
+  for (const auto& [addr, e] : entries_) {  // map -> deterministic, address-sorted
     w.write_fixed_bytes(codec::ByteView(addr.data(), addr.size()), 32);
     w.write_bytes(view(e.public_key));
     w.write_bytes(view(e.sealed));

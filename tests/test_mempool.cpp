@@ -49,7 +49,7 @@ int main() {
 
   auto alice = ed(1);
   auto bob = ed(2);
-  auto carol = ed(3);  // never funded, never a recipient → her txs stay invalid
+  auto carol = ed(3);  // never funded, never a recipient -> her txs stay invalid
   const Hash alice_addr = crypto::address_of(view(alice.public_key));
   const Hash bob_addr = crypto::address_of(view(bob.public_key));
 
@@ -206,7 +206,7 @@ int main() {
     CHECK(sel.size() == 1);  // only one can spend op0
   }
 
-  // ── Membership admission gate (CredentialGate, Option A) ─────────────────────
+  // -- Membership admission gate (CredentialGate, Option A) ---------------------
   // A permissioned pool admits a tx only behind a valid "submit"-scope
   // presentation. The plain add() is the trusted path and stays ungated.
   {
@@ -243,7 +243,7 @@ int main() {
     auto tx2 = transfer(alice, bob_addr, 1, 10, kChain);
     CHECK(gated.add(tx2, kChain, 4, view(challenge), view(pres), now) == AddResult::kNotAdmitted);
 
-    // The plain add() is the trusted path — never gated, even with a gate set.
+    // The plain add() is the trusted path - never gated, even with a gate set.
     CHECK(gated.add(tx2, kChain) == AddResult::kAdded);
 
     // An ungated pool ignores the presentation argument entirely (permissionless).

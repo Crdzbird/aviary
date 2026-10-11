@@ -11,7 +11,7 @@
 #include "aviary/codec.hpp"
 #include "aviary/crypto.hpp"
 
-/// Custodial key management (ARCHITECTURE §: Wallet / key custody). Thin, RAII
+/// Custodial key management (ARCHITECTURE section : Wallet / key custody). Thin, RAII
 /// wrappers over cryptolib's Vault (envelope-encrypt secrets under a master key)
 /// and Keyring (protect that master key behind device / passphrase slots), plus
 /// a [KeyStore] that keeps account signing secrets encrypted at rest.
@@ -27,25 +27,25 @@ using crypto::ByteView;
 using crypto::Hash;
 using Bytes = crypto::Bytes;
 
-/// A secret sealed by a [Vault] → a flat, persistable blob (nonce ‖ ciphertext ‖
-/// MAC ‖ Ed25519 signature ‖ KDF salt).
+/// A secret sealed by a [Vault] -> a flat, persistable blob (nonce || ciphertext ||
+/// MAC || Ed25519 signature || KDF salt).
 using SealedBlob = Bytes;
 
-/// One account's exportable material — its public key and signing secret — with
+/// One account's exportable material - its public key and signing secret - with
 /// tiered, self-describing seals for moving it off the node (backup, device
 /// migration). Each tier is a different trust model; all fail closed:
 ///
-///   - **passphrase** — MolecularVault + Argon2id. Anyone who knows the phrase.
-///   - **recipient** — encapsulate to a device's hybrid-KEM public key (PQ).
+///  - **passphrase** - MolecularVault + Argon2id. Anyone who knows the phrase.
+///  - **recipient** - encapsulate to a device's hybrid-KEM public key (PQ).
 ///     Only that device can open; no shared secret to phish.
-///   - **signed-recipient** (Fortress-grade) — recipient-bound AND authenticated:
+///  - **signed-recipient** (Fortress-grade) - recipient-bound AND authenticated:
 ///     the receiver both decrypts with its KEM secret and verifies the sender's
 ///     hybrid signature, so a forged or substituted backup is rejected.
 struct PortableAccount {
   Bytes public_key;
   Bytes secret;
 
-  /// Canonical {public_key, secret} payload — what every tier seals.
+  /// Canonical {public_key, secret} payload - what every tier seals.
   Bytes encode() const;
   static PortableAccount decode(codec::ByteView bytes);
 
@@ -99,7 +99,7 @@ class Keyring {
 };
 
 /// A symmetric envelope-encryptor keyed by a 32-byte master key, using a
-/// committing AEAD (commits to key + AAD → closes the partitioning-oracle /
+/// committing AEAD (commits to key + AAD -> closes the partitioning-oracle /
 /// key-confusion gap). Stateless given the key: a blob sealed now still opens
 /// after the store is persisted and reloaded under the same recovered master.
 class Vault {
@@ -113,9 +113,9 @@ class Vault {
   Bytes open(const SealedBlob& blob, std::string_view aad = "") const;
 
   /// Max-assurance seal via cryptolib's MolecularVault: a cascade of
-  /// XChaCha20-Poly1305 ∘ AES-256-GCM-SIV under a key-committing outer layer
+  /// XChaCha20-Poly1305  then  AES-256-GCM-SIV under a key-committing outer layer
   /// (self-describing versioned envelope). Both cascade layers must break
-  /// before the plaintext leaks — defense in depth for long-lived signing
+  /// before the plaintext leaks - defense in depth for long-lived signing
   /// secrets at rest. Throws on failure.
   SealedBlob seal_max(ByteView plaintext, std::string_view aad = "") const;
   /// Open a [seal_max] envelope; fails closed on tamper / wrong key / wrong aad.
@@ -131,7 +131,7 @@ class Vault {
 /// (e.g. to sign a transaction).
 class KeyStore {
  public:
-  /// A new store protected by [passphrase] (adds one passphrase slot) — created
+  /// A new store protected by [passphrase] (adds one passphrase slot) - created
   /// unlocked.
   static KeyStore create_with_passphrase(std::string_view passphrase, bool sensitive = false);
 
@@ -156,7 +156,7 @@ class KeyStore {
   void unlock_with_device(ByteView factor_key);
 
   /// Slot management (delegates to the keyring). Adding a passphrase/device slot
-  /// requires no unlock — slots wrap the same master key.
+  /// requires no unlock - slots wrap the same master key.
   bool add_passphrase_slot(std::string_view passphrase, bool sensitive = false) {
     return keyring_.add_passphrase_slot(passphrase, sensitive);
   }
@@ -165,7 +165,7 @@ class KeyStore {
 
   /// Export one account as a PORTABLE encrypted envelope under a standalone
   /// [passphrase] (independent of this store's keyring): MolecularVault cascade
-  /// keyed by Argon2id(passphrase). [ops]/[mem] are the Argon2id work factors —
+  /// keyed by Argon2id(passphrase). [ops]/[mem] are the Argon2id work factors - 
   /// 0,0 selects cryptolib's SENSITIVE preset (slow on purpose; a backup is
   /// unlocked rarely and brute-forced forever). The store must be unlocked.
   Bytes export_account(const Hash& address, std::string_view passphrase,
@@ -185,7 +185,7 @@ class KeyStore {
   /// Serialise the whole store: the keyring envelope + every sealed entry. No
   /// plaintext secret is present.
   Bytes serialise() const;
-  /// Load a serialised store. It comes back LOCKED — call unlock_* before
+  /// Load a serialised store. It comes back LOCKED - call unlock_* before
   /// revealing secrets. Throws on a malformed blob. Reads both the current v2
   /// format (per-entry seal version) and legacy v1 (committing-AEAD entries).
   static KeyStore load(ByteView blob);

@@ -1,5 +1,5 @@
-// ChainTree: a declared family of chains — root ← child ← grandchild with
-// different mixtures — built together (genesis bottom-up, bindings top-down),
+// ChainTree: a declared family of chains - root <- child <- grandchild with
+// different mixtures - built together (genesis bottom-up, bindings top-down),
 // driven in-process (produce anchors children upward automatically), proven
 // from the root, extended by subclassing, and fail-closed on a bad spec.
 #include <cstdio>
@@ -104,7 +104,7 @@ int main() {
     CHECK(tree->height(1) == 1);
     const auto* reg = tree->node(1).chain.engine->ledger().subchains();
     CHECK(reg->tip_of(42)->hash() == c1.header.hash() && reg->tip_of(43)->hash() == s1.header.hash());
-    // Bounded by the child's policy: 6 grandchild blocks → child anchors 4, then 2.
+    // Bounded by the child's policy: 6 grandchild blocks -> child anchors 4, then 2.
     for (std::uint64_t t = 4; t <= 9; ++t) tree->produce(420, t);
     CHECK(tree->pending_anchors_for(42)[0].headers.size() == 4);
     tree->produce(42, 3);
@@ -115,7 +115,7 @@ int main() {
     CHECK_THROWS(tree->produce(7, 3));
   }
 
-  std::printf("== prove: a grandchild account from the root header; tamper → false ==\n");
+  std::printf("== prove: a grandchild account from the root header; tamper -> false ==\n");
   {
     SubchainProof p = tree->prove_account(420, alice);
     CHECK(p.hops.size() == 2 && p.hops[0].child_chain_id == 42 && p.hops[1].child_chain_id == 420);
@@ -125,9 +125,9 @@ int main() {
     CHECK(!tree->verify(t));
     // A root-level proof has no hops.
     SubchainProof rp = tree->prove_account(1, fill(0x77));
-    CHECK(rp.hops.empty() && !tree->verify(rp));                        // absent account → not provable
+    CHECK(rp.hops.empty() && !tree->verify(rp));                        // absent account -> not provable
     CHECK_THROWS(tree->prove_account(7, alice));
-    // The root moved on since → the old proof is stale at the NEW root but valid at its own.
+    // The root moved on since -> the old proof is stale at the NEW root but valid at its own.
     const Hash old_root = tree->root_tip().subchain_root;
     tree->produce(420, 10); tree->produce(42, 5); tree->produce(1, 4);
     CHECK(!tree->verify(p) && verify_subchain_proof(old_root, p));

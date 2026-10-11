@@ -42,7 +42,7 @@ class SentinelClient extends $grpc.Client {
   }
 
   /// The live capture pipeline: the device streams data records, the server
-  /// anchors each one and streams back anchoring receipts (pending → finalized).
+  /// anchors each one and streams back anchoring receipts (pending -> finalized).
   /// Bidirectional so finality receipts arrive asynchronously as blocks seal.
   $grpc.ResponseStream<$0.AnchorReceipt> streamData(
     $async.Stream<$0.DataRecord> request, {
@@ -67,7 +67,7 @@ class SentinelClient extends $grpc.Client {
     return $createUnaryCall(_$getLedger, request, options: options);
   }
 
-  /// ── Fleet: a CHAIN TREE — one fleet root anchoring a subchain per device;
+  /// -- Fleet: a CHAIN TREE - one fleet root anchoring a subchain per device;
   /// a device's on-chain identity is provable from the fleet root header.
   $grpc.ResponseFuture<$0.Fleet> buildFleet(
     $0.FleetSpec request, {

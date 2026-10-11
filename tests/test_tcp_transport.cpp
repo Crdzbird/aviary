@@ -1,4 +1,4 @@
-// Real BFT consensus over real TCP sockets — first plaintext, then over the
+// Real BFT consensus over real TCP sockets - first plaintext, then over the
 // mutually-authenticated, PQ-hybrid SecureSession (encrypted + identity-pinned).
 // Validators run one-per-thread with their own ledgers on loopback ports, dial a
 // fully-connected mesh, and run the poll-reactor transport until they commit.
@@ -179,7 +179,7 @@ int main() {
   std::printf("== Noise XX allow-list: a mis-pinned node is excluded, the quorum still commits ==\n");
   {
     // Node 3 presents an identity nobody allow-listed (and it pins the others
-    // wrongly) → every link to it fails the proof check; 0-1-2 still commit.
+    // wrongly) -> every link to it fails the proof check; 0-1-2 still commit.
     auto stranger = SecureSession::generate_identity();
     std::vector<SecureConfig> cfgs(n);
     for (std::uint32_t i = 0; i < n; ++i) {
@@ -270,7 +270,7 @@ int main() {
       return p.transport() == AssuranceProfile::Transport::kRatcheted ? p2p::TransportTier::kRatcheted
                                                                       : p2p::TransportTier::kMutual;
     };
-    // standard → kMutual (KEM keys wired, no prekeys); hardened → kRatcheted.
+    // standard -> kMutual (KEM keys wired, no prekeys); hardened -> kRatcheted.
     p2p::SecureConfig std_cfg = p2p::secure_config_from_records(
         tier_of(AssuranceProfile::standard()), ids[0], prekeys[0], /*self=*/0, records);
     CHECK(std_cfg.tier == p2p::TransportTier::kMutual);
@@ -297,7 +297,7 @@ int main() {
   std::printf("== reconnect: a severed link heals by redial; consensus recovers via round change ==\n");
   {
     // A LINE 0-1-2-3 so the 1-2 link is a genuine cut vertex: severing it
-    // partitions {0,1} from {2,3} — neither side is a quorum, so consensus can
+    // partitions {0,1} from {2,3} - neither side is a quorum, so consensus can
     // ONLY finish if the dialer-side redial heals the link (messages lost on the
     // dead socket are not replayed; the round machinery recovers).
     const std::vector<std::pair<std::uint32_t, std::uint32_t>> edges = {{0, 1}, {1, 2}, {2, 3}};
@@ -339,7 +339,7 @@ int main() {
   {
     // Everyone holds the truthful keys EXCEPT: nodes 0,1,2 have the wrong signing
     // key pinned for node 3. When they dial node 3, its real (authenticated)
-    // identity won't match what they expect → they drop the link. Node 3 is thus
+    // identity won't match what they expect -> they drop the link. Node 3 is thus
     // excluded, but 0-1-2 are a quorum (3 of 4) and finalize without it.
     const SecureSession::Identity wrong = SecureSession::generate_identity();
     std::vector<SecureConfig> cfgs(n);

@@ -45,7 +45,7 @@ void Value::push_back(Value v) {
   arr_.push_back(std::move(v));
 }
 
-// ── Serialization ────────────────────────────────────────────────────────────
+// -- Serialization ------------------------------------------------------------
 
 namespace {
 void escape_into(const std::string& s, std::string& out) {
@@ -115,7 +115,7 @@ std::string Value::dump() const {
   return out;
 }
 
-// ── Parsing ──────────────────────────────────────────────────────────────────
+// -- Parsing ------------------------------------------------------------------
 
 namespace {
 class Parser {
@@ -151,7 +151,7 @@ class Parser {
   }
 
   // Bound recursion: adversarial RPC responses (deeply nested arrays/objects)
-  // would otherwise overflow the stack — a remote DoS.
+  // would otherwise overflow the stack - a remote DoS.
   static constexpr int kMaxDepth = 200;
   struct DepthGuard {
     int& d;

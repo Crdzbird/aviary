@@ -1,5 +1,5 @@
 // Two-node networking core over an in-memory, end-to-end-encrypted transport:
-// tx gossip, finalized-block propagation, and range sync — exercising mempool +
+// tx gossip, finalized-block propagation, and range sync - exercising mempool +
 // BFT engine + wire protocol + secure session together.
 #include <map>
 #include <memory>
@@ -130,7 +130,7 @@ int main() {
   CHECK(C.height() == 0);
   auto idAsync = SecureSession::generate_identity();  // A's identity for this link
   auto idC = SecureSession::generate_identity();      // C's identity
-  auto [sc, c1] = SecureSession::begin_initiator(idAsync.kem.public_key, idC.sig);  // C → A
+  auto [sc, c1] = SecureSession::begin_initiator(idAsync.kem.public_key, idC.sig);  // C -> A
   auto [saC, c2] = SecureSession::accept_responder(idAsync, c1);
   sc.complete_initiator(c2);
 

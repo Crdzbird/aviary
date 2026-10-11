@@ -6,7 +6,7 @@ namespace aviary::p2p {
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 
-// The unsigned fields, canonically encoded — the byte string the owner signs
+// The unsigned fields, canonically encoded - the byte string the owner signs
 // (via the domain-tagged hash) and the prefix of the wire form.
 void encode_unsigned(codec::CodecWriter& w, const PeerRecord& r) {
   w.write_u32(r.id);
@@ -14,7 +14,7 @@ void encode_unsigned(codec::CodecWriter& w, const PeerRecord& r) {
   w.write_u16(r.port);
   w.write_bytes(view(r.kem_pk));
   w.write_bytes(view(r.sig_pk));
-  w.write_bytes(view(r.prekey));  // ratchet prekey (may be empty) — signed like the rest
+  w.write_bytes(view(r.prekey));  // ratchet prekey (may be empty) - signed like the rest
 }
 
 void encode_record(codec::CodecWriter& w, const PeerRecord& r) {
@@ -61,7 +61,7 @@ const PeerRecord* AddressBook::get(std::uint32_t id) const {
 std::vector<PeerRecord> AddressBook::all() const {
   std::vector<PeerRecord> out;
   out.reserve(peers_.size());
-  for (const auto& [id, r] : peers_) out.push_back(r);  // std::map → ascending id
+  for (const auto& [id, r] : peers_) out.push_back(r);  // std::map -> ascending id
   return out;
 }
 

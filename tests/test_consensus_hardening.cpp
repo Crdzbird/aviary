@@ -109,7 +109,7 @@ int main() {
     ValidatorSet slashed = vset.with_slashed(2);
     CHECK(slashed.total_power() == vset.total_power() - 1);
     CHECK(slashed.at(2).power == 0);
-    CHECK(slashed.quorum() == (3 * 2) / 3 + 1);  // 3 remaining → quorum 3
+    CHECK(slashed.quorum() == (3 * 2) / 3 + 1);  // 3 remaining -> quorum 3
   }
 
   std::printf("== evidence gossips over the wire and drives an engine evidence pool ==\n");
@@ -145,7 +145,7 @@ int main() {
     CHECK(engine.equivocators().size() == 1);  // unchanged
   }
 
-  // ── Validator-set binding + LastCommit, exercised through a real engine ──────
+  // -- Validator-set binding + LastCommit, exercised through a real engine ------
   auto vkey = bls(100);
   ValidatorSet single(std::vector<Validator>{{vkey.public_key, 1}});  // quorum 1
   auto alice = ed(1), bob = ed(2);
@@ -176,7 +176,7 @@ int main() {
   std::printf("== first block carries no last commit; later blocks certify the parent ==\n");
   Block b2 = produce(1, 50, 2);
   CHECK(validate_consensus_data(kChain, single, b2.header, b1.header.hash()).ok);
-  // Wrong parent → the embedded last commit does not certify it.
+  // Wrong parent -> the embedded last commit does not certify it.
   CHECK(!validate_consensus_data(kChain, single, b2.header, filled(0x11)).ok);
 
   std::printf("== tampered consensus_data is rejected ==\n");

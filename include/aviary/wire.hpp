@@ -6,7 +6,7 @@
 #include "aviary/consensus.hpp"
 #include "aviary/types.hpp"
 
-/// P2P wire protocol (ARCHITECTURE §9). Every message is canonically encoded so
+/// P2P wire protocol (ARCHITECTURE section 9). Every message is canonically encoded so
 /// the framing is deterministic and the decoders are fuzzable. A [Message] is a
 /// type tag plus a length-prefixed payload; typed messages encode into the
 /// payload.
@@ -19,8 +19,8 @@ enum class MessageType : std::uint8_t {
   kGetBlocks = 4,  ///< request a range of blocks (sync)
   kEvidence = 5,   ///< gossip proof that a validator double-signed
   kConsensus = 6,  ///< a Tendermint proposal / prevote / precommit
-  kAdmissionChallenge = 7,     ///< verifier → connecting peer: prove membership
-  kAdmissionPresentation = 8,  ///< peer → verifier: an anonymous credential proof
+  kAdmissionChallenge = 7,     ///< verifier -> connecting peer: prove membership
+  kAdmissionPresentation = 8,  ///< peer -> verifier: an anonymous credential proof
 };
 
 struct Message {
@@ -31,7 +31,7 @@ struct Message {
   static Message decode_all(codec::ByteView bytes);
 };
 
-// ── Typed messages ───────────────────────────────────────────────────────────
+// -- Typed messages -----------------------------------------------------------
 
 struct Hello {
   std::uint8_t version = 1;
@@ -72,14 +72,14 @@ struct ConsensusMsg {
   Bytes block;                ///< encoded Block (proposals only)
 };
 
-/// Verifier → connecting peer: a membership challenge. [challenge] is a fresh
+/// Verifier -> connecting peer: a membership challenge. [challenge] is a fresh
 /// random nonce; [epoch] is the membership epoch the peer must present under.
 struct AdmissionChallenge {
   std::uint32_t epoch = 0;
   Bytes challenge;
 };
 
-/// Peer → verifier: an anonymous credential [presentation] answering a challenge.
+/// Peer -> verifier: an anonymous credential [presentation] answering a challenge.
 struct AdmissionPresentation {
   Bytes presentation;
 };

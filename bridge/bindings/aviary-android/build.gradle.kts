@@ -1,9 +1,9 @@
-// Aviary for Android — standalone library (AAR).
+// Aviary for Android - standalone library (AAR).
 //
 // Bundles the prebuilt native pair (libaviary_c.so + the libcryptolib_c.so
 // it links) per ABI under src/main/jniLibs/<abi>/, and an auto-registered
 // AviaryStartup ContentProvider that warms them off the main thread at
-// launch — so the first call into the native layer pays no load cost and the
+// launch - so the first call into the native layer pays no load cost and the
 // warm-up never blocks startup (the Android analog of the Flutter Isolate /
 // Node worker_thread preload).
 //
@@ -11,7 +11,7 @@
 //
 // Publish locally with:  ./gradlew :aviary-android:publishToMavenLocal
 plugins {
-    // AGP 9+ provides built-in Kotlin compilation — no kotlin.android plugin.
+    // AGP 9+ provides built-in Kotlin compilation - no kotlin.android plugin.
     id("com.android.library")
     id("maven-publish")
 }

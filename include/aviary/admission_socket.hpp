@@ -4,9 +4,9 @@
 
 #include "aviary/credential_gate.hpp"
 
-/// Blocking membership admission over a connected socket — the one-shot
-/// challenge→present→admit round a non-validator gossip / submitter peer runs
-/// before it joins the mesh (docs/design/CREDENTIAL_GATE.md §6). This is a
+/// Blocking membership admission over a connected socket - the one-shot
+/// challenge->present->admit round a non-validator gossip / submitter peer runs
+/// before it joins the mesh (docs/design/CREDENTIAL_GATE.md section 6). This is a
 /// standalone pre-mesh handshake, deliberately separate from the consensus
 /// reactor (`run_tcp_bft_node`, which mutually authenticates *validators* by
 /// signing key). Messages are u32-BE length-prefixed, matching that reactor's
@@ -17,7 +17,7 @@ namespace aviary::p2p {
 /// Verifier side: challenge the peer on [fd], read its presentation, and decide.
 /// Returns true iff the peer answers within [timeout_ms] with a presentation that
 /// admits under [gate] for scope "gossip" at ([epoch], [now]). Any I/O error,
-/// timeout, malformed reply, or failed proof is a quiet false — never throws.
+/// timeout, malformed reply, or failed proof is a quiet false - never throws.
 bool admit_peer_over_socket(int fd, const consensus::CredentialGate& gate, std::uint32_t epoch,
                             std::uint64_t now, int timeout_ms = 5000);
 

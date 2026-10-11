@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "aviary/pos_engine.hpp"  // pos_signing_bytes — same sealing rule
+#include "aviary/pos_engine.hpp"  // pos_signing_bytes - same sealing rule
 
 namespace aviary::consensus {
 
@@ -13,7 +13,7 @@ namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 codec::ByteView hview(const Hash& h) { return codec::ByteView(h.data(), h.size()); }
 
-// Domain byte for the VRF eligibility input — distinct from BFT votes (0x01)
+// Domain byte for the VRF eligibility input - distinct from BFT votes (0x01)
 // and PoS proposal seals (0x02), so a proof can never double as either.
 constexpr std::uint8_t kVrfEligibility = 0x03;
 }  // namespace
@@ -70,8 +70,8 @@ bool VrfPosEngine::meets_threshold(const Bytes& beta, std::uint32_t index) const
   const std::uint64_t power = vset_.at(index).power;
   if (power == 0) return false;  // slashed validators are never eligible
 
-  // Ticket uniform in [0, total); eligible band = min(oversample × power, total).
-  // (unsigned __int128 avoids overflow; power × oversample can exceed 2^64.)
+  // Ticket uniform in [0, total); eligible band = min(oversample x power, total).
+  // (unsigned __int128 avoids overflow; power x oversample can exceed 2^64.)
   std::uint64_t ticket = 0;
   for (int i = 0; i < 8; ++i) ticket = (ticket << 8) | beta[i];
   ticket %= total;
@@ -126,7 +126,7 @@ BlockError VrfPosEngine::submit(const Block& block, codec::ByteView justificatio
 
   // The proof must verify under the claimed proposer's REGISTERED VRF key, over
   // the alpha this exact block position implies (height + parent pin it to this
-  // tip — a proof for another height/branch cannot be replayed here)...
+  // tip - a proof for another height/branch cannot be replayed here)...
   const Bytes a = alpha(block.header.height, d.attempt, block.header.parent_hash);
   const std::optional<Bytes> beta =
       crypto::ecvrf_verify(view(vrf_pubkeys_[d.proposer_index]), view(a), view(d.vrf_proof));

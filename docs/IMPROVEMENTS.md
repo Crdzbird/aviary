@@ -1597,9 +1597,12 @@ selectors - validated against real-world vectors). Deferred:
   were mapped to ASCII equivalents (about a thousand characters in 19
   files). The README introduction and status paragraph describe the current
   engine instead of the M0 to M2 milestone text.
-- **[ ] [M]** The same symbols remain in code comments and scripts: roughly
-  11,000 characters across the C++ sources and headers, the C ABI header, the
-  Swift, JVM and npm wrappers, CMakeLists.txt, scripts/ci.sh and .gitignore.
-  The C ABI header is copied into the shipped xcframeworks, so that sweep
-  needs an artifact rebuild or a header copy in the same commit.
+- **[x]** The same sweep over code, scripts, generated protobuf output,
+  Xcode configs and the golden vector comments: about 12,000 characters in
+  256 files, almost all box drawing banners, em dashes and arrows in
+  comments, plus a few dozen separators and arrows in test, demo and
+  example app strings. Builds and suites pass unchanged (69 C++, 29 Dart,
+  Go, 17 npm, Swift demo, JVM demo). The C ABI header copies inside the
+  shipped xcframeworks were synced from the source header. A pre-commit
+  guard against non-ASCII in tracked text is the natural follow up.
 

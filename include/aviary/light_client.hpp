@@ -8,11 +8,11 @@
 #include "aviary/consensus.hpp"
 #include "aviary/types.hpp"
 
-/// Light client (ARCHITECTURE §10): follows the header chain and verifies each
+/// Light client (ARCHITECTURE section 10): follows the header chain and verifies each
 /// header's commit certificate against the validator set, **without** holding
 /// transactions or full state. Because >2/3 of voting power signs the header id
 /// (which commits tx_root and state_root), a verified header lets the client
-/// trust those roots — and thus verify inclusion proofs against them.
+/// trust those roots - and thus verify inclusion proofs against them.
 namespace aviary::client {
 
 class LightClient {
@@ -21,7 +21,7 @@ class LightClient {
     bool ok = false;
     std::string error;
     /// Set only by accept_skipping: the header is well-certified by its own
-    /// set but too few of OUR trusted validators signed it — fetch an
+    /// set but too few of OUR trusted validators signed it - fetch an
     /// intermediate header and bisect (see sync_to). Never set for a header
     /// that is malformed, mis-certified, or not ahead of the tip.
     bool insufficient_overlap = false;
@@ -31,7 +31,7 @@ class LightClient {
   };
 
   /// A header, its commit certificate, and the FULL validator set in force at
-  /// its height (whose hash the header commits) — what a skipping client needs.
+  /// its height (whose hash the header commits) - what a skipping client needs.
   struct Checkpoint {
     BlockHeader header;
     consensus::CommitCertificate cert;
@@ -66,7 +66,7 @@ class LightClient {
   ///   1. h commits the hash of [h_set] (the set in force at its height),
   ///   2. [cert] is a >2/3 certificate for h under [h_set] (h's own rule), and
   ///   3. the signers of [cert] who are also in OUR trusted set hold more than
-  ///      trust_numerator/trust_denominator (default 1/3) of ITS power —
+  ///      trust_numerator/trust_denominator (default 1/3) of ITS power - 
   ///      with fewer than 1/3 Byzantine among the validators we already
   ///      trust, at least one honest trusted validator vouched for h.
   /// On success the tip is h, the certifying set is [h_set], and the set in
@@ -74,7 +74,7 @@ class LightClient {
   /// still accepted here (a skip of one needs no linkage either).
   ///
   /// SECURITY ASSUMPTION (the "trusting period"): this rule is only sound
-  /// while the validators of the trusted tip can still be held accountable —
+  /// while the validators of the trusted tip can still be held accountable - 
   /// a client that trusts a tip older than the chain's unbonding period must
   /// re-bootstrap from a fresh trusted header instead. Aviary has no
   /// consensus clock, so the bound is the operator's: see max_skip().

@@ -10,8 +10,8 @@
 #include "aviary/state.hpp"
 #include "aviary/types.hpp"
 
-/// Formal genesis (ARCHITECTURE §0). A [GenesisSpec] is the canonical, hashable
-/// description of a chain's initial conditions — its parameters, its starting
+/// Formal genesis (ARCHITECTURE section 0). A [GenesisSpec] is the canonical, hashable
+/// description of a chain's initial conditions - its parameters, its starting
 /// balances, and its validator set. Two nodes that load the same spec derive the
 /// same genesis hash, the same initial state root, and the same chain params, so
 /// "which chain is this" has a single, verifiable answer instead of the ad-hoc
@@ -25,7 +25,7 @@ struct GenesisAccount {
   bool operator==(const GenesisAccount&) const = default;
 };
 
-/// An unspent output created at genesis (UTXO model). Order is significant — each
+/// An unspent output created at genesis (UTXO model). Order is significant - each
 /// output is assigned a genesis outpoint by its position.
 struct GenesisUtxo {
   Hash owner{};
@@ -46,16 +46,16 @@ struct GenesisSpec {
 
   // The network-wide security posture (an AssuranceProfile::Level id; 0 =
   // unspecified). Committed into the genesis hash, so every node provably agrees
-  // on the tier at every seam — see assurance.hpp.
+  // on the tier at every seam - see assurance.hpp.
   std::uint16_t assurance_profile = 0;
 
   // An optional anonymous-membership policy (docs/design/CREDENTIAL_GATE.md).
   // Empty = permissionless (no admission gate). When set, these are the canonical
-  // `consensus::CredentialPolicy` bytes — the issuer key, attribute schema, and
-  // tier threshold — committed into the genesis hash so every node provably
-  // agrees on who may join. ORTHOGONAL to `assurance_profile` (§10.4): the crypto
+  // `consensus::CredentialPolicy` bytes - the issuer key, attribute schema, and
+  // tier threshold - committed into the genesis hash so every node provably
+  // agrees on who may join. ORTHOGONAL to `assurance_profile` (section 10.4): the crypto
   // posture and the permissioned/permissionless axis are independent, so a chain
-  // may be any posture × either membership mode. Reconstruct the policy with
+  // may be any posture x either membership mode. Reconstruct the policy with
   // `consensus::CredentialPolicy::from_genesis`.
   Bytes membership_policy{};
 
@@ -63,15 +63,15 @@ struct GenesisSpec {
   // engine, state model, and proposer policy assemble this chain, each named by
   // a stable component id, plus their canonical params. Empty = the default,
   // posture-driven assembly. Committed into the genesis hash so the MIXTURE is
-  // chain identity — a node cannot boot a different mix and still be this chain.
+  // chain identity - a node cannot boot a different mix and still be this chain.
   // Reconstruct with `ChainBlueprint::from_genesis`; assemble with ChainAssembler.
   Bytes chain_blueprint{};
 
   // Subchains (docs/design/SUBCHAINS.md). Both empty by default:
-  //  - `subchain_policy`: canonical `SubchainPolicy` bytes — this chain is a
+  // - `subchain_policy`: canonical `SubchainPolicy` bytes - this chain is a
   //    PARENT that anchors the registered children. Empty = anchors nothing,
   //    and any version-3 (anchor-carrying) header is rejected.
-  //  - `parent_binding`: canonical `ParentBinding` bytes — this chain is a
+  // - `parent_binding`: canonical `ParentBinding` bytes - this chain is a
   //    CHILD of exactly that parent (id + genesis hash). Committed into the
   //    genesis hash, so a child cannot be re-parented.
   // Orthogonal to posture, membership and blueprint; appended last.
@@ -86,7 +86,7 @@ struct GenesisSpec {
   // The initial validator set (each {48-byte BLS pubkey, power}).
   std::vector<consensus::Validator> validators;
 
-  /// Canonical encoding — a fixed byte layout independent of map/iteration order.
+  /// Canonical encoding - a fixed byte layout independent of map/iteration order.
   Bytes encode() const;
   static GenesisSpec decode_all(codec::ByteView bytes);
 
@@ -97,7 +97,7 @@ struct GenesisSpec {
   /// The runtime chain parameters derived from this genesis.
   ChainSpec chain_spec() const;
 
-  /// The initial validator set (throws if malformed — see ValidatorSet).
+  /// The initial validator set (throws if malformed - see ValidatorSet).
   consensus::ValidatorSet validator_set() const { return consensus::ValidatorSet(validators); }
 
   /// Build the initial state machine carrying the genesis flat fee: an account

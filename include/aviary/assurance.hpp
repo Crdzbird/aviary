@@ -6,15 +6,15 @@
 #include "aviary/genesis.hpp"
 #include "aviary/types.hpp"
 
-/// The single safety knob (ARCHITECTURE §: security posture). A blockchain is
-/// only as safe as its weakest configured seam — strong threshold custody over a
+/// The single safety knob (ARCHITECTURE section : security posture). A blockchain is
+/// only as safe as its weakest configured seam - strong threshold custody over a
 /// plaintext transport, or PQ signatures behind a grindable proposer, buys
 /// little. An [AssuranceProfile] fixes ONE named posture and derives a
 /// consistent tier at every seam from it: transaction signatures, custody,
 /// transport, consensus, and mempool.
 ///
 /// The profile's id is **committed into the genesis hash** (a field on
-/// [GenesisSpec]), so every node provably agrees on the posture — a node cannot
+/// [GenesisSpec]), so every node provably agrees on the posture - a node cannot
 /// silently join with a weaker configuration, exactly as cryptolib binds a suite
 /// id into its PQ envelopes. `from_genesis` reconstructs the profile AND checks
 /// the genesis's own parameters (its accepted signature algorithms) match what
@@ -44,7 +44,7 @@ class AssuranceProfile {
   Level level() const { return level_; }
   std::uint16_t id() const { return static_cast<std::uint16_t>(level_); }
 
-  /// The exact set of signature schemes this posture permits on-chain — feeds
+  /// The exact set of signature schemes this posture permits on-chain - feeds
   /// `GenesisSpec::accepted_sig_algos` / `ChainSpec`. Ascending, canonical.
   std::vector<std::uint8_t> required_sig_algos() const;
 
@@ -62,7 +62,7 @@ class AssuranceProfile {
 
   /// The posture a genesis declares. Throws if the id is unknown OR if the
   /// genesis's accepted signature set does not match what the level mandates
-  /// (an inconsistent spec — a strong claim over weak parameters).
+  /// (an inconsistent spec - a strong claim over weak parameters).
   static AssuranceProfile from_genesis(const GenesisSpec& g);
 
   bool operator==(const AssuranceProfile&) const = default;

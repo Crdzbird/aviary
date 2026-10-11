@@ -23,12 +23,12 @@ constexpr codec::u128 kU128Max = ~static_cast<codec::u128>(0);
 
 // Seal the overlay into a fresh baseline when it grows past this fraction of the
 // committed state (1/kSealDivisor), amortising the O(N) rebuild over many
-// blocks. Below the threshold, state_root() stays on the O(K·log N) incremental
+// blocks. Below the threshold, state_root() stays on the O(K-log N) incremental
 // path. Also a small absolute floor so tiny states just rebuild.
 constexpr std::size_t kSealDivisor = 8;
 constexpr std::size_t kSealFloor = 64;
 
-// Canonical leaf preimage for an account: addr(32) ‖ balance(u128) ‖ nonce(u64).
+// Canonical leaf preimage for an account: addr(32) || balance(u128) || nonce(u64).
 Bytes account_leaf_preimage(const Hash& addr, const AccountStateMachine::Account& acc) {
   codec::CodecWriter w;
   w.write_fixed_bytes(view(addr), 32);
@@ -113,7 +113,7 @@ Hash AccountStateMachine::state_root() const {
   if (overlay_.empty()) return base_->tree.root();
 
   // Any brand-new account shifts leaf positions, so the incremental path (which
-  // only rewrites existing positions) does not apply — rebuild. Likewise once
+  // only rewrites existing positions) does not apply - rebuild. Likewise once
   // the overlay is a big fraction of the state, rebuilding amortises better than
   // repeatedly walking a large change set.
   bool has_inserts = false;
@@ -131,7 +131,7 @@ Hash AccountStateMachine::state_root() const {
   }
 
   // Updates-only, small overlay: recompute just the changed leaves' root-paths
-  // against the cached committed tree — O(K·log N), no rebuild, no mutation.
+  // against the cached committed tree - O(K-log N), no rebuild, no mutation.
   std::map<std::size_t, Hash> changes;
   for (const auto& [addr, acc] : overlay_) {
     auto it = std::lower_bound(base_->sorted_addrs.begin(), base_->sorted_addrs.end(), addr);
@@ -228,7 +228,7 @@ ValidationResult AccountStateMachine::validate(const Transaction& tx) const {
 }
 
 void AccountStateMachine::apply(const Transaction& tx) {
-  // Precondition: validate(tx).ok — fields here are known good.
+  // Precondition: validate(tx).ok - fields here are known good.
   const Transfer t = decode_transfer(tx.body);
   const Hash sender = crypto::address_of(view(tx.author));
 
@@ -236,7 +236,7 @@ void AccountStateMachine::apply(const Transaction& tx) {
   s.balance -= t.amount + flat_fee_ + tx.declared_fee();  // fees burned, not credited
   s.nonce += 1;
   put(sender, s);
-  // Read the recipient AFTER writing the sender so a self-transfer nets to −fee
+  // Read the recipient AFTER writing the sender so a self-transfer nets to -fee
   // (overlay reflects the just-debited balance).
   Account r = account(t.recipient);
   r.balance += t.amount;
@@ -261,7 +261,7 @@ Bytes AccountStateMachine::serialize() const {
   codec::CodecWriter w;
   w.write_u128(flat_fee_);
   w.write_u32(static_cast<std::uint32_t>(base_->accounts.size()));
-  for (const auto& [addr, acc] : base_->accounts) {  // map → address-sorted, canonical
+  for (const auto& [addr, acc] : base_->accounts) {  // map -> address-sorted, canonical
     w.write_fixed_bytes(view(addr), 32);
     w.write_u128(acc.balance);
     w.write_u64(acc.nonce);

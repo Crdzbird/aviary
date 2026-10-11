@@ -55,7 +55,7 @@ AddResult Mempool::add(const Transaction& tx, std::uint64_t chain_id) {
     }
   }
 
-  // Capacity: when full, run a fee-priority eviction — the cheapest resident is
+  // Capacity: when full, run a fee-priority eviction - the cheapest resident is
   // dropped only if the newcomer outbids it. So a full pool keeps the highest
   // paying txs; a spammer must outbid to displace anyone.
   if (pool_.size() >= cfg_.max_txs) {
@@ -111,8 +111,8 @@ std::vector<Transaction> Mempool::select(const StateMachine& state,
   // applied; a UTXO spending a not-yet-created output) becomes ready in a later
   // pass. The fee-ordered scan makes selection deterministic and fee-priority.
   //
-  // Selection stops at whichever block limit binds first — tx count [max] or the
-  // configured total-bytes budget — so a block's size is bounded regardless of
+  // Selection stops at whichever block limit binds first - tx count [max] or the
+  // configured total-bytes budget - so a block's size is bounded regardless of
   // how the pool is shaped.
   bool progress = true;
   while (progress && out.size() < max) {
@@ -123,7 +123,7 @@ std::vector<Transaction> Mempool::select(const StateMachine& state,
       const Transaction& tx = *txp;
       const std::size_t tx_bytes = tx.encode().size();
       if (cfg_.max_block_bytes != 0 && block_bytes + tx_bytes > cfg_.max_block_bytes) {
-        // Skip this tx (too big for the remaining budget) but keep scanning —
+        // Skip this tx (too big for the remaining budget) but keep scanning - 
         // a smaller ready tx may still fit.
         continue;
       }

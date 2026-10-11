@@ -7,7 +7,7 @@
 #include <vector>
 
 /// A small, dependency-free JSON value + parser + serializer, used by the
-/// JSON-RPC client (ARCHITECTURE §11). Objects preserve insertion order so
+/// JSON-RPC client (ARCHITECTURE section 11). Objects preserve insertion order so
 /// serialization is deterministic (important for testable requests).
 namespace aviary::json {
 

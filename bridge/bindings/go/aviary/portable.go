@@ -11,7 +11,7 @@ import (
 	"unsafe"
 )
 
-// PortableAccount is one signing account — its public key and secret — that can
+// PortableAccount is one signing account - its public key and secret - that can
 // be moved off the node under a chosen trust tier. Every seal is authenticated
 // and fails closed on tamper / wrong key / wrong passphrase.
 type PortableAccount struct {

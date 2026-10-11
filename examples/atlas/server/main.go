@@ -1,4 +1,4 @@
-// Atlas Settlement Network — gRPC server backed by Aviary (Go binding).
+// Atlas Settlement Network - gRPC server backed by Aviary (Go binding).
 package main
 
 import (
@@ -16,7 +16,7 @@ func main() {
 	if err := bc.Init(); err != nil {
 		log.Fatalf("aviary init: %v", err)
 	}
-	log.Printf("Atlas Settlement Network — aviary %s (crypto %s)",
+	log.Printf("Atlas Settlement Network - aviary %s (crypto %s)",
 		bc.Version(), bc.CryptoBackendVersion())
 
 	addr := ":50051"

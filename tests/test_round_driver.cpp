@@ -2,7 +2,7 @@
 // crypto + ledger. N validators, each with its own Ledger, gossip signed
 // wire::ConsensusMsg to each other; timeouts fire when the network is quiescent.
 // We assert they all COMMIT the same real block (matching state_root), building a
-// real >2/3 commit certificate — including a faulty-proposer round change.
+// real >2/3 commit certificate - including a faulty-proposer round change.
 #include <cstdint>
 #include <deque>
 #include <map>

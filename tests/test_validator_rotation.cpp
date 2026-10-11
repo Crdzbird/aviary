@@ -21,7 +21,7 @@ constexpr std::uint64_t kChain = 9;
 std::unique_ptr<Ledger> fresh_ledger() {
   return std::make_unique<Ledger>(ChainSpec{kChain, StateModel::kAccount}, std::make_unique<AccountStateMachine>());
 }
-// All of [signers] (index, key) precommit → certificate.
+// All of [signers] (index, key) precommit -> certificate.
 std::optional<CommitCertificate> certify(const BftEngine& e, const Block& b,
                                          const std::vector<std::pair<std::uint32_t, crypto::KeyPair>>& signers) {
   std::vector<Vote> votes;
@@ -34,7 +34,7 @@ int main() {
   init();
   std::vector<crypto::KeyPair> k = {bls_key(10), bls_key(11), bls_key(12), bls_key(13), bls_key(14)};
   std::vector<Validator> old_vs = {{k[0].public_key, 1}, {k[1].public_key, 1}, {k[2].public_key, 1}, {k[3].public_key, 1}};
-  std::vector<Validator> new_vs = {{k[1].public_key, 1}, {k[2].public_key, 1}, {k[3].public_key, 1}, {k[4].public_key, 1}};  // drop 0, add 4 → indices shift
+  std::vector<Validator> new_vs = {{k[1].public_key, 1}, {k[2].public_key, 1}, {k[3].public_key, 1}, {k[4].public_key, 1}};  // drop 0, add 4 -> indices shift
   ValidatorSet old_set(old_vs), new_set(new_vs);
   CHECK(old_set.hash() != new_set.hash());
   CHECK(old_set.index_of(k[3].public_key) == 3u && new_set.index_of(k[3].public_key) == 2u && !new_set.index_of(k[0].public_key));
@@ -62,14 +62,14 @@ int main() {
   engine.schedule_validator_set(new_set);
   Block b2 = engine.propose({}, 2);
   CHECK(announced_validator_set(b2.header) && announced_validator_set(b2.header)->hash() == new_set.hash());
-  CHECK_THROWS(follower.precommit(b2, 1, k[1]));                       // governance: unscheduled → refuses to vote
+  CHECK_THROWS(follower.precommit(b2, 1, k[1]));                       // governance: unscheduled -> refuses to vote
   auto c2 = certify(engine, b2, {{0, k[0]}, {1, k[1]}, {2, k[2]}});   // old indices, old keys
   CHECK(c2.has_value());
   CHECK(engine.finalize(b2, *c2).ok);
   CHECK(engine.validators().hash() == new_set.hash());                // in force for the next block
   CHECK(engine.tip_validators().hash() == old_set.hash());            // the tip was certified by the old set
   CHECK(!engine.scheduled_validator_set());
-  CHECK(follower.finalize(b2, *c2).ok);                               // certified → the follower FOLLOWS
+  CHECK(follower.finalize(b2, *c2).ok);                               // certified -> the follower FOLLOWS
   CHECK(follower.validators().hash() == new_set.hash());
 
   std::printf("== block 3: hash of the NEW set, last commit verified under the OLD set ==\n");

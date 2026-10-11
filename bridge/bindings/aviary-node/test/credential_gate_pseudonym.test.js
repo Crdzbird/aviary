@@ -1,7 +1,7 @@
-// CredentialGate Option B — pseudonymous membership (per-epoch Sybil resistance)
-// over the npm binding. Blind issuance (commit → blind-sign → finalize), then a
-// per-(epoch, scope) pseudonym: same member+epoch+scope → the same nym, a
-// different epoch → an unlinkable one.
+// CredentialGate Option B - pseudonymous membership (per-epoch Sybil resistance)
+// over the npm binding. Blind issuance (commit -> blind-sign -> finalize), then a
+// per-(epoch, scope) pseudonym: same member+epoch+scope -> the same nym, a
+// different epoch -> an unlinkable one.
 const bc = require('..');
 function assert(ok, m) { if (!ok) throw new Error('FAIL: ' + m); }
 const eq = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
@@ -31,22 +31,22 @@ const present = (c, epoch, scope, b) => policy.presentPseudonymous(c, epoch, sco
 const nymA = gate.admitPseudonymous(5, 'gossip', ch(1), present(cred, 5, 'gossip', 1), now);
 assert(nymA && nymA.length === 48, 'admit returns a 48-byte pseudonym');
 
-// Sybil-linkable: a fresh presentation, same member+epoch+scope → the same nym.
+// Sybil-linkable: a fresh presentation, same member+epoch+scope -> the same nym.
 const nym2 = gate.admitPseudonymous(5, 'gossip', ch(2), present(cred, 5, 'gossip', 2), now);
-assert(nym2 && eq(nym2, nymA), 'same member+epoch+scope → same nym');
+assert(nym2 && eq(nym2, nymA), 'same member+epoch+scope -> same nym');
 assert(gate.noteAdmission(5, 'gossip', nymA), 'first admission is fresh');
 assert(!gate.noteAdmission(5, 'gossip', nym2), 'a second session on the nym is flagged (Sybil cap)');
 
 // Unlinkable across epochs / scopes.
 const nymE = gate.admitPseudonymous(6, 'gossip', ch(1), present(cred, 6, 'gossip', 1), now);
-assert(nymE && !eq(nymE, nymA), 'different epoch → different nym');
+assert(nymE && !eq(nymE, nymA), 'different epoch -> different nym');
 const nymS = gate.admitPseudonymous(5, 'submit', ch(1), present(cred, 5, 'submit', 1), now);
-assert(nymS && !eq(nymS, nymA), 'different scope → different nym');
+assert(nymS && !eq(nymS, nymA), 'different scope -> different nym');
 
-// Different member → different nym.
+// Different member -> different nym.
 const nymO = gate.admitPseudonymous(5, 'gossip', ch(1),
   present(issue(Buffer.alloc(32, 0x88), 3, notAfter, 1), 5, 'gossip', 1), now);
-assert(nymO && !eq(nymO, nymA), 'different member → different nym');
+assert(nymO && !eq(nymO, nymA), 'different member -> different nym');
 
 // Context binding (anti-replay).
 const presA = present(cred, 5, 'gossip', 1);

@@ -4,7 +4,7 @@ import Aviary
 import Foundation
 import CryptoKit
 
-// Optional: warm the native backend off the main thread. Fire-and-forget — the
+// Optional: warm the native backend off the main thread. Fire-and-forget - the
 // synchronous API below never waits on it.
 let warmed = DispatchSemaphore(value: 0)
 Aviary.preload { warmed.signal() }
@@ -12,7 +12,7 @@ Aviary.preload { warmed.signal() }
 print("aviary:", Aviary.version)
 print("crypto backend:", Aviary.cryptoBackendVersion)
 
-// A full ledger flow — fully synchronous, no await.
+// A full ledger flow - fully synchronous, no await.
 let node = try Aviary.makeNode(chainID: 42)
 let alice = try node.newAccount()
 let bob = try node.newAccount()
@@ -30,7 +30,7 @@ print("state proof verified:", ok)
 let secp = Data(repeating: 0x11, count: 32)
 print("eth:", try Aviary.ethAddress(secret32: secp))
 
-// Portable account export — the three tiers, all fail-closed.
+// Portable account export - the three tiers, all fail-closed.
 let hy = try node.newAccountHybrid()
 let env1 = try Aviary.sealAccountPassphrase(publicKey: hy.publicKey, secret: hy.secret,
                                                   passphrase: "backup", ops: 3, mem: 1 << 16)
@@ -95,7 +95,7 @@ let strangerReveal = try pool.reveal(proposerKemSecret: strangerKem.secret, max:
 precondition(strangerReveal.isEmpty, "a non-proposer opens nothing")
 print("assurance + sealed-mempool OK")
 
-// CredentialGate (anonymous membership admission, Option A — unlinkable).
+// CredentialGate (anonymous membership admission, Option A - unlinkable).
 let issuer = try Aviary.newBBSIssuer(keyMaterial: Data(repeating: 0x11, count: 32))
 precondition(issuer.publicKey.count == 96 && issuer.secret.count == 32, "BBS issuer key sizes")
 let credPolicy = try Aviary.CredentialPolicy(chainID: 7, issuerPublic: issuer.publicKey,
@@ -124,7 +124,7 @@ precondition(!credGate.admit(epoch: 5, scope: "submit", challenge: credChallenge
                              presentation: Data("garbage".utf8), now: credNow), "malformed rejected")
 print("credential-gate OK")
 
-// CredentialGate Option B (pseudonymous — per-epoch Sybil resistance).
+// CredentialGate Option B (pseudonymous - per-epoch Sybil resistance).
 let pseudoPolicy = try Aviary.CredentialPolicy(chainID: 7, issuerPublic: issuer.publicKey,
                                                      header: Data("aviary.credential.v2".utf8),
                                                      minTier: 2, mode: .pseudonymous)
@@ -143,12 +143,12 @@ let nymA = try pseudoGate.admitPseudonymous(epoch: 5, scope: "gossip", challenge
 precondition(nymA != nil && nymA!.count == 48, "admit returns a 48-byte pseudonym")
 let presP2 = try pseudoPolicy.presentPseudonymous(credential: pseudoCred, epoch: 5, scope: "gossip", challenge: chd(2))
 let nym2 = try pseudoGate.admitPseudonymous(epoch: 5, scope: "gossip", challenge: chd(2), presentation: presP2, now: credNow)
-precondition(nym2 == nymA, "same member+epoch+scope → same pseudonym")
+precondition(nym2 == nymA, "same member+epoch+scope -> same pseudonym")
 precondition(pseudoGate.noteAdmission(epoch: 5, scope: "gossip", nym: nymA!), "first admission fresh")
 precondition(!pseudoGate.noteAdmission(epoch: 5, scope: "gossip", nym: nym2!), "Sybil cap flags the duplicate")
 let presE = try pseudoPolicy.presentPseudonymous(credential: pseudoCred, epoch: 6, scope: "gossip", challenge: chd(1))
 let nymE = try pseudoGate.admitPseudonymous(epoch: 6, scope: "gossip", challenge: chd(1), presentation: presE, now: credNow)
-precondition(nymE != nil && nymE != nymA, "different epoch → unlinkable pseudonym")
+precondition(nymE != nil && nymE != nymA, "different epoch -> unlinkable pseudonym")
 print("credential-gate pseudonymous OK")
 
 // Composable chains: declare a mixture, commit it into genesis, assemble, commit a block.
@@ -198,7 +198,7 @@ let feBp = try Aviary.Blueprint(consensus: "swift-engine", stateModel: "account"
 let feGen = try Aviary.commitBlueprint(genesis: gen, blueprint: feBp)
 let feChain = Aviary.assembleChain(genesis: feGen, me: 0, blsPub: val.publicKey, blsSec: val.secret)!
 let feBlk = try feChain.propose(timestamp: 2)
-let feJust = try feChain.seal(feBlk)   // → Swift justify
+let feJust = try feChain.seal(feBlk)   // -> Swift justify
 precondition(feJust.starts(with: Data("swift-just:".utf8)), "seal via Swift justify")
 var feBad = feJust; feBad[feBad.count - 1] ^= 1
 precondition(!feChain.submit(block: feBlk, justification: feBad) && feChain.height == 0, "tampered justification refused, ledger untouched")
@@ -296,7 +296,7 @@ do {
 }
 print("validator-rotation OK")
 
-// Light-client overlap rule: power moves A → B; a client trusting only A bisects through the rotation.
+// Light-client overlap rule: power moves A -> B; a client trusting only A bisects through the rotation.
 do {
     let va = try Aviary.newBLSValidator(keyMaterial: Data(repeating: 0x91, count: 32))
     let vb = try Aviary.newBLSValidator(keyMaterial: Data(repeating: 0x92, count: 32))
@@ -338,7 +338,7 @@ do {
 }
 print("light-client-skip OK")
 
-// ChainTree: root ← child ← grandchild (+ sibling) built together, produced upward, proven from the root, hooks from Swift.
+// ChainTree: root <- child <- grandchild (+ sibling) built together, produced upward, proven from the root, hooks from Swift.
 do {
     func tv(_ seed: UInt8, _ power: UInt64 = 1) throws -> Aviary.TreeValidator {
         let v = try Aviary.newBLSValidator(keyMaterial: Data(repeating: seed, count: 32)); return .init(publicKey: v.publicKey, secret: v.secret, power: power) }

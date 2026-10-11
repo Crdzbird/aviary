@@ -17,7 +17,7 @@ import (
 // composable-chain handle) whose validator set the operator rotates by
 // announcing the next set, certified by the current one. An "auditor" light
 // client that only ever trusted the genesis set follows with the OVERLAP
-// (skipping) rule — bisecting through every rotation header.
+// (skipping) rule - bisecting through every rotation header.
 type council struct {
 	mu          sync.Mutex
 	chainID     uint64
@@ -25,7 +25,7 @@ type council struct {
 	operator    *bc.PortableAccount
 	genesisSet  []bc.GenesisValidator
 	genesisHdr  []byte
-	checkpoints map[uint64]bc.Checkpoint // height → (header, cert, set in force at that height)
+	checkpoints map[uint64]bc.Checkpoint // height -> (header, cert, set in force at that height)
 	ts          uint64
 	rotations   uint32
 	auditorH    uint64
@@ -78,7 +78,7 @@ func (c *council) step(label string, ok bool, detail string) {
 }
 
 // produce finalizes the next council block (the operator always keeps quorum
-// alone: it holds ≥ 3/4 of the power after every rotation) and records the
+// alone: it holds >= 3/4 of the power after every rotation) and records the
 // checkpoint the auditor will need.
 func (c *council) produce() error {
 	inForce, err := c.chain.Validators()
@@ -152,7 +152,7 @@ func (s *server) CouncilAction(_ context.Context, r *pb.CouncilRequest) (*pb.Cou
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		// Next set: every existing member keeps power 1 except the operator, who
-		// holds 3× the others so it still reaches quorum alone (a demo convenience —
+		// holds 3x the others so it still reaches quorum alone (a demo convenience -
 		// on a real council the other validators would certify too).
 		next := []bc.GenesisValidator{}
 		others := 0
@@ -175,11 +175,11 @@ func (s *server) CouncilAction(_ context.Context, r *pb.CouncilRequest) (*pb.Cou
 		}
 		c.rotations++
 		c.step(fmt.Sprintf("rotation #%d announced in block %d", c.rotations, c.chain.Height()), true,
-			fmt.Sprintf("certified by the OLD %d-validator set; the new %d-validator set rules from the next block (%s… joined)", len(vs), len(next), hexb(nv.Public)[:12]))
+			fmt.Sprintf("certified by the OLD %d-validator set; the new %d-validator set rules from the next block (%s... joined)", len(vs), len(next), hexb(nv.Public)[:12]))
 	case pb.CouncilOp_COUNCIL_AUDITOR_SYNC:
 		target := c.chain.Height()
 		if target == 0 {
-			c.step("auditor sync", false, "nothing to sync yet — produce a block first")
+			c.step("auditor sync", false, "nothing to sync yet - produce a block first")
 			break
 		}
 		lc, err := bc.NewLightClient(c.chainID+1000, c.genesisSet, c.genesisHdr)
@@ -190,11 +190,11 @@ func (s *server) CouncilAction(_ context.Context, r *pb.CouncilRequest) (*pb.Cou
 		tcp := c.checkpoints[target]
 		switch lc.AcceptSkipping(tcp) {
 		case bc.SkipAccepted:
-			c.step(fmt.Sprintf("auditor skipped genesis → %d in one jump", target), true,
+			c.step(fmt.Sprintf("auditor skipped genesis -> %d in one jump", target), true,
 				"the target's certificate is signed by > 1/3 of the set the auditor trusts")
 		case bc.SkipInsufficientOverlap:
-			c.step(fmt.Sprintf("auditor cannot jump genesis → %d", target), true,
-				"thin overlap with the genesis set (rotations in between) → bisecting")
+			c.step(fmt.Sprintf("auditor cannot jump genesis -> %d", target), true,
+				"thin overlap with the genesis set (rotations in between) -> bisecting")
 			fetched := []uint64{}
 			if err := lc.SyncTo(tcp, target, func(h uint64) (bc.Checkpoint, bool) {
 				fetched = append(fetched, h)
@@ -203,14 +203,14 @@ func (s *server) CouncilAction(_ context.Context, r *pb.CouncilRequest) (*pb.Cou
 			}); err != nil {
 				c.step("auditor bisection", false, err.Error())
 			} else {
-				c.step(fmt.Sprintf("auditor bisected to %d", target), true, fmt.Sprintf("intermediate headers fetched: %v — each accepted rotation refreshed the trusted set", fetched))
+				c.step(fmt.Sprintf("auditor bisected to %d", target), true, fmt.Sprintf("intermediate headers fetched: %v - each accepted rotation refreshed the trusted set", fetched))
 			}
 		default:
 			c.step("auditor sync", false, "checkpoint refused (hard failure)")
 		}
 		c.auditorH = lc.Height()
 		vs, _ := lc.Validators()
-		c.step(fmt.Sprintf("auditor now trusts height %d", c.auditorH), c.auditorH == target, fmt.Sprintf("and a %d-validator set — without replaying every header", len(vs)))
+		c.step(fmt.Sprintf("auditor now trusts height %d", c.auditorH), c.auditorH == target, fmt.Sprintf("and a %d-validator set - without replaying every header", len(vs)))
 	}
 	return c.pb(), nil
 }

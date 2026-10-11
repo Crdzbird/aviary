@@ -11,16 +11,16 @@
 #include "aviary/ledger.hpp"
 #include "aviary/types.hpp"
 
-/// VRF-based proof-of-stake (ARCHITECTURE §7, hardened tier): a composed engine
+/// VRF-based proof-of-stake (ARCHITECTURE section 7, hardened tier): a composed engine
 /// that closes the reference [PosEngine]'s grinding gap. Its stake-weighted
-/// leader is a *public deterministic function of the height* — predictable
+/// leader is a *public deterministic function of the height* - predictable
 /// arbitrarily far ahead (targeted DoS) and, with any influence over the seed,
 /// grindable. Here, eligibility is an **ECVRF proof** (RFC 9381):
 ///
-///   alpha = tag ‖ chain_id ‖ height ‖ attempt ‖ parent_hash
+///   alpha = tag || chain_id || height || attempt || parent_hash
 ///   pi    = ecvrf_prove(vrf_sk, alpha)         (only the leader can make it)
-///   beta  = proof_to_hash(pi)                  (fixed — nothing to grind)
-///   eligible ⇔ (beta as ticket) mod total_power < oversample × power
+///   beta  = proof_to_hash(pi)                  (fixed - nothing to grind)
+///   eligible <=> (beta as ticket) mod total_power < oversample x power
 ///
 /// Nobody can predict a future leader (beta needs the leader's secret key), the
 /// leader can't shop for a favourable outcome (beta is a function, not a
@@ -33,7 +33,7 @@
 /// deployment would commit them in the genesis spec.
 namespace aviary::consensus {
 
-/// The VRF-PoS payload in a block's consensus_data (its own versioned type —
+/// The VRF-PoS payload in a block's consensus_data (its own versioned type - 
 /// the reference PosEngine's PosData format is untouched).
 struct VrfPosData {
   std::uint32_t proposer_index = 0;
@@ -63,7 +63,7 @@ class VrfPosEngine : public ConsensusEngine {
   const BlockHeader& tip() const override { return ledger_->tip(); }
 
   /// Is THIS validator an eligible leader for tip+1 at [attempt]? Returns the
-  /// ECVRF proof if so (deterministic: same tip → same answer).
+  /// ECVRF proof if so (deterministic: same tip -> same answer).
   std::optional<Bytes> eligible(std::uint32_t attempt) const;
 
   /// Assemble the next block: finds the first attempt (0..kMaxAttempts) at
@@ -73,7 +73,7 @@ class VrfPosEngine : public ConsensusEngine {
   Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                          std::vector<Anchor> anchors) override;
 
-  /// The leader's BLS signature over the block id — the block's justification
+  /// The leader's BLS signature over the block id - the block's justification
   /// (same sealing rule as the reference PoS engine).
   Bytes seal(const Block& block) const;
 

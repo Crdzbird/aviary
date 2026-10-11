@@ -1,8 +1,8 @@
-// CredentialGate — anonymous membership admission (Option A, unlinkable) over the
+// CredentialGate - anonymous membership admission (Option A, unlinkable) over the
 // npm binding. An issuer signs a member's attributes as a BBS credential; a
 // holder admits itself to a role by proving in zero knowledge it holds an
 // issuer-signed credential whose tier clears the policy and whose expiry has not
-// passed — revealing nothing else.
+// passed - revealing nothing else.
 const bc = require('..');
 function assert(ok, m) { if (!ok) throw new Error('FAIL: ' + m); }
 

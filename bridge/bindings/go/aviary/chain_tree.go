@@ -22,11 +22,11 @@ import (
 
 // ChainTreeNode declares one chain of a family: its mixture, posture, funded
 // accounts, validators (Secret empty for validators this process does not
-// hold), anchoring bounds and child chains (subchains — must be BFT).
+// hold), anchoring bounds and child chains (subchains - must be BFT).
 type ChainTreeNode struct {
 	ChainID             uint64
 	Blueprint           *Blueprint // nil = bft/account
-	AssuranceLevel      uint16     // 0 → 1 (standard)
+	AssuranceLevel      uint16     // 0 -> 1 (standard)
 	Accounts            []GenesisAccount
 	Validators          []ChainTreeValidator
 	MaxAnchorsPerBlock  uint16
@@ -155,11 +155,15 @@ func (t *ChainTree) ChainIDs() ([]uint64, error) {
 	}
 	return out, nil
 }
-func (t *ChainTree) Height(chainID uint64) uint64 { return uint64(C.aviary_chain_tree_height(t.h, C.uint64_t(chainID))) }
+func (t *ChainTree) Height(chainID uint64) uint64 {
+	return uint64(C.aviary_chain_tree_height(t.h, C.uint64_t(chainID)))
+}
 func (t *ChainTree) Genesis(chainID uint64) ([]byte, error) {
 	return takeBuf(C.aviary_chain_tree_genesis(t.h, C.uint64_t(chainID)))
 }
-func (t *ChainTree) Tip(chainID uint64) ([]byte, error) { return takeBuf(C.aviary_chain_tree_tip(t.h, C.uint64_t(chainID))) }
+func (t *ChainTree) Tip(chainID uint64) ([]byte, error) {
+	return takeBuf(C.aviary_chain_tree_tip(t.h, C.uint64_t(chainID)))
+}
 func (t *ChainTree) PendingAnchors(chainID uint64) uint32 {
 	return uint32(C.aviary_chain_tree_pending_anchors(t.h, C.uint64_t(chainID)))
 }

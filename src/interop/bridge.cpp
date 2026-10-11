@@ -20,7 +20,7 @@ constexpr std::uint8_t kPacketDomain = 0xB0;
 constexpr std::uint8_t kAttestDomain = 0xB1;
 }  // namespace
 
-// ── Payload / packet ─────────────────────────────────────────────────────────
+// -- Payload / packet ---------------------------------------------------------
 
 Bytes TransferPayload::encode() const {
   codec::CodecWriter w;
@@ -72,7 +72,7 @@ Hash Packet::commitment() const {
   return crypto::blake3_256(buf);
 }
 
-// ── Attestation ──────────────────────────────────────────────────────────────
+// -- Attestation --------------------------------------------------------------
 
 Bytes attestation_signing_bytes(const Hash& commitment, std::uint32_t attestor_index) {
   codec::CodecWriter w;
@@ -144,7 +144,7 @@ bool verify_attestation(const consensus::ValidatorSet& attestors, const Hash& co
   return crypto::bls_aggregate_verify(msgs, pks, view(attestation.agg_signature));
 }
 
-// ── Endpoint ─────────────────────────────────────────────────────────────────
+// -- Endpoint -----------------------------------------------------------------
 
 namespace {
 constexpr codec::u128 kU128Max = ~static_cast<codec::u128>(0);

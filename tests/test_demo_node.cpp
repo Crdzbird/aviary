@@ -71,7 +71,7 @@ int main() {
     DemoNode fresh(43);
     auto carol = fresh.new_account();
     const Hash carol_addr = addr_of(carol);
-    // Read state BEFORE the first credit — under the old semantics this sealed
+    // Read state BEFORE the first credit - under the old semantics this sealed
     // the (empty) genesis and the credit below was silently dropped.
     CHECK(fresh.height() == 0);
     CHECK(fresh.balance(carol_addr) == 0);

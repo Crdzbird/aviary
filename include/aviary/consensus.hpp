@@ -9,8 +9,8 @@
 #include "aviary/crypto.hpp"
 #include "aviary/types.hpp"
 
-/// BFT consensus primitives (ARCHITECTURE §7). A commit certificate proves that
-/// validators holding more than 2/3 of voting power precommitted a block id —
+/// BFT consensus primitives (ARCHITECTURE section 7). A commit certificate proves that
+/// validators holding more than 2/3 of voting power precommitted a block id - 
 /// the deterministic, instant-finality core of the Tendermint-style engine.
 ///
 /// Votes are BLS-signed and bind the signer's validator index, so each signer's
@@ -38,13 +38,13 @@ class ValidatorSet {
 
   /// Byzantine quorum: the minimum power that strictly exceeds 2/3 of the total
   /// (`floor(2*total/3) + 1`). Two quorums always intersect (each > 1/2), which
-  /// is what makes conflicting commits impossible — the safety foundation.
+  /// is what makes conflicting commits impossible - the safety foundation.
   std::uint64_t quorum() const;
 
   /// Canonical commitment to the set.
   Hash hash() const;
 
-  /// A copy with validator [index]'s voting power zeroed — the punishment for
+  /// A copy with validator [index]'s voting power zeroed - the punishment for
   /// proven equivocation (it can no longer contribute to any quorum). Indices
   /// are preserved so existing certificates still resolve. Applying it is a
   /// protocol/governance action (a validator-set change at some height); this
@@ -63,7 +63,7 @@ class ValidatorSet {
 };
 
 /// Canonical bytes a validator signs for a precommit. Binds chain/height/round/
-/// block id AND the validator index (→ distinct message per signer).
+/// block id AND the validator index (-> distinct message per signer).
 Bytes vote_signing_bytes(std::uint64_t chain_id, std::uint64_t height,
                          std::uint32_t round, const Hash& block_id,
                          std::uint32_t validator_index);
@@ -110,10 +110,10 @@ std::optional<CommitCertificate> aggregate_commit(
 CommitError verify_commit(std::uint64_t chain_id, const ValidatorSet& vset,
                           const CommitCertificate& cert);
 
-// ── Consensus header payload (S4) ───────────────────────────────────────────
+// -- Consensus header payload (S4) -------------------------------------------
 //
 // What the BFT engine stores in BlockHeader::consensus_data (opaque to the
-// ledger, but committed by the header hash — so validators sign it). It binds
+// ledger, but committed by the header hash - so validators sign it). It binds
 // the block to a specific validator set and carries the previous block's commit
 // certificate, so a stored/relayed chain self-certifies: each block proves its
 // parent was finalized by >2/3, not merely that headers link.
@@ -140,7 +140,7 @@ CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& 
 
 /// The rotation-aware form: [current] is the set in force at h.height (its hash
 /// must be committed by the header and it certifies h itself); [certifying] is
-/// the set that finalized the PARENT (it verifies the embedded last commit) —
+/// the set that finalized the PARENT (it verifies the embedded last commit) - 
 /// they differ exactly for the block after a validator-set change. Also checks
 /// that an announced next set is well-formed. Never throws.
 CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& current,
@@ -151,10 +151,10 @@ CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& 
 /// announces none or its consensus data is malformed / the set is invalid.
 std::optional<ValidatorSet> announced_validator_set(const BlockHeader& h);
 
-// ── Equivocation evidence (S4) ──────────────────────────────────────────────
+// -- Equivocation evidence (S4) ----------------------------------------------
 //
 // Proof that a validator double-signed: two valid precommits at the same
-// (height, round) for DIFFERENT block ids — a deliberate attempt to violate
+// (height, round) for DIFFERENT block ids - a deliberate attempt to violate
 // safety, and the canonical slashable offense.
 struct Evidence {
   std::uint32_t validator_index = 0;

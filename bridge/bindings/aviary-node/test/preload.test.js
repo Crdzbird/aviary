@@ -21,7 +21,7 @@ const assert = require('node:assert');
   assert.strictEqual(await bc.preload(), true, 'preload() resolved true');
   assert.strictEqual(await bc.preload(), true, 'preload idempotent');
 
-  // A full ledger flow — all synchronous, no await.
+  // A full ledger flow - all synchronous, no await.
   const node = bc.newNode(1n);
   const a = node.newAccount();
   const b = node.newAccount();
@@ -46,5 +46,5 @@ const assert = require('node:assert');
   assert.ok(raw.length > 0, 'signed raw tx produced');
   node.free();
 
-  console.log(`aviary npm preload test: OK (v${bc.version()}, crypto ${bc.cryptoBackendVersion()}, eth ${eth1.slice(0, 10)}…, selector 0x${sel})`);
+  console.log(`aviary npm preload test: OK (v${bc.version()}, crypto ${bc.cryptoBackendVersion()}, eth ${eth1.slice(0, 10)}..., selector 0x${sel})`);
 })().catch((e) => { console.error('FAILED:', e); process.exit(1); });

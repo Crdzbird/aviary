@@ -4,7 +4,7 @@
 // - protoc             v7.36.1
 // source: atlas.proto
 
-// Atlas Settlement Network — a wholesale settlement & tokenized-asset platform
+// Atlas Settlement Network - a wholesale settlement & tokenized-asset platform
 // built on Aviary. Operators launch custom settlement chains (BFT, instant
 // finality); institutions hold custodial wallets; settlements finalize with
 // cryptographic balance proofs; and wallets interact with EVM smart contracts
@@ -66,7 +66,7 @@ type AtlasClient interface {
 	GetMetrics(ctx context.Context, in *ChainRef, opts ...grpc.CallOption) (*Metrics, error)
 	// Live ledger feed (server-streaming): admissions, finalizations, removals.
 	StreamEvents(ctx context.Context, in *ChainRef, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Event], error)
-	// ── Governance: a validator council (coordinated rotation) + an auditor
+	// -- Governance: a validator council (coordinated rotation) + an auditor
 	// light client that syncs with the OVERLAP rule (bisection through rotations).
 	GetCouncil(ctx context.Context, in *ChainRef, opts ...grpc.CallOption) (*Council, error)
 	CouncilAction(ctx context.Context, in *CouncilRequest, opts ...grpc.CallOption) (*Council, error)
@@ -262,7 +262,7 @@ type AtlasServer interface {
 	GetMetrics(context.Context, *ChainRef) (*Metrics, error)
 	// Live ledger feed (server-streaming): admissions, finalizations, removals.
 	StreamEvents(*ChainRef, grpc.ServerStreamingServer[Event]) error
-	// ── Governance: a validator council (coordinated rotation) + an auditor
+	// -- Governance: a validator council (coordinated rotation) + an auditor
 	// light client that syncs with the OVERLAP rule (bisection through rotations).
 	GetCouncil(context.Context, *ChainRef) (*Council, error)
 	CouncilAction(context.Context, *CouncilRequest) (*Council, error)

@@ -6,9 +6,9 @@
 
 #include "aviary/interop/json.hpp"
 
-/// Generic JSON-RPC 2.0 client over a pluggable transport (ARCHITECTURE §11).
+/// Generic JSON-RPC 2.0 client over a pluggable transport (ARCHITECTURE section 11).
 /// The transport is an interface so the logic is testable with an in-memory mock;
-/// a real HTTP transport is a thin adapter (deferred — see IMPROVEMENTS).
+/// a real HTTP transport is a thin adapter (deferred - see IMPROVEMENTS).
 namespace aviary::interop {
 
 /// A JSON-RPC error returned by the server (carries the numeric code).

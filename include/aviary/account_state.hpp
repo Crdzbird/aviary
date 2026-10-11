@@ -12,19 +12,19 @@
 
 namespace aviary {
 
-/// Account-model state machine (ARCHITECTURE §5). State is a map
-/// `address → {balance, nonce}`, committed as a Merkle root over canonically
+/// Account-model state machine (ARCHITECTURE section 5). State is a map
+/// `address -> {balance, nonce}`, committed as a Merkle root over canonically
 /// encoded, address-sorted account leaves. Replay protection is a monotonic
 /// per-account nonce.
 ///
-/// Transaction body layout (canonical): `u64 nonce ‖ fixed32 recipient ‖ u128 amount`.
+/// Transaction body layout (canonical): `u64 nonce || fixed32 recipient || u128 amount`.
 ///
 /// **Commitment performance (copy-on-write).** The committed accounts and their
 /// cached Merkle tree live in an immutable, shared `Snapshot`; uncommitted
-/// changes accumulate in a small `overlay_`. So `clone()` — done once per block
-/// to apply it atomically — shares the snapshot and copies only the overlay
+/// changes accumulate in a small `overlay_`. So `clone()` - done once per block
+/// to apply it atomically - shares the snapshot and copies only the overlay
 /// (O(changed accounts)), not the whole state. `state_root()` recomputes only
-/// the changed leaves' root-paths against the cached tree (O(K·log N)) when the
+/// the changed leaves' root-paths against the cached tree (O(K-log N)) when the
 /// block merely moves value between existing accounts, and rebuilds fully only
 /// when new accounts appear or the overlay grows large. The committed root is
 /// byte-identical to `merkle::compute_root` over the sorted leaves.
@@ -38,7 +38,7 @@ class AccountStateMachine : public StateMachine {
   /// [flat_fee] is a fixed protocol fee burned from the sender on every applied
   /// transfer (a chain parameter, not committed per-block state). 0 (the default)
   /// is a feeless chain and leaves the state transition byte-identical to a chain
-  /// with no fee concept — so existing golden vectors are unaffected.
+  /// with no fee concept - so existing golden vectors are unaffected.
   explicit AccountStateMachine(codec::u128 flat_fee = 0);
 
   codec::u128 flat_fee() const { return flat_fee_; }
@@ -82,10 +82,10 @@ class AccountStateMachine : public StateMachine {
  private:
   // An immutable, shareable committed baseline: the accounts (sorted by
   // address), the same addresses in leaf order, and the cached Merkle tree over
-  // their leaf hashes. Shared across clones via shared_ptr — never mutated once
+  // their leaf hashes. Shared across clones via shared_ptr - never mutated once
   // published; a new Snapshot is built by seal().
   struct Snapshot {
-    std::map<Hash, Account> accounts;    // std::map → deterministic sorted order
+    std::map<Hash, Account> accounts;    // std::map -> deterministic sorted order
     std::vector<Hash> sorted_addrs;      // accounts' keys, in leaf order
     merkle::MerkleIndex tree;            // over leaf hashes, in the same order
   };
@@ -101,8 +101,8 @@ class AccountStateMachine : public StateMachine {
 
   const Account* lookup(const Hash& address) const;  // overlay-then-base
   void put(const Hash& address, const Account& acc); // write to overlay
-  void seal() const;                                 // fold overlay → new base_
-  std::map<Hash, Account> merged() const;            // base ∪ overlay
+  void seal() const;                                 // fold overlay -> new base_
+  std::map<Hash, Account> merged() const;            // base U overlay
 };
 
 }  // namespace aviary

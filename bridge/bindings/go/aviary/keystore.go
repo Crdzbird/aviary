@@ -28,7 +28,7 @@ func NewKeyStore(passphrase string) (*KeyStore, error) {
 	return &KeyStore{h}, nil
 }
 
-// LoadKeyStore parses a serialised store. It comes back LOCKED — call Unlock
+// LoadKeyStore parses a serialised store. It comes back LOCKED - call Unlock
 // before revealing secrets.
 func LoadKeyStore(blob []byte) (*KeyStore, error) {
 	ensure()
@@ -58,7 +58,7 @@ func (k *KeyStore) Reveal(address []byte) ([]byte, error) {
 	return takeBuf(C.aviary_keystore_reveal(k.h, bp(address)))
 }
 
-// Serialise returns the persistable (encrypted) blob — no plaintext key.
+// Serialise returns the persistable (encrypted) blob - no plaintext key.
 func (k *KeyStore) Serialise() ([]byte, error) {
 	return takeBuf(C.aviary_keystore_serialise(k.h))
 }

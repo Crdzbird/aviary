@@ -28,7 +28,7 @@ static std::string hex(const Bytes& b) {
 int main() {
   init();
 
-  // Fixed transaction: version 1, chain 7, body "hello", author 32×0x11, sig 64×0x22.
+  // Fixed transaction: version 1, chain 7, body "hello", author 32x0x11, sig 64x0x22.
   Transaction tx;
   tx.version = 1;
   tx.chain_id = 7;
@@ -49,8 +49,8 @@ int main() {
   h.consensus_data = {};
   print_hash("header_hash", h.hash());
 
-  // State-proof golden: an account state with two entries (addresses 32×0x11
-  // and 32×0x22); prove the first against the state root.
+  // State-proof golden: an account state with two entries (addresses 32x0x11
+  // and 32x0x22); prove the first against the state root.
   Hash addr_a{}; addr_a.fill(0x11);
   Hash addr_b{}; addr_b.fill(0x22);
   AccountStateMachine st;

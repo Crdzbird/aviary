@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-// Sentinel — a tamper-evident DEVICE PROVENANCE LEDGER built on Aviary.
+// Sentinel - a tamper-evident DEVICE PROVENANCE LEDGER built on Aviary.
 //
 // A device enrolls by sending its hardware information + a credential; the server
 // derives a chain whose GENESIS/ORIGIN block is cryptographically bound to that
 // exact device + credential (its "birth certificate"). Thereafter the device
-// streams data — photos, video chunks, GPS locations, sensor readings — and each
+// streams data - photos, video chunks, GPS locations, sensor readings - and each
 // item's BLAKE3 content hash is ANCHORED on the device's chain with BFT finality.
 //
 // The raw media never goes on-chain; only its hash + metadata are anchored, so
@@ -26,7 +26,7 @@ service Sentinel {
   rpc ProvisionDevice(DeviceInfo) returns (Provenance);
 
   // The live capture pipeline: the device streams data records, the server
-  // anchors each one and streams back anchoring receipts (pending → finalized).
+  // anchors each one and streams back anchoring receipts (pending -> finalized).
   // Bidirectional so finality receipts arrive asynchronously as blocks seal.
   rpc StreamData(stream DataRecord) returns (stream AnchorReceipt);
 
@@ -36,7 +36,7 @@ service Sentinel {
   // Ledger status + Prometheus-style metrics for the device chain.
   rpc GetLedger(DeviceRef) returns (LedgerStatus);
 
-  // ── Fleet: a CHAIN TREE — one fleet root anchoring a subchain per device;
+  // -- Fleet: a CHAIN TREE - one fleet root anchoring a subchain per device;
   // a device's on-chain identity is provable from the fleet root header.
   rpc BuildFleet(FleetSpec) returns (Fleet);
   rpc GetFleet(FleetRef) returns (Fleet);
@@ -55,7 +55,7 @@ message DeviceInfo {
 
 message Provenance {
   uint64 chain_id = 1;         // deterministically derived from the device fingerprint
-  string device_fingerprint = 2; // BLAKE3(device info ‖ credential), hex
+  string device_fingerprint = 2; // BLAKE3(device info || credential), hex
   string genesis_hash = 3;     // origin block state root, hex
   string device_address = 4;   // device's on-chain identity (hex)
   uint64 genesis_height = 5;   // 1 once the origin block is sealed
@@ -88,7 +88,7 @@ message DataRecord {
 message AnchorReceipt {
   uint64 sequence = 1;         // device-local record index
   DataKind kind = 2;
-  string content_hash = 3;     // BLAKE3 of the record, hex — the anchored identifier
+  string content_hash = 3;     // BLAKE3 of the record, hex - the anchored identifier
   string txid = 4;
   bool finalized = 5;          // false = anchored in mempool; true = sealed in a block
   uint64 height = 6;           // block height once finalized
@@ -120,7 +120,7 @@ message LedgerStatus {
   map<string, uint64> kind_counts = 8; // anchored counts by kind name
 }
 
-// ── Fleet (chain tree) ─────────────────────────────────────────────────────────
+// -- Fleet (chain tree) ---------------------------------------------------------
 message FleetSpec { repeated string device_labels = 1; }
 message FleetRef { uint64 chain_id = 1; }   // 0 = the fleet itself
 message FleetNode {

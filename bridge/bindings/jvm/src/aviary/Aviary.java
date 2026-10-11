@@ -6,9 +6,9 @@ import java.nio.charset.StandardCharsets;
 import static java.lang.foreign.ValueLayout.*;
 
 /**
- * Aviary JVM binding (Java FFM / Panama). Drives the full node — create a
+ * Aviary JVM binding (Java FFM / Panama). Drives the full node - create a
  * chain, accounts, transfer, produce blocks, stream events, metrics, light-client
- * verification — plus EVM/Bitcoin/Solana interop, over the C ABI. Usable from
+ * verification - plus EVM/Bitcoin/Solana interop, over the C ABI. Usable from
  * Java and Kotlin alike.
  */
 public final class Aviary implements AutoCloseable {
@@ -243,7 +243,7 @@ public final class Aviary implements AutoCloseable {
     public String btcAddress(byte[] secret32) { return new String(call1(btcAddr, secret32), StandardCharsets.UTF_8); }
     public String solAddress(byte[] edSecret) { return new String(call1(solAddr, edSecret), StandardCharsets.UTF_8); }
 
-    // ── Portable account export (tiered encrypted backup) ──────────────────────
+    // -- Portable account export (tiered encrypted backup) ----------------------
 
     /** A signing account's material (or a KEM device key), returned by the open calls. */
     public record PortableAccount(byte[] publicKey, byte[] secret) {}
@@ -261,7 +261,7 @@ public final class Aviary implements AutoCloseable {
         catch (Throwable t) { throw new RuntimeException(t); }
     }
 
-    /** Tier 1 — seal an account under a passphrase (ops=mem=0 → SENSITIVE preset). */
+    /** Tier 1 - seal an account under a passphrase (ops=mem=0 -> SENSITIVE preset). */
     public byte[] sealAccountPassphrase(byte[] pub, byte[] secret, String passphrase, long ops, long mem) {
         try { return consume((MemorySegment) pSealPass.invoke(arena.allocate(RES), seg(pub), (long) pub.length,
                 seg(secret), (long) secret.length, arena.allocateFrom(passphrase), ops, mem)); }
@@ -273,7 +273,7 @@ public final class Aviary implements AutoCloseable {
         catch (Throwable t) { throw new RuntimeException(t); }
     }
 
-    /** Tier 2 — recipient-bound (PQ): only the device's KEM secret opens it. */
+    /** Tier 2 - recipient-bound (PQ): only the device's KEM secret opens it. */
     public byte[] sealAccountTo(byte[] pub, byte[] secret, byte[] recipientKemPublic) {
         try { return consume((MemorySegment) pSealTo.invoke(arena.allocate(RES), seg(pub), (long) pub.length,
                 seg(secret), (long) secret.length, seg(recipientKemPublic), (long) recipientKemPublic.length)); }
@@ -285,7 +285,7 @@ public final class Aviary implements AutoCloseable {
         catch (Throwable t) { throw new RuntimeException(t); }
     }
 
-    /** Tier 3 — signed-recipient (Fortress-grade): recipient-bound + the receiver verifies the owner. */
+    /** Tier 3 - signed-recipient (Fortress-grade): recipient-bound + the receiver verifies the owner. */
     public byte[] sealAccountSignedTo(byte[] pub, byte[] secret, byte[] recipientKemPublic, byte[] senderSigSecret) {
         try { return consume((MemorySegment) pSealSigned.invoke(arena.allocate(RES), seg(pub), (long) pub.length,
                 seg(secret), (long) secret.length, seg(recipientKemPublic), (long) recipientKemPublic.length,
@@ -299,7 +299,7 @@ public final class Aviary implements AutoCloseable {
         catch (Throwable t) { throw new RuntimeException(t); }
     }
 
-    // ── Threshold (FROST t-of-n) accounts ──────────────────────────────────────
+    // -- Threshold (FROST t-of-n) accounts --------------------------------------
 
     /** A participant's share of a threshold account (opaque, self-describing). */
     public record ShareCard(byte[] bytes, int index, byte[] groupPublicKey, byte[] publicShare) {}
@@ -323,7 +323,7 @@ public final class Aviary implements AutoCloseable {
         return cards;
     }
 
-    /** Seal a share card for rest (ops=mem=0 → SENSITIVE preset). */
+    /** Seal a share card for rest (ops=mem=0 -> SENSITIVE preset). */
     public byte[] sealShare(byte[] card, String passphrase, long ops, long mem) {
         try { return consume((MemorySegment) thSeal.invoke(arena.allocate(RES), seg(card), (long) card.length,
                 arena.allocateFrom(passphrase), ops, mem)); }
@@ -363,7 +363,7 @@ public final class Aviary implements AutoCloseable {
             try { return (int) thVerify.invoke(h, (short) id, seg(publicShare), seg(sigShare)) == 1; }
             catch (Throwable e) { throw new RuntimeException(e); }
         }
-        /** Aggregate (id → 32-byte share) pairs into a 64-byte Ed25519 signature. */
+        /** Aggregate (id -> 32-byte share) pairs into a 64-byte Ed25519 signature. */
         public byte[] aggregate(int[] ids, byte[][] sigShares) {
             MemorySegment idSeg = arena.allocate(JAVA_SHORT, ids.length);
             for (int i = 0; i < ids.length; i++) idSeg.setAtIndex(JAVA_SHORT, i, (short) ids[i]);
@@ -385,7 +385,7 @@ public final class Aviary implements AutoCloseable {
         try { return mh.invoke(arena.allocate(RES), seg(a), (long) a.length); } catch (Throwable e) { throw new RuntimeException(e); }
     }
 
-    // ── AssuranceProfile + SealedMempool ───────────────────────────────────────
+    // -- AssuranceProfile + SealedMempool ---------------------------------------
 
     /** The tiers a security posture mandates at every seam. */
     public record AssuranceProfile(boolean ratcheted, boolean vrf, boolean thresholdCustody,
@@ -441,9 +441,9 @@ public final class Aviary implements AutoCloseable {
     }
     public SealedMempool newSealedMempool(long capacity) { return new SealedMempool(capacity); }
 
-    // ── CredentialGate (anonymous membership admission, Option A) ───────────────
+    // -- CredentialGate (anonymous membership admission, Option A) ---------------
 
-    /** A BBS issuer keypair (public 96 B, secret 32 B) — the chain's issuer identity. */
+    /** A BBS issuer keypair (public 96 B, secret 32 B) - the chain's issuer identity. */
     public PortableAccount newBBSIssuer(byte[] keyMaterial) {
         try { return splitBlob(consume((MemorySegment) bbsKeygen.invoke(arena.allocate(RES), seg(keyMaterial), (long) keyMaterial.length))); }
         catch (Throwable e) { throw new RuntimeException(e); }
@@ -486,7 +486,7 @@ public final class Aviary implements AutoCloseable {
             catch (Throwable e) { throw new RuntimeException(e); }
         }
 
-        // ── Option B — pseudonymous ────────────────────────────────────────────
+        // -- Option B - pseudonymous --------------------------------------------
         /** Holder step 1: derive a nym seed and blind-commit it (holder-secret blob). */
         public byte[] membershipCommit(byte[] memberSecret) {
             try { return consume((MemorySegment) membershipCommit.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length,
@@ -531,7 +531,7 @@ public final class Aviary implements AutoCloseable {
         public void revokeIssuerEpoch(int epoch) {
             try { credGateRevoke.invoke(h, epoch); } catch (Throwable e) { throw new RuntimeException(e); }
         }
-        /** Admit? Runs the full checklist. Total — a malformed presentation is a quiet false. */
+        /** Admit? Runs the full checklist. Total - a malformed presentation is a quiet false. */
         public boolean admit(int epoch, String scope, byte[] challenge, byte[] presentation, long now) {
             try { return (int) credGateAdmit.invoke(h, epoch, arena.allocateFrom(scope), seg(challenge), (long) challenge.length,
                     seg(presentation), (long) presentation.length, now) == 1; }
@@ -545,11 +545,11 @@ public final class Aviary implements AutoCloseable {
                 return nym.length == 0 ? null : nym;
             } catch (Throwable e) { throw new RuntimeException(e); }
         }
-        /** §6.2 targeted revocation of an exact pseudonym. */
+        /** section 6.2 targeted revocation of an exact pseudonym. */
         public void revokeNym(byte[] nym) {
             try { credGateRevokeNym.invoke(h, seg(nym), (long) nym.length); } catch (Throwable e) { throw new RuntimeException(e); }
         }
-        /** §6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope). */
+        /** section 6.3 Sybil cap: record an admitted nym; true if first this (epoch, scope). */
         public boolean noteAdmission(int epoch, String scope, byte[] nym) {
             try { return (int) credGateNoteAdmission.invoke(h, epoch, arena.allocateFrom(scope), seg(nym), (long) nym.length) == 1; }
             catch (Throwable e) { throw new RuntimeException(e); }
@@ -558,7 +558,7 @@ public final class Aviary implements AutoCloseable {
     }
     public CredentialGate newCredentialGate(CredentialPolicy policy) { return new CredentialGate(policy); }
 
-    // ── Composable chains (blueprint + registry discovery + assembly) ───────────
+    // -- Composable chains (blueprint + registry discovery + assembly) -----------
 
     /** A validator BLS keypair (public 48 B, secret 32 B) from >= 32 B of key material. */
     public PortableAccount newBLSValidator(byte[] ikm) {
@@ -618,7 +618,7 @@ public final class Aviary implements AutoCloseable {
         catch (Throwable e) { throw new RuntimeException(e); }
     }
 
-    /** An assembled node behind the uniform propose → (seal | mine) → submit flow. */
+    /** An assembled node behind the uniform propose -> (seal | mine) -> submit flow. */
     public final class Chain implements AutoCloseable {
         private final MemorySegment h;
         Chain(MemorySegment h) { this.h = h; }
@@ -646,7 +646,7 @@ public final class Aviary implements AutoCloseable {
             try { chainFree.invoke(h); } catch (Throwable ignored) {}
         }
 
-        // ── Subchains ──
+        // -- Subchains --
         /** Propose the next block on a PARENT chain, anchoring encoded anchors (ascending child id). Throws on an invalid anchor. */
         public byte[] proposeAnchored(long timestamp, byte[][] anchors) {
             byte[] blob = blobList(anchors);
@@ -673,7 +673,7 @@ public final class Aviary implements AutoCloseable {
         public byte[] proveAccount(byte[] address) { try { return consume((MemorySegment) chainProveAccount.invoke(arena.allocate(RES), h, seg(address))); } catch (Throwable e) { throw new RuntimeException(e); } }
     }
 
-    /** The canonical ValidatorSet encoding: [count]([len][pk][power u64])×. */
+    /** The canonical ValidatorSet encoding: [count]([len][pk][power u64])x. */
     static java.util.List<ValidatorEntry> decodeValidatorSet(byte[] b) {
         java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
         int n = bb.getInt(); var out = new java.util.ArrayList<ValidatorEntry>(n);
@@ -691,7 +691,7 @@ public final class Aviary implements AutoCloseable {
     public static final int SKIP_REFUSED = 0, SKIP_ACCEPTED = 1, SKIP_INSUFFICIENT_OVERLAP = 2;
 
     /** A light client: follows a header chain with certificates only. Sequential accept plus the
-     *  OVERLAP (skipping) rule — acceptSkipping jumps to a far header when its own set certifies it
+     *  OVERLAP (skipping) rule - acceptSkipping jumps to a far header when its own set certifies it
      *  and the signers hold more than the trust level (default 1/3) of the set the client already
      *  trusts; syncTo bisects when the overlap is too thin. */
     public final class LightClient implements AutoCloseable {
@@ -713,7 +713,7 @@ public final class Aviary implements AutoCloseable {
             byte[] vs = encodeValidatorSet(cp.validators());
             try { return (int) lcAcceptSkipping.invoke(h, seg(cp.header()), (long) cp.header().length, seg(cp.certificate()), (long) cp.certificate().length, seg(vs), (long) vs.length); } catch (Throwable e) { throw new RuntimeException(e); }
         }
-        /** Bisection: fetch(height) → checkpoint or null. Throws on a hard refusal / missing checkpoint. */
+        /** Bisection: fetch(height) -> checkpoint or null. Throws on a hard refusal / missing checkpoint. */
         public void syncTo(Checkpoint target, long targetHeight, java.util.function.LongFunction<Checkpoint> fetch) {
             var stack = new java.util.ArrayDeque<Object[]>(); stack.push(new Object[]{target, targetHeight});
             for (int n = 0; !stack.isEmpty(); n++) {
@@ -734,7 +734,7 @@ public final class Aviary implements AutoCloseable {
     }
     public LightClient newLightClient(long chainId, java.util.List<ValidatorEntry> validators, byte[] trustedHeader) { return new LightClient(chainId, validators, trustedHeader); }
 
-    // ── Chain tree: declare a FAMILY of chains and drive it together ──────────
+    // -- Chain tree: declare a FAMILY of chains and drive it together ----------
     /** One chain of a family; children are subchains (must be BFT). secret = null for a validator this process does not hold. */
     public static final class TreeNode {
         public long chainId; public Blueprint blueprint; public int assuranceLevel = 1;
@@ -803,12 +803,12 @@ public final class Aviary implements AutoCloseable {
     }
     public ChainTree buildChainTree(TreeNode root) { return new ChainTree(root); }
 
-    // ── Subchains: a parent block anchors a child chain's finalized headers ────
+    // -- Subchains: a parent block anchors a child chain's finalized headers ----
     // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
     // genesis HEADER + fixed validator set; anchor its certified headers; prove a
     // state entry on a descendant from the parent's header. v1 anchors BFT children.
 
-    /** [count u32]([len u32][bytes])× — the C ABI's blob-list convention. */
+    /** [count u32]([len u32][bytes])x - the C ABI's blob-list convention. */
     static byte[] blobList(byte[][] items) {
         int n = 4; for (byte[] it : items) n += 4 + it.length;
         java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(n).putInt(items.length);
@@ -820,7 +820,7 @@ public final class Aviary implements AutoCloseable {
         all[0] = arena.allocate(RES); System.arraycopy(args, 0, all, 1, args.length);
         try { return consume((MemorySegment) mh.invokeWithArguments(all)); } catch (Throwable e) { throw new RuntimeException(e); }
     }
-    /** A genesis's genesis HEADER — the identity a parent registers a child by. */
+    /** A genesis's genesis HEADER - the identity a parent registers a child by. */
     public byte[] genesisHeader(byte[] genesis) { return call(genesisHeaderH, seg(genesis), (long) genesis.length); }
     /** Encode a child registration (48-byte BLS keys; maxDepth = the child's own subtree depth, 0 = leaf). */
     public byte[] encodeChildRegistration(long chainId, byte[] genesisHeader, byte[][] validatorPks, long[] powers, int maxDepth) {
@@ -843,21 +843,21 @@ public final class Aviary implements AutoCloseable {
     public byte[] certifiedHeader(byte[] header, byte[] certificate) { return call(certifiedHeaderEncode, seg(header), (long) header.length, seg(certificate), (long) certificate.length); }
     /** An anchor: one child's CONSECUTIVE certified headers. */
     public byte[] encodeAnchor(long childChainId, byte[][] certifiedHeaders) { byte[] blob = blobList(certifiedHeaders); return call(anchorEncode, childChainId, seg(blob), (long) blob.length); }
-    /** A cross-chain proof: hops (parent → … → the chain holding the entry) + that chain's state proof. */
+    /** A cross-chain proof: hops (parent -> ... -> the chain holding the entry) + that chain's state proof. */
     public byte[] encodeSubchainProof(byte[][] hops, byte[] stateProof) { byte[] blob = blobList(hops); return call(subchainProofEncode, seg(blob), (long) blob.length, seg(stateProof), (long) stateProof.length); }
     /** Whether the proof is committed under the parent's 32-byte subchain root all the way down and its state proof holds. */
     public boolean verifySubchainProof(byte[] parentSubchainRoot, byte[] proof) {
         if (parentSubchainRoot.length != 32) return false;
         try { return (int) subchainProofVerify.invoke(seg(parentSubchainRoot), seg(proof), (long) proof.length) == 1; } catch (Throwable e) { throw new RuntimeException(e); }
     }
-    // ── Foreign components (engines / proposers implemented in Java) ────────────
+    // -- Foreign components (engines / proposers implemented in Java) ------------
 
     /** A consensus engine implemented in Java, plugged into a mixture by id. The
      *  consensus pipeline stays native; Java supplies the JUSTIFICATION policy.
      *  Both methods run synchronously inside consensus and MUST be deterministic
      *  (no clock, no randomness) and must not call back into the chain. */
     public interface ForeignEngine {
-        /** The justification for a block this node proposed (≤ 4096 B), or null to refuse. */
+        /** The justification for a block this node proposed (<= 4096 B), or null to refuse. */
         byte[] justify(byte[] block);
         boolean verify(byte[] block, byte[] justification);
     }
@@ -894,7 +894,7 @@ public final class Aviary implements AutoCloseable {
         } catch (Throwable e) { throw new RuntimeException(e); }
     }
 
-    /** Register a Java {@link ForeignEngine} under id (chain identity — never rename). */
+    /** Register a Java {@link ForeignEngine} under id (chain identity - never rename). */
     public boolean registerEngine(String id, ForeignEngine engine, boolean grindProof) {
         long h = NEXT_HANDLE.getAndIncrement();
         FOREIGN.put(h, engine);
@@ -948,7 +948,7 @@ public final class Aviary implements AutoCloseable {
         } catch (Throwable t) { throw new RuntimeException(t); }
     }
 
-    /** Load a serialised key store. It comes back LOCKED — call unlock(). */
+    /** Load a serialised key store. It comes back LOCKED - call unlock(). */
     public KeyStore loadKeyStore(byte[] blob) {
         try {
             MemorySegment h = (MemorySegment) ksLoad.invoke(seg(blob), (long) blob.length);
@@ -979,7 +979,7 @@ public final class Aviary implements AutoCloseable {
             catch (Throwable t) { throw new RuntimeException(t); }
         }
 
-        /** The persistable (encrypted) blob — no plaintext key. */
+        /** The persistable (encrypted) blob - no plaintext key. */
         public byte[] serialise() {
             try { return consume((MemorySegment) ksSerialise.invoke(arena.allocate(RES), ks)); }
             catch (Throwable t) { throw new RuntimeException(t); }
@@ -1046,7 +1046,7 @@ public final class Aviary implements AutoCloseable {
             catch (Throwable t) { throw new RuntimeException(t); }
         }
         // Valid until the first block is produced (reads do NOT seal genesis);
-        // throws afterwards — never a silent no-op.
+        // throws afterwards - never a silent no-op.
         public void credit(byte[] address, long amount) {
             int rc;
             try { rc = (int) credit.invoke(node, seg(address), amount); }
@@ -1261,7 +1261,7 @@ public final class Aviary implements AutoCloseable {
         } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
     }
 
-    // ── FFM plumbing ─────────────────────────────────────────────────────────
+    // -- FFM plumbing ---------------------------------------------------------
     private MethodHandle h(String name, FunctionDescriptor fd) {
         return linker.downcallHandle(lib.find(name).orElseThrow(
                 () -> new IllegalStateException("symbol not found: " + name)), fd);

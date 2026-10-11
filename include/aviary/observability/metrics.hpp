@@ -9,7 +9,7 @@
 #include <vector>
 
 /// Metrics primitives + a registry with a Prometheus text exporter
-/// (ARCHITECTURE §12). Counters/gauges are lock-free; the histogram is
+/// (ARCHITECTURE section 12). Counters/gauges are lock-free; the histogram is
 /// mutex-guarded. Export order is deterministic (sorted by name).
 namespace aviary::observe {
 

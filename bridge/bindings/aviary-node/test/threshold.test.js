@@ -51,4 +51,4 @@ const env = bc.sealShare(cards[1], 'share-pass', 3, 1 << 16);
 assert(Buffer.compare(bc.unsealShare(env, 'share-pass'), cards[1]) === 0, 'sealed share round-trips');
 assert(fails(() => bc.unsealShare(env, 'wrong')), 'wrong passphrase fails closed');
 
-console.log('aviary npm threshold test: OK (2-of-3 → Ed25519, threshold enforced, attribution, sealed)');
+console.log('aviary npm threshold test: OK (2-of-3 -> Ed25519, threshold enforced, attribution, sealed)');

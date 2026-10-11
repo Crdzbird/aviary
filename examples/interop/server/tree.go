@@ -11,7 +11,7 @@ import (
 )
 
 // treeSpec is the shared, deterministic family: every validator key derives
-// from (seed ‖ role), so Go and Flutter build byte-identical genesis specs and
+// from (seed || role), so Go and Flutter build byte-identical genesis specs and
 // therefore identical headers and roots.
 func treeSpec(seed, alice []byte, credit uint64) (bc.ChainTreeNode, error) {
 	val := func(role string) (bc.ChainTreeValidator, error) {

@@ -82,7 +82,7 @@ Hash DemoNode::submit_transfer(codec::ByteView from_secret, const Hash& to,
                                codec::u128 amount, std::uint64_t nonce) {
   ensure_started();
   if (from_secret.size() != 64) throw std::runtime_error("demo_node: ed25519 secret must be 64 bytes");
-  // libsodium layout: secret = seed(32) ‖ public(32).
+  // libsodium layout: secret = seed(32) || public(32).
   crypto::KeyPair kp;
   kp.secret_key = Bytes(from_secret.begin(), from_secret.end());
   kp.public_key = Bytes(from_secret.begin() + 32, from_secret.end());

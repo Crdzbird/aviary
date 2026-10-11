@@ -31,9 +31,9 @@ crypto::ByteView str_view(std::string_view s) {
   return crypto::ByteView(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 }
 
-// ph = hash_tagged(kCredentialPresentation, chain_id ‖ epoch ‖ scope ‖ challenge).
+// ph = hash_tagged(kCredentialPresentation, chain_id || epoch || scope || challenge).
 // Binds a presentation to its exact context so a proof for one (epoch, scope,
-// challenge) never verifies against another (anti-replay; CREDENTIAL_GATE.md §6).
+// challenge) never verifies against another (anti-replay; CREDENTIAL_GATE.md section 6).
 crypto::Hash presentation_header(std::uint64_t chain_id, std::uint32_t epoch,
                                  std::string_view scope, crypto::ByteView challenge) {
   codec::CodecWriter w;
@@ -51,7 +51,7 @@ const std::vector<std::uint64_t> kDisclosedIndexes{
 
 }  // namespace
 
-// ── CredentialPolicy ─────────────────────────────────────────────────────────
+// -- CredentialPolicy ---------------------------------------------------------
 
 Bytes CredentialPolicy::encode() const {
   codec::CodecWriter w;
@@ -91,7 +91,7 @@ std::optional<CredentialPolicy> CredentialPolicy::from_genesis(const GenesisSpec
   return decode_all(view(g.membership_policy));
 }
 
-// ── Issuance (trusted-issuer model; §5/§10.2) ────────────────────────────────
+// -- Issuance (trusted-issuer model; section 5/section 10.2) --------------------------------
 
 Credential issue_credential(const CredentialPolicy& policy, crypto::ByteView issuer_secret_key,
                             crypto::ByteView member_secret, std::uint8_t tier,
@@ -108,14 +108,14 @@ Credential issue_credential(const CredentialPolicy& policy, crypto::ByteView iss
   attrs.push_back(enc_u8(tier));                                    // 1: tier
   attrs.push_back(enc_u64(not_after));                             // 2: not_after
   attrs.push_back(enc_u32(issuer_epoch));                         // 3: issuer_epoch
-  for (const auto& e : extra) attrs.push_back(e);                  // 4…: policy-specific
+  for (const auto& e : extra) attrs.push_back(e);                  // 4...: policy-specific
 
   Bytes sig = crypto::bbs_sign(issuer_secret_key, view(policy.issuer_public_key),
                                view(policy.header), attrs);
   return Credential{std::move(sig), std::move(attrs)};
 }
 
-// ── Presentation (holder) ────────────────────────────────────────────────────
+// -- Presentation (holder) ----------------------------------------------------
 
 Bytes CredentialGate::present(const CredentialPolicy& policy, const Credential& cred,
                               std::uint32_t epoch, std::string_view scope,
@@ -145,7 +145,7 @@ Bytes CredentialGate::present(const CredentialPolicy& policy, const Credential& 
   return w.take();
 }
 
-// ── Admission (verifier) ─────────────────────────────────────────────────────
+// -- Admission (verifier) -----------------------------------------------------
 
 bool CredentialGate::admit(std::uint32_t epoch, std::string_view scope, crypto::ByteView challenge,
                            crypto::ByteView presentation, std::uint64_t now) const {
@@ -184,15 +184,15 @@ bool CredentialGate::admit(std::uint32_t epoch, std::string_view scope, crypto::
   return true;
 }
 
-// ── Option B — pseudonymous (blind issuance + per-epoch pseudonym) ───────────
+// -- Option B - pseudonymous (blind issuance + per-epoch pseudonym) -----------
 
 namespace {
-// The domain string for deriving a member's nym seed. Fixed → the same member
+// The domain string for deriving a member's nym seed. Fixed -> the same member
 // secret always maps to the same seed (hence the same per-context pseudonym).
 const Bytes kNymSeedDst{'b', 'l', 'o', 'c', 'k', 'c', 'h', 'a', 'i', 'n', 'e',
                         'r', '.', 'n', 'y', 'm', '-', 's', 'e', 'e', 'd', '.', 'v', '1'};
 
-// The pseudonym linkability context: chain_id ‖ epoch ‖ scope — NOT the
+// The pseudonym linkability context: chain_id || epoch || scope - NOT the
 // challenge, so the pseudonym is stable across a member's presentations within
 // one (epoch, scope) while the proof itself is still challenge-bound via ph.
 Bytes pseudonym_context(std::uint64_t chain_id, std::uint32_t epoch, std::string_view scope) {
@@ -204,7 +204,7 @@ Bytes pseudonym_context(std::uint64_t chain_id, std::uint32_t epoch, std::string
 }
 
 // The Option-B signer (issuer-set, disclosed) attribute vector. member_secret is
-// not a signed message here — it lives in the nym seed. So L = 3.
+// not a signed message here - it lives in the nym seed. So L = 3.
 std::vector<Bytes> signer_attrs(std::uint8_t tier, std::uint64_t not_after,
                                 std::uint32_t issuer_epoch) {
   return {enc_u8(tier), enc_u64(not_after), enc_u32(issuer_epoch)};
@@ -297,9 +297,9 @@ std::optional<Bytes> CredentialGate::admit_pseudonymous(std::uint32_t epoch, std
   }
   if (!proof_ok) return std::nullopt;                     // 1. issuer-signed & context-bound
   if (not_after <= now) return std::nullopt;              // 2. expiry
-  if (issuer_epoch_revoked(issuer_epoch)) return std::nullopt;  // 3. bulk revocation (§6.1)
+  if (issuer_epoch_revoked(issuer_epoch)) return std::nullopt;  // 3. bulk revocation (section 6.1)
   if (tier < policy_.min_tier) return std::nullopt;       // 4. attribute policy
-  if (nym_revoked(view(pseudonym))) return std::nullopt;  // 5. targeted nym revocation (§6.2)
+  if (nym_revoked(view(pseudonym))) return std::nullopt;  // 5. targeted nym revocation (section 6.2)
   return pseudonym;
 }
 

@@ -9,7 +9,7 @@ namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 codec::ByteView hview(const Hash& h) { return codec::ByteView(h.data(), h.size()); }
 
-// Domain byte for a PoS proposal signature — distinct from BFT precommit votes
+// Domain byte for a PoS proposal signature - distinct from BFT precommit votes
 // (0x01) so a vote signature can never be replayed as a proposal.
 constexpr std::uint8_t kPosProposal = 0x02;
 }  // namespace
@@ -26,7 +26,7 @@ std::uint32_t stake_weighted_proposer(std::uint64_t height, const ValidatorSet& 
   for (int i = 0; i < 8; ++i) ticket = (ticket << 8) | h[i];
   ticket %= total;
 
-  // Walk validators, accumulating stake — the ticket lands in the leader's band.
+  // Walk validators, accumulating stake - the ticket lands in the leader's band.
   // Zero-power validators occupy no band, so they are never selected.
   std::uint64_t acc = 0;
   for (std::uint32_t i = 0; i < vset.size(); ++i) {

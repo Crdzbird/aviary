@@ -18,7 +18,7 @@ Hash to_hash(const Bytes& b) {
 }
 }  // namespace
 
-// ── Transaction ──────────────────────────────────────────────────────────────
+// -- Transaction --------------------------------------------------------------
 
 Bytes Transaction::signing_bytes() const {
   codec::CodecWriter w;
@@ -72,7 +72,7 @@ Hash Transaction::txid() const {
   return crypto::hash_tagged(crypto::Domain::kTxId, encode());
 }
 
-// ── BlockHeader ──────────────────────────────────────────────────────────────
+// -- BlockHeader --------------------------------------------------------------
 
 Bytes BlockHeader::encode() const {
   codec::CodecWriter w;
@@ -110,7 +110,7 @@ BlockHeader BlockHeader::decode(codec::CodecReader& r) {
   return h;
 }
 
-// ── CertifiedHeader / Anchor ─────────────────────────────────────────────────
+// -- CertifiedHeader / Anchor -------------------------------------------------
 
 Bytes CertifiedHeader::encode() const {
   codec::CodecWriter w;
@@ -183,7 +183,7 @@ Hash BlockHeader::hash() const {
   return crypto::hash_tagged(crypto::Domain::kHeader, encode());
 }
 
-// ── Block ────────────────────────────────────────────────────────────────────
+// -- Block --------------------------------------------------------------------
 
 Bytes Block::encode() const {
   if (header.version < 3 && !anchors.empty()) {
@@ -225,7 +225,7 @@ Block Block::decode_all(codec::ByteView bytes) {
   return b;
 }
 
-// ── Receipt ──────────────────────────────────────────────────────────────────
+// -- Receipt ------------------------------------------------------------------
 
 Bytes Receipt::encode() const {
   codec::CodecWriter w;
@@ -243,7 +243,7 @@ Receipt Receipt::decode_all(codec::ByteView bytes) {
   return rc;
 }
 
-// ── Free functions ───────────────────────────────────────────────────────────
+// -- Free functions -----------------------------------------------------------
 
 Hash compute_tx_root(const std::vector<Transaction>& txs) {
   std::vector<Hash> leaves;
@@ -300,7 +300,7 @@ bool verify_transaction_signature(const Transaction& tx) {
       if (tx.author.size() != 32 || tx.signature.size() != 7856) return false;
       return crypto::slh_dsa_verify(view(msg), view(tx.signature), view(tx.author));
     default:
-      return false;  // unknown scheme — never accept
+      return false;  // unknown scheme - never accept
   }
 }
 

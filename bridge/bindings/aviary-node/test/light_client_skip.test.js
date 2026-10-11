@@ -29,4 +29,4 @@ assert(lc2.acceptSkipping(cps[2]) === bc.SkipRefused, 'max_skip refuses a 2-bloc
 lc2.setMaxSkip(0); throws(() => lc2.syncTo(cps[3], 3, () => null), 'unavailable checkpoint fails');
 throws(() => new bc.LightClient(8, [], gh), 'empty set refused');
 lc.free(); lc2.free(); A.free(); B.free();
-console.log('light-client-skip test: OK (thin overlap → bisection through the rotation → follow the new set)');
+console.log('light-client-skip test: OK (thin overlap -> bisection through the rotation -> follow the new set)');

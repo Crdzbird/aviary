@@ -37,7 +37,7 @@ int main() {
   const Hash alice_addr = crypto::address_of(view(alice.public_key));
   const Hash bob_addr = crypto::address_of(view(bob.public_key));
 
-  std::printf("== account state serialize/deserialize → byte-identical root ==\n");
+  std::printf("== account state serialize/deserialize -> byte-identical root ==\n");
   {
     AccountStateMachine sm;
     sm.credit_genesis(alice_addr, 1000);
@@ -52,7 +52,7 @@ int main() {
     // (advance alice's nonce via a full ledger below)
   }
 
-  std::printf("== ledger snapshot → restore resumes the chain ==\n");
+  std::printf("== ledger snapshot -> restore resumes the chain ==\n");
   {
     auto g = std::make_unique<AccountStateMachine>();
     g->credit_genesis(alice_addr, 1000);

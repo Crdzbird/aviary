@@ -4,16 +4,16 @@
 // 	protoc        v7.36.1
 // source: interop.proto
 
-// Interop — proves the Aviary ledger is byte-identical across language
+// Interop - proves the Aviary ledger is byte-identical across language
 // bindings. A Go server (aviary Go binding, full node) and a Flutter
 // client (aviary, native) each run the ledger independently and
 // cross-check three directions:
 //
-//   • go → flutter : the server builds a chain and returns a light-client proof;
+//  - go -> flutter : the server builds a chain and returns a light-client proof;
 //                    the client VERIFIES it locally against the state root.
-//   • flutter → go : the client builds a chain and produces a proof; the server
+//  - flutter -> go : the client builds a chain and produces a proof; the server
 //                    VERIFIES it.
-//   • go ↔ flutter : both compute the SAME canonical bytes (BLAKE3 hash, canonical
+//  - go <-> flutter : both compute the SAME canonical bytes (BLAKE3 hash, canonical
 //                    txid, header hash) and apply the SAME deterministic scenario;
 //                    the state roots must match byte-for-byte. A mismatch is a
 //                    consensus fork between bindings.
@@ -246,7 +246,7 @@ type ChainScenario struct {
 	AliceSecret    []byte                 `protobuf:"bytes,2,opt,name=alice_secret,json=aliceSecret,proto3" json:"alice_secret,omitempty"` // 64-byte Ed25519 secret
 	BobSecret      []byte                 `protobuf:"bytes,3,opt,name=bob_secret,json=bobSecret,proto3" json:"bob_secret,omitempty"`
 	AliceCredit    uint64                 `protobuf:"varint,4,opt,name=alice_credit,json=aliceCredit,proto3" json:"alice_credit,omitempty"`          // genesis credit to Alice
-	TransferAmount uint64                 `protobuf:"varint,5,opt,name=transfer_amount,json=transferAmount,proto3" json:"transfer_amount,omitempty"` // Alice → Bob
+	TransferAmount uint64                 `protobuf:"varint,5,opt,name=transfer_amount,json=transferAmount,proto3" json:"transfer_amount,omitempty"` // Alice -> Bob
 	Timestamp      uint64                 `protobuf:"varint,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                                 // block timestamp
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -512,7 +512,7 @@ func (x *VerifyResult) GetOk() bool {
 	return false
 }
 
-// ── Chain tree ─────────────────────────────────────────────────────────────────
+// -- Chain tree -----------------------------------------------------------------
 type TreeScenario struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Seed          []byte                 `protobuf:"bytes,1,opt,name=seed,proto3" json:"seed,omitempty"`

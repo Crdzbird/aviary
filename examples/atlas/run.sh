@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Atlas Settlement Network — start the gRPC server, then run the Flutter console.
+# Atlas Settlement Network - start the gRPC server, then run the Flutter console.
 # Prereq: the aviary host dylib is built (cd ../.. && cmake --build build).
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

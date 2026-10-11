@@ -10,7 +10,7 @@ package aviary
 // libcryptolib_c, so this file links ONLY -laviary_c.
 //
 // Consuming from OUTSIDE the repo (via `go get`)? The header resolves from the
-// module cache, but the prebuilt library does not ship in the module — point the
+// module cache, but the prebuilt library does not ship in the module - point the
 // linker at your build with environment variables (appended to the flags below):
 //
 //	export CGO_LDFLAGS="-L/opt/aviary/lib"
@@ -32,7 +32,7 @@ package aviary
 import "C"
 
 // Note: cryptolib's own cgo_local.go now bakes the rpath to its build/release,
-// so we no longer add a cryptolib rpath here — importing its Go package brings
+// so we no longer add a cryptolib rpath here - importing its Go package brings
 // the loader path along. For a fully self-contained binary (no shared library at
 // run time at all), build with `-tags "aviary_static cryptolib_static"`
 // after building both static archives (see cgo_static.go).

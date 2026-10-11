@@ -37,7 +37,7 @@ int main() {
   evm::Address a0 = evm::address_from_secret(view(sk));
   CHECK(evm::to_checksum_address(a0) == "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266");
 
-  std::printf("== legacy tx sign → recover sender (self-consistency) ==\n");
+  std::printf("== legacy tx sign -> recover sender (self-consistency) ==\n");
   {
     evm::LegacyTx tx;
     tx.nonce = 0;
@@ -107,10 +107,10 @@ int main() {
     CHECK(!st.raw.empty() && st.raw[0] == 0x02);
     // The signing preimage is domain-separated by the same type byte.
     CHECK(evm::signing_bytes(tx)[0] == 0x02);
-    // y_parity is 0/1 — NOT the legacy v (recid + 35 + 2*chainId).
+    // y_parity is 0/1 - NOT the legacy v (recid + 35 + 2*chainId).
     CHECK(st.y_parity == 0 || st.y_parity == 1);
     CHECK(st.r.size() == 32 && st.s.size() == 32);
-    // Sign → recover round-trips to the signer's address.
+    // Sign -> recover round-trips to the signer's address.
     CHECK(evm::recover_sender(tx, st) == evm::address_from_secret(view(sk)));
     // Deterministic (RFC 6979): signing again yields the identical raw tx.
     CHECK(evm::sign(tx, view(sk)).raw == st.raw);

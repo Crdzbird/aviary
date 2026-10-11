@@ -1,4 +1,4 @@
-// Kotlin demo — the same Java FFM binding, called idiomatically from Kotlin.
+// Kotlin demo - the same Java FFM binding, called idiomatically from Kotlin.
 // Build:  kotlinc Demo.kt -cp out -include-runtime -d demo.jar
 // Run:    java --enable-native-access=ALL-UNNAMED -cp out:demo.jar DemoKt
 import aviary.Aviary

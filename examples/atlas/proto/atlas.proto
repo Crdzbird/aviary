@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// Atlas Settlement Network — a wholesale settlement & tokenized-asset platform
+// Atlas Settlement Network - a wholesale settlement & tokenized-asset platform
 // built on Aviary. Operators launch custom settlement chains (BFT, instant
 // finality); institutions hold custodial wallets; settlements finalize with
 // cryptographic balance proofs; and wallets interact with EVM smart contracts
@@ -37,7 +37,7 @@ service Atlas {
   // Live ledger feed (server-streaming): admissions, finalizations, removals.
   rpc StreamEvents(ChainRef) returns (stream Event);
 
-  // ── Governance: a validator council (coordinated rotation) + an auditor
+  // -- Governance: a validator council (coordinated rotation) + an auditor
   // light client that syncs with the OVERLAP rule (bisection through rotations).
   rpc GetCouncil(ChainRef) returns (Council);
   rpc CouncilAction(CouncilRequest) returns (Council);
@@ -110,16 +110,16 @@ message BalanceProof {
 message Erc20Request {
   uint64 chain_id = 1;
   string wallet_id = 2;       // signs with this wallet's secp256k1 key
-  string token_address = 3;   // ERC-20 contract, 0x… (20 bytes)
-  string to_address = 4;      // recipient, 0x…
+  string token_address = 3;   // ERC-20 contract, 0x... (20 bytes)
+  string to_address = 4;      // recipient, 0x...
   uint64 amount = 5;
   uint64 nonce = 6;
   uint64 gas_price = 7;
   uint64 gas_limit = 8;
-  uint64 evm_chain_id = 9;    // 1 = mainnet, 11155111 = sepolia, …
+  uint64 evm_chain_id = 9;    // 1 = mainnet, 11155111 = sepolia, ...
 }
 message SignedEvmTx {
-  string raw_tx_hex = 1;      // 0x…  ready for eth_sendRawTransaction
+  string raw_tx_hex = 1;      // 0x...  ready for eth_sendRawTransaction
   string calldata_hex = 2;    // the ABI-encoded transfer() call
   string from_address = 3;    // signer's ETH address (EIP-55)
 }
@@ -145,7 +145,7 @@ message Event {
   int64 unix_millis = 8;
 }
 
-// ── Governance ────────────────────────────────────────────────────────────────
+// -- Governance ----------------------------------------------------------------
 message CouncilValidator { string public_key = 1; uint64 power = 2; bool operator = 3; }
 message CouncilStep { string label = 1; bool ok = 2; string detail = 3; }
 message Council {

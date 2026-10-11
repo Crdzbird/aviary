@@ -7,18 +7,18 @@
 #include "aviary/crypto.hpp"
 #include "aviary/types.hpp"
 
-/// Encrypted mempool (ARCHITECTURE §9, anti-MEV): transactions are sealed to the
+/// Encrypted mempool (ARCHITECTURE section 9, anti-MEV): transactions are sealed to the
 /// block proposer's key and stay opaque in the pool until the proposer opens
 /// them at block-build time. A front-runner watching the mempool sees only
-/// ciphertext plus a fee hint — never the transaction's contents (which
-/// contract, which amounts) — so it cannot profitably re-order or sandwich.
+/// ciphertext plus a fee hint - never the transaction's contents (which
+/// contract, which amounts) - so it cannot profitably re-order or sandwich.
 ///
 /// The submitter seals the encoded transaction to the proposer's hybrid-KEM
 /// public key (recipient-bound PQ seal); only the proposer's KEM secret opens
 /// it. A cleartext `fee_hint` rides alongside so the pool can order by fee
 /// WITHOUT decrypting; it is bound as the seal's AAD, so it can't be swapped
 /// after sealing, and on reveal the proposer additionally checks the opened
-/// transaction's real fee equals the hint — a submitter can't buy priority with
+/// transaction's real fee equals the hint - a submitter can't buy priority with
 /// a lie. This is a submission envelope only: committed blocks carry ordinary
 /// plaintext transactions, so nothing downstream (consensus, ledger, wire)
 /// changes.
@@ -50,7 +50,7 @@ class SealedMempool {
   /// [proposer_kem_secret], returning the transactions that (a) decrypt, (b)
   /// decode to a valid transaction, and (c) whose real declared fee equals the
   /// committed hint. Undecryptable / malformed / fee-lying entries are silently
-  /// skipped (they were never really in the auction). Const — revealing does not
+  /// skipped (they were never really in the auction). Const - revealing does not
   /// drain the pool; the caller removes what it includes.
   std::vector<Transaction> reveal(crypto::ByteView proposer_kem_secret, std::size_t max) const;
 

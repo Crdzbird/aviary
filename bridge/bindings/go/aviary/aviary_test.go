@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 	"github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 )
 
 // The API self-initializes; no explicit Init() needed.
@@ -62,7 +62,7 @@ func TestLedgerFlowAndProof(t *testing.T) {
 }
 
 // Cross-binding determinism: aviary's BLAKE3 (via C++ core) equals
-// cryptolib's BLAKE3 (via its Go binding) — both link the same backend.
+// cryptolib's BLAKE3 (via its Go binding) - both link the same backend.
 func TestHashMatchesCryptolib(t *testing.T) {
 	msg := []byte("aviary")
 	viaCore, err := bc.Hash(msg)
@@ -102,7 +102,7 @@ func TestInterop(t *testing.T) {
 }
 
 // Q1 end-to-end: a hybrid (post-quantum) account funds, transfers, finalizes,
-// and its balance is provable — the full PQ tx path through the C ABI.
+// and its balance is provable - the full PQ tx path through the C ABI.
 func TestHybridTransferEndToEnd(t *testing.T) {
 	node := bc.NewNode(0x9001)
 	defer node.Free()
@@ -144,7 +144,7 @@ func TestGenesisOrdering(t *testing.T) {
 	defer node.Free()
 	_, _, addr, _ := node.NewAccount()
 
-	// Read state BEFORE crediting — must not silently drop the credit.
+	// Read state BEFORE crediting - must not silently drop the credit.
 	_ = node.Height()
 	_ = node.Balance(addr)
 	_ = node.StateRoot()
@@ -310,7 +310,7 @@ func TestPortableAccountTiers(t *testing.T) {
 	}
 	acct := bc.PortableAccount{Public: public, Secret: secret}
 
-	// Tier 1 — passphrase. Light Argon2id factors keep the test fast.
+	// Tier 1 - passphrase. Light Argon2id factors keep the test fast.
 	env, err := acct.SealPassphrase("backup-phrase", 3, 1<<16)
 	if err != nil {
 		t.Fatal(err)
@@ -332,7 +332,7 @@ func TestPortableAccountTiers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Tier 2 — recipient-bound.
+	// Tier 2 - recipient-bound.
 	env2, err := acct.SealTo(devPub)
 	if err != nil {
 		t.Fatal(err)
@@ -350,7 +350,7 @@ func TestPortableAccountTiers(t *testing.T) {
 		t.Fatal("a different device opened a recipient-bound envelope")
 	}
 
-	// Tier 3 — signed-recipient. Sign with a hybrid sig secret; the receiver
+	// Tier 3 - signed-recipient. Sign with a hybrid sig secret; the receiver
 	// verifies it. Reuse the account's hybrid signing secret as the owner key.
 	env3, err := acct.SealSignedTo(devPub, secret)
 	if err != nil {
@@ -363,11 +363,11 @@ func TestPortableAccountTiers(t *testing.T) {
 	if !bytes.Equal(back3.Secret, secret) {
 		t.Fatal("signed-recipient round-trip lost the secret")
 	}
-	// Wrong expected signer → rejected (authenticity).
+	// Wrong expected signer -> rejected (authenticity).
 	if _, err := bc.OpenSignedFrom(env3, devSec, strangerPub); err == nil {
 		t.Fatal("an envelope not signed by the expected owner opened")
 	}
-	// Tampered envelope → rejected.
+	// Tampered envelope -> rejected.
 	tampered := append([]byte(nil), env3...)
 	tampered[len(tampered)/2] ^= 0x01
 	if _, err := bc.OpenSignedFrom(tampered, devSec, public); err == nil {
@@ -560,7 +560,7 @@ func TestSealedMempool(t *testing.T) {
 }
 
 // TestCredentialGate drives Option A anonymous membership admission end to end:
-// issue an issuer-signed credential, present it unlinkably, admit — then confirm
+// issue an issuer-signed credential, present it unlinkably, admit - then confirm
 // the gate rejects on context mismatch, expiry, tier, revocation, and forgery.
 func TestCredentialGate(t *testing.T) {
 	issuer, err := bc.NewBBSIssuer(bytes.Repeat([]byte{0x11}, 32))
@@ -659,8 +659,8 @@ func TestCredentialGate(t *testing.T) {
 }
 
 // TestCredentialGatePseudonymous drives Option B end to end: blind issuance
-// (commit -> blind-sign -> finalize), then per-(epoch, scope) pseudonyms — same
-// member+epoch+scope -> same nym (Sybil-linkable), different epoch -> unlinkable —
+// (commit -> blind-sign -> finalize), then per-(epoch, scope) pseudonyms - same
+// member+epoch+scope -> same nym (Sybil-linkable), different epoch -> unlinkable -
 // plus the Sybil cap, targeted nym revocation, and the reject set.
 func TestCredentialGatePseudonymous(t *testing.T) {
 	issuer, err := bc.NewBBSIssuer(bytes.Repeat([]byte{0x2a}, 32))
@@ -738,7 +738,7 @@ func TestCredentialGatePseudonymous(t *testing.T) {
 		t.Fatal("different scope should yield a different nym")
 	}
 
-	// A different member → a different nym in the same context.
+	// A different member -> a different nym in the same context.
 	nymO, ok := gate.AdmitPseudonymous(5, "gossip", bytes.Repeat([]byte{1}, 32),
 		present(issueCred(bytes.Repeat([]byte{0x88}, 32), 3, notAfter, 1), 5, "gossip", 1), now)
 	if !ok || bytes.Equal(nymO, nymA) {
@@ -796,7 +796,7 @@ func TestCredentialGatePseudonymous(t *testing.T) {
 
 // TestChainBlueprint drives composable chains end to end: discover registered
 // components, declare a mixture, commit it into genesis (identity changes),
-// assemble, and commit blocks through built-in PoS and PoW — then confirm the
+// assemble, and commit blocks through built-in PoS and PoW - then confirm the
 // fail-closed rejects (unknown id, posture-forbidden engine, state mismatch).
 func TestChainBlueprint(t *testing.T) {
 	has := func(xs []string, s string) bool {
@@ -846,7 +846,7 @@ func TestChainBlueprint(t *testing.T) {
 		t.Fatal("committing a mixture must change the genesis hash")
 	}
 
-	// Built-in PoS: propose → seal → submit.
+	// Built-in PoS: propose -> seal -> submit.
 	chain, err := bc.AssembleChain(mixed, 0, v.Public, v.Secret)
 	if err != nil {
 		t.Fatal(err)
@@ -864,7 +864,7 @@ func TestChainBlueprint(t *testing.T) {
 		t.Fatalf("PoS block did not commit (just=%d height=%d)", len(just), chain.Height())
 	}
 
-	// Built-in PoW via params (32-byte easiest target): propose → mine → submit.
+	// Built-in PoW via params (32-byte easiest target): propose -> mine -> submit.
 	pow, _ := bc.NewBlueprint("pow", "account", "", bytes.Repeat([]byte{0xFF}, 32))
 	powGen, _ := bc.CommitBlueprint(genesis, pow)
 	pc, err := bc.AssembleChain(powGen, 0, v.Public, v.Secret)
@@ -921,7 +921,7 @@ func (e *goHashEngine) Verify(block, just []byte) bool {
 
 // TestForeignComponents: a consensus engine and a proposer policy implemented IN
 // GO join a chain mixture by id, the chain assembles, and blocks commit through
-// the Go justification policy — with a tampered justification refused by the Go
+// the Go justification policy - with a tampered justification refused by the Go
 // verifier while the ledger stays untouched.
 func TestForeignComponents(t *testing.T) {
 	eng := &goHashEngine{}
@@ -953,13 +953,13 @@ func TestForeignComponents(t *testing.T) {
 	defer chain.Free()
 
 	blk, _ := chain.Propose(2)
-	just, err := chain.Seal(blk) // → Go Justify
+	just, err := chain.Seal(blk) // -> Go Justify
 	if err != nil || !bytes.HasPrefix(just, []byte("go-just:")) {
 		t.Fatalf("seal via Go justify: %v %q", err, just)
 	}
 	bad := append([]byte(nil), just...)
 	bad[len(bad)-1] ^= 1
-	if chain.Submit(blk, bad) || chain.Height() != 0 { // → Go Verify refuses; ledger untouched
+	if chain.Submit(blk, bad) || chain.Height() != 0 { // -> Go Verify refuses; ledger untouched
 		t.Fatal("tampered justification must be refused with the ledger untouched")
 	}
 	if !chain.Submit(blk, just) || chain.Height() != 1 {
@@ -987,7 +987,7 @@ func TestForeignComponents(t *testing.T) {
 // Subchains over the Go binding: a single-validator BFT child finalizes blocks
 // with real certificates; a parent registers it at genesis, anchors the child's
 // certified headers, and a state entry on the child is proven from the parent's
-// header alone. Tamper → refused.
+// header alone. Tamper -> refused.
 func TestSubchains(t *testing.T) {
 	must := func(b []byte, err error) []byte {
 		t.Helper()
@@ -1125,7 +1125,6 @@ func TestSubchains(t *testing.T) {
 	}
 }
 
-
 // Validator rotation over the Go binding: a single-validator BFT chain grows
 // to two validators (keeping its own quorum), then rotates itself out and can
 // no longer certify. Every step is certified by the set in force at that time.
@@ -1150,7 +1149,7 @@ func TestValidatorRotation(t *testing.T) {
 	if len(vs) != 1 || !bytes.Equal(vs[0].PublicKey, me.Public) {
 		t.Fatalf("initial set: %v", vs)
 	}
-	// Grow: {me:3, other:1} — announced by block 1, certified by the old set (me alone).
+	// Grow: {me:3, other:1} - announced by block 1, certified by the old set (me alone).
 	grown := []bc.GenesisValidator{{PublicKey: me.Public, Power: 3}, {PublicKey: other.Public, Power: 1}}
 	if err := chain.ScheduleValidators(grown); err != nil {
 		t.Fatal(err)
@@ -1198,7 +1197,6 @@ func TestValidatorRotation(t *testing.T) {
 		t.Fatal("PoS must refuse")
 	}
 }
-
 
 // Light-client overlap rule over the Go binding: power moves from validator A
 // (the genesis set) to validator B; a client that only trusts the genesis set
@@ -1296,8 +1294,7 @@ func TestLightClientSkipping(t *testing.T) {
 	}
 }
 
-
-// ChainTree over the Go binding: declare root ← child ← grandchild (+ a sibling),
+// ChainTree over the Go binding: declare root <- child <- grandchild (+ a sibling),
 // build once, produce upward, prove a grandchild account from the root, observe
 // finalizations from Go, and confirm structural / registry rejects.
 func TestChainTree(t *testing.T) {

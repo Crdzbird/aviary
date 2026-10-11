@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-/// Structured, leveled logging with a pluggable sink (ARCHITECTURE §12). The
+/// Structured, leveled logging with a pluggable sink (ARCHITECTURE section 12). The
 /// core emits no wall-clock; a sink may add timestamps. Records carry structured
 /// key/value fields (height, round, peer, tx hash) rather than interpolated text.
 namespace aviary::observe {
@@ -32,7 +32,7 @@ class LogSink {
   virtual void write(const LogRecord& record) = 0;
 };
 
-/// Captures records in memory — for tests and inspection.
+/// Captures records in memory - for tests and inspection.
 class BufferSink : public LogSink {
  public:
   void write(const LogRecord& record) override { records.push_back(record); }

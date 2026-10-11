@@ -20,7 +20,7 @@ const (
 	Fortress AssuranceLevel = 3
 )
 
-// AssuranceProfile is the consistent tier a posture mandates at every seam — a
+// AssuranceProfile is the consistent tier a posture mandates at every seam - a
 // consumer wires the classes it names.
 type AssuranceProfile struct {
 	Ratcheted        bool   // transport tier: false = mutual-auth SIGMA, true = PQ ratchet

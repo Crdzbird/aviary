@@ -80,7 +80,7 @@ int main() {
     CHECK(store.size() == 3);            // unchanged
   }
 
-  std::printf("== serialize → load rebuilds blocks + every index ==\n");
+  std::printf("== serialize -> load rebuilds blocks + every index ==\n");
   {
     Bytes blob = store.serialize();
     BlockStore back = BlockStore::load(view(blob));

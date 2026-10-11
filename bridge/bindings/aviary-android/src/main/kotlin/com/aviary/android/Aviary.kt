@@ -42,7 +42,7 @@ object Aviary {
      *
      * Spawns a short-lived background daemon thread that maps the libraries.
      * Because the mapping is process-global, this warms the path for later
-     * synchronous use on the main thread — the first native call then pays no
+     * synchronous use on the main thread - the first native call then pays no
      * load cost. Fire-and-forget: the caller never blocks, and [onReady] (if
      * given) is invoked on the background thread once warm. Safe to call
      * repeatedly and safe to never call.

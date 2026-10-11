@@ -13,8 +13,8 @@ import (
 	"unsafe"
 )
 
-// Composable chains. A chain is a MIXTURE of pluggable components — a consensus
-// engine, a state model, a proposer policy — each named by a stable id. The
+// Composable chains. A chain is a MIXTURE of pluggable components - a consensus
+// engine, a state model, a proposer policy - each named by a stable id. The
 // mixture is committed into the genesis hash (it IS chain identity); an id
 // nobody registered, or a mix the assurance posture forbids, is rejected at
 // assembly (fail-closed). Custom components are C++ subclasses registered
@@ -62,7 +62,7 @@ func (b *Blueprint) Hash() ([]byte, error) {
 	return takeBuf(C.aviary_blueprint_hash(bp(b.encoded), C.size_t(len(b.encoded))))
 }
 
-// decodeIDs parses [count u32]([len u32][id])×.
+// decodeIDs parses [count u32]([len u32][id])x.
 func decodeIDs(blob []byte) ([]string, error) {
 	if len(blob) < 4 {
 		return nil, errors.New("registry: short id list")
@@ -174,7 +174,7 @@ func GenesisHash(genesis []byte) ([]byte, error) {
 }
 
 // Chain is an assembled node: the engine its mixture named, behind the uniform
-// Propose → (Seal | Mine) → Submit flow.
+// Propose -> (Seal | Mine) -> Submit flow.
 type Chain struct {
 	h      C.AviaryChain
 	handle cgo.Handle
@@ -182,7 +182,7 @@ type Chain struct {
 
 // ErrRejected is returned when assembly is refused: an unknown component id, a
 // state id that does not match the genesis seeding, or an engine the assurance
-// posture forbids. Fail-closed — never a silent substitution.
+// posture forbids. Fail-closed - never a silent substitution.
 var ErrRejected = errors.New("chain: assembly rejected (unknown component id or a mix the posture forbids)")
 
 // AssembleChain assembles a node for validator me from a genesis, using its

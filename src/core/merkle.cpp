@@ -47,7 +47,7 @@ Proof make_proof(const std::vector<Hash>& leaves, std::uint32_t index) {
       if (idx + 1 < level.size()) {
         proof.siblings.push_back(level[idx + 1]);  // sibling on the right
       }
-      // else: lone node carried up — no sibling recorded
+      // else: lone node carried up - no sibling recorded
     } else {
       proof.siblings.push_back(level[idx - 1]);  // sibling on the left
     }
@@ -80,7 +80,7 @@ bool verify_proof(const Hash& root, const Hash& leaf, const Proof& proof,
   return si == proof.siblings.size() && h == root;
 }
 
-// ── MerkleIndex ────────────────────────────────────────────────────────────────
+// -- MerkleIndex ----------------------------------------------------------------
 
 void MerkleIndex::reset(std::vector<Hash> leaves) {
   levels_.clear();
@@ -106,7 +106,7 @@ Hash MerkleIndex::root_with_updates(const std::map<std::size_t, Hash>& changes) 
 
   // Sparse overlay of recomputed nodes, keyed by (level, index). Every read
   // falls back to the cached level when a node was not recomputed, so only the
-  // O(K·log N) nodes on the changed leaves' root-paths are ever hashed.
+  // O(K-log N) nodes on the changed leaves' root-paths are ever hashed.
   std::map<std::pair<std::size_t, std::size_t>, Hash> ov;
   std::set<std::size_t> dirty;
   for (const auto& [i, h] : changes) {

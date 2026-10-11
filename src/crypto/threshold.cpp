@@ -24,7 +24,7 @@ Bytes take(CryptoBufferResult r, const char* op) {
 
 Bytes copy_buf(const CryptoBuffer& b) { return Bytes(b.data, b.data + b.len); }
 
-// Sealed-share AAD: "aviary.share.v1" ‖ hex(group_pk) ‖ ":" ‖ index —
+// Sealed-share AAD: "aviary.share.v1" || hex(group_pk) || ":" || index - 
 // binds the envelope to one slot of one group.
 std::string share_aad(const Bytes& group_pk, std::uint16_t index) {
   static const char* kHex = "0123456789abcdef";
@@ -39,7 +39,7 @@ std::string share_aad(const Bytes& group_pk, std::uint16_t index) {
 }
 }  // namespace
 
-// ── ShareCard ───────────────────────────────────────────────────────────────
+// -- ShareCard ---------------------------------------------------------------
 
 Bytes ShareCard::encode() const {
   codec::CodecWriter w;
@@ -75,7 +75,7 @@ ShareCard ShareCard::decode(codec::ByteView bytes) {
 }
 
 // The AAD is derived from group + index, which the opener only knows after
-// opening — so the envelope carries a cleartext binding prefix that reproduces
+// opening - so the envelope carries a cleartext binding prefix that reproduces
 // it: [u16 index][32 B group_pk][molecular envelope]. Tampering with the prefix
 // changes the derived AAD and the open fails closed; a successful open is then
 // cross-checked against the card inside.
@@ -114,7 +114,7 @@ ShareCard ShareCard::unseal(codec::ByteView envelope, std::string_view passphras
   return c;
 }
 
-// ── ThresholdAccount ────────────────────────────────────────────────────────
+// -- ThresholdAccount --------------------------------------------------------
 
 std::vector<ShareCard> ThresholdAccount::create(std::uint16_t n, std::uint16_t t) {
   CryptoFrostKeyGen kg = cryptolib_frost_keygen(n, t);
@@ -148,7 +148,7 @@ std::vector<ShareCard> ThresholdAccount::create(std::uint16_t n, std::uint16_t t
   return cards;
 }
 
-// ── SigningCeremony ─────────────────────────────────────────────────────────
+// -- SigningCeremony ---------------------------------------------------------
 
 std::pair<SigningCeremony::Nonces, SigningCeremony::Commitment> SigningCeremony::commit(
     const ShareCard& share) {

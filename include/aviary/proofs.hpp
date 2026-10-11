@@ -7,9 +7,9 @@
 #include "aviary/merkle.hpp"
 #include "aviary/types.hpp"
 
-/// Inclusion proofs (ARCHITECTURE §10). A light client that has verified a
+/// Inclusion proofs (ARCHITECTURE section 10). A light client that has verified a
 /// header (via the commit certificate) trusts its tx_root and state_root, and
-/// can then verify these proofs against those roots — without full data.
+/// can then verify these proofs against those roots - without full data.
 ///
 /// M5 supports **presence** proofs. Absence proofs (a key is NOT in the state)
 /// need neighbor proofs over a sorted trie and are deferred (see IMPROVEMENTS).
@@ -29,7 +29,7 @@ struct StateProof {
 };
 
 /// Verify a presence proof against [state_root]. Returns false for an
-/// absence (present=false) proof — absence verification is not yet supported.
+/// absence (present=false) proof - absence verification is not yet supported.
 bool verify_state_proof(const Hash& state_root, const StateProof& p);
 
 /// Proof that a transaction is included in a block, against the block's tx_root.

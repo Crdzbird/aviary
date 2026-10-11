@@ -17,7 +17,7 @@ constexpr const char* kCtxR2I = "aviary-p2p-r2i-v1";
 // transcript, so a transcript signature is bound to this exact key agreement.
 constexpr const char* kCtxBind = "aviary-p2p-bind-v1";
 
-// Transcript role tags — a signature for one role can never verify as the other.
+// Transcript role tags - a signature for one role can never verify as the other.
 constexpr std::uint8_t kRoleInitiator = 0x01;
 constexpr std::uint8_t kRoleResponder = 0x02;
 
@@ -36,7 +36,7 @@ Bytes transcript_core(const Bytes& responder_kem_pk, const Bytes& ciphertext,
   return w.take();
 }
 
-// The bytes a party signs: role ‖ core ‖ suffix (suffix is empty for the
+// The bytes a party signs: role || core || suffix (suffix is empty for the
 // initiator; the responder appends its header + identity).
 Bytes signable(std::uint8_t role, const Bytes& core, const Bytes& suffix) {
   codec::CodecWriter w;
@@ -75,7 +75,7 @@ std::pair<SecureSession, Bytes> SecureSession::begin_initiator(
       crypto::hybrid_sig_sign(view(signable(kRoleInitiator, core, {})), view(initiator_sig.secret_key));
   s.pending_transcript_ = core;  // to verify the responder's signature later
 
-  // msg1 = ciphertext ‖ initiator header ‖ initiator identity pk ‖ sig_I.
+  // msg1 = ciphertext || initiator header || initiator identity pk || sig_I.
   codec::CodecWriter w;
   w.write_bytes(view(kem.ciphertext));
   w.write_bytes(view(s.enc_->header()));
@@ -99,7 +99,7 @@ std::pair<SecureSession, Bytes> SecureSession::accept_responder(const Identity& 
   const Bytes binder = crypto::derive_key(kCtxBind, view(ss));
 
   // Authenticate the initiator. A wrong KEM key yields a different shared secret
-  // → a different binder → this signature fails to verify, so an impostor (or a
+  // -> a different binder -> this signature fails to verify, so an impostor (or a
   // key mismatch) aborts the handshake here rather than opening a bad channel.
   const Bytes core = transcript_core(responder.kem.public_key, ciphertext, initiator_header,
                                      initiator_id_pk, binder);
@@ -118,7 +118,7 @@ std::pair<SecureSession, Bytes> SecureSession::accept_responder(const Identity& 
   const Bytes sig_r =
       crypto::hybrid_sig_sign(view(signable(kRoleResponder, core, suffix)), view(responder.sig.secret_key));
 
-  // msg2 = responder header ‖ responder identity pk ‖ sig_R.
+  // msg2 = responder header || responder identity pk || sig_R.
   codec::CodecWriter w;
   w.write_bytes(view(s.enc_->header()));
   w.write_bytes(view(responder.sig.public_key));

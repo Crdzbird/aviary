@@ -8,7 +8,7 @@ namespace aviary::node {
 ProfiledValidator ProfiledValidator::boot(const GenesisSpec& genesis, std::uint32_t me,
                                           crypto::KeyPair bls_key, Bytes vrf_secret,
                                           std::vector<Bytes> vrf_pubkeys) {
-  // Validate the genesis against the posture it declares — a spec that claims a
+  // Validate the genesis against the posture it declares - a spec that claims a
   // strong level over weak parameters, or an unknown id, is rejected here.
   const AssuranceProfile profile = AssuranceProfile::from_genesis(genesis);
 
@@ -26,7 +26,7 @@ ProfiledValidator ProfiledValidator::boot(const GenesisSpec& genesis, std::uint3
     case AssuranceProfile::Consensus::kVrf:
       if (vrf_secret.empty() || vrf_pubkeys.size() != vset.size()) {
         throw std::runtime_error(
-            "profiled-validator: this posture mandates VRF election — a per-node VRF secret and a "
+            "profiled-validator: this posture mandates VRF election - a per-node VRF secret and a "
             "validator-aligned VRF key registry are required");
       }
       vrf = std::make_unique<consensus::VrfPosEngine>(std::move(vset), std::move(vrf_pubkeys), me,

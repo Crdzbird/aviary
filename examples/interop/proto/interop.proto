@@ -1,15 +1,15 @@
 syntax = "proto3";
 
-// Interop — proves the Aviary ledger is byte-identical across language
+// Interop - proves the Aviary ledger is byte-identical across language
 // bindings. A Go server (aviary Go binding, full node) and a Flutter
 // client (aviary, native) each run the ledger independently and
 // cross-check three directions:
 //
-//   • go → flutter : the server builds a chain and returns a light-client proof;
+//  - go -> flutter : the server builds a chain and returns a light-client proof;
 //                    the client VERIFIES it locally against the state root.
-//   • flutter → go : the client builds a chain and produces a proof; the server
+//  - flutter -> go : the client builds a chain and produces a proof; the server
 //                    VERIFIES it.
-//   • go ↔ flutter : both compute the SAME canonical bytes (BLAKE3 hash, canonical
+//  - go <-> flutter : both compute the SAME canonical bytes (BLAKE3 hash, canonical
 //                    txid, header hash) and apply the SAME deterministic scenario;
 //                    the state roots must match byte-for-byte. A mismatch is a
 //                    consensus fork between bindings.
@@ -18,16 +18,16 @@ package interop.v1;
 option go_package = "interop/gen;interopv1";
 
 service Interop {
-  // go ↔ flutter: compute canonical bytes for identical inputs (determinism).
+  // go <-> flutter: compute canonical bytes for identical inputs (determinism).
   rpc ComputeCanonical(CanonicalInput) returns (CanonicalOutput);
 
-  // go → flutter: the server builds the scenario and returns a verifiable proof.
+  // go -> flutter: the server builds the scenario and returns a verifiable proof.
   rpc BuildChain(ChainScenario) returns (ChainResult);
 
-  // flutter → go: the server verifies a proof the client produced.
+  // flutter -> go: the server verifies a proof the client produced.
   rpc VerifyProof(ProofBundle) returns (VerifyResult);
 
-  // ── Chain tree: Go builds a deterministic family (root ← child ← grandchild)
+  // -- Chain tree: Go builds a deterministic family (root <- child <- grandchild)
   // from shared seeds; Flutter builds the SAME tree natively. Roots must match,
   // and each side verifies the other's cross-chain proof.
   rpc BuildTree(TreeScenario) returns (TreeResult);
@@ -68,7 +68,7 @@ message ChainScenario {
   bytes alice_secret = 2;     // 64-byte Ed25519 secret
   bytes bob_secret = 3;
   uint64 alice_credit = 4;    // genesis credit to Alice
-  uint64 transfer_amount = 5; // Alice → Bob
+  uint64 transfer_amount = 5; // Alice -> Bob
   uint64 timestamp = 6;       // block timestamp
 }
 message ChainResult {
@@ -87,7 +87,7 @@ message ProofBundle {
 }
 message VerifyResult { bool ok = 1; }
 
-// ── Chain tree ─────────────────────────────────────────────────────────────────
+// -- Chain tree -----------------------------------------------------------------
 message TreeScenario { bytes seed = 1; bytes alice_address = 2; uint64 alice_credit = 3; }
 message TreeResult {
   repeated uint64 chain_ids = 1;

@@ -12,7 +12,7 @@ import (
 	"unsafe"
 )
 
-// ShareCard is one participant's share of a threshold (FROST t-of-n) account —
+// ShareCard is one participant's share of a threshold (FROST t-of-n) account -
 // an opaque, self-describing blob. Persist it sealed (SealShare); never store it
 // plaintext. The account's secret key never exists: shares sign, the group key
 // signs nothing.
@@ -74,7 +74,7 @@ func (c ShareCard) Index() uint16          { i, _, _, _ := c.info(); return i }
 func (c ShareCard) GroupPublicKey() []byte { _, g, _, _ := c.info(); return g }
 func (c ShareCard) PublicShare() []byte    { _, _, p, _ := c.info(); return p }
 
-// SealShare seals the card for rest under a passphrase (ops=mem=0 → SENSITIVE).
+// SealShare seals the card for rest under a passphrase (ops=mem=0 -> SENSITIVE).
 func (c ShareCard) Seal(passphrase string, ops uint64, mem uint) ([]byte, error) {
 	ensure()
 	cp := C.CString(passphrase)
@@ -136,7 +136,7 @@ func (c *Ceremony) VerifyShare(id uint16, publicShare, sigShare []byte) bool {
 	return C.aviary_threshold_verify_share(c.h, C.uint16_t(id), bp(publicShare), bp(sigShare)) == 1
 }
 
-// Aggregate combines (id → share) pairs into a standard 64-byte Ed25519 signature
+// Aggregate combines (id -> share) pairs into a standard 64-byte Ed25519 signature
 // under the group public key. The pairs may be in any order.
 func (c *Ceremony) Aggregate(ids []uint16, sigShares [][]byte) ([]byte, error) {
 	if len(ids) != len(sigShares) {

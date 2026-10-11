@@ -12,8 +12,8 @@
 #include "aviary/crypto.hpp"
 #include "aviary/codec.hpp"
 
-/// Inbound interoperability — a federated, attestation-based cross-chain bridge
-/// (ARCHITECTURE §11). A set of bridge validators (the attestor set) BLS-sign
+/// Inbound interoperability - a federated, attestation-based cross-chain bridge
+/// (ARCHITECTURE section 11). A set of bridge validators (the attestor set) BLS-sign
 /// cross-chain packets; an endpoint mints/releases only after verifying a >2/3
 /// aggregated attestation, with replay protection. This reuses the consensus
 /// validator-set + BLS-aggregation machinery.
@@ -28,8 +28,8 @@ using crypto::Hash;
 using Bytes = std::vector<std::uint8_t>;
 
 enum class TransferKind : std::uint8_t {
-  kMint = 0,     ///< lock on source → mint wrapped on dest
-  kRelease = 1,  ///< burn wrapped on source → release escrow on dest
+  kMint = 0,     ///< lock on source -> mint wrapped on dest
+  kRelease = 1,  ///< burn wrapped on source -> release escrow on dest
 };
 
 struct TransferPayload {
@@ -54,7 +54,7 @@ struct Packet {
   Hash commitment() const;  ///< domain-separated hash of the canonical packet
 };
 
-// ── Attestation (BLS, index-bound like consensus votes) ──────────────────────
+// -- Attestation (BLS, index-bound like consensus votes) ----------------------
 
 Bytes attestation_signing_bytes(const Hash& commitment, std::uint32_t attestor_index);
 
@@ -78,7 +78,7 @@ std::optional<Attestation> aggregate_attestation(const consensus::ValidatorSet& 
 bool verify_attestation(const consensus::ValidatorSet& attestors, const Hash& commitment,
                         const Attestation& attestation);
 
-// ── Endpoint ─────────────────────────────────────────────────────────────────
+// -- Endpoint -----------------------------------------------------------------
 
 struct BridgeResult {
   bool ok = false;

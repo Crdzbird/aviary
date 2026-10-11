@@ -13,7 +13,7 @@
 
 namespace aviary {
 
-/// Genesis parameters that fully parameterize a chain (ARCHITECTURE §0).
+/// Genesis parameters that fully parameterize a chain (ARCHITECTURE section 0).
 struct ChainSpec {
   std::uint64_t chain_id = 0;
   StateModel state_model = StateModel::kAccount;
@@ -35,7 +35,7 @@ struct ChainSpec {
   std::uint64_t max_block_bytes = 0;  ///< sum of encoded tx sizes
 
   /// When true, produced blocks are version-2 and commit an execution
-  /// `receipt_root` (one receipt per tx). Default false → version-1 blocks, no
+  /// `receipt_root` (one receipt per tx). Default false -> version-1 blocks, no
   /// receipts, byte-identical to before.
   bool produce_receipts = false;
 
@@ -63,8 +63,8 @@ struct BlockError {
 };
 
 /// A single-node ledger: holds the committed state and chain tip, validates and
-/// applies blocks atomically (ARCHITECTURE §6), and can produce the next block.
-/// Consensus is out of scope here (M2) — this is the deterministic state layer
+/// applies blocks atomically (ARCHITECTURE section 6), and can produce the next block.
+/// Consensus is out of scope here (M2) - this is the deterministic state layer
 /// every consensus engine drives.
 class Ledger {
  public:
@@ -97,7 +97,7 @@ class Ledger {
   /// Dry run of exactly the checks process_block applies (header, limits,
   /// roots, every tx, every subchain anchor) with NO state change. A consensus
   /// driver uses it before voting on a proposal, so a block the ledger would
-  /// refuse can never be certified (docs/design/SUBCHAINS.md §6).
+  /// refuse can never be certified (docs/design/SUBCHAINS.md section 6).
   BlockError validate_block(const Block& block) const;
 
   /// Serialize the chain tip + full committed state to a self-describing blob a

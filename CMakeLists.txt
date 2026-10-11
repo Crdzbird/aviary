@@ -32,7 +32,7 @@ endif()
 option(AVIARY_BUILD_FUZZERS "Build libFuzzer targets" OFF)
 
 # Build the C ABI as a STATIC archive (for an XCFramework / static linking into
-# an app). In this mode we do NOT link cryptolib_c — its symbols are resolved
+# an app). In this mode we do NOT link cryptolib_c - its symbols are resolved
 # when the final app links (alongside cryptolib's own static lib). Only the
 # header is needed. Forced on for iOS.
 option(AVIARY_STATIC "Build aviary_c as a STATIC archive" OFF)
@@ -71,12 +71,12 @@ else()
   set(_aviary_ipo OFF)
 endif()
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # Locate the prebuilt cryptolib_c C ABI.
-# Decision (ARCHITECTURE §3): link cryptolib's self-contained C ABI, not its
-# header-only C++ API — decouples our build from cryptolib's transitive deps.
+# Decision (ARCHITECTURE section 3): link cryptolib's self-contained C ABI, not its
+# header-only C++ API - decouples our build from cryptolib's transitive deps.
 # Override the checkout location with -DCRYPTOLIB_ROOT=<path> if not a sibling.
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 set(CRYPTOLIB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../cryptolib"
     CACHE PATH "Path to the cryptolib checkout")
 
@@ -86,7 +86,7 @@ find_path(CRYPTOLIB_C_INCLUDE_DIR
   NO_DEFAULT_PATH)
 
 if(NOT CRYPTOLIB_C_INCLUDE_DIR)
-  message(FATAL_ERROR "cryptolib_c.h not found — set -DCRYPTOLIB_ROOT=<path>.")
+  message(FATAL_ERROR "cryptolib_c.h not found - set -DCRYPTOLIB_ROOT=<path>.")
 endif()
 message(STATUS "aviary: cryptolib_c header  = ${CRYPTOLIB_C_INCLUDE_DIR}")
 
@@ -105,14 +105,14 @@ if(NOT AVIARY_STATIC)
       NO_DEFAULT_PATH)
   endif()
   if(NOT CRYPTOLIB_C_LIBRARY)
-    message(FATAL_ERROR "cryptolib_c library not found — build it or pass -DCRYPTOLIB_C_LIBRARY=<path>.")
+    message(FATAL_ERROR "cryptolib_c library not found - build it or pass -DCRYPTOLIB_C_LIBRARY=<path>.")
   endif()
   list(GET CRYPTOLIB_C_LIBRARY 0 _cryptolib_first)
   get_filename_component(CRYPTOLIB_C_LIBDIR "${_cryptolib_first}" DIRECTORY)
   message(STATUS "aviary: cryptolib_c library = ${CRYPTOLIB_C_LIBRARY}")
 endif()
 
-# ── Core static library ──────────────────────────────────────────────────────
+# -- Core static library ------------------------------------------------------
 add_library(aviary_core STATIC
   src/version.cpp
   src/crypto/cryptolib_backend.cpp
@@ -197,7 +197,7 @@ if(AVIARY_GC_SECTIONS AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NA
   target_compile_options(aviary_core PRIVATE -ffunction-sections -fdata-sections)
 endif()
 
-# ── C ABI library: SHARED on host (loaded by bindings), STATIC for XCFramework ─
+# -- C ABI library: SHARED on host (loaded by bindings), STATIC for XCFramework -
 if(AVIARY_STATIC)
   add_library(aviary_c STATIC bridge/aviary_c.cpp)
 else()
@@ -231,17 +231,17 @@ if(NOT AVIARY_BUILD_TESTS)
   return()  # cross / static builds only need the library
 endif()
 
-# ── Golden-vector generator (not a test; documents how vectors are derived) ──
+# -- Golden-vector generator (not a test; documents how vectors are derived) --
 add_executable(print_vectors tools/print_vectors.cpp)
 target_link_libraries(print_vectors PRIVATE aviary_core)
 set_target_properties(print_vectors PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
 
-# ── State-commitment micro-benchmark (not a test; documents the P1 win) ──────
+# -- State-commitment micro-benchmark (not a test; documents the P1 win) ------
 add_executable(bench_state tools/bench_state.cpp)
 target_link_libraries(bench_state PRIVATE aviary_core)
 set_target_properties(bench_state PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
 
-# ── Tests (zero-dependency runner, matching cryptolib's convention) ──────────
+# -- Tests (zero-dependency runner, matching cryptolib's convention) ----------
 enable_testing()
 
 # One executable per test file; each links the core and is registered with ctest.

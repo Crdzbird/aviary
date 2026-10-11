@@ -70,7 +70,7 @@ int main() {
     if (!tampered.siblings.empty()) tampered.siblings[0] = leaf(123);
     CHECK(!verify_proof(root, ls[2], tampered, 6));
     // A leaf_count that changes the path shape is rejected (sibling count no
-    // longer matches). NOTE: a count that preserves the path can still verify —
+    // longer matches). NOTE: a count that preserves the path can still verify - 
     // the binding is the sibling set, not leaf_count alone.
     CHECK(!verify_proof(root, ls[2], p, 3));
     // Too-few siblings rejected.

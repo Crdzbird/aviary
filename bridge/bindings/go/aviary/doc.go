@@ -15,7 +15,7 @@
 // # Requirements
 //
 // This package uses cgo and links against libaviary_c, which in turn links
-// cryptolib's C ABI (libcryptolib_c) — provided by the depended-on cryptolib Go
+// cryptolib's C ABI (libcryptolib_c) - provided by the depended-on cryptolib Go
 // module. CGO_ENABLED=1 is required. Build the native libraries once and make
 // them discoverable at link and run time (see cgo_local.go / cgo_pkgconfig.go).
 package aviary

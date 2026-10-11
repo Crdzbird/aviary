@@ -29,14 +29,14 @@ int main() {
     crypto::Ratchet responder =
         crypto::Ratchet::accept(view(handshake), view(prekey.public_key), view(prekey.secret_key));
 
-    // 20 messages each direction — the ratchet turns repeatedly.
+    // 20 messages each direction - the ratchet turns repeatedly.
     for (int i = 0; i < 20; ++i) {
-      Bytes a = msg("initiator→responder");
+      Bytes a = msg("initiator->responder");
       a.push_back(static_cast<std::uint8_t>(i));
       Bytes ct = initiator.encrypt(view(a));
       CHECK(responder.decrypt(view(ct)) == a);
 
-      Bytes b = msg("responder→initiator");
+      Bytes b = msg("responder->initiator");
       b.push_back(static_cast<std::uint8_t>(i));
       Bytes ct2 = responder.encrypt(view(b));
       CHECK(initiator.decrypt(view(ct2)) == b);
@@ -86,7 +86,7 @@ int main() {
     crypto::KeyPair r_pre = crypto::Ratchet::generate_prekey();
 
     // The attacker signs the transcript with its own key but the wire claims a
-    // different identity — the responder recomputes and the signature won't check.
+    // different identity - the responder recomputes and the signature won't check.
     auto [chan, hello] = ArmoredChannel::initiate(view(r_pre.public_key), view(r_id.public_key), attacker);
     // Corrupt the claimed identity inside the hello (swap in a stranger's pk).
     crypto::KeyPair stranger = crypto::hybrid_sig_keygen();
@@ -117,7 +117,7 @@ int main() {
     crypto::KeyPair impostor_pre = crypto::Ratchet::generate_prekey();  // attacker's own prekey
 
     auto [initiator, hello] = ArmoredChannel::initiate(view(real_pre.public_key), view(r_id.public_key), i_id);
-    // An impostor without the real prekey secret tries to accept — encapsulation
+    // An impostor without the real prekey secret tries to accept - encapsulation
     // was to real_pre.public_key, so accepting with a different prekey fails.
     bool threw = false;
     try {
@@ -158,7 +158,7 @@ int main() {
     rec.sign(r_id.secret_key);
     CHECK_MSG(rec.verify(), "the record (incl. prekey) is authentically signed");
 
-    // Tampering with the prekey breaks the record signature — an attacker can't
+    // Tampering with the prekey breaks the record signature - an attacker can't
     // substitute its own prekey to MITM the channel.
     p2p::PeerRecord tampered = rec;
     tampered.prekey = crypto::Ratchet::generate_prekey().public_key;

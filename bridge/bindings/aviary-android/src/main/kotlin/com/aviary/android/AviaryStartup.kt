@@ -7,7 +7,7 @@ import android.net.Uri
 
 /**
  * Auto-registered startup hook. Android instantiates manifest-declared
- * [ContentProvider]s very early in app launch — before the first frame — which
+ * [ContentProvider]s very early in app launch - before the first frame - which
  * makes [onCreate] an ideal, dependency-free place to warm the native libraries
  * off the main thread. Merely depending on this AAR enables the warm-up; no
  * app code required.
@@ -19,7 +19,7 @@ class AviaryStartup : ContentProvider() {
         return true
     }
 
-    // ── Unused ContentProvider surface (this provider exists only for onCreate). ──
+    // -- Unused ContentProvider surface (this provider exists only for onCreate). --
     override fun query(
         uri: Uri,
         projection: Array<out String>?,

@@ -10,7 +10,7 @@ namespace aviary::interop::bitcoin {
 namespace {
 codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()); }
 
-// ── Bech32 (BIP173) ──────────────────────────────────────────────────────────
+// -- Bech32 (BIP173) ----------------------------------------------------------
 const char* kBech32Charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
 std::uint32_t bech32_polymod(const std::vector<std::uint8_t>& values) {
@@ -119,7 +119,7 @@ std::string p2wpkh_address_from_secret(codec::ByteView secret_key, const std::st
   return p2wpkh_address(view(pk), hrp);
 }
 
-// ── Transactions (P2WPKH / BIP143) ───────────────────────────────────────────
+// -- Transactions (P2WPKH / BIP143) -------------------------------------------
 
 namespace {
 void put_u32_le(Bytes& out, std::uint32_t v) {
@@ -148,7 +148,7 @@ void put_var_bytes(Bytes& out, const Bytes& b) {
 // DER-encode a single integer (minimal big-endian, prepend 0x00 if high bit set).
 void der_int(Bytes& out, const Bytes& v32) {
   std::size_t i = 0;
-  while (i < v32.size() - 1 && v32[i] == 0) ++i;  // strip leading zeros (keep ≥1)
+  while (i < v32.size() - 1 && v32[i] == 0) ++i;  // strip leading zeros (keep >=1)
   Bytes mag(v32.begin() + static_cast<std::ptrdiff_t>(i), v32.end());
   out.push_back(0x02);
   if (mag[0] & 0x80) {
@@ -177,7 +177,7 @@ Bytes p2wpkh_script_pubkey(const Bytes& pubkey_hash) {
 
 Bytes bip143_sighash(const Tx& tx, std::size_t index, const Bytes& script_code,
                      std::uint64_t amount, std::uint32_t sighash_type) {
-  // hashPrevouts = sha256d( ‖ outpoint(txid ‖ vout LE) ).
+  // hashPrevouts = sha256d( || outpoint(txid || vout LE) ).
   Bytes prevouts;
   for (const auto& in : tx.inputs) {
     prevouts.insert(prevouts.end(), in.prevout.txid.begin(), in.prevout.txid.end());
@@ -185,12 +185,12 @@ Bytes bip143_sighash(const Tx& tx, std::size_t index, const Bytes& script_code,
   }
   Bytes hash_prevouts = hash256(view(prevouts));
 
-  // hashSequence = sha256d( ‖ nSequence LE ).
+  // hashSequence = sha256d( || nSequence LE ).
   Bytes sequences;
   for (const auto& in : tx.inputs) put_u32_le(sequences, in.sequence);
   Bytes hash_sequence = hash256(view(sequences));
 
-  // hashOutputs = sha256d( ‖ value LE ‖ var(scriptPubKey) ).
+  // hashOutputs = sha256d( || value LE || var(scriptPubKey) ).
   Bytes outputs;
   for (const auto& out : tx.outputs) {
     put_u64_le(outputs, out.value);
@@ -234,7 +234,7 @@ Bytes sign_p2wpkh_input(const Tx& tx, std::size_t index, std::uint64_t amount,
                         std::uint32_t sighash_type) {
   Bytes script_code = p2wpkh_script_code(pubkey_hash);
   Bytes sighash = bip143_sighash(tx, index, script_code, amount, sighash_type);
-  Bytes sig65 = crypto::secp256k1_sign(view(sighash), secret_key);  // r‖s‖recid, low-S
+  Bytes sig65 = crypto::secp256k1_sign(view(sighash), secret_key);  // r||s||recid, low-S
   Bytes der = der_encode_signature(Bytes(sig65.begin(), sig65.begin() + 64));
   der.push_back(static_cast<std::uint8_t>(sighash_type));  // append sighash-type byte
   return der;

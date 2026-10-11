@@ -131,7 +131,7 @@ class AtlasClient extends $grpc.Client {
         options: options);
   }
 
-  /// ── Governance: a validator council (coordinated rotation) + an auditor
+  /// -- Governance: a validator council (coordinated rotation) + an auditor
   /// light client that syncs with the OVERLAP rule (bisection through rotations).
   $grpc.ResponseFuture<$0.Council> getCouncil(
     $0.ChainRef request, {

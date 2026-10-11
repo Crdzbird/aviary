@@ -3,7 +3,7 @@
 
 namespace aviary::codec {
 
-// ── Writer ───────────────────────────────────────────────────────────────────
+// -- Writer -------------------------------------------------------------------
 
 void CodecWriter::write_u16(std::uint16_t v) {
   out_.push_back(static_cast<std::uint8_t>(v >> 8));
@@ -61,7 +61,7 @@ void CodecWriter::write_biguint(ByteView magnitude) {
   write_bytes(magnitude);
 }
 
-// ── Reader ───────────────────────────────────────────────────────────────────
+// -- Reader -------------------------------------------------------------------
 
 void CodecReader::need(std::size_t n) const {
   if (pos_ + n > data_.size()) {

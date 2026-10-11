@@ -1,4 +1,4 @@
-// Aviary demo — a Flutter dashboard driving the entire stack through the
+// Aviary demo - a Flutter dashboard driving the entire stack through the
 // C ABI: create a chain, fund accounts, send transactions, produce blocks, watch
 // a live event stream, read observability metrics, verify a light-client proof,
 // and derive multi-chain interop addresses.
@@ -13,10 +13,10 @@ void main() {
   // Isolate-backed warm-up, NOT awaited. preload() runs the one-time
   // crypto-backend init on a background isolate; we don't wait for it. The
   // synchronous API (Aviary.instance) is usable immediately:
-  //   • the native libraries are already MAPPED at app launch off the UI thread
-  //     — on Android by the AviaryStartup ContentProvider, on iOS/macOS by
-  //     dyld loading the embedded framework — so the lazy load is cheap, and
-  //   • preload() additionally pushes cryptolib_init off the UI isolate.
+  //  - the native libraries are already MAPPED at app launch off the UI thread
+  //    - on Android by the AviaryStartup ContentProvider, on iOS/macOS by
+  //     dyld loading the embedded framework - so the lazy load is cheap, and
+  //  - preload() additionally pushes cryptolib_init off the UI isolate.
   // So: isolate loading, no await, no UI stall.
   Aviary.preload();
   runApp(const AviaryDemoApp());
@@ -204,7 +204,7 @@ class _DashboardState extends State<Dashboard> {
     final proof = node.proveAccount(_alice!.address);
     final ok = _bc!.verifyStateProof(node.stateRoot(), proof);
     setState(() => _proofOk = ok);
-    _snack(ok ? 'Light-client proof of Alice verified ✓' : 'Proof failed');
+    _snack(ok ? 'Light-client proof of Alice verified ok' : 'Proof failed');
   }
 
   void _snack(String msg) =>
@@ -236,7 +236,7 @@ class _DashboardState extends State<Dashboard> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Aviary  ·  v${_bc!.version()}  ·  crypto ${_bc!.cryptoBackend()}',
+          'Aviary - v${_bc!.version()} - crypto ${_bc!.cryptoBackend()}',
         ),
       ),
       body: ListView(
@@ -301,7 +301,7 @@ class _DashboardState extends State<Dashboard> {
     ),
     const SizedBox(height: 8),
     Text(
-      'alice ${_short(_alice!.address)}…   bob ${_short(_bob!.address)}…',
+      'alice ${_short(_alice!.address)}...   bob ${_short(_bob!.address)}...',
       style: const TextStyle(
         fontFamily: 'monospace',
         fontSize: 12,
@@ -327,7 +327,7 @@ class _DashboardState extends State<Dashboard> {
         FilledButton.icon(
           onPressed: _send,
           icon: const Icon(Icons.send),
-          label: const Text('Alice → Bob'),
+          label: const Text('Alice -> Bob'),
         ),
         FilledButton.tonalIcon(
           onPressed: _produce,
@@ -366,7 +366,7 @@ class _DashboardState extends State<Dashboard> {
   Widget _eventsCard() => _section('Live event stream', Icons.stream, [
     if (_events.isEmpty)
       const Text(
-        'No events yet — send a transaction.',
+        'No events yet - send a transaction.',
         style: TextStyle(color: Colors.white54),
       )
     else
@@ -401,9 +401,9 @@ class _DashboardState extends State<Dashboard> {
   String _eventDetail(Map<String, dynamic> e) {
     switch (e['type']) {
       case 'block_finalized':
-        return 'height ${e['height']} · ${e['tx_count']} tx · root ${(e['state_root'] as String).substring(0, 16)}…';
+        return 'height ${e['height']} - ${e['tx_count']} tx - root ${(e['state_root'] as String).substring(0, 16)}...';
       case 'tx_admitted':
-        return 'txid ${(e['txid'] as String).substring(0, 16)}… · mempool ${e['mempool_size']}';
+        return 'txid ${(e['txid'] as String).substring(0, 16)}... - mempool ${e['mempool_size']}';
       default:
         return 'mempool ${e['mempool_size']}';
     }
@@ -411,7 +411,7 @@ class _DashboardState extends State<Dashboard> {
 
   // Anonymous membership (CredentialGate Option B): a member proves it holds an
   // issuer-signed credential without revealing its identity, carrying a
-  // per-(epoch, scope) pseudonym — the same within an epoch (Sybil-resistant),
+  // per-(epoch, scope) pseudonym - the same within an epoch (Sybil-resistant),
   // unlinkable across epochs. The nym seed is blind-committed, so the issuer
   // never learns it.
   void _runMembershipDemo() {
@@ -450,29 +450,31 @@ class _DashboardState extends State<Dashboard> {
 
       final log = <String>[];
       final nymA = admit(5, 'gossip', 1);
-      log.add('admitted · pseudonym ${_short(nymA!)}…');
+      log.add('admitted - pseudonym ${_short(nymA!)}...');
       final nym2 = admit(5, 'gossip', 2); // fresh challenge, same epoch+scope
       log.add(
         _eqBytes(nym2!, nymA)
-            ? 'epoch 5 again → SAME pseudonym (Sybil-linkable ✓)'
-            : 'epoch 5 again → different (unexpected)',
+            ? 'epoch 5 again -> SAME pseudonym (Sybil-linkable ok)'
+            : 'epoch 5 again -> different (unexpected)',
       );
       log.add(
         gate.noteAdmission(5, 'gossip', nymA) &&
                 !gate.noteAdmission(5, 'gossip', nym2)
-            ? 'Sybil cap: 2nd session on the nym refused ✓'
+            ? 'Sybil cap: 2nd session on the nym refused ok'
             : 'Sybil cap unexpected',
       );
       final nymE = admit(6, 'gossip', 1); // next epoch
       log.add(
         !_eqBytes(nymE!, nymA)
-            ? 'epoch 6 → DIFFERENT pseudonym (unlinkable ✓)'
-            : 'epoch 6 → same (unexpected)',
+            ? 'epoch 6 -> DIFFERENT pseudonym (unlinkable ok)'
+            : 'epoch 6 -> same (unexpected)',
       );
       gate.revokeNym(nymA);
       final banned = admit(5, 'gossip', 3) == null;
       log.add(
-        banned ? 'revoked nym → refused in epoch 5 ✓' : 'revocation unexpected',
+        banned
+            ? 'revoked nym -> refused in epoch 5 ok'
+            : 'revocation unexpected',
       );
       gate.free();
       setState(
@@ -495,7 +497,7 @@ class _DashboardState extends State<Dashboard> {
     [
       const Text(
         'A permissioned chain admits a member by a zero-knowledge proof of an '
-        'issuer-signed credential — no identity revealed — carrying a '
+        'issuer-signed credential - no identity revealed - carrying a '
         'per-epoch pseudonym for Sybil resistance and targeted revocation.',
         style: TextStyle(color: Colors.white70, fontSize: 13),
       ),
@@ -522,7 +524,7 @@ class _DashboardState extends State<Dashboard> {
 
   // Composable chains: a chain is a MIXTURE of pluggable components (engine,
   // state model, proposer policy) named by stable ids. The mixture is committed
-  // into the genesis hash — it IS chain identity — and an unknown id or a mix the
+  // into the genesis hash - it IS chain identity - and an unknown id or a mix the
   // assurance posture forbids is rejected at assembly (fail-closed).
   void _runMixtureDemo() {
     try {
@@ -530,7 +532,7 @@ class _DashboardState extends State<Dashboard> {
       final log = <String>[];
       log.add('engines: ${bc.engineIds().join(", ")}');
       log.add(
-        'state models: ${bc.stateModelIds().join(", ")} · proposers: ${bc.proposerIds().join(", ")}',
+        'state models: ${bc.stateModelIds().join(", ")} - proposers: ${bc.proposerIds().join(", ")}',
       );
 
       final v = bc.newBLSValidator(Uint8List(32)..fillRange(0, 32, 0x60));
@@ -552,13 +554,13 @@ class _DashboardState extends State<Dashboard> {
       );
       final mixed = bc.commitBlueprint(genesis, pos);
       log.add(
-        'genesis ${_short(bc.genesisHash(genesis))}… → with mixture ${_short(bc.genesisHash(mixed))}… (identity changed ✓)',
+        'genesis ${_short(bc.genesisHash(genesis))}... -> with mixture ${_short(bc.genesisHash(mixed))}... (identity changed ok)',
       );
       final chain = bc.assembleChain(mixed, 0, v.public, v.secret)!;
       final blk = chain.propose(2);
       final ok = chain.submit(blk, chain.seal(blk));
       log.add(
-        'pos/account/round-robin → propose → seal → submit: ${ok ? "height ${chain.height} ✓" : "failed"}',
+        'pos/account/round-robin -> propose -> seal -> submit: ${ok ? "height ${chain.height} ok" : "failed"}',
       );
       chain.free();
 
@@ -577,7 +579,7 @@ class _DashboardState extends State<Dashboard> {
       final cand = pc.propose(2);
       final okPow = pc.submit(pc.mine(cand));
       log.add(
-        'pow/account → propose → mine → submit: ${okPow ? "height ${pc.height} ✓" : "failed"}',
+        'pow/account -> propose -> mine -> submit: ${okPow ? "height ${pc.height} ok" : "failed"}',
       );
       pc.free();
 
@@ -596,7 +598,7 @@ class _DashboardState extends State<Dashboard> {
       );
       log.add(
         unknown == null
-            ? 'unregistered "my-custom-engine" → rejected ✓'
+            ? 'unregistered "my-custom-engine" -> rejected ok'
             : 'unexpected',
       );
       final hardened = bc.buildGenesis(
@@ -613,7 +615,7 @@ class _DashboardState extends State<Dashboard> {
       );
       log.add(
         forbidden == null
-            ? 'hardened posture + predictable-leader pos → rejected ✓'
+            ? 'hardened posture + predictable-leader pos -> rejected ok'
             : 'unexpected',
       );
       setState(
@@ -671,7 +673,7 @@ class _DashboardState extends State<Dashboard> {
       final plain = bc.genesisHash(parentGen);
       parentGen = bc.commitSubchainPolicy(parentGen, policy);
       log.add(
-        'parent genesis ${_short(plain)}… → with subchain policy ${_short(bc.genesisHash(parentGen))}… (identity changed ✓)',
+        'parent genesis ${_short(plain)}... -> with subchain policy ${_short(bc.genesisHash(parentGen))}... (identity changed ok)',
       );
       // The child binds to its parent: its hash changes, its genesis header does not.
       final bound = bc.commitParentBinding(
@@ -680,7 +682,7 @@ class _DashboardState extends State<Dashboard> {
         bc.genesisHash(parentGen),
       );
       log.add(
-        'child bound to parent: hash ${_short(bc.genesisHash(childGen))}… → ${_short(bc.genesisHash(bound))}… (cannot be re-parented ✓)',
+        'child bound to parent: hash ${_short(bc.genesisHash(childGen))}... -> ${_short(bc.genesisHash(bound))}... (cannot be re-parented ok)',
       );
 
       final child = bc.assembleChain(bound, 0, cv.public, cv.secret)!;
@@ -701,9 +703,9 @@ class _DashboardState extends State<Dashboard> {
       final pblk = parent.proposeAnchored(2, [anchor]);
       final okParent = parent.submit(pblk, parent.certify(pblk));
       log.add(
-        'parent block anchors child[1..2]: ${okParent ? "height ${parent.height}, child tip recorded ✓" : "failed"}',
+        'parent block anchors child[1..2]: ${okParent ? "height ${parent.height}, child tip recorded ok" : "failed"}',
       );
-      // Tamper: a flipped certificate byte, and a stale re-anchor — both refused before proposal.
+      // Tamper: a flipped certificate byte, and a stale re-anchor - both refused before proposal.
       final tampered = Uint8List.fromList(certified[1])
         ..[certified[1].length - 1] ^= 1;
       var refused = false;
@@ -716,7 +718,7 @@ class _DashboardState extends State<Dashboard> {
       }
       log.add(
         refused
-            ? 'tampered child certificate → anchor refused ✓'
+            ? 'tampered child certificate -> anchor refused ok'
             : 'unexpected',
       );
       refused = false;
@@ -727,7 +729,7 @@ class _DashboardState extends State<Dashboard> {
       }
       log.add(
         refused
-            ? 're-anchoring an already-anchored height → refused ✓'
+            ? 're-anchoring an already-anchored height -> refused ok'
             : 'unexpected',
       );
       // Cross-chain proof: alice's balance on the CHILD, verified from the PARENT header alone.
@@ -739,7 +741,7 @@ class _DashboardState extends State<Dashboard> {
       final bad = Uint8List.fromList(proof)..[proof.length - 1] ^= 1;
       final badOk = bc.verifySubchainProof(root, bad);
       log.add(
-        'alice on chain 42 proven from chain 1 header (subchain_root ${_short(root)}…): ${ok ? "verified ✓" : "FAILED"}; tampered proof: ${badOk ? "accepted ✗" : "rejected ✓"}',
+        'alice on chain 42 proven from chain 1 header (subchain_root ${_short(root)}...): ${ok ? "verified ok" : "FAILED"}; tampered proof: ${badOk ? "accepted x" : "rejected ok"}',
       );
       child.free();
       parent.free();
@@ -795,29 +797,29 @@ class _DashboardState extends State<Dashboard> {
       );
       final tree = bc.buildChainTree(root);
       log.add(
-        'built ${tree.chainIds().length} chains in one go: ${tree.chainIds().join(" → ")} (genesis bottom-up, bindings top-down)',
+        'built ${tree.chainIds().length} chains in one go: ${tree.chainIds().join(" -> ")} (genesis bottom-up, bindings top-down)',
       );
       final finalized = <int, int>{};
       tree.onFinalized = (id, _) => finalized[id] = (finalized[id] ?? 0) + 1;
       tree.produce(420, 2);
       tree.produce(420, 3);
       log.add(
-        'grandchild 420 finalized 2 blocks → child 42 has ${tree.pendingAnchors(42)} pending anchor',
+        'grandchild 420 finalized 2 blocks -> child 42 has ${tree.pendingAnchors(42)} pending anchor',
       );
       tree.produce(42, 2);
       tree.produce(43, 2);
       tree.produce(1, 2);
       log.add(
-        'produced on 42, 43 and the root → heights root ${tree.height(1)}, 42: ${tree.height(42)}, 420: ${tree.height(420)}; anchors flowed upward ✓',
+        'produced on 42, 43 and the root -> heights root ${tree.height(1)}, 42: ${tree.height(42)}, 420: ${tree.height(420)}; anchors flowed upward ok',
       );
       log.add(
-        'finalization hook (Dart) saw: ${finalized.entries.map((e) => "${e.key}×${e.value}").join(", ")}',
+        'finalization hook (Dart) saw: ${finalized.entries.map((e) => "${e.key}x${e.value}").join(", ")}',
       );
       final proof = tree.proveAccount(420, alice);
       final ok = tree.verify(proof);
       final bad = Uint8List.fromList(proof)..[proof.length - 1] ^= 1;
       log.add(
-        "alice on grandchild 420 proven from the ROOT header: ${ok ? "verified ✓" : "FAILED"}; tampered: ${tree.verify(bad) ? "accepted ✗" : "rejected ✓"}",
+        "alice on grandchild 420 proven from the ROOT header: ${ok ? "verified ok" : "FAILED"}; tampered: ${tree.verify(bad) ? "accepted x" : "rejected ok"}",
       );
       var refused = false;
       try {
@@ -834,7 +836,7 @@ class _DashboardState extends State<Dashboard> {
       }
       log.add(
         refused
-            ? 'a PoS child in the spec → refused (only BFT children can be anchored) ✓'
+            ? 'a PoS child in the spec -> refused (only BFT children can be anchored) ok'
             : 'unexpected',
       );
       tree.free();
@@ -857,8 +859,8 @@ class _DashboardState extends State<Dashboard> {
     Icons.park,
     [
       const Text(
-        'Declare a root chain, its subchains and their subchains — each with its '
-        'own mixture, accounts and validators — and build them all at once. '
+        'Declare a root chain, its subchains and their subchains - each with its '
+        'own mixture, accounts and validators - and build them all at once. '
         'Producing on any chain anchors its children upward; anything on any '
         'descendant is provable from the root header. Hooks let Dart supply '
         'transactions and observe finalization.',
@@ -920,8 +922,8 @@ class _DashboardState extends State<Dashboard> {
   Widget
   _mixtureCard() => _section('Composable chains (mixtures)', Icons.tune, [
     const Text(
-      'A chain is a mixture of pluggable components — consensus engine, state '
-      'model, proposer policy — named by id. The mixture is committed into the '
+      'A chain is a mixture of pluggable components - consensus engine, state '
+      'model, proposer policy - named by id. The mixture is committed into the '
       'genesis hash, and an unknown or posture-forbidden mix is refused.',
       style: TextStyle(color: Colors.white70, fontSize: 13),
     ),

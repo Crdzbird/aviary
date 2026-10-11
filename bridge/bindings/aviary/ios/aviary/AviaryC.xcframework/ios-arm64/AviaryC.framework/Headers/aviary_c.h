@@ -6,11 +6,11 @@
  * conventions of cryptolib's C ABI.
  *
  * Memory contract:
- *   - Functions returning AviaryBuffer allocate via malloc().
+ *  - Functions returning AviaryBuffer allocate via malloc().
  *     The caller MUST call aviary_buffer_free() when done.
- *   - Input data is borrowed (const pointers) — never freed by the library.
- *   - Error strings are heap-allocated — free with aviary_str_free().
- *   - Version strings are static — do NOT free.
+ *  - Input data is borrowed (const pointers) - never freed by the library.
+ *  - Error strings are heap-allocated - free with aviary_str_free().
+ *  - Version strings are static - do NOT free.
  *
  * Boundary contract (cpp-crypto-engineer): all C++ exceptions are isolated at
  * this boundary and surfaced as error returns; no exception crosses into C.
@@ -35,14 +35,14 @@ extern "C" {
 #  define AVIARY_API __attribute__((visibility("default")))
 #endif
 
-/** Stable status codes returned by int-returning functions. Values are ABI —
+/** Stable status codes returned by int-returning functions. Values are ABI - 
  *  never renumber. Bindings surface these as typed errors so failures are
  *  distinguishable (a silently-swallowed credit is a fund-loss bug). */
 typedef enum {
   AVIARY_OK = 0,
   /** Generic failure (exception with no more specific mapping). */
   AVIARY_ERR = 1,
-  /** Genesis is sealed (a block was produced) — credit is no longer valid;
+  /** Genesis is sealed (a block was produced) - credit is no longer valid;
    *  fund accounts with transfers instead. */
   AVIARY_ERR_GENESIS_SEALED = 2,
   /** Malformed input (wrong length, null where required, bad encoding). */
@@ -64,10 +64,10 @@ typedef struct {
 /** Initialize the crypto backend. Returns 0 on success, non-zero on failure. */
 AVIARY_API int aviary_init(void);
 
-/** Aviary library version. Static string — do not free. */
+/** Aviary library version. Static string - do not free. */
 AVIARY_API const char* aviary_version(void);
 
-/** Linked cryptolib backend version (proves linkage). Static — do not free. */
+/** Linked cryptolib backend version (proves linkage). Static - do not free. */
 AVIARY_API const char* aviary_crypto_backend_version(void);
 /** The file system path of the loaded Aviary library, written to [out] (not NUL
  *  terminated). Returns the length, or 0 when unknown or [cap] is too small.
@@ -81,7 +81,7 @@ AVIARY_API AviaryBufferResult aviary_hash(const uint8_t* msg,
                                                             size_t len);
 
 /** Canonical transaction id (32 bytes) for the given fields:
- *  BLAKE3-256( 0x03 ‖ canonical(tx) ). Proves the canonical tx encoding is
+ *  BLAKE3-256( 0x03 || canonical(tx) ). Proves the canonical tx encoding is
  *  reproducible from any binding. Free buf with aviary_buffer_free(). */
 AVIARY_API AviaryBufferResult aviary_txid(
     uint8_t version, uint64_t chain_id,
@@ -89,7 +89,7 @@ AVIARY_API AviaryBufferResult aviary_txid(
     const uint8_t* author, size_t author_len,
     const uint8_t* signature, size_t sig_len);
 
-/** Canonical block-header hash (32 bytes): BLAKE3-256( 0x02 ‖ canonical(header) ).
+/** Canonical block-header hash (32 bytes): BLAKE3-256( 0x02 || canonical(header) ).
  *  parent_hash, tx_root and state_root must each point to 32 bytes. */
 AVIARY_API AviaryBufferResult aviary_header_hash(
     uint8_t version, uint64_t chain_id, uint64_t height,
@@ -97,7 +97,7 @@ AVIARY_API AviaryBufferResult aviary_header_hash(
     const uint8_t* tx_root, const uint8_t* state_root,
     const uint8_t* consensus_data, size_t consensus_len);
 
-/* ── Verification (light client) ──────────────────────────────────────────────
+/* -- Verification (light client) ----------------------------------------------
  * Blob-based: inputs are canonical encodings produced by the C++ core. Each
  * returns 1 if valid, 0 otherwise (a malformed blob returns 0, never crashes). */
 
@@ -114,7 +114,7 @@ AVIARY_API int aviary_verify_commit(
     uint64_t chain_id, const uint8_t* validator_set, size_t vset_len,
     const uint8_t* cert, size_t cert_len);
 
-/* ── Demo node (full chain: ledger + BFT + mempool + observability) ───────────
+/* -- Demo node (full chain: ledger + BFT + mempool + observability) -----------
  * A self-contained single-validator account-model node. The whole stack behind
  * a handle, for the example apps. Buffers are malloc'd; free with
  * aviary_buffer_free / aviary_str_free. */
@@ -202,7 +202,7 @@ AVIARY_API AviaryBufferResult aviary_node_metrics(AviaryNode node);
 AVIARY_API AviaryBufferResult aviary_node_prove_account(
     AviaryNode node, const uint8_t* address);
 
-/* ── Custodial key store (S3) ──────────────────────────────────────────────────
+/* -- Custodial key store (S3) --------------------------------------------------
  * A container that seals account signing secrets at rest. A node never needs to
  * hold a plaintext key: create a store under a passphrase, add accounts, persist
  * the (encrypted) blob, reload it LOCKED, unlock, then reveal a secret only to
@@ -247,7 +247,7 @@ AVIARY_API AviaryBufferResult aviary_node_submit_transfer_keystore(AviaryNode no
 /** Serialise the store (keyring envelope + sealed entries; no plaintext key). */
 AVIARY_API AviaryBufferResult aviary_keystore_serialise(AviaryKeyStore ks);
 
-/** Load a serialised store. Comes back LOCKED — call unlock before revealing. NULL on error. */
+/** Load a serialised store. Comes back LOCKED - call unlock before revealing. NULL on error. */
 AVIARY_API AviaryKeyStore aviary_keystore_load(const uint8_t* blob, size_t len);
 
 /** Unlock with a passphrase. Returns 0 on success, nonzero on wrong passphrase. */
@@ -259,28 +259,28 @@ AVIARY_API int aviary_keystore_unlocked(AviaryKeyStore ks);
 /** Destroy a key-store handle. */
 AVIARY_API void aviary_keystore_free(AviaryKeyStore ks);
 
-/* ── Portable account export (tiered encrypted backup) ─────────────────────────
+/* -- Portable account export (tiered encrypted backup) -------------------------
  * Move one signing account off the node under a chosen trust tier, all fail-
  * closed. An account is a (public_key, secret) pair; the "open" calls return it
  * as a self-describing blob: [pub_len:4 BE][public_key][secret] (the same layout
  * aviary_node_new_account_hybrid uses), so a binding unpacks it once and
  * reuses that helper. */
 
-/** A hybrid KEM keypair (X25519 + ML-KEM-768) — a "device key" for the
+/** A hybrid KEM keypair (X25519 + ML-KEM-768) - a "device key" for the
  *  recipient-bound tiers. Returns [pub_len:4 BE][public][secret], or an error. */
 AVIARY_API AviaryBufferResult aviary_hybrid_kem_keygen(void);
 
-/** Tier 1 — passphrase (MolecularVault + Argon2id). ops/mem are Argon2id work
+/** Tier 1 - passphrase (MolecularVault + Argon2id). ops/mem are Argon2id work
  *  factors; pass 0,0 for the SENSITIVE preset. Returns the sealed envelope. */
 AVIARY_API AviaryBufferResult aviary_portable_seal_passphrase(
     const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
     const char* passphrase, uint64_t ops, size_t mem);
-/** Open a passphrase envelope → [pub_len:4 BE][public][secret]. Error on wrong
+/** Open a passphrase envelope -> [pub_len:4 BE][public][secret]. Error on wrong
  *  passphrase / tamper. */
 AVIARY_API AviaryBufferResult aviary_portable_open_passphrase(
     const uint8_t* envelope, size_t env_len, const char* passphrase);
 
-/** Tier 2 — recipient-bound (PQ). Seal to a device's hybrid-KEM public key; only
+/** Tier 2 - recipient-bound (PQ). Seal to a device's hybrid-KEM public key; only
  *  its KEM secret opens it. No shared secret to phish. */
 AVIARY_API AviaryBufferResult aviary_portable_seal_to(
     const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
@@ -288,7 +288,7 @@ AVIARY_API AviaryBufferResult aviary_portable_seal_to(
 AVIARY_API AviaryBufferResult aviary_portable_open_to(
     const uint8_t* envelope, size_t env_len, const uint8_t* recipient_kem_secret, size_t rk_len);
 
-/** Tier 3 — signed-recipient (Fortress-grade): recipient-bound AND authenticated.
+/** Tier 3 - signed-recipient (Fortress-grade): recipient-bound AND authenticated.
  *  The receiver verifies the owner's hybrid signature on open. */
 AVIARY_API AviaryBufferResult aviary_portable_seal_signed_to(
     const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
@@ -299,18 +299,18 @@ AVIARY_API AviaryBufferResult aviary_portable_open_signed_from(
     const uint8_t* recipient_kem_secret, size_t rk_len,
     const uint8_t* sender_sig_public, size_t sp_len);
 
-/* ── Threshold accounts (FROST t-of-n; the key never exists) ───────────────────
+/* -- Threshold accounts (FROST t-of-n; the key never exists) -------------------
  * A t-of-n account whose secret key is never assembled: dealt shares sign in a
  * two-round ceremony, and the aggregate is a STANDARD 64-byte Ed25519 signature
- * — so a threshold-signed transaction verifies through the ordinary Ed25519 path
+ * - so a threshold-signed transaction verifies through the ordinary Ed25519 path
  * (the chain can't tell). Flow: create() deals n share cards; each participating
  * card runs commit() (keep the nonces, broadcast the commitment); a coordinator
  * opens a ceremony over the fixed roster of commitments; each card signs; the
  * shares aggregate into the group signature.
  *
  * Blob layouts (bindings split these; all multi-byte ints big-endian):
- *   create()   → [u16 count]  then count × ( [u32 len][share-card bytes] )
- *   commit()   → [hiding_nonce 32][binding_nonce 32][commitment 66]
+ *   create()   -> [u16 count]  then count x ( [u32 len][share-card bytes] )
+ *   commit()   -> [hiding_nonce 32][binding_nonce 32][commitment 66]
  *                where commitment = [id 2][hiding_commit 32][binding_commit 32].
  *                Keep bytes[0..64) (the secret nonces); broadcast bytes[64..130)
  *                (the commitment) to the coordinator.
@@ -327,11 +327,11 @@ AVIARY_API AviaryBufferResult aviary_threshold_create(uint16_t n, uint16_t t);
 AVIARY_API AviaryBufferResult aviary_threshold_share_info(
     const uint8_t* card, size_t card_len);
 
-/** Seal a share card for rest (MolecularVault + Argon2id; ops=mem=0 → SENSITIVE).
+/** Seal a share card for rest (MolecularVault + Argon2id; ops=mem=0 -> SENSITIVE).
  *  The envelope binds the group key + slot, so it can't be relocated. */
 AVIARY_API AviaryBufferResult aviary_threshold_share_seal(
     const uint8_t* card, size_t card_len, const char* passphrase, uint64_t ops, size_t mem);
-/** Open a sealed share card → the card bytes. Fails closed on wrong passphrase. */
+/** Open a sealed share card -> the card bytes. Fails closed on wrong passphrase. */
 AVIARY_API AviaryBufferResult aviary_threshold_share_unseal(
     const uint8_t* envelope, size_t env_len, const char* passphrase);
 
@@ -354,12 +354,12 @@ AVIARY_API AviaryBufferResult aviary_threshold_sign(
 AVIARY_API int aviary_threshold_verify_share(
     AviaryCeremony c, uint16_t id, const uint8_t* public32, const uint8_t* sig_share32);
 
-/** Aggregate [count] (id, 32-byte share) pairs → a 64-byte Ed25519 signature.
+/** Aggregate [count] (id, 32-byte share) pairs -> a 64-byte Ed25519 signature.
  *  The pairs may be in any order; the ceremony reorders them internally. */
 AVIARY_API AviaryBufferResult aviary_threshold_aggregate(
     AviaryCeremony c, const uint16_t* ids, const uint8_t* sig_shares, size_t count);
 
-/* ── AssuranceProfile (one security posture, describing every tier) ────────────
+/* -- AssuranceProfile (one security posture, describing every tier) ------------
  * A named posture fixes a consistent tier at every seam. Levels: 1 = standard,
  * 2 = hardened, 3 = fortress. `describe` returns a fixed blob:
  *   [transport u8 (0=mutual, 1=ratcheted)]
@@ -367,10 +367,10 @@ AVIARY_API AviaryBufferResult aviary_threshold_aggregate(
  *   [threshold_custody u8 (0/1)]
  *   [sealed_mempool  u8 (0/1)]
  *   [sig_algo_count  u8][mandated SigAlgo bytes ...]
- * so a consumer can wire the classes the posture requires. Unknown level → error. */
+ * so a consumer can wire the classes the posture requires. Unknown level -> error. */
 AVIARY_API AviaryBufferResult aviary_assurance_describe(uint16_t level);
 
-/* ── Transaction encoding ──────────────────────────────────────────────────────
+/* -- Transaction encoding ------------------------------------------------------
  * Encode a transaction from its fields into the canonical wire form (e.g. to
  * seal into the mempool below). [fee] is only carried when version >= 2. */
 AVIARY_API AviaryBufferResult aviary_tx_encode(
@@ -378,7 +378,7 @@ AVIARY_API AviaryBufferResult aviary_tx_encode(
     const uint8_t* body, size_t body_len, const uint8_t* author, size_t author_len,
     const uint8_t* signature, size_t sig_len);
 
-/* ── SealedMempool (anti-MEV: transactions invisible until inclusion) ──────────
+/* -- SealedMempool (anti-MEV: transactions invisible until inclusion) ----------
  * A submitter seals an encoded transaction to the block proposer's hybrid-KEM
  * key; the pool orders by a cleartext fee hint WITHOUT decrypting, and only the
  * proposer opens the winners at build time. A front-runner sees only ciphertext.
@@ -387,7 +387,7 @@ AVIARY_API AviaryBufferResult aviary_tx_encode(
 /** Opaque sealed-mempool handle. */
 typedef void* AviarySealedMempool;
 
-/** Seal an encoded transaction to [proposer_kem_public] → a SealedTx blob (its
+/** Seal an encoded transaction to [proposer_kem_public] -> a SealedTx blob (its
  *  cleartext fee hint is the transaction's declared fee). */
 AVIARY_API AviaryBufferResult aviary_sealed_tx_seal(
     const uint8_t* tx_encoded, size_t tx_len, const uint8_t* proposer_kem_public, size_t pk_len);
@@ -398,43 +398,43 @@ AVIARY_API int aviary_sealed_mempool_add(
     AviarySealedMempool m, const uint8_t* sealed_tx, size_t len);
 AVIARY_API size_t aviary_sealed_mempool_size(AviarySealedMempool m);
 /** Proposer-only: open up to [max] highest-fee submissions with the KEM secret.
- *  Returns a blob: [count u32] then count × ( [tx_len u32][encoded tx] ). Entries
+ *  Returns a blob: [count u32] then count x ( [tx_len u32][encoded tx] ). Entries
  *  that don't decrypt / decode, or whose real fee != the committed hint, are
  *  silently skipped. */
 AVIARY_API AviaryBufferResult aviary_sealed_mempool_reveal(
     AviarySealedMempool m, const uint8_t* proposer_kem_secret, size_t sk_len, size_t max);
 AVIARY_API void aviary_sealed_mempool_free(AviarySealedMempool m);
 
-/* ── CredentialGate (anonymous membership admission — BBS, Option A) ───────────
+/* -- CredentialGate (anonymous membership admission - BBS, Option A) -----------
  *  A permissioned chain admits a member to a role by a ZERO-KNOWLEDGE proof that
  *  it holds an issuer-signed credential whose `tier` clears a policy threshold
- *  and whose `not_after` has not passed — revealing nothing else. Option A is
+ *  and whose `not_after` has not passed - revealing nothing else. Option A is
  *  *unlinkable*: two presentations of one credential cannot be correlated (great
- *  privacy, weak Sybil resistance — real per-epoch Sybil resistance is Option B,
+ *  privacy, weak Sybil resistance - real per-epoch Sybil resistance is Option B,
  *  blocked on an upstream cryptolib BBS-pseudonym primitive). See
  *  docs/design/CREDENTIAL_GATE.md.
  *
  *  Blob layouts (big-endian):
- *   - BBS issuer keypair: the account blob [pub_len:4][pub 96][sec 32].
- *   - policy: CredentialPolicy::encode() (opaque; produce via _policy_encode).
- *   - credential: [sig_len:4][sig 80]([attr_count:4]([attr_len:4][attr])×) — HOLDER
+ *  - BBS issuer keypair: the account blob [pub_len:4][pub 96][sec 32].
+ *  - policy: CredentialPolicy::encode() (opaque; produce via _policy_encode).
+ *  - credential: [sig_len:4][sig 80]([attr_count:4]([attr_len:4][attr])x) - HOLDER
  *     SECRET (carries member_secret + hidden attributes); store sealed at rest.
- *   - presentation: opaque proof+disclosed blob from _present.
- * ─────────────────────────────────────────────────────────────────────────── */
+ *  - presentation: opaque proof+disclosed blob from _present.
+ * --------------------------------------------------------------------------- */
 
 /** A BBS issuer keypair from >=32 bytes of key material. Returns the account blob
  *  [pub_len:4][pub 96][sec 32]. The public key is the chain's issuer identity. */
 AVIARY_API AviaryBufferResult aviary_bbs_keygen(
     const uint8_t* key_material, size_t km_len);
 
-/** Canonically encode a membership policy → the opaque `policy` blob every other
+/** Canonically encode a membership policy -> the opaque `policy` blob every other
  *  CredentialGate call takes. attribute_count must be 4 (the four well-known
  *  attributes) in this ABI; extra policy-specific attributes are not yet exposed. */
 AVIARY_API AviaryBufferResult aviary_credential_policy_encode(
     uint64_t chain_id, const uint8_t* issuer_pk, size_t pk_len,
     const uint8_t* header, size_t header_len, uint32_t attribute_count, uint8_t min_tier);
 
-/** The 32-byte commitment to a policy (hash_tagged) — commit this into genesis so
+/** The 32-byte commitment to a policy (hash_tagged) - commit this into genesis so
  *  every node provably agrees on the issuer, schema, and threshold. */
 AVIARY_API AviaryBufferResult aviary_credential_policy_hash(
     const uint8_t* policy, size_t policy_len);
@@ -465,7 +465,7 @@ AVIARY_API void aviary_credential_gate_revoke_epoch(
     AviaryCredentialGate g, uint32_t epoch);
 /** Verifier side: admit? Runs the full checklist (proof + expiry + revocation +
  *  tier) binding (epoch, scope, challenge, now). Returns 1 admit, 0 reject.
- *  Never fails — any malformed presentation / failed proof is a quiet 0. */
+ *  Never fails - any malformed presentation / failed proof is a quiet 0. */
 AVIARY_API int aviary_credential_gate_admit(
     AviaryCredentialGate g, uint32_t epoch, const char* scope,
     const uint8_t* challenge, size_t challenge_len, const uint8_t* presentation,
@@ -473,21 +473,21 @@ AVIARY_API int aviary_credential_gate_admit(
 /** Free a gate handle. */
 AVIARY_API void aviary_credential_gate_free(AviaryCredentialGate g);
 
-/* ── CredentialGate Option B — pseudonymous (per-epoch Sybil resistance) ───────
+/* -- CredentialGate Option B - pseudonymous (per-epoch Sybil resistance) -------
  *  Real per-epoch Sybil resistance: each presentation carries a deterministic
  *  per-(chain, epoch, scope) pseudonym derived from a holder seed the issuer
- *  never sees (blind BBS issuance). Same member + same epoch + scope → the SAME
- *  pseudonym; a different epoch → an unlinkable one. See CREDENTIAL_GATE.md §3.2.
+ *  never sees (blind BBS issuance). Same member + same epoch + scope -> the SAME
+ *  pseudonym; a different epoch -> an unlinkable one. See CREDENTIAL_GATE.md section 3.2.
  *
  *  Blob layouts (each field is a length-prefixed byte string unless noted):
- *   - membership_commit blob:  [commitment][nym_seed 32][secret_prover_blind 32]
- *     — HOLDER SECRET. Decode the FIRST field (commitment) to send to the issuer;
+ *  - membership_commit blob:  [commitment][nym_seed 32][secret_prover_blind 32]
+ *    - HOLDER SECRET. Decode the FIRST field (commitment) to send to the issuer;
  *     keep the whole blob for _finalize_membership.
- *   - blind_issuance blob:     [sig][entropy 32][tier u8][not_after u64][issuer_epoch u32]
- *     — opaque; the issuer returns it to the holder.
- *   - pseudonymous credential: opaque holder-secret blob (feed to _present_pseudonymous).
- *   - presentation:            opaque proof+nym blob from _present_pseudonymous.
- * ─────────────────────────────────────────────────────────────────────────── */
+ *  - blind_issuance blob:     [sig][entropy 32][tier u8][not_after u64][issuer_epoch u32]
+ *    - opaque; the issuer returns it to the holder.
+ *  - pseudonymous credential: opaque holder-secret blob (feed to _present_pseudonymous).
+ *  - presentation:            opaque proof+nym blob from _present_pseudonymous.
+ * --------------------------------------------------------------------------- */
 
 /** Encode a policy with an explicit admission mode (0 = unlinkable / Option A,
  *  1 = pseudonymous / Option B). `aviary_credential_policy_encode` is the
@@ -525,19 +525,19 @@ AVIARY_API AviaryBufferResult aviary_credential_gate_admit_pseudonymous(
     AviaryCredentialGate g, uint32_t epoch, const char* scope, const uint8_t* challenge,
     size_t challenge_len, const uint8_t* presentation, size_t presentation_len, uint64_t now);
 
-/** Targeted revocation (§6.2): refuse this exact pseudonym. */
+/** Targeted revocation (section 6.2): refuse this exact pseudonym. */
 AVIARY_API void aviary_credential_gate_revoke_nym(
     AviaryCredentialGate g, const uint8_t* nym, size_t nym_len);
 
-/** Sybil cap (§6.3): record an admitted nym for (epoch, scope). Returns 1 if this
+/** Sybil cap (section 6.3): record an admitted nym for (epoch, scope). Returns 1 if this
  *  is the first session on it, 0 if a duplicate (the caller rate-limits). */
 AVIARY_API int aviary_credential_gate_note_admission(
     AviaryCredentialGate g, uint32_t epoch, const char* scope, const uint8_t* nym,
     size_t nym_len);
 
-/* ── ChainBlueprint + ChainAssembler (composable chains) ──────────────────────
- *  A chain is a MIXTURE of pluggable components — consensus engine, state
- *  model, proposer policy — each named by a stable id. The mixture is committed
+/* -- ChainBlueprint + ChainAssembler (composable chains) ----------------------
+ *  A chain is a MIXTURE of pluggable components - consensus engine, state
+ *  model, proposer policy - each named by a stable id. The mixture is committed
  *  into the genesis hash (it IS chain identity); an id nobody registered, or a
  *  mix the assurance posture forbids, is rejected at assembly (fail-closed).
  *  Custom components are C++ subclasses registered in-process
@@ -545,11 +545,11 @@ AVIARY_API int aviary_credential_gate_note_admission(
  *  DECLARE mixtures naming it.
  *
  *  Blobs: blueprint / genesis / block = canonical encodings (opaque to callers);
- *  id lists = [count u32]([len u32][id])×; keypairs = account blob
+ *  id lists = [count u32]([len u32][id])x; keypairs = account blob
  *  [pub_len:4][pub][sec]. All exceptions are isolated at this boundary.
- * ─────────────────────────────────────────────────────────────────────────── */
+ * --------------------------------------------------------------------------- */
 
-/** A BLS validator keypair from >= 32 bytes of key material → account blob
+/** A BLS validator keypair from >= 32 bytes of key material -> account blob
  *  [pub 48][sec 32]. */
 AVIARY_API AviaryBufferResult aviary_bls_keygen(
     const uint8_t* ikm, size_t ikm_len);
@@ -577,7 +577,7 @@ AVIARY_API AviaryBufferResult aviary_genesis_build(
     uint64_t chain_id, uint64_t timestamp, uint16_t assurance_level, uint8_t state_model,
     const uint8_t* account_addrs, const uint64_t* account_balances, size_t account_count,
     const uint8_t* validator_pks, const uint64_t* validator_powers, size_t validator_count);
-/** Commit a mixture into a genesis → the new genesis blob (its hash changes:
+/** Commit a mixture into a genesis -> the new genesis blob (its hash changes:
  *  the mixture is chain identity). */
 AVIARY_API AviaryBufferResult aviary_genesis_commit_blueprint(
     const uint8_t* genesis, size_t genesis_len, const uint8_t* blueprint, size_t blueprint_len);
@@ -586,7 +586,7 @@ AVIARY_API AviaryBufferResult aviary_genesis_hash(
     const uint8_t* genesis, size_t genesis_len);
 
 /** An assembled chain: the engine the mixture named, behind the uniform
- *  propose → (seal | mine) → submit flow. Opaque handle. */
+ *  propose -> (seal | mine) -> submit flow. Opaque handle. */
 typedef void* AviaryChain;
 
 /** Assemble a node for validator [me] from [genesis] (using its committed
@@ -600,7 +600,7 @@ AVIARY_API AviaryChain aviary_chain_assemble(
 AVIARY_API uint64_t aviary_chain_height(AviaryChain c);
 /** The mixture this chain runs (encoded blueprint). */
 AVIARY_API AviaryBufferResult aviary_chain_blueprint(AviaryChain c);
-/** Propose the next (empty) block → encoded Block. Errors if this node may not
+/** Propose the next (empty) block -> encoded Block. Errors if this node may not
  *  propose now (e.g. not the leader). */
 AVIARY_API AviaryBufferResult aviary_chain_propose(
     AviaryChain c, uint64_t timestamp);
@@ -608,7 +608,7 @@ AVIARY_API AviaryBufferResult aviary_chain_propose(
  *  buffer for engines that do not seal (PoW, BFT, custom). */
 AVIARY_API AviaryBufferResult aviary_chain_seal(
     AviaryChain c, const uint8_t* block, size_t block_len);
-/** PoW: search a solving nonce → the solved, encoded Block. Errors if the
+/** PoW: search a solving nonce -> the solved, encoded Block. Errors if the
  *  engine is not PoW or no solution was found within the bound. */
 AVIARY_API AviaryBufferResult aviary_chain_mine(
     AviaryChain c, const uint8_t* block, size_t block_len);
@@ -618,14 +618,14 @@ AVIARY_API int aviary_chain_submit(
     const uint8_t* justification, size_t justification_len);
 AVIARY_API void aviary_chain_free(AviaryChain c);
 
-/* ── Subchains: a parent block anchors a child chain's finalized headers ─────
+/* -- Subchains: a parent block anchors a child chain's finalized headers -----
  *  (docs/design/SUBCHAINS.md). A child is registered at the parent's genesis
  *  by its genesis HEADER + fixed validator set; a parent block carries anchors
  *  (consecutive certified child headers) which every parent validator verifies
  *  with the light-client rule; the child's tip is committed in the parent
  *  header's subchain_root. Cross-chain proofs descend hop by hop from a parent
  *  header to a state entry on a descendant. v1 anchors BFT children only.
- *  Blob LISTS below are [count u32]([len u32][bytes])× (big-endian). */
+ *  Blob LISTS below are [count u32]([len u32][bytes])x (big-endian). */
 
 /** A genesis's genesis HEADER (the identity a parent registers a child by). */
 AVIARY_API AviaryBufferResult aviary_genesis_header(
@@ -641,10 +641,10 @@ AVIARY_API AviaryBufferResult aviary_child_registration_encode(
 AVIARY_API AviaryBufferResult aviary_subchain_policy_encode(
     uint16_t max_children, uint8_t max_depth, uint16_t max_anchors_per_block,
     uint16_t max_headers_per_anchor, const uint8_t* registrations, size_t registrations_len);
-/** Commit a subchain policy into a genesis → the parent's genesis blob (hash changes). */
+/** Commit a subchain policy into a genesis -> the parent's genesis blob (hash changes). */
 AVIARY_API AviaryBufferResult aviary_genesis_commit_subchain_policy(
     const uint8_t* genesis, size_t genesis_len, const uint8_t* policy, size_t policy_len);
-/** Bind a child genesis to its parent (id + 32-byte parent genesis hash) →
+/** Bind a child genesis to its parent (id + 32-byte parent genesis hash) ->
  *  the child's genesis blob (hash changes: it can never be re-parented). */
 AVIARY_API AviaryBufferResult aviary_genesis_commit_parent_binding(
     const uint8_t* genesis, size_t genesis_len, uint64_t parent_chain_id,
@@ -655,28 +655,28 @@ AVIARY_API AviaryBufferResult aviary_block_header(
 /** A header's 32-byte subchain_root (all-zero below version 3). */
 AVIARY_API AviaryBufferResult aviary_header_subchain_root(
     const uint8_t* header, size_t header_len);
-/** A child header + the certificate that finalized it → CertifiedHeader bytes. */
+/** A child header + the certificate that finalized it -> CertifiedHeader bytes. */
 AVIARY_API AviaryBufferResult aviary_certified_header_encode(
     const uint8_t* header, size_t header_len, const uint8_t* certificate, size_t certificate_len);
-/** An anchor: one child's CONSECUTIVE certified headers (a LIST) → Anchor bytes. */
+/** An anchor: one child's CONSECUTIVE certified headers (a LIST) -> Anchor bytes. */
 AVIARY_API AviaryBufferResult aviary_anchor_encode(
     uint64_t child_chain_id, const uint8_t* certified_headers, size_t certified_headers_len);
 /** Propose the next block on a PARENT chain, anchoring a LIST of anchors
- *  (ascending child id). Errors if any anchor is invalid — never proposes it. */
+ *  (ascending child id). Errors if any anchor is invalid - never proposes it. */
 AVIARY_API AviaryBufferResult aviary_chain_propose_anchored(
     AviaryChain c, uint64_t timestamp, const uint8_t* anchors, size_t anchors_len);
 /** BFT engines: this validator's precommit aggregated into a commit
- *  certificate for [block] → CommitCertificate bytes (the justification for
+ *  certificate for [block] -> CommitCertificate bytes (the justification for
  *  aviary_chain_submit, and what a parent anchors). Errors if the engine
  *  is not BFT or this validator alone does not reach quorum (gather the other
  *  validators' precommits with the C++ API). */
 AVIARY_API AviaryBufferResult aviary_chain_certify(
     AviaryChain c, const uint8_t* block, size_t block_len);
-/* ── Light client: follow a header chain with certificates only ──────────────
+/* -- Light client: follow a header chain with certificates only --------------
  *  Sequential accept, plus the OVERLAP (skipping) rule: jump to a far header
  *  when its own set certifies it AND the signers hold more than trust_level
  *  (default 1/3) of the set the client already trusts. Validator sets are
- *  the canonical ValidatorSet encoding: [count u32]([len u32][pk][power u64])×
+ *  the canonical ValidatorSet encoding: [count u32]([len u32][pk][power u64])x
  *  (what aviary_chain_validators returns). Handles are not thread-safe. */
 typedef void* AviaryLightClient;
 /** Trust a header (e.g. from aviary_genesis_header) and the set in force
@@ -707,7 +707,7 @@ AVIARY_API void aviary_light_client_set_trust_level(
 AVIARY_API void aviary_light_client_set_max_skip(AviaryLightClient lc, uint64_t blocks);
 AVIARY_API void aviary_light_client_free(AviaryLightClient lc);
 
-/* ── Validator-set changes (coordinated rotation, BFT engines) ────────────────
+/* -- Validator-set changes (coordinated rotation, BFT engines) ----------------
  *  Operators agree a new set out of band and each SCHEDULES it; the next block
  *  this node proposes announces it; aviary_chain_certify refuses to vote
  *  for an unscheduled change; once a rotation block is certified by >2/3 of
@@ -719,7 +719,7 @@ AVIARY_API void aviary_light_client_free(AviaryLightClient lc);
 AVIARY_API int aviary_chain_schedule_validators(
     AviaryChain c, const uint8_t* validator_pks, const uint64_t* validator_powers,
     size_t validator_count);
-/** The validator set in force for the next block: [count u32]([len u32][pk][power u64])×. */
+/** The validator set in force for the next block: [count u32]([len u32][pk][power u64])x. */
 AVIARY_API AviaryBufferResult aviary_chain_validators(AviaryChain c);
 
 /** A parent's last anchored header for [child_chain_id] (errors if this chain
@@ -732,8 +732,8 @@ AVIARY_API AviaryBufferResult aviary_chain_subchain_hop(
 /** State-inclusion proof for a 32-byte address on this (account-model) chain. */
 AVIARY_API AviaryBufferResult aviary_chain_prove_account(
     AviaryChain c, const uint8_t* address);
-/** A cross-chain proof: a LIST of hops (parent → … → the chain holding the
- *  entry) + that chain's state proof → SubchainProof bytes. */
+/** A cross-chain proof: a LIST of hops (parent -> ... -> the chain holding the
+ *  entry) + that chain's state proof -> SubchainProof bytes. */
 AVIARY_API AviaryBufferResult aviary_subchain_proof_encode(
     const uint8_t* hops, size_t hops_len, const uint8_t* state_proof, size_t state_proof_len);
 /** 1 iff [proof] is committed under the 32-byte [parent_subchain_root] all the
@@ -741,14 +741,14 @@ AVIARY_API AviaryBufferResult aviary_subchain_proof_encode(
 AVIARY_API int aviary_subchain_proof_verify(
     const uint8_t* parent_subchain_root, const uint8_t* proof, size_t proof_len);
 
-/* ── Chain tree: declare a FAMILY of chains and build / drive it together ────
- *  A recursive spec — each node a chain with its own mixture, accounts,
+/* -- Chain tree: declare a FAMILY of chains and build / drive it together ----
+ *  A recursive spec - each node a chain with its own mixture, accounts,
  *  validators and children (subchains). build() resolves genesis bottom-up,
- *  bindings top-down and assembles every node (NULL on any reject — see
+ *  bindings top-down and assembles every node (NULL on any reject - see
  *  aviary_chain_tree_spec_error for the reason). produce() proposes
  *  with the node's pending child anchors, justifies in-process (BFT: the
  *  locally held validator secrets must reach quorum; PoS/VRF seal; PoW mine),
- *  submits and archives — blocks flow upward automatically. prove_account
+ *  submits and archives - blocks flow upward automatically. prove_account
  *  yields a SubchainProof from the ROOT header. Hooks let ANY language extend
  *  the tree (transactions to include; finalization observer). Not thread-safe. */
 typedef void* AviaryChainTree;
@@ -769,7 +769,7 @@ AVIARY_API AviaryBufferResult aviary_chain_tree_spec_error(
     const uint8_t* spec, size_t spec_len);
 /** Build the whole family from an encoded ROOT node. NULL on any reject. */
 AVIARY_API AviaryChainTree aviary_chain_tree_build(const uint8_t* spec, size_t spec_len);
-/** Chain ids in pre-order (parents first): [count u32][u64]×. */
+/** Chain ids in pre-order (parents first): [count u32][u64]x. */
 AVIARY_API AviaryBufferResult aviary_chain_tree_chain_ids(AviaryChainTree t);
 AVIARY_API uint64_t aviary_chain_tree_height(AviaryChainTree t, uint64_t chain_id);
 /** The node's final genesis blob (policy + binding committed). */
@@ -778,7 +778,7 @@ AVIARY_API AviaryBufferResult aviary_chain_tree_genesis(AviaryChainTree t, uint6
 AVIARY_API AviaryBufferResult aviary_chain_tree_tip(AviaryChainTree t, uint64_t chain_id);
 /** How many anchors produce() would include on [chain_id] right now. */
 AVIARY_API uint32_t aviary_chain_tree_pending_anchors(AviaryChainTree t, uint64_t chain_id);
-/** Produce + finalize the next block on [chain_id] → the encoded Block. Errors with the reason. */
+/** Produce + finalize the next block on [chain_id] -> the encoded Block. Errors with the reason. */
 AVIARY_API AviaryBufferResult aviary_chain_tree_produce(
     AviaryChainTree t, uint64_t chain_id, uint64_t timestamp);
 /** Cross-chain proof of a 32-byte address on [chain_id] from the ROOT header (no hops for the root). */
@@ -787,7 +787,7 @@ AVIARY_API AviaryBufferResult aviary_chain_tree_prove_account(
 /** 1 iff [proof] is committed by the root's CURRENT header. */
 AVIARY_API int aviary_chain_tree_verify(AviaryChainTree t, const uint8_t* proof, size_t proof_len);
 /** Transactions to include when [chain_id] produces at [timestamp]: write a
- *  LIST of encoded transactions into [out] (≤ out_cap), set *out_len; return
+ *  LIST of encoded transactions into [out] (<= out_cap), set *out_len; return
  *  1, or 0 to include none. Runs synchronously inside produce(). */
 typedef int (*AviaryTxSourceFn)(void* ctx, uint64_t chain_id, uint64_t timestamp,
                                       uint8_t* out, size_t out_cap, size_t* out_len);
@@ -878,14 +878,14 @@ AVIARY_API AviaryBufferResult aviary_secure_encrypt(AviarySecureSession s, const
 AVIARY_API AviaryBufferResult aviary_secure_decrypt(AviarySecureSession s, const uint8_t* frame, size_t len);
 AVIARY_API void aviary_secure_free(AviarySecureSession s);
 
-/* ── Foreign components: implement engines / proposers in ANY language ────────
+/* -- Foreign components: implement engines / proposers in ANY language --------
  *  The consensus pipeline stays in C++ (a foreign engine proposes and applies
  *  via the Ledger); the foreign code supplies the JUSTIFICATION policy through
  *  C callbacks. Callbacks are invoked synchronously inside consensus and MUST
  *  be deterministic (no clock / randomness / map order) and must not re-enter
  *  the chain. [ctx] is passed back verbatim (an opaque handle to your object).
- *  A foreign engine seals via aviary_chain_seal (→ your justify) and
- *  submits via aviary_chain_submit (→ your verify, then apply). */
+ *  A foreign engine seals via aviary_chain_seal (-> your justify) and
+ *  submits via aviary_chain_submit (-> your verify, then apply). */
 
 /** Justify a block this node proposed: write up to out_cap bytes into [out],
  *  set *out_len. Return 1 on success, 0 to refuse. */
@@ -897,7 +897,7 @@ typedef int (*AviaryVerifyFn)(void* ctx, const uint8_t* block, size_t block_len,
 /** Leader election: the proposer index for [height] among [validator_count]. */
 typedef uint32_t (*AviaryProposerFn)(void* ctx, uint64_t height, uint32_t validator_count);
 
-/** Register a foreign engine under [id] (chain identity — never rename).
+/** Register a foreign engine under [id] (chain identity - never rename).
  *  Returns 1 on success, 0 on bad arguments. */
 AVIARY_API int aviary_registry_add_engine(
     const char* id, AviaryJustifyFn justify, AviaryVerifyFn verify, void* ctx,
@@ -909,7 +909,7 @@ AVIARY_API int aviary_registry_add_proposer(
 #define AVIARY_MAX_JUSTIFICATION 4096
 
 
-/* ── Interop address derivation (showcase) ─────────────────────────────────── */
+/* -- Interop address derivation (showcase) ----------------------------------- */
 
 /** Ethereum EIP-55 checksum address (string) from a 32-byte secp256k1 secret. */
 AVIARY_API AviaryBufferResult aviary_eth_address(const uint8_t* secret32);
@@ -918,7 +918,7 @@ AVIARY_API AviaryBufferResult aviary_btc_address(const uint8_t* secret32);
 /** Solana address (base58 string) from a 64-byte Ed25519 secret. */
 AVIARY_API AviaryBufferResult aviary_sol_address(const uint8_t* ed_secret64);
 
-/* ── EVM smart-contract interaction ────────────────────────────────────────── */
+/* -- EVM smart-contract interaction ------------------------------------------ */
 
 /** ABI-encoded calldata for ERC-20 transfer(address,uint256): to is 20 bytes. */
 AVIARY_API AviaryBufferResult aviary_eth_erc20_transfer(

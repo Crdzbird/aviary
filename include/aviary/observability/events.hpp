@@ -4,8 +4,8 @@
 
 #include "aviary/crypto.hpp"
 
-/// Chain event types published on the EventBus (ARCHITECTURE §12). Payloads are
-/// deterministic — heights and hashes the core already computed.
+/// Chain event types published on the EventBus (ARCHITECTURE section 12). Payloads are
+/// deterministic - heights and hashes the core already computed.
 namespace aviary::observe {
 
 using crypto::Hash;

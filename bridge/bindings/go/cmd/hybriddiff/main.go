@@ -1,4 +1,4 @@
-// hybriddiff — the Go half of the cross-binding hybrid determinism check.
+// hybriddiff - the Go half of the cross-binding hybrid determinism check.
 // Builds a post-quantum scenario and emits the shared keys + resulting state
 // root as JSON; the Dart half replays it and asserts the same root.
 package main

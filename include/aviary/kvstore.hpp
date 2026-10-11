@@ -11,7 +11,7 @@
 #include "aviary/codec.hpp"
 #include "aviary/types.hpp"
 
-/// An embedded log-structured key→bytes store (ARCHITECTURE §13; Bitcask-style),
+/// An embedded log-structured key->bytes store (ARCHITECTURE section 13; Bitcask-style),
 /// with no external dependency. Writes APPEND a record to a single log file; an
 /// in-memory index maps each key to its latest value's offset in the log, so a
 /// read is one seek + read. Reopening replays the log to rebuild the index

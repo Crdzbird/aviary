@@ -4,16 +4,16 @@
 // - protoc             v7.36.1
 // source: interop.proto
 
-// Interop — proves the Aviary ledger is byte-identical across language
+// Interop - proves the Aviary ledger is byte-identical across language
 // bindings. A Go server (aviary Go binding, full node) and a Flutter
 // client (aviary, native) each run the ledger independently and
 // cross-check three directions:
 //
-//   • go → flutter : the server builds a chain and returns a light-client proof;
+//  - go -> flutter : the server builds a chain and returns a light-client proof;
 //                    the client VERIFIES it locally against the state root.
-//   • flutter → go : the client builds a chain and produces a proof; the server
+//  - flutter -> go : the client builds a chain and produces a proof; the server
 //                    VERIFIES it.
-//   • go ↔ flutter : both compute the SAME canonical bytes (BLAKE3 hash, canonical
+//  - go <-> flutter : both compute the SAME canonical bytes (BLAKE3 hash, canonical
 //                    txid, header hash) and apply the SAME deterministic scenario;
 //                    the state roots must match byte-for-byte. A mismatch is a
 //                    consensus fork between bindings.
@@ -44,13 +44,13 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type InteropClient interface {
-	// go ↔ flutter: compute canonical bytes for identical inputs (determinism).
+	// go <-> flutter: compute canonical bytes for identical inputs (determinism).
 	ComputeCanonical(ctx context.Context, in *CanonicalInput, opts ...grpc.CallOption) (*CanonicalOutput, error)
-	// go → flutter: the server builds the scenario and returns a verifiable proof.
+	// go -> flutter: the server builds the scenario and returns a verifiable proof.
 	BuildChain(ctx context.Context, in *ChainScenario, opts ...grpc.CallOption) (*ChainResult, error)
-	// flutter → go: the server verifies a proof the client produced.
+	// flutter -> go: the server verifies a proof the client produced.
 	VerifyProof(ctx context.Context, in *ProofBundle, opts ...grpc.CallOption) (*VerifyResult, error)
-	// ── Chain tree: Go builds a deterministic family (root ← child ← grandchild)
+	// -- Chain tree: Go builds a deterministic family (root <- child <- grandchild)
 	// from shared seeds; Flutter builds the SAME tree natively. Roots must match,
 	// and each side verifies the other's cross-chain proof.
 	BuildTree(ctx context.Context, in *TreeScenario, opts ...grpc.CallOption) (*TreeResult, error)
@@ -119,13 +119,13 @@ func (c *interopClient) VerifyTreeProof(ctx context.Context, in *TreeProofBundle
 // All implementations must embed UnimplementedInteropServer
 // for forward compatibility.
 type InteropServer interface {
-	// go ↔ flutter: compute canonical bytes for identical inputs (determinism).
+	// go <-> flutter: compute canonical bytes for identical inputs (determinism).
 	ComputeCanonical(context.Context, *CanonicalInput) (*CanonicalOutput, error)
-	// go → flutter: the server builds the scenario and returns a verifiable proof.
+	// go -> flutter: the server builds the scenario and returns a verifiable proof.
 	BuildChain(context.Context, *ChainScenario) (*ChainResult, error)
-	// flutter → go: the server verifies a proof the client produced.
+	// flutter -> go: the server verifies a proof the client produced.
 	VerifyProof(context.Context, *ProofBundle) (*VerifyResult, error)
-	// ── Chain tree: Go builds a deterministic family (root ← child ← grandchild)
+	// -- Chain tree: Go builds a deterministic family (root <- child <- grandchild)
 	// from shared seeds; Flutter builds the SAME tree natively. Roots must match,
 	// and each side verifies the other's cross-chain proof.
 	BuildTree(context.Context, *TreeScenario) (*TreeResult, error)

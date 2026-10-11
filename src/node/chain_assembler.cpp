@@ -24,7 +24,7 @@ Registries& regs() {
   return r;
 }
 
-// ── Built-ins ────────────────────────────────────────────────────────────────
+// -- Built-ins ----------------------------------------------------------------
 // Registered once, lazily, so the four shipped engines / two state models / two
 // proposer policies are always nameable. Custom components simply add to the
 // same maps.
@@ -35,7 +35,7 @@ void register_builtins_locked(Registries& r) {
                       },
                       /*grind_proof=*/false};
   r.engines["pow"] = {[](BootContext& c) -> std::unique_ptr<consensus::ConsensusEngine> {
-                        // params = a 32-byte difficulty target; absent → easiest (all 0xFF).
+                        // params = a 32-byte difficulty target; absent -> easiest (all 0xFF).
                         Hash target;
                         target.fill(0xFF);
                         if (c.blueprint && c.blueprint->component_params.size() == 32) {
@@ -63,7 +63,7 @@ void register_builtins_locked(Registries& r) {
                                 std::move(c.ledger));
                           },
                           /*grind_proof=*/true};
-  // State models — the id must match how the genesis is seeded.
+  // State models - the id must match how the genesis is seeded.
   r.states["account"] = [](const GenesisSpec& g) {
     if (g.state_model != StateModel::kAccount)
       throw std::runtime_error("chain-assembler: state 'account' but genesis is seeded as UTXO");
@@ -102,7 +102,7 @@ std::vector<std::string> keys(const M& m) {
 
 }  // namespace
 
-// ── ComponentRegistry ────────────────────────────────────────────────────────
+// -- ComponentRegistry --------------------------------------------------------
 
 void ComponentRegistry::register_engine(const std::string& id, EngineFactory make,
                                         bool grind_proof) {
@@ -154,7 +154,7 @@ const ProposerFactory* ComponentRegistry::find_proposer(const std::string& id) {
   return it == r.proposers.end() ? nullptr : &it->second;
 }
 
-// ── ChainAssembler ───────────────────────────────────────────────────────────
+// -- ChainAssembler -----------------------------------------------------------
 
 ChainBlueprint ChainAssembler::default_blueprint(const GenesisSpec& genesis) {
   const AssuranceProfile profile = AssuranceProfile::from_genesis(genesis);
@@ -168,13 +168,13 @@ ChainBlueprint ChainAssembler::default_blueprint(const GenesisSpec& genesis) {
 AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_t me,
                                         crypto::KeyPair bls_key, Bytes vrf_secret,
                                         std::vector<Bytes> vrf_pubkeys) {
-  // 1. The posture check every boot already runs (unknown id / inconsistent sigs → throw).
+  // 1. The posture check every boot already runs (unknown id / inconsistent sigs -> throw).
   const AssuranceProfile profile = AssuranceProfile::from_genesis(genesis);
 
   // 2. The mixture: committed in genesis, else the posture-driven default.
   ChainBlueprint bp = ChainBlueprint::from_genesis(genesis).value_or(default_blueprint(genesis));
 
-  // 3. State model → genesis state → ledger (the id must match the seeding).
+  // 3. State model -> genesis state -> ledger (the id must match the seeding).
   const StateFactory* sf = ComponentRegistry::find_state(bp.state_model_id);
   if (!sf) throw std::runtime_error("chain-assembler: unknown state model id '" + bp.state_model_id + "'");
   auto ledger = std::make_unique<Ledger>(genesis.chain_spec(), (*sf)(genesis), genesis.timestamp);
@@ -187,7 +187,7 @@ AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_
     proposer = (*pf)();
   }
 
-  // 5. Engine — and the posture must permit it: a grind-proof posture cannot
+  // 5. Engine - and the posture must permit it: a grind-proof posture cannot
   //    run a predictable-leader engine.
   const EngineEntry* ee = ComponentRegistry::find_engine(bp.consensus_id);
   if (!ee) throw std::runtime_error("chain-assembler: unknown consensus id '" + bp.consensus_id + "'");

@@ -1,11 +1,11 @@
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # Aviary .gitignore
-# Native libraries and platform build outputs are NOT committed — they are large
+# Native libraries and platform build outputs are NOT committed - they are large
 # and machine-built. Rebuild them with the scripts in scripts/ (and the sibling
 # cryptolib checkout). See each binding's README.
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
-# ── Build output (CMake / Gradle / SPM / Flutter, at any depth) ──
+# -- Build output (CMake / Gradle / SPM / Flutter, at any depth) --
 build/
 build-*/
 /cmake-build-*/
@@ -14,7 +14,7 @@ build-*/
 .build/
 DerivedData/
 
-# ── Native artifacts (rebuilt via scripts/) ──
+# -- Native artifacts (rebuilt via scripts/) --
 *.o
 *.a
 *.dylib
@@ -25,21 +25,21 @@ DerivedData/
 **/prebuilds/
 **/native/
 
-# ── Go ──
+# -- Go --
 # Compiled example servers (extension-less binaries)
 /examples/atlas/server/atlas-server
 /examples/sentinel/server/sentinel-server
 /examples/interop/server/interop-server
 /bridge/bindings/go/**/aviary_demo
 
-# ── JVM ──
+# -- JVM --
 /bridge/bindings/jvm/out/
 /bridge/bindings/jvm/demo.jar
 
-# ── Node ──
+# -- Node --
 node_modules/
 
-# ── Dart / Flutter ──
+# -- Dart / Flutter --
 .dart_tool/
 .packages
 pubspec.lock
@@ -52,7 +52,7 @@ pubspec.lock
 **/.symlinks/
 **/Pods/
 
-# ── Local machine config / IDE ──
+# -- Local machine config / IDE --
 local.properties
 .swiftpm/
 .idea/

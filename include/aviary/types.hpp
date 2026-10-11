@@ -7,7 +7,7 @@
 #include "aviary/codec.hpp"
 #include "aviary/crypto.hpp"
 
-/// Core ledger data model (ARCHITECTURE §6). Model-agnostic: the [Transaction]
+/// Core ledger data model (ARCHITECTURE section 6). Model-agnostic: the [Transaction]
 /// is a signed transport envelope whose [body] is interpreted by the pluggable
 /// StateMachine (account or UTXO). Everything here is canonically encoded.
 namespace aviary {
@@ -30,15 +30,15 @@ enum class SigAlgo : std::uint8_t {
                             ///< in [signature]; verification is done by the UTXO
                             ///< state machine (one signer per input).
   kSlhDsa = 4,              ///< SLH-DSA-SHA2-128s (FIPS 205, stateless hash-based).
-                            ///< Security rests on SHA-2 alone — no lattice
-                            ///< assumption — so it survives even if ML-DSA falls.
+                            ///< Security rests on SHA-2 alone - no lattice
+                            ///< assumption - so it survives even if ML-DSA falls.
                             ///< author 32 B, signature 7856 B.
 };
 
 struct Transaction {
   /// 1 = legacy Ed25519 envelope (no sig_algo byte); 2 = extended envelope that
-  /// carries [sig_algo]. Bumping the version — not adding an unconditional field
-  /// — keeps every version-1 canonical encoding (and its golden vectors) intact.
+  /// carries [sig_algo]. Bumping the version - not adding an unconditional field
+  /// - keeps every version-1 canonical encoding (and its golden vectors) intact.
   std::uint8_t version = 1;
   std::uint64_t chain_id = 0;
   /// Signature scheme (a SigAlgo). Only serialized when version >= 2. Committed
@@ -68,14 +68,14 @@ struct Transaction {
   static Transaction decode(codec::CodecReader& r);
   static Transaction decode_all(codec::ByteView bytes);
 
-  /// Transaction id: BLAKE3-256( 0x03 ‖ encode() ).
+  /// Transaction id: BLAKE3-256( 0x03 || encode() ).
   Hash txid() const;
 };
 
 struct BlockHeader {
   /// 1 = base header; 2 = also commits [receipt_root]; 3 = also commits
   /// [anchor_root] + [subchain_root] (docs/design/SUBCHAINS.md). Bumping the
-  /// version — not adding an unconditional field — keeps every version-1/2
+  /// version - not adding an unconditional field - keeps every version-1/2
   /// encoding (and its golden vectors) byte-identical.
   std::uint8_t version = 1;
   std::uint64_t chain_id = 0;
@@ -93,13 +93,13 @@ struct BlockHeader {
   static BlockHeader decode(codec::CodecReader& r);
   static BlockHeader decode_all(codec::ByteView bytes);
 
-  /// Header hash: BLAKE3-256( 0x02 ‖ encode() ).
+  /// Header hash: BLAKE3-256( 0x02 || encode() ).
   Hash hash() const;
   bool operator==(const BlockHeader&) const = default;
 };
 
 /// A child chain's finalized header with the certificate that finalized it
-/// (the child's canonical `consensus::CommitCertificate` bytes — kept opaque
+/// (the child's canonical `consensus::CommitCertificate` bytes - kept opaque
 /// here so types.hpp stays free of the consensus layer; the subchain registry
 /// decodes and verifies it). See docs/design/SUBCHAINS.md.
 struct CertifiedHeader {
@@ -113,9 +113,9 @@ struct CertifiedHeader {
 };
 
 /// A subchain ANCHOR: one child chain's finalized progress, carried in a parent
-/// block. [headers] is a CONSECUTIVE segment (child tip+1 … tip+k, each with its
+/// block. [headers] is a CONSECUTIVE segment (child tip+1 ... tip+k, each with its
 /// certificate), so the parent verifies every child header exactly as a light
-/// client would — no gaps, no new verification rule. Bounded by the parent's
+/// client would - no gaps, no new verification rule. Bounded by the parent's
 /// SubchainPolicy. Anchors in a block are ordered by ascending child_chain_id,
 /// one per child.
 struct Anchor {
@@ -125,7 +125,7 @@ struct Anchor {
   Bytes encode() const;
   static Anchor decode(codec::CodecReader& r);
   static Anchor decode_all(codec::ByteView bytes);
-  /// BLAKE3-256( kAnchor ‖ encode() ) — the Merkle leaf under anchor_root.
+  /// BLAKE3-256( kAnchor || encode() ) - the Merkle leaf under anchor_root.
   Hash hash() const;
   bool operator==(const Anchor&) const = default;
 };
@@ -136,7 +136,7 @@ struct Block {
   std::vector<Anchor> anchors;  ///< only serialized when header.version >= 3
 
   /// Throws std::invalid_argument if [anchors] is non-empty on a header whose
-  /// version cannot carry them — never silently drops a commitment.
+  /// version cannot carry them - never silently drops a commitment.
   Bytes encode() const;
   static Block decode_all(codec::ByteView bytes);
 };

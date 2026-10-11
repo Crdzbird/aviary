@@ -101,7 +101,7 @@ int main() {
     Block blk = engine.propose({}, 3);
     auto cert = engine.try_commit(blk, {engine.precommit(blk, 0, vkey)});
     Block tampered = blk;
-    tampered.header.state_root[0] ^= 0x01;  // cert no longer matches → rejected
+    tampered.header.state_root[0] ^= 0x01;  // cert no longer matches -> rejected
     CHECK(!engine.finalize(tampered, *cert).ok);
   }
   CHECK(rejected == 1);

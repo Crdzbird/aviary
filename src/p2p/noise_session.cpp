@@ -57,7 +57,7 @@ void NoiseSession::complete_responder(const Bytes& msg2) {
   split_ = true;
 }
 
-// kNoiseBinding ‖ signer role ‖ final handshake hash. The role stops a proof
+// kNoiseBinding || signer role || final handshake hash. The role stops a proof
 // being reflected back to its author; the hash pins it to this session alone.
 Bytes NoiseSession::signable(bool signer_is_initiator) const {
   Hash h = noise_.handshake_hash();

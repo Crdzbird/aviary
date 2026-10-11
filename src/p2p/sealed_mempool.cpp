@@ -46,7 +46,7 @@ bool SealedMempool::add(const SealedTx& tx) {
     pool_.pop_back();
   }
   // Insert keeping descending fee-hint order; equal hints keep insertion order
-  // (upper_bound on the "greater" comparator → after equals) for determinism.
+  // (upper_bound on the "greater" comparator -> after equals) for determinism.
   auto pos = std::upper_bound(pool_.begin(), pool_.end(), tx,
                               [](const SealedTx& a, const SealedTx& b) { return a.fee_hint > b.fee_hint; });
   pool_.insert(pos, tx);
@@ -62,7 +62,7 @@ std::vector<Transaction> SealedMempool::reveal(crypto::ByteView proposer_kem_sec
     try {
       plain = crypto::pq_open(view(s.envelope), proposer_kem_secret, view(fee_aad(s.fee_hint)));
     } catch (...) {
-      continue;  // not for us / tampered — never really in the auction
+      continue;  // not for us / tampered - never really in the auction
     }
     Transaction tx;
     try {

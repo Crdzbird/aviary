@@ -11,22 +11,22 @@
 #include "aviary/ledger.hpp"
 #include "aviary/types.hpp"
 
-/// A proof-of-stake reference engine (ARCHITECTURE §7): a third consensus family
+/// A proof-of-stake reference engine (ARCHITECTURE section 7): a third consensus family
 /// behind the same [ConsensusEngine] seam as BFT and PoW. Each height has a
 /// single, deterministic, stake-weighted **slot leader**; a block is justified by
-/// that leader's signature over the block id. More stake → more slots; a slashed
-/// (zero-power) validator is never a leader — reusing the existing stake +
+/// that leader's signature over the block id. More stake -> more slots; a slashed
+/// (zero-power) validator is never a leader - reusing the existing stake +
 /// slashing machinery.
 ///
 /// **Decoupling.** Proposer selection is a [ProposerPolicy] value injected at
 /// construction, so the selection rule (default: deterministic stake-weighted)
 /// can be swapped for round-robin, a VRF, or an epoch schedule without touching
-/// the engine — the enhancement seam. The justification (the leader's signature)
+/// the engine - the enhancement seam. The justification (the leader's signature)
 /// is a *different* type from the BFT certificate and the PoW nonce, yet all
 /// three plug into the same `submit(block, justification)`.
 ///
 /// Reference-grade: no finality gadget beyond the leader signature and linear
-/// chain extension (no fork choice / reorg) — larger follow-ups.
+/// chain extension (no fork choice / reorg) - larger follow-ups.
 namespace aviary::consensus {
 
 /// Deterministic proposer selection: given the height and the (stake-weighted)
@@ -76,7 +76,7 @@ class PosEngine : public ConsensusEngine {
   Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                          std::vector<Anchor> anchors) override;
 
-  /// The leader's signature over [block]'s id — the block's justification.
+  /// The leader's signature over [block]'s id - the block's justification.
   Bytes seal(const Block& block) const;
 
   /// Verify the block was produced by the legitimate stake-weighted leader for

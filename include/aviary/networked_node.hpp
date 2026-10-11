@@ -12,9 +12,9 @@
 #include "aviary/ledger.hpp"
 #include "aviary/round_driver.hpp"
 
-/// A runnable validator node (ARCHITECTURE §7/§9): the assembly that ties the
+/// A runnable validator node (ARCHITECTURE section 7/section 9): the assembly that ties the
 /// consensus driver to the gossip overlay over its own ledger. It is the first
-/// object that behaves like a whole validator — everything below (round state
+/// object that behaves like a whole validator - everything below (round state
 /// machine, BLS votes, commit certificates, mesh flooding, dedup) is a component
 /// it wires together.
 ///
@@ -22,9 +22,9 @@
 /// `wire::ConsensusMsg`, and a [GossipOverlay] that floods opaque bytes across a
 /// partial mesh. A consensus broadcast becomes a gossip origination; a gossip
 /// delivery (deduped by content hash) feeds the driver AND relays onward. So
-/// consensus runs over a realistic relayed network instead of magic broadcast —
+/// consensus runs over a realistic relayed network instead of magic broadcast - 
 /// which is what lets it show relay tolerance (a validator reaches quorum via
-/// hops) and partition tolerance (a connected ≥quorum majority still finalizes).
+/// hops) and partition tolerance (a connected >=quorum majority still finalizes).
 ///
 /// Still a pure input/output object (no clock/socket): it returns the gossip
 /// relays to send and the timeouts to arm; the caller wires them to a real
@@ -82,7 +82,7 @@ class NetworkedNode {
 
   /// Every unique consensus payload this node has originated or accepted for the
   /// current height, in arrival order. A transport replays this to a peer whose
-  /// link (re)establishes after consensus started — reconnect catch-up. Votes
+  /// link (re)establishes after consensus started - reconnect catch-up. Votes
   /// lost on a dead socket are never re-flooded by gossip (dedup), so without
   /// this a healed partition stays stalled: neither side can reach quorum, and
   /// Tendermint can't even change rounds without 2f+1 crossing the cut. The
@@ -99,7 +99,7 @@ class NetworkedNode {
   std::string metrics_text();
 
  private:
-  Outbound emit(const consensus::RoundDriver::Output& out);  // driver output → gossip + timeouts
+  Outbound emit(const consensus::RoundDriver::Output& out);  // driver output -> gossip + timeouts
 
   std::unique_ptr<Ledger> ledger_;
   consensus::RoundDriver driver_;

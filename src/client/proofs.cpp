@@ -27,7 +27,7 @@ merkle::Proof decode_merkle_proof(codec::CodecReader& r) {
 }
 }  // namespace
 
-// ── StateProof ───────────────────────────────────────────────────────────────
+// -- StateProof ---------------------------------------------------------------
 
 Bytes StateProof::encode() const {
   codec::CodecWriter w;
@@ -55,7 +55,7 @@ bool verify_state_proof(const Hash& state_root, const StateProof& p) {
   return merkle::verify_proof(state_root, leaf, p.proof, p.leaf_count);
 }
 
-// ── TxInclusionProof ─────────────────────────────────────────────────────────
+// -- TxInclusionProof ---------------------------------------------------------
 
 Bytes TxInclusionProof::encode() const {
   codec::CodecWriter w;
@@ -93,7 +93,7 @@ bool verify_tx_inclusion(const Hash& tx_root, const TxInclusionProof& p) {
   return merkle::verify_proof(tx_root, leaf, p.proof, p.leaf_count);
 }
 
-// ── Receipt inclusion ──────────────────────────────────────────────────────────
+// -- Receipt inclusion ----------------------------------------------------------
 
 Bytes ReceiptProof::encode() const {
   codec::CodecWriter w;

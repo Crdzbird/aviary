@@ -11,4 +11,4 @@ PRODUCT_NAME = aviary_example
 PRODUCT_BUNDLE_IDENTIFIER = com.aviary.aviaryExample
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.aviary. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright (c) 2026 com.aviary. All rights reserved.

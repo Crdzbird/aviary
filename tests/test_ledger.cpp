@@ -125,7 +125,7 @@ int main() {
     CHECK(!er.ok);
   }
 
-  std::printf("== adversarial: atomicity — one bad tx voids the whole block ==\n");
+  std::printf("== adversarial: atomicity - one bad tx voids the whole block ==\n");
   {
     Transaction good = make_transfer(alice, bob_addr, 1, 10, kChain);
     Transaction bad = make_transfer(alice, bob_addr, 1, 10, kChain);  // dup nonce 1
@@ -173,7 +173,7 @@ int main() {
     CHECK(as_account(fl).account(alice_addr).balance == 1000 - 100 - kFee);  // 890
     CHECK(as_account(fl).account(bob_addr).balance == 100);
 
-    // Determinism: same inputs → same block hash (fee folded into the root).
+    // Determinism: same inputs -> same block hash (fee folded into the root).
     auto g2 = std::make_unique<AccountStateMachine>(kFee);
     g2->credit_genesis(alice_addr, 1000);
     Ledger fl2(spec, std::move(g2));
@@ -187,7 +187,7 @@ int main() {
     Block fbz = flz.build_block({make_transfer(alice, bob_addr, 0, 100, kChain)}, 1);
     CHECK(fbz.header.state_root != fb.header.state_root);
 
-    // Sender must cover amount + fee: 995 + fee(10) > 1000 → rejected.
+    // Sender must cover amount + fee: 995 + fee(10) > 1000 -> rejected.
     CHECK_THROWS(fl.build_block({make_transfer(alice, bob_addr, 1, 995, kChain)}, 2));
     // Exactly 890 balance can send at most 880 (+10 fee).
     Block ok = fl.build_block({make_transfer(alice, bob_addr, 1, 880, kChain)}, 2);

@@ -27,7 +27,7 @@ Attestation attest(const ValidatorSet& set, const std::vector<crypto::KeyPair>& 
 int main() {
   init();
 
-  // 4 bridge attestors, power 1 each → quorum 3.
+  // 4 bridge attestors, power 1 each -> quorum 3.
   std::vector<crypto::KeyPair> keys = {bls(10), bls(11), bls(12), bls(13)};
   std::vector<Validator> vs;
   for (auto& k : keys) vs.push_back(Validator{k.public_key, 1});
@@ -41,7 +41,7 @@ int main() {
   BridgeEndpoint chainA(kChainA, attestors);
   BridgeEndpoint chainB(kChainB, attestors);
 
-  std::printf("== lock on A → mint on B ==\n");
+  std::printf("== lock on A -> mint on B ==\n");
   Packet lockPkt = chainA.lock(kChainB, asset, 100, bob);
   CHECK(chainA.escrow(asset) == 100);
   CHECK(lockPkt.dest_chain == kChainB);
@@ -60,7 +60,7 @@ int main() {
   CHECK(!chainB.receive(lockPkt, att).ok);
   CHECK(chainB.minted_balance(asset, bob) == 100);  // unchanged
 
-  // Below quorum → no attestation forms.
+  // Below quorum -> no attestation forms.
   {
     std::vector<AttestationVote> two = {
         sign_attestation(lockPkt.commitment(), 0, keys[0]),
@@ -90,7 +90,7 @@ int main() {
     CHECK(!chainA.receive(p3, a3).ok);  // p3.dest is B, received on A
   }
 
-  std::printf("== burn on B → release on A ==\n");
+  std::printf("== burn on B -> release on A ==\n");
   {
     Packet burnPkt = chainB.burn(kChainA, asset, 40, alice);
     Attestation a = attest(attestors, keys, burnPkt, 4);  // all 4 attest

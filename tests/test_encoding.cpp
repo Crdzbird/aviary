@@ -26,11 +26,11 @@ int main() {
   CHECK(base64_decode("Zm9vYmFy") == str("foobar"));
 
   std::printf("== base58 ==\n");
-  // 32 zero bytes → the Solana System Program id (32 '1's).
+  // 32 zero bytes -> the Solana System Program id (32 '1's).
   CHECK(base58_encode(Bytes(32, 0)) == std::string(32, '1'));
   CHECK(base58_decode(std::string(32, '1')) == Bytes(32, 0));
   CHECK(base58_encode(Bytes{}) == "");
-  // Leading zero bytes map to leading '1's; trailing 0x01 → '2'.
+  // Leading zero bytes map to leading '1's; trailing 0x01 -> '2'.
   CHECK(base58_encode(Bytes{0x00, 0x00, 0x01}) == "112");
   // Round-trip a non-trivial value.
   {

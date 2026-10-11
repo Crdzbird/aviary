@@ -1,4 +1,4 @@
-// Interop server — the Go side of the Go↔Flutter cross-binding ledger check.
+// Interop server - the Go side of the Go<->Flutter cross-binding ledger check.
 package main
 
 import (
@@ -15,7 +15,7 @@ import (
 
 type server struct{ pb.UnimplementedInteropServer }
 
-// ComputeCanonical — go ↔ flutter: canonical bytes for identical inputs.
+// ComputeCanonical - go <-> flutter: canonical bytes for identical inputs.
 func (s *server) ComputeCanonical(_ context.Context, in *pb.CanonicalInput) (*pb.CanonicalOutput, error) {
 	hash, err := bc.Hash(in.GetMessage())
 	if err != nil {
@@ -34,20 +34,20 @@ func (s *server) ComputeCanonical(_ context.Context, in *pb.CanonicalInput) (*pb
 	return &pb.CanonicalOutput{Hash: hash, Txid: txid, HeaderHash: hdr}, nil
 }
 
-// BuildChain — go → flutter: build the scenario, return a verifiable proof.
+// BuildChain - go -> flutter: build the scenario, return a verifiable proof.
 func (s *server) BuildChain(_ context.Context, in *pb.ChainScenario) (*pb.ChainResult, error) {
 	node := bc.NewNode(in.GetChainId())
 	defer node.Free()
 	return applyScenario(node, in)
 }
 
-// VerifyProof — flutter → go: verify a proof the client produced.
+// VerifyProof - flutter -> go: verify a proof the client produced.
 func (s *server) VerifyProof(_ context.Context, in *pb.ProofBundle) (*pb.VerifyResult, error) {
 	return &pb.VerifyResult{Ok: bc.VerifyStateProof(in.GetStateRoot(), in.GetProof())}, nil
 }
 
 // applyScenario runs the deterministic scenario on a node. Both bindings run the
-// IDENTICAL steps (shared secrets → identical accounts and deterministic Ed25519
+// IDENTICAL steps (shared secrets -> identical accounts and deterministic Ed25519
 // transfers), so the state root is reproducible across languages.
 func applyScenario(node *bc.Node, in *pb.ChainScenario) (*pb.ChainResult, error) {
 	aSec, bSec := in.GetAliceSecret(), in.GetBobSecret()
@@ -79,7 +79,7 @@ func main() {
 	if err := bc.Init(); err != nil {
 		log.Fatalf("aviary init: %v", err)
 	}
-	log.Printf("Interop server — aviary %s (crypto %s)", bc.Version(), bc.CryptoBackendVersion())
+	log.Printf("Interop server - aviary %s (crypto %s)", bc.Version(), bc.CryptoBackendVersion())
 	lis, err := net.Listen("tcp", ":50053")
 	if err != nil {
 		log.Fatalf("listen: %v", err)

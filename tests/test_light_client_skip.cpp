@@ -104,7 +104,7 @@ int main() {
     LightClient::Result r = lc.accept_skipping(cp(6).header, cp(6).cert, cp(6).validators);
     CHECK_MSG(r.ok, r.error.c_str());
     CHECK(lc.height() == 6 && lc.tip_validators().hash() == cp(6).validators.hash());
-    // With a stricter trust level (1/2) the same jump is too thin — and reports it as such.
+    // With a stricter trust level (1/2) the same jump is too thin - and reports it as such.
     LightClient strict(kChain, chain.genesis_set, chain.genesis);
     strict.set_trust_level(1, 2);
     LightClient::Result s = strict.accept_skipping(cp(6).header, cp(6).cert, cp(6).validators);
@@ -118,7 +118,7 @@ int main() {
     CHECK(!edge.accept_skipping(cp(6).header, cp(6).cert, cp(6).validators).ok);
   }
 
-  std::printf("== a complete replacement: no overlap → thin, not a hard failure ==\n");
+  std::printf("== a complete replacement: no overlap -> thin, not a hard failure ==\n");
   {
     LightClient lc(kChain, chain.genesis_set, chain.genesis);
     LightClient::Result r = lc.accept_skipping(cp(10).header, cp(10).cert, cp(10).validators);
@@ -184,7 +184,7 @@ int main() {
     LightClient lc(kChain, chain.genesis_set, chain.genesis);
     CHECK(lc.sync_to(cp(10), chain.fetcher()).ok);
     const auto& acc = dynamic_cast<const AccountStateMachine&>(chain.engine->ledger().state());
-    // State moved on (height 11) — prove against the height-10 root via the chain's own history is
+    // State moved on (height 11) - prove against the height-10 root via the chain's own history is
     // not available here, so prove at the CURRENT tip after walking one more header.
     CHECK(lc.accept(cp(11).header, cp(11).cert).ok);
     StateProof p = acc.prove_account(Hash{});

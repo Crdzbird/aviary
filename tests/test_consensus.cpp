@@ -87,7 +87,7 @@ int main() {
   std::printf("== safety: f=1 byzantine cannot finalize a conflicting block ==\n");
   {
     // Honest validators 0,1,2 precommit A. Byzantine validator 3 double-signs
-    // A and B. B receives only validator 3's vote → power 1 < quorum 3.
+    // A and B. B receives only validator 3's vote -> power 1 < quorum 3.
     std::vector<Vote> votes_for_A = {
         sign_vote(kChain, 2, 0, A, 0, keys[0]),
         sign_vote(kChain, 2, 0, A, 1, keys[1]),
@@ -101,7 +101,7 @@ int main() {
     auto certB = aggregate_commit(kChain, vset, 2, 0, B, votes_for_B);
     CHECK(certA.has_value());            // A finalizes
     CHECK(verify_commit(kChain, vset, *certA).ok);
-    CHECK(!certB.has_value());           // B cannot — no conflicting commit
+    CHECK(!certB.has_value());           // B cannot - no conflicting commit
   }
 
   std::printf("== weighted power: a >2/3 stakeholder commits alone ==\n");

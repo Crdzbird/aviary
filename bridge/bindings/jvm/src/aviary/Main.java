@@ -37,7 +37,7 @@ public final class Main {
             System.out.println("  SOL: " + bc.solAddress(alice.secret()));
 
             node.close();
-            // Portable account export — the three tiers, all fail-closed.
+            // Portable account export - the three tiers, all fail-closed.
             var hy = node.newAccountHybrid();
             byte[] env1 = bc.sealAccountPassphrase(hy.publicKey(), hy.secret(), "backup", 3, 1 << 16);
             if (!java.util.Arrays.equals(bc.openAccountPassphrase(env1, "backup").secret(), hy.secret()))
@@ -95,7 +95,7 @@ public final class Main {
             byte[] tenv = bc.sealShare(cards[1].bytes(), "share-pass", 3, 1 << 16);
             if (!java.util.Arrays.equals(bc.unsealShare(tenv, "share-pass"), cards[1].bytes()))
                 throw new IllegalStateException("sealed share round-trip");
-            System.out.println("threshold OK (2-of-3 → Ed25519, attribution, sealed)");
+            System.out.println("threshold OK (2-of-3 -> Ed25519, attribution, sealed)");
 
             // AssuranceProfile tiers + SealedMempool (anti-MEV).
             var hardP = bc.describeAssurance(2);
@@ -113,7 +113,7 @@ public final class Main {
             }
             System.out.println("assurance + sealed-mempool OK");
 
-            // CredentialGate (anonymous membership admission, Option A — unlinkable).
+            // CredentialGate (anonymous membership admission, Option A - unlinkable).
             var issuer = bc.newBBSIssuer(new byte[32]);
             if (issuer.publicKey().length != 96 || issuer.secret().length != 32)
                 throw new IllegalStateException("bad BBS issuer key sizes");
@@ -146,7 +146,7 @@ public final class Main {
             }
             System.out.println("credential-gate OK");
 
-            // CredentialGate Option B (pseudonymous — per-epoch Sybil resistance).
+            // CredentialGate Option B (pseudonymous - per-epoch Sybil resistance).
             var pseudoPolicy = bc.new CredentialPolicy(7, issuer.publicKey(),
                     "aviary.credential.v2".getBytes(java.nio.charset.StandardCharsets.UTF_8), 4, 2, 1);
             byte[] ms = new byte[32];
@@ -206,7 +206,7 @@ public final class Main {
             if (!bc.engineIds().contains("java-engine")) throw new IllegalStateException("java-engine not discoverable");
             try (var fc = bc.assembleChain(bc.commitBlueprint(gen, bc.new Blueprint("java-engine", "account", "", null)), 0, val.publicKey(), val.secret())) {
                 byte[] fb = fc.propose(2);
-                byte[] fj = fc.seal(fb);  // → Java justify
+                byte[] fj = fc.seal(fb);  // -> Java justify
                 if (!new String(fj, 0, 10).equals("java-just:")) throw new IllegalStateException("seal via Java justify");
                 byte[] bad = fj.clone(); bad[bad.length - 1] ^= 1;
                 if (fc.submit(fb, bad) || fc.height() != 0) throw new IllegalStateException("tampered justification must be refused, ledger untouched");
@@ -293,7 +293,7 @@ public final class Main {
             }
             System.out.println("validator-rotation OK");
 
-            // Light-client overlap rule: power moves A → B; a client trusting only A bisects through the rotation.
+            // Light-client overlap rule: power moves A -> B; a client trusting only A bisects through the rotation.
             {
                 var va = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{(byte) 0x91}, 32));
                 var vb = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{(byte) 0x92}, 32));
@@ -335,7 +335,7 @@ public final class Main {
             }
             System.out.println("light-client-skip OK");
 
-            // ChainTree: root ← child ← grandchild (+ sibling) built together, produced upward, proven from the root, hooks from Java.
+            // ChainTree: root <- child <- grandchild (+ sibling) built together, produced upward, proven from the root, hooks from Java.
             {
                 java.util.function.Function<Integer, byte[][]> kp = seed -> { var v = bc.newBLSValidator(java.util.Arrays.copyOf(new byte[]{seed.byteValue()}, 32)); return new byte[][]{v.publicKey(), v.secret()}; };
                 byte[] aliceT = new byte[32]; java.util.Arrays.fill(aliceT, (byte) 0xA1);

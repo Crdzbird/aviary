@@ -58,7 +58,7 @@ void FileStore::remove(const std::string& key) const {
   std::filesystem::remove(path_for(key), ec);
 }
 
-// ── Chain persistence ──────────────────────────────────────────────────────────
+// -- Chain persistence ----------------------------------------------------------
 
 void save_chain(const FileStore& store, const BlockStore& blocks, const Ledger& ledger) {
   const Bytes block_bytes = blocks.serialize();

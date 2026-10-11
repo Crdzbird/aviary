@@ -79,7 +79,7 @@ int main() {
     Outpoint b2 = g2->add_genesis_utxo(Output{bob_addr, 400});
     Ledger l2(ChainSpec{kChain, StateModel::kUtxo}, std::move(g2));
 
-    // Bob signs alice's input (carol signs bob's) → both witnesses mis-own.
+    // Bob signs alice's input (carol signs bob's) -> both witnesses mis-own.
     Transaction bad =
         multisig_spend({a2, b2}, {Output{carol_addr, 1000}}, {bob, carol});
     CHECK_THROWS(l2.build_block({bad}, 1));
@@ -106,7 +106,7 @@ int main() {
     Outpoint a3 = g3->add_genesis_utxo(Output{alice_addr, 600});
     Outpoint b3 = g3->add_genesis_utxo(Output{bob_addr, 400});
     Ledger l3(ChainSpec{kChain, StateModel::kUtxo}, std::move(g3));
-    // 1000 in, 950 out → 50 burned as fee.
+    // 1000 in, 950 out -> 50 burned as fee.
     Transaction tx = multisig_spend({a3, b3}, {Output{carol_addr, 950}}, {alice, bob});
     CHECK(as_utxo(l3).flat_fee() == 0);
     Block blk = l3.build_block({tx}, 1);

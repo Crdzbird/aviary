@@ -33,7 +33,7 @@ Message Message::decode_all(codec::ByteView bytes) {
   return m;
 }
 
-// ── Hello ────────────────────────────────────────────────────────────────────
+// -- Hello --------------------------------------------------------------------
 
 Message make(const Hello& h) {
   codec::CodecWriter w;
@@ -54,7 +54,7 @@ Hello as_hello(const Message& m) {
   return h;
 }
 
-// ── Tx ───────────────────────────────────────────────────────────────────────
+// -- Tx -----------------------------------------------------------------------
 
 Message make(const TxMsg& t) {
   return Message{MessageType::kTx, t.tx.encode()};
@@ -65,7 +65,7 @@ TxMsg as_tx(const Message& m) {
   return TxMsg{Transaction::decode_all(view(m.payload))};
 }
 
-// ── Block (+ commit certificate) ─────────────────────────────────────────────
+// -- Block (+ commit certificate) ---------------------------------------------
 
 Message make(const BlockMsg& b) {
   codec::CodecWriter w;
@@ -88,7 +88,7 @@ BlockMsg as_block(const Message& m) {
   return b;
 }
 
-// ── GetBlocks ────────────────────────────────────────────────────────────────
+// -- GetBlocks ----------------------------------------------------------------
 
 Message make(const GetBlocks& g) {
   codec::CodecWriter w;
@@ -107,7 +107,7 @@ GetBlocks as_get_blocks(const Message& m) {
   return g;
 }
 
-// ── Evidence (double-signing proof) ──────────────────────────────────────────
+// -- Evidence (double-signing proof) ------------------------------------------
 
 Message make(const EvidenceMsg& e) {
   return Message{MessageType::kEvidence, e.evidence.encode()};
@@ -118,7 +118,7 @@ EvidenceMsg as_evidence(const Message& m) {
   return EvidenceMsg{consensus::Evidence::decode_all(view(m.payload))};
 }
 
-// ── Consensus (proposal / prevote / precommit) ───────────────────────────────
+// -- Consensus (proposal / prevote / precommit) -------------------------------
 
 namespace {
 codec::ByteView hview(const Hash& h) { return codec::ByteView(h.data(), h.size()); }
@@ -157,7 +157,7 @@ ConsensusMsg as_consensus(const Message& m) {
   return c;
 }
 
-// ── Admission (anonymous membership; docs/design/CREDENTIAL_GATE.md §6) ───────
+// -- Admission (anonymous membership; docs/design/CREDENTIAL_GATE.md section 6) -------
 
 Message make(const AdmissionChallenge& a) {
   codec::CodecWriter w;

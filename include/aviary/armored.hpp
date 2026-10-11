@@ -6,20 +6,20 @@
 #include "aviary/types.hpp"
 
 /// A mutually-authenticated, post-quantum, forward-secret **and** post-compromise-
-/// secure channel (ARCHITECTURE §9, hardened transport tier). It composes two
+/// secure channel (ARCHITECTURE section 9, hardened transport tier). It composes two
 /// cryptolib pieces the raw ratchet cannot provide alone:
 ///
-///   - confidentiality + forward secrecy + post-compromise healing from the
+///  - confidentiality + forward secrecy + post-compromise healing from the
 ///     hybrid-KEM Double Ratchet ([crypto::Ratchet]); and
-///   - MUTUAL identity authentication from the hybrid signature (Ed25519 +
-///     ML-DSA-65) — the same long-term key a peer publishes in its signed PEX
+///  - MUTUAL identity authentication from the hybrid signature (Ed25519 +
+///     ML-DSA-65) - the same long-term key a peer publishes in its signed PEX
 ///     record and the secure session authenticates with.
 ///
 /// The raw ratchet authenticates only the responder (via prekey ownership). The
 /// [ArmoredChannel] handshake adds the missing half: the initiator signs a
 /// transcript binding the ratchet handshake, the responder's prekey, and both
 /// identity keys, so the responder learns *who* dialed it and can pin that
-/// identity against its allow-list. Result — neither side can be impersonated,
+/// identity against its allow-list. Result - neither side can be impersonated,
 /// nothing is readable by a quantum "harvest now" adversary, and a key leak on
 /// a long-lived validator link heals as messages flow.
 ///

@@ -98,7 +98,7 @@ struct Sim {
         timeouts.erase(timeouts.begin());
         if (correct.count(owner)) handle(owner, sm[owner]->on_timeout(static_cast<Step>(step), round));
       } else {
-        return;  // stuck (no messages, no timeouts) — will show as an undecided validator
+        return;  // stuck (no messages, no timeouts) - will show as an undecided validator
       }
     }
   }
@@ -132,7 +132,7 @@ int main() {
     s.run();
     CHECK(s.all_decided());
     CHECK(s.agreement());
-    // Round-0 proposer is validator 0 → everyone decides value_for(0).
+    // Round-0 proposer is validator 0 -> everyone decides value_for(0).
     CHECK(s.decision[0].has_value() && *s.decision[0] == value_for(0));
   }
 

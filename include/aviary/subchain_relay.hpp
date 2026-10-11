@@ -7,9 +7,9 @@
 #include "aviary/block_store.hpp"
 #include "aviary/subchain.hpp"
 
-/// The in-process relay (docs/design/SUBCHAINS.md §9 Q6): what a parent
+/// The in-process relay (docs/design/SUBCHAINS.md section 9 Q6): what a parent
 /// proposer should anchor next, computed from a child's finalized archive and
-/// the parent's current registry. Pure functions — deterministic, no I/O — so a
+/// the parent's current registry. Pure functions - deterministic, no I/O - so a
 /// proposer's choice is reproducible and every validator re-verifies it anyway.
 namespace aviary::node {
 
@@ -22,7 +22,7 @@ std::optional<Anchor> pending_anchor(const SubchainRegistry& parent, std::uint64
                                      const BlockStore& child_archive, std::uint16_t limit = 0);
 
 /// All pending anchors for the given (child id, archive) pairs, in canonical
-/// order and bounded by max_anchors_per_block — ready for propose_anchored.
+/// order and bounded by max_anchors_per_block - ready for propose_anchored.
 std::vector<Anchor> pending_anchors(const SubchainRegistry& parent,
                                     const std::vector<std::pair<std::uint64_t, const BlockStore*>>& children);
 

@@ -10,11 +10,11 @@
 #include "aviary/pos_engine.hpp"
 #include "aviary/vrf_pos.hpp"
 
-/// A validator assembled from a profiled genesis (ARCHITECTURE §: node boot).
+/// A validator assembled from a profiled genesis (ARCHITECTURE section : node boot).
 /// This is the integration seam that turns the [AssuranceProfile] from a
 /// *description* of a security posture into an *enforced* one: `boot` reads the
 /// profile committed in the genesis, validates the genesis against it, and then
-/// wires the concrete classes that posture mandates — the consensus engine
+/// wires the concrete classes that posture mandates - the consensus engine
 /// (stake-weighted PoS vs grind-proof VRF-PoS), the ledger's signature-scheme
 /// gate, and the mempool policy. A node cannot boot at a posture its genesis
 /// does not declare, and cannot silently run a weaker engine than its peers.
@@ -46,7 +46,7 @@ class ProfiledValidator {
   /// Whether account/validator keys should use threshold custody.
   bool threshold_custody() const { return profile_.threshold_custody(); }
 
-  // ── Uniform consensus ops (dispatch to whichever engine the profile chose) ──
+  // -- Uniform consensus ops (dispatch to whichever engine the profile chose) --
 
   /// Assemble the next candidate block (throws if this node isn't the leader /
   /// eligible for tip+1).

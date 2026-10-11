@@ -6,9 +6,9 @@
 #include "aviary/crypto.hpp"
 #include "aviary/types.hpp"
 
-/// The pluggable state machine (ARCHITECTURE §5). The block-processing pipeline
+/// The pluggable state machine (ARCHITECTURE section 5). The block-processing pipeline
 /// is written once against this interface; account and UTXO implementations slot
-/// in. All methods are deterministic — no I/O, no clock, no randomness.
+/// in. All methods are deterministic - no I/O, no clock, no randomness.
 namespace aviary {
 
 struct ValidationResult {
@@ -36,7 +36,7 @@ class StateMachine {
   /// Applies a previously-validated tx. Precondition: validate(tx).ok.
   virtual void apply(const Transaction& tx) = 0;
 
-  /// The fee a valid [tx] pays against the CURRENT (pre-apply) state — 0 for a
+  /// The fee a valid [tx] pays against the CURRENT (pre-apply) state - 0 for a
   /// model with no fee. Used to build execution receipts; call before apply().
   virtual codec::u128 tx_fee(const Transaction& /*tx*/) const { return 0; }
 

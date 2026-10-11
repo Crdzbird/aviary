@@ -1,5 +1,5 @@
 // PortableAccount: move a signing account off the node under a chosen trust
-// tier — a shared passphrase, recipient-bound to a device's key (no shared
+// tier - a shared passphrase, recipient-bound to a device's key (no shared
 // secret), or recipient-bound AND authenticated (Fortress-grade). Every tier
 // fails closed on tamper / wrong key / wrong passphrase.
 #include <string>
@@ -39,7 +39,7 @@ int main() {
     CHECK(back.public_key == acct.public_key && back.secret == acct.secret);
   }
 
-  std::printf("== tier 1 — passphrase: anyone with the phrase; wrong phrase fails ==\n");
+  std::printf("== tier 1 - passphrase: anyone with the phrase; wrong phrase fails ==\n");
   {
     const Bytes env = acct.seal_passphrase("backup-phrase", /*ops=*/3, /*mem=*/1u << 16);
     PortableAccount back = PortableAccount::open_passphrase(view(env), "backup-phrase");
@@ -48,7 +48,7 @@ int main() {
               "wrong passphrase fails closed");
   }
 
-  std::printf("== tier 2 — recipient-bound: only the device's KEM secret opens ==\n");
+  std::printf("== tier 2 - recipient-bound: only the device's KEM secret opens ==\n");
   {
     auto device = crypto::hybrid_kem_keygen();
     auto stranger = crypto::hybrid_kem_keygen();
@@ -66,7 +66,7 @@ int main() {
               "tampered envelope fails closed");
   }
 
-  std::printf("== tier 3 — signed-recipient: recipient verifies the owner too ==\n");
+  std::printf("== tier 3 - signed-recipient: recipient verifies the owner too ==\n");
   {
     auto device = crypto::hybrid_kem_keygen();
     auto owner = crypto::hybrid_sig_keygen();
@@ -77,14 +77,14 @@ int main() {
         PortableAccount::open_signed_from(view(env), view(device.secret_key), view(owner.public_key));
     CHECK(back.secret == acct.secret);
 
-    // Right device key, WRONG expected signer → rejected (authenticity).
+    // Right device key, WRONG expected signer -> rejected (authenticity).
     CHECK_MSG(fails([&] {
                 PortableAccount::open_signed_from(view(env), view(device.secret_key),
                                                   view(impostor.public_key));
               }),
               "an envelope not signed by the expected owner is rejected");
 
-    // Right signer, WRONG device key → rejected (confidentiality).
+    // Right signer, WRONG device key -> rejected (confidentiality).
     auto stranger = crypto::hybrid_kem_keygen();
     CHECK_MSG(fails([&] {
                 PortableAccount::open_signed_from(view(env), view(stranger.secret_key),
@@ -93,7 +93,7 @@ int main() {
               "a different device cannot open it");
   }
 
-  std::printf("== KeyStore composition: extract → seal → open → absorb into another store ==\n");
+  std::printf("== KeyStore composition: extract -> seal -> open -> absorb into another store ==\n");
   {
     KeyStore src = KeyStore::create_with_passphrase("store-A");
     const crypto::Hash addr = src.add_account(view(kp.public_key), view(kp.secret_key));

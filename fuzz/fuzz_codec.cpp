@@ -1,5 +1,5 @@
 // libFuzzer harness for the canonical deserializers (the untrusted-input attack
-// surface). Each decoder must either succeed or throw CodecError — anything else
+// surface). Each decoder must either succeed or throw CodecError - anything else
 // (or a crash caught by ASan/UBSan) is a bug.
 //
 // Build: cmake -DAVIARY_BUILD_FUZZERS=ON (needs a libFuzzer-capable clang)

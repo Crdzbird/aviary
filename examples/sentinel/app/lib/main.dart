@@ -1,7 +1,7 @@
-// Sentinel — device provenance recorder. A thin gRPC client (no native blockchain
+// Sentinel - device provenance recorder. A thin gRPC client (no native blockchain
 // code): the device enrolls (its info + credential generate the genesis/origin
-// block on the server), then streams data — photos, video chunks, GPS locations,
-// sensor readings — each of which is hashed and anchored on the device's chain
+// block on the server), then streams data - photos, video chunks, GPS locations,
+// sensor readings - each of which is hashed and anchored on the device's chain
 // with BFT finality. Every anchored item can be independently verified against the
 // chain root (proof-of-existence + integrity). All ledger work is server-side.
 import 'dart:async';
@@ -291,7 +291,7 @@ class _RecorderState extends State<Recorder> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Sentinel · Device Provenance'),
+          title: const Text('Sentinel - Device Provenance'),
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.videocam), text: 'Recorder'),
@@ -317,7 +317,7 @@ class _RecorderState extends State<Recorder> {
     );
   }
 
-  // ── Fleet tab: a chain tree — the fleet root anchors one subchain per device ──
+  // -- Fleet tab: a chain tree - the fleet root anchors one subchain per device --
   Future<void> _fleetCall(Future<void> Function() f) async {
     setState(() => _fleetBusy = true);
     try {
@@ -394,11 +394,11 @@ class _RecorderState extends State<Recorder> {
                   color: n.root ? Colors.amberAccent : Colors.tealAccent,
                 ),
                 title: Text(
-                  '${n.label} · chain ${n.chainId}',
+                  '${n.label} - chain ${n.chainId}',
                   style: const TextStyle(fontSize: 13),
                 ),
                 subtitle: Text(
-                  'height ${n.height}${n.root ? " · pending anchors ${n.pendingAnchors}" : " · identity ${n.identityAddress.substring(0, 12)}…"}',
+                  'height ${n.height}${n.root ? " - pending anchors ${n.pendingAnchors}" : " - identity ${n.identityAddress.substring(0, 12)}..."}',
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                 ),
                 trailing: Wrap(
@@ -428,7 +428,7 @@ class _RecorderState extends State<Recorder> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'root subchain_root ${f.rootSubchainRoot.substring(0, 24)}…',
+                  'root subchain_root ${f.rootSubchainRoot.substring(0, 24)}...',
                   style: const TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
@@ -459,7 +459,7 @@ class _RecorderState extends State<Recorder> {
                   child: Text(
                     _fleetProof!.verified
                         ? 'Device ${_fleetProof!.chainId} identity verified from the fleet root header (${_fleetProof!.proofBytes} B proof)'
-                        : 'Not verifiable from the current root — produce a device block, then a root block, then prove again.',
+                        : 'Not verifiable from the current root - produce a device block, then a root block, then prove again.',
                   ),
                 ),
               ],
@@ -532,7 +532,7 @@ class _RecorderState extends State<Recorder> {
   Widget _identityCard() {
     final p = _prov!, i = _info!;
     return _section('Device identity (origin block)', Icons.verified_user, [
-      _kv('Device', '${i.label} · ${i.model}'),
+      _kv('Device', '${i.label} - ${i.model}'),
       _kv('Platform', '${i.platform} ${i.osVersion}'),
       _kv('Chain id', '${p.chainId}'),
       _kv('Fingerprint', p.deviceFingerprint),
@@ -546,7 +546,7 @@ class _RecorderState extends State<Recorder> {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                'Origin block sealed at height ${p.genesisHeight} — bound to this device + credential',
+                'Origin block sealed at height ${p.genesisHeight} - bound to this device + credential',
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ),
@@ -591,7 +591,7 @@ class _RecorderState extends State<Recorder> {
     final l = _ledger;
     return _section('Ledger', Icons.link, [
       if (l == null)
-        const Text('…')
+        const Text('...')
       else ...[
         Wrap(
           spacing: 28,
@@ -623,7 +623,7 @@ class _RecorderState extends State<Recorder> {
   Widget _feedCard() => _section('Provenance feed', Icons.receipt_long, [
     if (_recs.isEmpty)
       const Text(
-        'No captures yet — tap a capture button or flip "Live".',
+        'No captures yet - tap a capture button or flip "Live".',
         style: TextStyle(color: Colors.white54),
       )
     else
@@ -638,7 +638,7 @@ class _RecorderState extends State<Recorder> {
       leading: Icon(_kindIcon(r.kind), color: color, size: 20),
       title: Text(r.summary, style: const TextStyle(fontSize: 13)),
       subtitle: Text(
-        '${r.hash.substring(0, 16)}…  ·  ${r.finalized ? "finalized @${r.height}" : "anchoring…"}',
+        '${r.hash.substring(0, 16)}... - ${r.finalized ? "finalized @${r.height}" : "anchoring..."}',
         style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
       ),
       trailing: r.verified == true

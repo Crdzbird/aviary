@@ -38,7 +38,7 @@ int main() {
   Bytes block_id{'B', 'L', 'O', 'C', 'K', '#', '7'};
   auto vote_msg = [&](std::uint8_t idx) {
     Bytes m = block_id;
-    m.push_back(idx);  // bind validator index → distinct per signer
+    m.push_back(idx);  // bind validator index -> distinct per signer
     return m;
   };
   std::vector<Bytes> sigs = {

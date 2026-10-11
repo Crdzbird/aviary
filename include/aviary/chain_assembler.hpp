@@ -16,7 +16,7 @@
 /// through a registry of factories. This replaces a hardcoded "switch over the
 /// engines we know" with an open, fail-closed one: built-ins register on first
 /// use, custom subclasses of the seams register under their own id, and an id
-/// nobody registered — or a mix the assurance posture forbids — throws.
+/// nobody registered - or a mix the assurance posture forbids - throws.
 namespace aviary::node {
 
 /// Everything a component factory may draw on. [ledger] is built from the
@@ -30,7 +30,7 @@ struct BootContext {
   crypto::KeyPair bls_key;
   Bytes vrf_secret;
   std::vector<Bytes> vrf_pubkeys;
-  consensus::ProposerPolicy proposer;  ///< resolved from blueprint.proposer_id ("" → empty)
+  consensus::ProposerPolicy proposer;  ///< resolved from blueprint.proposer_id ("" -> empty)
 };
 
 using EngineFactory = std::function<std::unique_ptr<consensus::ConsensusEngine>(BootContext&)>;
@@ -39,7 +39,7 @@ using StateFactory = std::function<std::unique_ptr<StateMachine>(const GenesisSp
 using ProposerFactory = std::function<consensus::ProposerPolicy()>;
 
 /// A registered engine: its factory plus whether its leader election is
-/// grind-proof (unpredictable) — what a hardened/fortress posture mandates.
+/// grind-proof (unpredictable) - what a hardened/fortress posture mandates.
 struct EngineEntry {
   EngineFactory make;
   bool grind_proof = false;
@@ -53,7 +53,7 @@ class ComponentRegistry {
   static void register_state(const std::string& id, StateFactory make);
   static void register_proposer(const std::string& id, ProposerFactory make);
 
-  /// Discovery — what a mixture may name (built-ins + anything registered).
+  /// Discovery - what a mixture may name (built-ins + anything registered).
   static std::vector<std::string> engine_ids();
   static std::vector<std::string> state_ids();
   static std::vector<std::string> proposer_ids();
@@ -64,7 +64,7 @@ class ComponentRegistry {
 };
 
 /// An assembled chain: the mixture it was built from, the posture it runs
-/// under, and the engine — behind the uniform ConsensusEngine seam.
+/// under, and the engine - behind the uniform ConsensusEngine seam.
 struct AssembledChain {
   ChainBlueprint blueprint;
   AssuranceProfile profile;
@@ -81,7 +81,7 @@ class ChainAssembler {
                                  crypto::KeyPair bls_key, Bytes vrf_secret = {},
                                  std::vector<Bytes> vrf_pubkeys = {});
 
-  /// The mixture a genesis WITHOUT a blueprint assembles as — derived from its
+  /// The mixture a genesis WITHOUT a blueprint assembles as - derived from its
   /// posture and state model, so every legacy genesis is still assemblable.
   static ChainBlueprint default_blueprint(const GenesisSpec& genesis);
 };

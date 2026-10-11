@@ -46,7 +46,7 @@ int main() {
   ForkChoice fc(ChainSpec{kChain, StateModel::kAccount}, genesis);
 
   // Producers for two competing branches, each a real ledger building valid
-  // blocks. Branch A sends alice → bob; branch B sends alice → carol.
+  // blocks. Branch A sends alice -> bob; branch B sends alice -> carol.
   auto producerA = std::make_unique<Ledger>(ChainSpec{kChain, StateModel::kAccount}, genesis());
   auto producerB = std::make_unique<Ledger>(ChainSpec{kChain, StateModel::kAccount}, genesis());
 
@@ -78,10 +78,10 @@ int main() {
 
   std::printf("== a shorter/equal side branch is stored but not canonical ==\n");
   {
-    auto rb1 = fc.add_block(b1);  // cumulative 1 < 2 → not head
+    auto rb1 = fc.add_block(b1);  // cumulative 1 < 2 -> not head
     CHECK(rb1.accepted && !rb1.reorg);
     CHECK(fc.head() == a2.header.hash());  // still branch A
-    auto rb2 = fc.add_block(b2);  // cumulative 2 == 2 → tie keeps incumbent
+    auto rb2 = fc.add_block(b2);  // cumulative 2 == 2 -> tie keeps incumbent
     CHECK(rb2.accepted && !rb2.reorg);
     CHECK(fc.head() == a2.header.hash());
     CHECK(fc.knows(b1.header.hash()) && fc.knows(b2.header.hash()));
@@ -91,11 +91,11 @@ int main() {
 
   std::printf("== a heavier branch triggers a reorg; canonical state changes ==\n");
   {
-    auto rb3 = fc.add_block(b3);  // cumulative 3 > 2 → REORG to branch B
+    auto rb3 = fc.add_block(b3);  // cumulative 3 > 2 -> REORG to branch B
     CHECK(rb3.accepted && rb3.reorg);
     CHECK(fc.head() == b3.header.hash());
     CHECK(fc.head_height() == 3);
-    // The state now reflects branch B — bob's credit is gone, carol has hers.
+    // The state now reflects branch B - bob's credit is gone, carol has hers.
     CHECK(acc(fc.canonical()).account(carol_addr).balance == 350);
     CHECK(acc(fc.canonical()).account(bob_addr).balance == 0);
     CHECK(acc(fc.canonical()).account(alice_addr).balance == 650);

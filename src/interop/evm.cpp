@@ -125,7 +125,7 @@ Address recover_sender(const LegacyTx& tx, const SignedTx& signed_tx) {
   return address_from_pubkey(view(pk));
 }
 
-// ── EIP-1559 (type-2) ───────────────────────────────────────────────────────────
+// -- EIP-1559 (type-2) -----------------------------------------------------------
 
 namespace {
 constexpr std::uint8_t kEip1559Type = 0x02;
@@ -184,7 +184,7 @@ SignedEip1559 sign(const Eip1559Tx& tx, codec::ByteView secret_key) {
   out.y_parity = sig[64];  // 0 or 1 for type-2
 
   std::vector<rlp::Item> fields = payload_fields(tx);
-  fields.push_back(str_item(rlp::uint_bytes(out.y_parity)));  // 0 → empty, 1 → 0x01
+  fields.push_back(str_item(rlp::uint_bytes(out.y_parity)));  // 0 -> empty, 1 -> 0x01
   fields.push_back(str_item(strip_leading_zeros(out.r)));
   fields.push_back(str_item(strip_leading_zeros(out.s)));
 

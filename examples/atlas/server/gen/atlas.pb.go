@@ -4,7 +4,7 @@
 // 	protoc        v7.36.1
 // source: atlas.proto
 
-// Atlas Settlement Network — a wholesale settlement & tokenized-asset platform
+// Atlas Settlement Network - a wholesale settlement & tokenized-asset platform
 // built on Aviary. Operators launch custom settlement chains (BFT, instant
 // finality); institutions hold custodial wallets; settlements finalize with
 // cryptographic balance proofs; and wallets interact with EVM smart contracts
@@ -1013,13 +1013,13 @@ type Erc20Request struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ChainId       uint64                 `protobuf:"varint,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	WalletId      string                 `protobuf:"bytes,2,opt,name=wallet_id,json=walletId,proto3" json:"wallet_id,omitempty"`             // signs with this wallet's secp256k1 key
-	TokenAddress  string                 `protobuf:"bytes,3,opt,name=token_address,json=tokenAddress,proto3" json:"token_address,omitempty"` // ERC-20 contract, 0x… (20 bytes)
-	ToAddress     string                 `protobuf:"bytes,4,opt,name=to_address,json=toAddress,proto3" json:"to_address,omitempty"`          // recipient, 0x…
+	TokenAddress  string                 `protobuf:"bytes,3,opt,name=token_address,json=tokenAddress,proto3" json:"token_address,omitempty"` // ERC-20 contract, 0x... (20 bytes)
+	ToAddress     string                 `protobuf:"bytes,4,opt,name=to_address,json=toAddress,proto3" json:"to_address,omitempty"`          // recipient, 0x...
 	Amount        uint64                 `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
 	Nonce         uint64                 `protobuf:"varint,6,opt,name=nonce,proto3" json:"nonce,omitempty"`
 	GasPrice      uint64                 `protobuf:"varint,7,opt,name=gas_price,json=gasPrice,proto3" json:"gas_price,omitempty"`
 	GasLimit      uint64                 `protobuf:"varint,8,opt,name=gas_limit,json=gasLimit,proto3" json:"gas_limit,omitempty"`
-	EvmChainId    uint64                 `protobuf:"varint,9,opt,name=evm_chain_id,json=evmChainId,proto3" json:"evm_chain_id,omitempty"` // 1 = mainnet, 11155111 = sepolia, …
+	EvmChainId    uint64                 `protobuf:"varint,9,opt,name=evm_chain_id,json=evmChainId,proto3" json:"evm_chain_id,omitempty"` // 1 = mainnet, 11155111 = sepolia, ...
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1119,7 +1119,7 @@ func (x *Erc20Request) GetEvmChainId() uint64 {
 
 type SignedEvmTx struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RawTxHex      string                 `protobuf:"bytes,1,opt,name=raw_tx_hex,json=rawTxHex,proto3" json:"raw_tx_hex,omitempty"`        // 0x…  ready for eth_sendRawTransaction
+	RawTxHex      string                 `protobuf:"bytes,1,opt,name=raw_tx_hex,json=rawTxHex,proto3" json:"raw_tx_hex,omitempty"`        // 0x...  ready for eth_sendRawTransaction
 	CalldataHex   string                 `protobuf:"bytes,2,opt,name=calldata_hex,json=calldataHex,proto3" json:"calldata_hex,omitempty"` // the ABI-encoded transfer() call
 	FromAddress   string                 `protobuf:"bytes,3,opt,name=from_address,json=fromAddress,proto3" json:"from_address,omitempty"` // signer's ETH address (EIP-55)
 	unknownFields protoimpl.UnknownFields
@@ -1433,7 +1433,7 @@ func (x *Event) GetUnixMillis() int64 {
 	return 0
 }
 
-// ── Governance ────────────────────────────────────────────────────────────────
+// -- Governance ----------------------------------------------------------------
 type CouncilValidator struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PublicKey     string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`

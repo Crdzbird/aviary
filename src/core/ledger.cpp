@@ -7,7 +7,7 @@
 namespace aviary {
 
 namespace {
-// Total encoded size of a block's transactions — the quantity ChainSpec bounds.
+// Total encoded size of a block's transactions - the quantity ChainSpec bounds.
 std::uint64_t total_tx_bytes(const std::vector<Transaction>& txs) {
   std::uint64_t n = 0;
   for (const auto& tx : txs) n += tx.encode().size();
@@ -121,8 +121,8 @@ BlockError Ledger::run_block(const Block& block, Worked& out) const {
     return BlockError::failure("tx_root mismatch");
   }
 
-  // 3b/3c. Subchain anchors (docs/design/SUBCHAINS.md §6): structural root +
-  // order first, then the per-header light-client verification — all on a
+  // 3b/3c. Subchain anchors (docs/design/SUBCHAINS.md section 6): structural root +
+  // order first, then the per-header light-client verification - all on a
   // working copy of the registry, BEFORE any transaction work.
   if (!block.anchors.empty() && !registry_) return BlockError::failure("anchors on a chain with no subchain policy");
   out.registry = registry_;
@@ -135,7 +135,7 @@ BlockError Ledger::run_block(const Block& block, Worked& out) const {
     }
   }
 
-  // 4. Per-tx: signature verify → state validate → apply, on a working copy so
+  // 4. Per-tx: signature verify -> state validate -> apply, on a working copy so
   // the commit is all-or-nothing.
   out.state = state_->clone();
   const bool with_receipts = block.header.version >= 2;
@@ -181,7 +181,7 @@ BlockError Ledger::validate_block(const Block& block) const {
 BlockError Ledger::process_block(const Block& block) {
   Worked w;
   if (BlockError e = run_block(block, w); !e.ok) return e;
-  // 6. (consensus verification — the engine's job)
+  // 6. (consensus verification - the engine's job)
   // 7. Commit atomically.
   state_ = std::move(w.state);
   last_receipts_ = std::move(w.receipts);

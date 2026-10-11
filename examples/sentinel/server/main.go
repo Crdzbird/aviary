@@ -1,4 +1,4 @@
-// Sentinel — device provenance ledger gRPC server, backed by Aviary.
+// Sentinel - device provenance ledger gRPC server, backed by Aviary.
 package main
 
 import (
@@ -16,7 +16,7 @@ func main() {
 	if err := bc.Init(); err != nil {
 		log.Fatalf("aviary init: %v", err)
 	}
-	log.Printf("Sentinel device provenance ledger — aviary %s (crypto %s)",
+	log.Printf("Sentinel device provenance ledger - aviary %s (crypto %s)",
 		bc.Version(), bc.CryptoBackendVersion())
 
 	addr := ":50052"

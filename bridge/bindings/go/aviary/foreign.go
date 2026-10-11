@@ -27,10 +27,10 @@ import (
 // ForeignEngine is a consensus engine implemented in Go and plugged into a chain
 // mixture by id. The consensus pipeline stays in C++ (propose/apply go through
 // the Ledger); Go supplies the JUSTIFICATION policy. Both methods are invoked
-// synchronously inside consensus and MUST be deterministic — no clock, no
-// randomness, no map-iteration order — and must not call back into the chain.
+// synchronously inside consensus and MUST be deterministic - no clock, no
+// randomness, no map-iteration order - and must not call back into the chain.
 type ForeignEngine interface {
-	// Justify returns the justification for a block this node proposed (≤ 4096
+	// Justify returns the justification for a block this node proposed (<= 4096
 	// bytes), or nil to refuse.
 	Justify(block []byte) []byte
 	// Verify reports whether justification is valid for block.
@@ -41,7 +41,7 @@ type ForeignEngine interface {
 // index for a height among validators. Must be deterministic.
 type ForeignProposer func(height uint64, validators uint32) uint32
 
-// RegisterEngine registers a Go engine under id (chain identity — never
+// RegisterEngine registers a Go engine under id (chain identity - never
 // rename). grindProof declares whether its leader election is unpredictable.
 // The engine is retained for the life of the process.
 func RegisterEngine(id string, e ForeignEngine, grindProof bool) error {

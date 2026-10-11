@@ -1,7 +1,7 @@
 // Package aviary is a cgo binding for the Aviary C ABI.
 //
-// It is a thin marshaling layer (ARCHITECTURE §0): it never computes consensus
-// bytes itself — it hands data to the C++ core and returns what the core
+// It is a thin marshaling layer (ARCHITECTURE section 0): it never computes consensus
+// bytes itself - it hands data to the C++ core and returns what the core
 // produced. All hashing happens in C++. The crypto backend is cryptolib, whose
 // Go binding is depended on (see crypto.go) so the full crypto surface is
 // available to consumers alongside the ledger.
@@ -23,9 +23,9 @@ import (
 	"unsafe"
 )
 
-// ── Initialization (lazy + optional background warm-up) ───────────────────────
+// -- Initialization (lazy + optional background warm-up) -----------------------
 //
-// aviary_init → cryptolib_init, which is idempotent. The native lib loads
+// aviary_init -> cryptolib_init, which is idempotent. The native lib loads
 // at process start (cgo), but the one-time backend init must be run once; we do
 // it lazily on first use so callers cannot forget it.
 
@@ -52,8 +52,8 @@ func doInit() error {
 // point calls it, so the API works without an explicit Init.
 func ensure() { initOnce.Do(func() { initErr = doInit() }) }
 
-// Init initializes the crypto backend. Optional — the API self-initializes on
-// first use — but call it once at start if you want the init error surfaced.
+// Init initializes the crypto backend. Optional - the API self-initializes on
+// first use - but call it once at start if you want the init error surfaced.
 // Idempotent and concurrency-safe.
 func Init() error { ensure(); return initErr }
 
@@ -61,7 +61,7 @@ func Init() error { ensure(); return initErr }
 //
 // The Go analog of the Flutter/Node fire-and-forget preload: it runs the
 // one-time init off the calling goroutine, so the first real call pays no init
-// cost. You never need to wait on it — the synchronous API self-initializes
+// cost. You never need to wait on it - the synchronous API self-initializes
 // regardless. Safe to call repeatedly and safe to never call.
 func Preload() { go ensure() }
 

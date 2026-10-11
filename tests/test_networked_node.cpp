@@ -1,6 +1,6 @@
 // A validator node = RoundDriver over GossipOverlay. Consensus runs over a
 // realistic partial-mesh gossip network (relayed, deduped) instead of magic
-// broadcast — so we can show relay tolerance (a validator reaches quorum via
+// broadcast - so we can show relay tolerance (a validator reaches quorum via
 // hops it isn't directly connected to) and partition tolerance (a connected
 // >2/3 majority finalizes; an isolated minority stalls).
 #include <deque>
@@ -132,7 +132,7 @@ int main() {
     const Hash tip = net.nodes[0]->ledger().tip().hash();
     CHECK(net.nodes[1]->ledger().tip().hash() == tip);
     CHECK(net.nodes[2]->ledger().tip().hash() == tip);
-    // The isolated validator never sees the proposal → cannot finalize.
+    // The isolated validator never sees the proposal -> cannot finalize.
     CHECK(!net.nodes[3]->committed());
     CHECK(net.nodes[3]->ledger().tip().height == 0);
   }

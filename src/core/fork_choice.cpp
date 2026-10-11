@@ -25,12 +25,12 @@ std::uint64_t ForkChoice::weight_of(const Hash& head) const {
 }
 
 std::unique_ptr<Ledger> ForkChoice::ledger_at(const Hash& block_hash) const {
-  // Collect the branch genesis→block_hash by following parent links.
+  // Collect the branch genesis->block_hash by following parent links.
   std::vector<const Block*> branch;
   Hash cur = block_hash;
   while (cur != genesis_hash_) {
     auto it = nodes_.find(cur);
-    if (it == nodes_.end()) return nullptr;  // dangling — should not happen
+    if (it == nodes_.end()) return nullptr;  // dangling - should not happen
     branch.push_back(&it->second.block);
     cur = it->second.parent;
   }
@@ -62,7 +62,7 @@ ForkChoice::AddResult ForkChoice::add_block(const Block& block, std::uint64_t we
 
   if (parent == head_) {
     // Fast path: the block extends the current head. Validate + apply directly
-    // (process_block is atomic — canonical_ is unchanged on failure). Extending
+    // (process_block is atomic - canonical_ is unchanged on failure). Extending
     // the heaviest branch always keeps it heaviest, so the head advances.
     if (BlockError be = canonical_->process_block(block); !be.ok) {
       return {false, false, be.error};
@@ -81,7 +81,7 @@ ForkChoice::AddResult ForkChoice::add_block(const Block& block, std::uint64_t we
   nodes_[id] = Node{block, parent, block.header.height, new_cum};
 
   // Fork choice: switch only if this branch is STRICTLY heavier (ties keep the
-  // incumbent head → deterministic).
+  // incumbent head -> deterministic).
   if (new_cum > head_cum) {
     canonical_ = std::move(branch_ledger);  // already at the new head
     head_ = id;

@@ -1,6 +1,6 @@
 // Deterministic fuzz-lite + round-trip property tests for the deserializers
 // (the untrusted-input attack surface). Goal: on ANY bytes, every decoder
-// either succeeds or throws CodecError — never any other exception, never a
+// either succeeds or throws CodecError - never any other exception, never a
 // crash. Build with -DAVIARY_SANITIZE=ON to run these under ASan/UBSan.
 #include <cstdint>
 #include <vector>
@@ -34,7 +34,7 @@
 using namespace aviary;
 
 namespace {
-// Seeded xorshift64 — deterministic, no std::rand / clock (determinism mandate).
+// Seeded xorshift64 - deterministic, no std::rand / clock (determinism mandate).
 struct Rng {
   std::uint64_t s;
   explicit Rng(std::uint64_t seed) : s(seed ? seed : 0x9e3779b97f4a7c15ull) {}

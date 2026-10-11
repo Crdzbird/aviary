@@ -6,7 +6,7 @@
 // grows, by timing the accelerated `state_root()` after a single-account
 // mutation against the naive full recompute over the same set.
 //
-// Not a correctness test (test_state_incremental covers that) — just evidence
+// Not a correctness test (test_state_incremental covers that) - just evidence
 // the DoS lever is gone. Build: `cmake --build build --target bench_state`.
 #include <chrono>
 #include <cstdint>

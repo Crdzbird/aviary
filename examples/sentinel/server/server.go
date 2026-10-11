@@ -26,7 +26,7 @@ type device struct {
 	mu          sync.Mutex
 	node        *bc.Node
 	chainID     uint64
-	fingerprint []byte // 32 bytes, BLAKE3(device info ‖ credential)
+	fingerprint []byte // 32 bytes, BLAKE3(device info || credential)
 	address     []byte // on-chain identity (32 bytes)
 	secret      []byte // custodial signing key for anchoring txs
 	label       string
@@ -56,7 +56,7 @@ func (s *server) lookup(chainID uint64) *device {
 
 // ProvisionDevice binds a chain to a device: the device info + credential form a
 // fingerprint that (a) deterministically derives the chain id and (b) is anchored
-// as the origin block — the device's on-chain birth certificate.
+// as the origin block - the device's on-chain birth certificate.
 func (s *server) ProvisionDevice(_ context.Context, in *pb.DeviceInfo) (*pb.Provenance, error) {
 	if in.GetDeviceId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "device_id required")
@@ -178,7 +178,7 @@ func (s *server) StreamData(stream pb.Sentinel_StreamDataServer) error {
 		}
 		d := s.lookup(rec.GetChainId())
 		if d == nil {
-			sendCh <- &pb.AnchorReceipt{Summary: "unknown device — provision first"}
+			sendCh <- &pb.AnchorReceipt{Summary: "unknown device - provision first"}
 			continue
 		}
 		dev = d
@@ -325,7 +325,7 @@ func summarize(rec *pb.DataRecord) string {
 	case pb.DataKind_VIDEO:
 		return fmt.Sprintf("Video chunk %s, %s", humanBytes(len(rec.GetPayload())), orDash(rec.GetMime()))
 	case pb.DataKind_LOCATION:
-		return fmt.Sprintf("GPS %.5f, %.5f (±%.0fm)", rec.GetLat(), rec.GetLon(), rec.GetAccuracyM())
+		return fmt.Sprintf("GPS %.5f, %.5f (+/-%.0fm)", rec.GetLat(), rec.GetLon(), rec.GetAccuracyM())
 	case pb.DataKind_SENSOR:
 		keys := make([]string, 0, len(rec.GetSensors()))
 		for k := range rec.GetSensors() {

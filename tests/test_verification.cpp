@@ -79,7 +79,7 @@ int main() {
     StateProof p = acc(engine).prove_account(alice_addr);
     CHECK(p.present);
     CHECK(verify_state_proof(lc.tip().state_root, p));
-    // The committed value is readable and correct (alice spent 150 → 850).
+    // The committed value is readable and correct (alice spent 150 -> 850).
     auto leaf = AccountStateMachine::decode_account_leaf(p.leaf_preimage);
     CHECK(leaf.address == alice_addr);
     CHECK(leaf.balance == 850);

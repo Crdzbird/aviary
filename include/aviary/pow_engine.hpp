@@ -9,14 +9,14 @@
 #include "aviary/ledger.hpp"
 #include "aviary/types.hpp"
 
-/// A proof-of-work reference engine (ARCHITECTURE §7), demonstrating a second
+/// A proof-of-work reference engine (ARCHITECTURE section 7), demonstrating a second
 /// consensus family behind the same [ConsensusEngine] seam as the BFT engine.
 ///
 /// A block is justified by *work*: its header hash must not exceed a difficulty
 /// [target]. The nonce lives in `consensus_data` (so it is committed by the
 /// header hash), which is exactly what a miner varies. `propose` returns an
 /// unsolved candidate; `mine` searches for a nonce that meets the target; and
-/// `submit` re-verifies the embedded work before committing — the work is
+/// `submit` re-verifies the embedded work before committing - the work is
 /// intrinsic to the block, so `submit`'s justification argument is unused.
 ///
 /// This is a *reference* engine: the difficulty target is fixed (no retargeting)
@@ -65,10 +65,10 @@ class PowEngine : public ConsensusEngine {
   }
 
   /// Adjust the difficulty so mining tracks [desired_interval] given the
-  /// [actual_interval] the last block(s) took: new_target ≈ current × actual /
+  /// [actual_interval] the last block(s) took: new_target ~ current x actual /
   /// desired. Blocks that came too SLOW (actual > desired) make the target
   /// LARGER (easier); too fast makes it smaller (harder). The per-step change is
-  /// clamped to [1/4, 4]× (Bitcoin-style) and saturates at the all-ones max.
+  /// clamped to [1/4, 4]x (Bitcoin-style) and saturates at the all-ones max.
   static Hash retarget(const Hash& current, std::uint64_t actual_interval,
                        std::uint64_t desired_interval);
 

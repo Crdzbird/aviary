@@ -162,7 +162,7 @@ std::size_t UtxoStateMachine::utxo_count() const {
 
 Hash UtxoStateMachine::state_root() const {
   // UTXO blocks add/remove outpoints (structural), so the incremental-update
-  // path never applies — materialise once when there are pending changes.
+  // path never applies - materialise once when there are pending changes.
   if (overlay_.empty()) return base_->tree.root();
   seal();
   return base_->tree.root();
@@ -282,7 +282,7 @@ ValidationResult UtxoStateMachine::validate(const Transaction& tx) const {
 }
 
 void UtxoStateMachine::apply(const Transaction& tx) {
-  // Precondition: validate(tx).ok. The fee (inputs − outputs) is burned simply
+  // Precondition: validate(tx).ok. The fee (inputs - outputs) is burned simply
   // by not creating an output for it.
   const Body b = decode_body(tx.body);
   for (const auto& op : b.inputs) overlay_[op] = std::nullopt;  // tombstone: spent
@@ -294,7 +294,7 @@ void UtxoStateMachine::apply(const Transaction& tx) {
 }
 
 codec::u128 UtxoStateMachine::tx_fee(const Transaction& tx) const {
-  // The implicit fee is sum(inputs) − sum(outputs) against the current UTXO set.
+  // The implicit fee is sum(inputs) - sum(outputs) against the current UTXO set.
   Body b;
   try {
     b = decode_body(tx.body);
@@ -323,7 +323,7 @@ Bytes UtxoStateMachine::serialize() const {
   w.write_u128(flat_fee_);
   w.write_u64(genesis_counter_);
   w.write_u32(static_cast<std::uint32_t>(base_->utxos.size()));
-  for (const auto& [op, out] : base_->utxos) {  // map → outpoint-sorted, canonical
+  for (const auto& [op, out] : base_->utxos) {  // map -> outpoint-sorted, canonical
     encode_outpoint(w, op);
     encode_output(w, out);
   }

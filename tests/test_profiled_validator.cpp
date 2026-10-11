@@ -1,6 +1,6 @@
 // Integration: boot validators from a single profiled genesis and drive them to
 // commit through whichever engine the AssuranceProfile mandates. This proves the
-// composed safety classes work as ONE system — the profile committed in genesis
+// composed safety classes work as ONE system - the profile committed in genesis
 // actually selects the engine, enforces the signature gate, and every node runs
 // the same posture.
 #include <memory>
@@ -44,7 +44,7 @@ int main() {
   init();
   const Hash alice = crypto::address_of(view(ed(1).public_key));
 
-  std::printf("== standard posture boots a stake-weighted PoS validator set → commits ==\n");
+  std::printf("== standard posture boots a stake-weighted PoS validator set -> commits ==\n");
   {
     const std::uint32_t n = 3;
     const GenesisSpec g = profiled_genesis(AssuranceProfile::standard(), n, alice);
@@ -64,7 +64,7 @@ int main() {
     CHECK(!vals[0]->threshold_custody() && !vals[0]->sealed_mempool());
   }
 
-  std::printf("== hardened posture boots a VRF-PoS validator set → commits ==\n");
+  std::printf("== hardened posture boots a VRF-PoS validator set -> commits ==\n");
   {
     const std::uint32_t n = 4;
     const GenesisSpec g = profiled_genesis(AssuranceProfile::hardened(), n, alice);
@@ -100,7 +100,7 @@ int main() {
             leader = i;
             break;
           } catch (const std::exception&) {
-            // not eligible at this attempt — try the next validator
+            // not eligible at this attempt - try the next validator
           }
         }
       }
@@ -113,7 +113,7 @@ int main() {
   std::printf("== the profile's signature gate is enforced end to end ==\n");
   {
     // Hardened forbids bare Ed25519. A v1 (Ed25519) transfer must be rejected by
-    // the ledger the profiled genesis built — proving the posture reaches the
+    // the ledger the profiled genesis built - proving the posture reaches the
     // state layer, not just the descriptor.
     const GenesisSpec g = profiled_genesis(AssuranceProfile::hardened(), 1, alice);
     ChainSpec spec = g.chain_spec();

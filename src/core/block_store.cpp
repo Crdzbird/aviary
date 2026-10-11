@@ -50,7 +50,7 @@ std::optional<BlockStore::TxLocation> BlockStore::find_tx(const Hash& txid) cons
 Bytes BlockStore::serialize() const {
   codec::CodecWriter w;
   w.write_u32(static_cast<std::uint32_t>(by_height_.size()));
-  for (const auto& [height, sb] : by_height_) {  // map → ascending height, canonical
+  for (const auto& [height, sb] : by_height_) {  // map -> ascending height, canonical
     w.write_u64(height);
     const Bytes blk = sb.block.encode();
     const Bytes cert = sb.commit.encode();

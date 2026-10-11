@@ -4,12 +4,12 @@
 // 	protoc        v7.36.1
 // source: sentinel.proto
 
-// Sentinel — a tamper-evident DEVICE PROVENANCE LEDGER built on Aviary.
+// Sentinel - a tamper-evident DEVICE PROVENANCE LEDGER built on Aviary.
 //
 // A device enrolls by sending its hardware information + a credential; the server
 // derives a chain whose GENESIS/ORIGIN block is cryptographically bound to that
 // exact device + credential (its "birth certificate"). Thereafter the device
-// streams data — photos, video chunks, GPS locations, sensor readings — and each
+// streams data - photos, video chunks, GPS locations, sensor readings - and each
 // item's BLAKE3 content hash is ANCHORED on the device's chain with BFT finality.
 //
 // The raw media never goes on-chain; only its hash + metadata are anchored, so
@@ -179,7 +179,7 @@ func (x *DeviceInfo) GetCredential() []byte {
 type Provenance struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	ChainId           uint64                 `protobuf:"varint,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`                              // deterministically derived from the device fingerprint
-	DeviceFingerprint string                 `protobuf:"bytes,2,opt,name=device_fingerprint,json=deviceFingerprint,proto3" json:"device_fingerprint,omitempty"` // BLAKE3(device info ‖ credential), hex
+	DeviceFingerprint string                 `protobuf:"bytes,2,opt,name=device_fingerprint,json=deviceFingerprint,proto3" json:"device_fingerprint,omitempty"` // BLAKE3(device info || credential), hex
 	GenesisHash       string                 `protobuf:"bytes,3,opt,name=genesis_hash,json=genesisHash,proto3" json:"genesis_hash,omitempty"`                   // origin block state root, hex
 	DeviceAddress     string                 `protobuf:"bytes,4,opt,name=device_address,json=deviceAddress,proto3" json:"device_address,omitempty"`             // device's on-chain identity (hex)
 	GenesisHeight     uint64                 `protobuf:"varint,5,opt,name=genesis_height,json=genesisHeight,proto3" json:"genesis_height,omitempty"`            // 1 once the origin block is sealed
@@ -375,7 +375,7 @@ type AnchorReceipt struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	Sequence           uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"` // device-local record index
 	Kind               DataKind               `protobuf:"varint,2,opt,name=kind,proto3,enum=sentinel.v1.DataKind" json:"kind,omitempty"`
-	ContentHash        string                 `protobuf:"bytes,3,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"` // BLAKE3 of the record, hex — the anchored identifier
+	ContentHash        string                 `protobuf:"bytes,3,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"` // BLAKE3 of the record, hex - the anchored identifier
 	Txid               string                 `protobuf:"bytes,4,opt,name=txid,proto3" json:"txid,omitempty"`
 	Finalized          bool                   `protobuf:"varint,5,opt,name=finalized,proto3" json:"finalized,omitempty"` // false = anchored in mempool; true = sealed in a block
 	Height             uint64                 `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`       // block height once finalized
@@ -743,7 +743,7 @@ func (x *LedgerStatus) GetKindCounts() map[string]uint64 {
 	return nil
 }
 
-// ── Fleet (chain tree) ─────────────────────────────────────────────────────────
+// -- Fleet (chain tree) ---------------------------------------------------------
 type FleetSpec struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeviceLabels  []string               `protobuf:"bytes,1,rep,name=device_labels,json=deviceLabels,proto3" json:"device_labels,omitempty"`

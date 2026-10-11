@@ -9,7 +9,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "── 1/3  C++ core + C ABI ─────────────────────────────────────────────"
+echo "-- 1/3  C++ core + C ABI ---------------------------------------------"
 CMAKE_ARGS=()
 if [[ -n "${CRYPTOLIB_ROOT:-}" ]]; then
   CMAKE_ARGS+=("-DCRYPTOLIB_ROOT=${CRYPTOLIB_ROOT}")
@@ -19,12 +19,12 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 
 echo
-echo "── 2/3  Dart binding ─────────────────────────────────────────────────"
+echo "-- 2/3  Dart binding -------------------------------------------------"
 ( cd bridge/bindings/dart && dart pub get && dart run bin/demo.dart )
 
 echo
-echo "── 3/3  Go binding ───────────────────────────────────────────────────"
+echo "-- 3/3  Go binding ---------------------------------------------------"
 ( cd bridge/bindings/go && CGO_ENABLED=1 go run ./cmd/demo )
 
 echo
-echo "✓ all three languages agree on the golden vectors"
+echo "ok all three languages agree on the golden vectors"

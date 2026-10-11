@@ -1,4 +1,4 @@
-// Atlas Settlement Network — Flutter operator console. A thin gRPC client (no
+// Atlas Settlement Network - Flutter operator console. A thin gRPC client (no
 // native blockchain code): all chain work happens in the Go server, which uses
 // Aviary. Demonstrates custom settlement chains, institutional custodial
 // wallets (multi-chain), instant-finality settlement with cryptographic balance
@@ -163,7 +163,7 @@ class _ConsoleState extends State<Console> {
           ..memo = 'console settlement',
       ),
     );
-    _snack('Settlement queued — produce a block to finalize');
+    _snack('Settlement queued - produce a block to finalize');
   }
 
   Future<void> _produce() async {
@@ -183,7 +183,7 @@ class _ConsoleState extends State<Console> {
           ..amount = Int64(1000000),
       ),
     );
-    _snack('Issued 1,000,000 — produce a block to finalize');
+    _snack('Issued 1,000,000 - produce a block to finalize');
   }
 
   Future<void> _proof(String walletId) async {
@@ -197,7 +197,7 @@ class _ConsoleState extends State<Console> {
     if (p != null) {
       setState(
         () => _lastProof =
-            'balance ${p.balance} · ${p.proofBytes}-byte proof · verified ${p.verified}',
+            'balance ${p.balance} - ${p.proofBytes}-byte proof - verified ${p.verified}',
       );
     }
   }
@@ -282,7 +282,7 @@ class _ConsoleState extends State<Console> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Atlas · ${c.name}'),
+          title: Text('Atlas - ${c.name}'),
           actions: [
             Center(
               child: Text(
@@ -319,7 +319,7 @@ class _ConsoleState extends State<Console> {
     );
   }
 
-  // ── Governance tab: validator council rotation + auditor light client ──────
+  // -- Governance tab: validator council rotation + auditor light client ------
   Future<void> _councilOp(pb.CouncilOp? op) async {
     setState(() => _councilBusy = true);
     try {
@@ -379,7 +379,7 @@ class _ConsoleState extends State<Console> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '${v.publicKey.substring(0, 16)}…  power ${v.power}${v.operator ? "  (operator)" : ""}',
+                        '${v.publicKey.substring(0, 16)}...  power ${v.power}${v.operator ? "  (operator)" : ""}',
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 12,
@@ -521,7 +521,7 @@ class _ConsoleState extends State<Console> {
 
   Widget _walletTile(pb.Wallet w) => ExpansionTile(
     tilePadding: EdgeInsets.zero,
-    title: Text('${w.institution} · ${w.label}'),
+    title: Text('${w.institution} - ${w.label}'),
     subtitle: Text(
       '${_fmt(w.balance.toInt())} ${_chain!.nativeSymbol}',
       style: const TextStyle(
@@ -644,7 +644,7 @@ class _ConsoleState extends State<Console> {
   Widget _eventsCard() => _section('Live ledger feed', Icons.stream, [
     if (_events.isEmpty)
       const Text(
-        'Awaiting events — settle or issue funds.',
+        'Awaiting events - settle or issue funds.',
         style: TextStyle(color: Colors.white54),
       )
     else
@@ -664,8 +664,8 @@ class _ConsoleState extends State<Console> {
               title: Text(e.type.name, style: const TextStyle(fontSize: 13)),
               subtitle: Text(
                 isBlock
-                    ? 'block ${e.height} · ${e.txCount} tx'
-                    : 'mempool ${e.mempoolSize}${e.txid.isNotEmpty ? " · ${e.txid.substring(0, 12)}…" : ""}',
+                    ? 'block ${e.height} - ${e.txCount} tx'
+                    : 'mempool ${e.mempoolSize}${e.txid.isNotEmpty ? " - ${e.txid.substring(0, 12)}..." : ""}',
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
               ),
             );

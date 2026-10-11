@@ -1,9 +1,9 @@
 // Adversarial gossip: does the honest network stay SAFE and LIVE when one
 // validator is Byzantine? Two scenarios over the in-memory gossip harness:
-//   1. Equivocation — the round-0 proposer double-proposes (two validly-signed,
+//   1. Equivocation - the round-0 proposer double-proposes (two validly-signed,
 //      conflicting blocks to different peers), then goes silent. The honest
 //      quorum must still agree on ONE block (safety) and finalize it (liveness).
-//   2. Spam — a peer floods undecodable garbage. Honest nodes must drop it, the
+//   2. Spam - a peer floods undecodable garbage. Honest nodes must drop it, the
 //      seen-set must bound the flood (dedup on re-inject), and consensus must
 //      finish unaffected.
 #include <deque>
@@ -98,7 +98,7 @@ int main() {
       net.nodes[i] = std::make_unique<NetworkedNode>(kChain, vset, i, bls(static_cast<std::uint8_t>(0x60 + i)),
                                                      genesis_ledger(alice), /*timestamp=*/100);
       for (std::uint32_t j = 0; j < n; ++j)
-        if (j != i) net.nodes[i]->add_peer(j);  // still peers with 0 — it just never answers
+        if (j != i) net.nodes[i]->add_peer(j);  // still peers with 0 - it just never answers
     }
 
     // Byzantine node 0: two proposals for the same (height 1, round 0). The
@@ -187,7 +187,7 @@ int main() {
     }
     CHECK_MSG(node->peer_banned(0), "a peer that floods garbage past the threshold is banned");
     CHECK_MSG(relayed, "garbage did flood (bounded) before the ban kicked in");
-    // Once banned, the spammer's traffic is dropped outright — no relay.
+    // Once banned, the spammer's traffic is dropped outright - no relay.
     CHECK_MSG(node->on_gossip(0, Bytes(30, 0xDD)).relays.empty(), "a banned peer's traffic is silenced");
   }
 

@@ -1,7 +1,7 @@
 // Membership admission over a real socket: a gossip peer proves it holds an
 // issuer-signed credential before it is admitted to the mesh
-// (docs/design/CREDENTIAL_GATE.md §6). This drives the blocking
-// challenge→present→admit round over a connected socketpair, verifier on one end
+// (docs/design/CREDENTIAL_GATE.md section 6). This drives the blocking
+// challenge->present->admit round over a connected socketpair, verifier on one end
 // and prover on the other (one thread each), and confirms the verdict for an
 // honest member, a forged credential, a garbage responder, and a silent peer.
 #include <sys/socket.h>
@@ -61,18 +61,18 @@ int main() {
   const std::uint64_t now = 1700000000ULL;
   const std::uint32_t epoch = 4;
 
-  // ── Honest member is admitted ──────────────────────────────────────────────
+  // -- Honest member is admitted ----------------------------------------------
   bool ok = run_exchange(gate, epoch, now, [&](int fd) {
     CHECK(p2p::present_over_socket(fd, policy, cred, 3000));
   });
   CHECK_MSG(ok, "an honest member is admitted over the socket");
 
-  // ── Unlinkability across two real connections ──────────────────────────────
+  // -- Unlinkability across two real connections ------------------------------
   bool ok2 = run_exchange(gate, epoch, now,
                           [&](int fd) { p2p::present_over_socket(fd, policy, cred, 3000); });
   CHECK_MSG(ok2, "the same member is admitted again on a fresh connection");
 
-  // ── A forged credential (wrong issuer) is refused ──────────────────────────
+  // -- A forged credential (wrong issuer) is refused --------------------------
   auto rogue = crypto::bbs_keygen(view(Bytes(32, 0xAA)));
   auto forged = consensus::issue_credential(policy, view(rogue.secret_key), view(member_secret), 2,
                                             4102444800ULL, 1);
@@ -80,7 +80,7 @@ int main() {
                           [&](int fd) { p2p::present_over_socket(fd, policy, forged, 3000); });
   CHECK_MSG(!bad, "a forged credential is refused over the socket");
 
-  // ── A garbage responder is refused (verifier stays total) ──────────────────
+  // -- A garbage responder is refused (verifier stays total) ------------------
   bool garbage = run_exchange(gate, epoch, now, [&](int fd) {
     // Read the challenge, then reply with junk instead of a presentation.
     std::uint8_t hdr[4];
@@ -94,11 +94,11 @@ int main() {
   });
   CHECK_MSG(!garbage, "a garbage responder is refused");
 
-  // ── A silent peer times out to a refusal, not a hang ───────────────────────
+  // -- A silent peer times out to a refusal, not a hang -----------------------
   bool silent = run_exchange(
       gate, epoch, now,
       [&](int fd) {
-        (void)fd;  // read nothing, send nothing — the verifier's recv must time out
+        (void)fd;  // read nothing, send nothing - the verifier's recv must time out
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
       },
       /*verifier_timeout_ms=*/200);

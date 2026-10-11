@@ -10,7 +10,7 @@
 #include "aviary/interop/rlp.hpp"
 
 /// EVM (Ethereum) interop: addresses and legacy (EIP-155) transaction signing
-/// (ARCHITECTURE §11). All signing uses cryptolib's secp256k1; hashing uses
+/// (ARCHITECTURE section 11). All signing uses cryptolib's secp256k1; hashing uses
 /// cryptolib's keccak256. Read/RPC layer is separate (json_rpc).
 namespace aviary::interop::evm {
 
@@ -18,8 +18,8 @@ using crypto::Hash;
 using Bytes = std::vector<std::uint8_t>;
 using Address = std::array<std::uint8_t, 20>;
 
-/// Address from a secp256k1 public key (65-byte uncompressed or 64-byte X‖Y):
-/// last 20 bytes of keccak256(X‖Y).
+/// Address from a secp256k1 public key (65-byte uncompressed or 64-byte X||Y):
+/// last 20 bytes of keccak256(X||Y).
 Address address_from_pubkey(codec::ByteView pubkey);
 Address address_from_secret(codec::ByteView secret_key);
 
@@ -43,7 +43,7 @@ struct LegacyTx {
 /// RLP of the EIP-155 signing preimage:
 /// [nonce, gasPrice, gas, to, value, data, chainId, 0, 0].
 Bytes signing_rlp(const LegacyTx& tx);
-/// keccak256 of signing_rlp — the digest secp256k1 signs.
+/// keccak256 of signing_rlp - the digest secp256k1 signs.
 Hash signing_hash(const LegacyTx& tx);
 
 struct SignedTx {
@@ -60,7 +60,7 @@ SignedTx sign(const LegacyTx& tx, codec::ByteView secret_key);
 /// Recover the sender address from a signed tx (ecrecover).
 Address recover_sender(const LegacyTx& tx, const SignedTx& signed_tx);
 
-// ── EIP-1559 (type-2) typed transactions (EIP-2718 envelope) ────────────────────
+// -- EIP-1559 (type-2) typed transactions (EIP-2718 envelope) --------------------
 
 /// One access-list entry: an address and the storage keys it pre-warms.
 struct AccessListEntry {
@@ -81,14 +81,14 @@ struct Eip1559Tx {
   std::vector<AccessListEntry> access_list;
 };
 
-/// The signing preimage: 0x02 ‖ rlp([chainId, nonce, maxPriorityFeePerGas,
+/// The signing preimage: 0x02 || rlp([chainId, nonce, maxPriorityFeePerGas,
 /// maxFeePerGas, gas, to, value, data, accessList]).
 Bytes signing_bytes(const Eip1559Tx& tx);
-/// keccak256 of signing_bytes — the digest secp256k1 signs.
+/// keccak256 of signing_bytes - the digest secp256k1 signs.
 Hash signing_hash(const Eip1559Tx& tx);
 
 struct SignedEip1559 {
-  Bytes raw;              ///< 0x02 ‖ rlp(payload ‖ [yParity, r, s]) — for sendRawTransaction
+  Bytes raw;              ///< 0x02 || rlp(payload || [yParity, r, s]) - for sendRawTransaction
   Hash tx_hash{};         ///< keccak256(raw)
   std::uint8_t y_parity = 0;  ///< 0 or 1 (NOT the legacy v = recid+35+2*chainId)
   Bytes r;                ///< 32 bytes

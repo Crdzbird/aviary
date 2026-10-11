@@ -124,12 +124,12 @@ int main() {
     CHECK(l.last_receipts().empty());
   }
 
-  std::printf("== UTXO receipts: fee is inputs − outputs ==\n");
+  std::printf("== UTXO receipts: fee is inputs - outputs ==\n");
   {
     auto g = std::make_unique<UtxoStateMachine>(0);
     Outpoint op0 = g->add_genesis_utxo(Output{alice_addr, 1000});
     Ledger l(receipt_spec(0, StateModel::kUtxo), std::move(g));
-    // Spend 1000 → 940 out, burning a 60 fee.
+    // Spend 1000 -> 940 out, burning a 60 fee.
     Block b = l.build_block({utxo_spend(alice, {op0}, {Output{bob_addr, 940}})}, 1);
     CHECK(b.header.version == 2);
     CHECK_MSG(l.process_block(b).ok, "utxo v2 block accepted");

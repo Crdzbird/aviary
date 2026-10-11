@@ -10,7 +10,7 @@
 #include "aviary/state.hpp"
 #include "aviary/types.hpp"
 
-/// Fork choice + reorg (ARCHITECTURE §6/§7). The [Ledger] is a single linear
+/// Fork choice + reorg (ARCHITECTURE section 6/section 7). The [Ledger] is a single linear
 /// chain; a real PoW/PoS network sees a *tree* of competing blocks and must pick
 /// the canonical branch and reorganize when a heavier one appears. [ForkChoice]
 /// is that tree: it stores blocks by hash, tracks each block's cumulative
@@ -18,7 +18,7 @@
 /// rebuilds the ledger state on a reorg by replaying the winning branch.
 ///
 /// It is **engine-agnostic**: the per-block weight is supplied by the caller, so
-/// the fork-choice rule is decoupled from consensus — a PoW engine passes the
+/// the fork-choice rule is decoupled from consensus - a PoW engine passes the
 /// block's work, a PoS/BFT longest-chain rule passes 1. The tree validates only
 /// the STATE transition (via the Ledger); the consensus *justification* (a BFT
 /// certificate, a PoW nonce, a PoS leader signature) is verified by the engine
@@ -62,7 +62,7 @@ class ForkChoice {
   };
 
   std::uint64_t weight_of(const Hash& head) const;  // cumulative weight (0 at genesis)
-  std::unique_ptr<Ledger> ledger_at(const Hash& block_hash) const;  // replay genesis→hash
+  std::unique_ptr<Ledger> ledger_at(const Hash& block_hash) const;  // replay genesis->hash
 
   ChainSpec spec_;
   std::function<std::unique_ptr<StateMachine>()> genesis_state_;

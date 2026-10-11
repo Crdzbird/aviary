@@ -90,7 +90,7 @@ int main() {
     // 0-1-2-3-4-5-0 ring (each node has 2 peers; lots of loop potential).
     Net net(6, {{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 0}});
     net.run(0, msg("block-42"));
-    // Every non-origin node accepted exactly once → 5 accepts.
+    // Every non-origin node accepted exactly once -> 5 accepts.
     CHECK(net.accepts == 5);
     for (std::uint32_t i = 0; i < 6; ++i) CHECK(net.nodes[i].seen(msg("block-42")));
     // Extra deliveries (the ring's redundant paths) were all deduped, not looped.
@@ -161,7 +161,7 @@ int main() {
     CHECK_MSG(fwd.size() == 1 && fwd[0].to == 3, "an honest peer's message still floods onward");
   }
 
-  // ── Membership admission gate (CredentialGate, Option A) ─────────────────────
+  // -- Membership admission gate (CredentialGate, Option A) ---------------------
   // A permissioned mesh admits a peer only behind a valid "gossip"-scope
   // presentation. The plain add_peer() is the trusted path and stays ungated.
   {
@@ -198,7 +198,7 @@ int main() {
     CHECK(!g.admit_peer(2, 3, viewb(challenge), viewb(sp), now));
     CHECK(g.peers().count(2) == 0);
 
-    // The plain add_peer() is the trusted path — never gated, even with a gate set.
+    // The plain add_peer() is the trusted path - never gated, even with a gate set.
     g.add_peer(2);
     CHECK(g.peers().count(2) == 1);
 

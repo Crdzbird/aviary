@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-/// Canonical, deterministic binary serialization — the determinism bedrock
-/// (ARCHITECTURE §2/§4, docs/CODEC_SPEC.md). One value has exactly one valid
+/// Canonical, deterministic binary serialization - the determinism bedrock
+/// (ARCHITECTURE section 2/section 4, docs/CODEC_SPEC.md). One value has exactly one valid
 /// encoding: the writer only ever emits it; the reader rejects anything else
 /// (trailing bytes, non-minimal biguint, out-of-range u64, malformed bool)
 /// rather than normalizing it.
@@ -74,7 +74,7 @@ class CodecWriter {
   Bytes out_;
 };
 
-/// Deterministic canonical decoder — the strict mirror of CodecWriter.
+/// Deterministic canonical decoder - the strict mirror of CodecWriter.
 class CodecReader {
  public:
   explicit CodecReader(ByteView bytes) : data_(bytes) {}

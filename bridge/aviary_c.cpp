@@ -95,7 +95,7 @@ aviary::custody::KeyStore* as_ks(AviaryKeyStore k) {
 }
 
 // Pack a {public_key, secret} pair as the self-describing account blob
-// [pub_len:4 BE][public][secret] — the same layout new_account_hybrid emits.
+// [pub_len:4 BE][public][secret] - the same layout new_account_hybrid emits.
 AviaryBufferResult account_blob(const aviary::crypto::Bytes& pub,
                                       const aviary::crypto::Bytes& sec) {
   std::vector<std::uint8_t> out;
@@ -119,7 +119,7 @@ cg::CredentialGate* as_gate(AviaryCredentialGate g) {
   return static_cast<cg::CredentialGate*>(g);
 }
 
-// Credential blob = [sig_len:4][sig]([attr_count:4]([attr_len:4][attr])×).
+// Credential blob = [sig_len:4][sig]([attr_count:4]([attr_len:4][attr])x).
 // Holder-secret (carries member_secret + hidden attributes).
 std::vector<std::uint8_t> encode_credential(const cg::Credential& c) {
   aviary::codec::CodecWriter w;
@@ -140,7 +140,7 @@ cg::Credential decode_credential(const std::uint8_t* p, std::size_t n) {
   return c;
 }
 
-// ── Option B blob (de)serialisers ──────────────────────────────────────────
+// -- Option B blob (de)serialisers ------------------------------------------
 using CW = aviary::codec::CodecWriter;
 using CR = aviary::codec::CodecReader;
 
@@ -184,7 +184,7 @@ cg::BlindIssuance decode_blind_issuance(const std::uint8_t* p, std::size_t n) {
   return b;
 }
 
-// pseudonymous credential = [sig][tier u8][not_after u64][issuer_epoch u32][nym_secrets…][spb]
+// pseudonymous credential = [sig][tier u8][not_after u64][issuer_epoch u32][nym_secrets...][spb]
 std::vector<std::uint8_t> encode_pseudonymous_credential(const cg::PseudonymousCredential& c) {
   CW w;
   w.write_bytes(cbv(c.signature.data(), c.signature.size()));
@@ -236,7 +236,7 @@ struct ChainBox {
 };
 ChainBox* as_box(AviaryChain c) { return static_cast<ChainBox*>(c); }
 aviary::node::AssembledChain* as_chain(AviaryChain c) { return &as_box(c)->chain; }
-// [count u32]([len u32][bytes])× → the items.
+// [count u32]([len u32][bytes])x -> the items.
 std::vector<aviary::crypto::Bytes> decode_blob_list(aviary::codec::ByteView v) {
   aviary::codec::CodecReader r(v);
   auto items = r.read_list<aviary::crypto::Bytes>([](aviary::codec::CodecReader& rr) { return rr.read_bytes(); });
@@ -248,7 +248,7 @@ std::vector<aviary::Anchor> decode_anchors(aviary::codec::ByteView v) {
   for (const auto& b : decode_blob_list(v)) out.push_back(aviary::Anchor::decode_all(cbv(b.data(), b.size())));
   return out;
 }
-// [count u32]([len u32][id])×
+// [count u32]([len u32][id])x
 std::vector<std::uint8_t> encode_ids(const std::vector<std::string>& ids) {
   aviary::codec::CodecWriter w;
   w.write_list(ids, [](aviary::codec::CodecWriter& ww, const std::string& id) {
@@ -413,7 +413,7 @@ int aviary_verify_commit(uint64_t chain_id, const uint8_t* validator_set,
   }
 }
 
-// ── Demo node ─────────────────────────────────────────────────────────────────
+// -- Demo node -----------------------------------------------------------------
 
 AviaryNode aviary_node_new(uint64_t chain_id) {
   try {
@@ -606,7 +606,7 @@ AviaryBufferResult aviary_node_prove_account(AviaryNode node, const uint8_t* add
   catch (const std::exception& e) { return error_result(e.what()); }
 }
 
-// ── Custodial key store ───────────────────────────────────────────────────────
+// -- Custodial key store -------------------------------------------------------
 
 AviaryKeyStore aviary_keystore_new(const char* passphrase) {
   try {
@@ -701,7 +701,7 @@ int aviary_keystore_unlocked(AviaryKeyStore ks) {
 
 void aviary_keystore_free(AviaryKeyStore ks) { delete as_ks(ks); }
 
-// ── Portable account export (tiered encrypted backup) ─────────────────────────
+// -- Portable account export (tiered encrypted backup) -------------------------
 
 AviaryBufferResult aviary_hybrid_kem_keygen(void) {
   try {
@@ -787,7 +787,7 @@ AviaryBufferResult aviary_portable_open_signed_from(
   }
 }
 
-// ── Threshold accounts (FROST t-of-n) ─────────────────────────────────────────
+// -- Threshold accounts (FROST t-of-n) -----------------------------------------
 
 namespace {
 namespace th = aviary::custody;
@@ -930,7 +930,7 @@ AviaryBufferResult aviary_threshold_aggregate(AviaryCeremony c,
                                                           const uint8_t* sig_shares, size_t count) {
   try {
     th::SigningCeremony* cer = as_ceremony(c);
-    // Reorder the caller's (id → share) pairs into the ceremony's roster order,
+    // Reorder the caller's (id -> share) pairs into the ceremony's roster order,
     // which is what SigningCeremony::aggregate expects.
     std::vector<aviary::crypto::Bytes> ordered;
     for (const auto& cm : cer->roster()) {
@@ -950,7 +950,7 @@ AviaryBufferResult aviary_threshold_aggregate(AviaryCeremony c,
   }
 }
 
-// ── AssuranceProfile ──────────────────────────────────────────────────────────
+// -- AssuranceProfile ----------------------------------------------------------
 
 AviaryBufferResult aviary_assurance_describe(uint16_t level) {
   try {
@@ -976,7 +976,7 @@ AviaryBufferResult aviary_assurance_describe(uint16_t level) {
   }
 }
 
-// ── Transaction encoding ──────────────────────────────────────────────────────
+// -- Transaction encoding ------------------------------------------------------
 
 AviaryBufferResult aviary_tx_encode(uint8_t version, uint64_t chain_id, uint8_t sig_algo,
                                                 uint64_t fee, const uint8_t* body, size_t body_len,
@@ -997,7 +997,7 @@ AviaryBufferResult aviary_tx_encode(uint8_t version, uint64_t chain_id, uint8_t 
   }
 }
 
-// ── SealedMempool ─────────────────────────────────────────────────────────────
+// -- SealedMempool -------------------------------------------------------------
 
 namespace {
 aviary::p2p::SealedMempool* as_pool(AviarySealedMempool m) {
@@ -1058,7 +1058,7 @@ AviaryBufferResult aviary_sealed_mempool_reveal(AviarySealedMempool m,
 
 void aviary_sealed_mempool_free(AviarySealedMempool m) { delete as_pool(m); }
 
-// ── CredentialGate (anonymous membership admission, Option A) ──────────────────
+// -- CredentialGate (anonymous membership admission, Option A) ------------------
 
 AviaryBufferResult aviary_bbs_keygen(const uint8_t* key_material, size_t km_len) {
   try {
@@ -1157,7 +1157,7 @@ int aviary_credential_gate_admit(AviaryCredentialGate g, uint32_t epoch,
 
 void aviary_credential_gate_free(AviaryCredentialGate g) { delete as_gate(g); }
 
-// ── CredentialGate Option B — pseudonymous ────────────────────────────────────
+// -- CredentialGate Option B - pseudonymous ------------------------------------
 
 AviaryBufferResult aviary_credential_policy_encode_ex(uint64_t chain_id,
                                                                   const uint8_t* issuer_pk,
@@ -1242,7 +1242,7 @@ AviaryBufferResult aviary_credential_gate_admit_pseudonymous(
                                      cbv(presentation, presentation_len), now);
   if (!nym) {
     const std::uint8_t empty = 0;
-    return bytes_result(&empty, 0);  // reject → empty buffer (len 0), no error
+    return bytes_result(&empty, 0);  // reject -> empty buffer (len 0), no error
   }
   return bytes_result(*nym);
 }
@@ -1260,7 +1260,7 @@ int aviary_credential_gate_note_admission(AviaryCredentialGate g, uint32_t epoch
 }
 
 
-// ── ChainBlueprint + ChainAssembler (composable chains) ───────────────────────
+// -- ChainBlueprint + ChainAssembler (composable chains) -----------------------
 
 AviaryBufferResult aviary_bls_keygen(const uint8_t* ikm, size_t ikm_len) {
   try {
@@ -1461,7 +1461,7 @@ AviaryBufferResult aviary_chain_metrics(AviaryChain c) {
 
 void aviary_chain_free(AviaryChain c) { delete as_box(c); }
 
-// ── Subchains ─────────────────────────────────────────────────────────────────
+// -- Subchains -----------------------------------------------------------------
 
 AviaryBufferResult aviary_genesis_header(const uint8_t* genesis, size_t genesis_len) {
   try {
@@ -1581,7 +1581,7 @@ AviaryBufferResult aviary_chain_certify(AviaryChain c, const uint8_t* block, siz
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
 
-// ── Light client ──────────────────────────────────────────────────────────────
+// -- Light client --------------------------------------------------------------
 
 namespace {
 aviary::client::LightClient* as_lc(AviaryLightClient lc) {
@@ -1712,7 +1712,7 @@ int aviary_subchain_proof_verify(const uint8_t* parent_subchain_root, const uint
   } catch (...) { return 0; }
 }
 
-// ── Chain tree ────────────────────────────────────────────────────────────────
+// -- Chain tree ----------------------------------------------------------------
 
 namespace {
 // The tree as seen from the C ABI: the hooks are C callbacks with a ctx.
@@ -2047,7 +2047,7 @@ AviaryBufferResult aviary_secure_decrypt(AviarySecureSession s, const uint8_t* f
 }
 void aviary_secure_free(AviarySecureSession s) { delete as_secure(s); }
 
-// ── Foreign components (C callbacks → registry) ───────────────────────────────
+// -- Foreign components (C callbacks -> registry) -------------------------------
 
 int aviary_registry_add_engine(const char* id, AviaryJustifyFn justify,
                                      AviaryVerifyFn verify, void* ctx, int grind_proof) {
@@ -2086,7 +2086,7 @@ int aviary_registry_add_proposer(const char* id, AviaryProposerFn fn, void* ctx)
   }
 }
 
-// ── Interop addresses ─────────────────────────────────────────────────────────
+// -- Interop addresses ---------------------------------------------------------
 
 AviaryBufferResult aviary_eth_address(const uint8_t* secret32) {
   try {
@@ -2103,12 +2103,12 @@ AviaryBufferResult aviary_btc_address(const uint8_t* secret32) {
 AviaryBufferResult aviary_sol_address(const uint8_t* ed_secret64) {
   try {
     aviary::interop::solana::Pubkey pk{};
-    std::memcpy(pk.data(), ed_secret64 + 32, 32);  // libsodium sk = seed‖pub
+    std::memcpy(pk.data(), ed_secret64 + 32, 32);  // libsodium sk = seed||pub
     return string_result(aviary::interop::solana::to_address(pk));
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
 
-// ── EVM smart-contract interaction ────────────────────────────────────────────
+// -- EVM smart-contract interaction --------------------------------------------
 
 AviaryBufferResult aviary_eth_erc20_transfer(const uint8_t* to20, uint64_t amount) {
   try {

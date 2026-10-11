@@ -50,12 +50,12 @@ Bytes build_transfer_message(const Pubkey& from, const Pubkey& to,
 
   // One instruction.
   encoding::compact_u16_encode(1, msg);
-  msg.push_back(2);  // programIdIndex → systemProgram (account index 2)
+  msg.push_back(2);  // programIdIndex -> systemProgram (account index 2)
   // Instruction accounts: indices [from=0, to=1].
   encoding::compact_u16_encode(2, msg);
   msg.push_back(0);
   msg.push_back(1);
-  // Instruction data: u32 LE discriminator (2 = Transfer) ‖ u64 LE lamports.
+  // Instruction data: u32 LE discriminator (2 = Transfer) || u64 LE lamports.
   Bytes data = {2, 0, 0, 0};
   for (int i = 0; i < 8; ++i) data.push_back(static_cast<std::uint8_t>((lamports >> (8 * i)) & 0xFF));
   encoding::compact_u16_encode(static_cast<std::uint16_t>(data.size()), msg);
@@ -73,7 +73,7 @@ Bytes sign_transaction(const Bytes& message, const crypto::KeyPair& keypair) {
   return tx;
 }
 
-// ── RPC client ───────────────────────────────────────────────────────────────
+// -- RPC client ---------------------------------------------------------------
 
 std::uint64_t SolanaClient::get_balance(const Pubkey& account) {
   json::Value params = json::Value::array({json::Value::string(to_address(account))});

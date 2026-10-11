@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
-/// A typed publish/subscribe event bus — the streaming API consumers subscribe
-/// to for live chain state (ARCHITECTURE §12). Strongly typed: subscribers get
+/// A typed publish/subscribe event bus - the streaming API consumers subscribe
+/// to for live chain state (ARCHITECTURE section 12). Strongly typed: subscribers get
 /// exactly the event type they ask for. Dispatch is synchronous and in
 /// subscription order (deterministic).
 ///

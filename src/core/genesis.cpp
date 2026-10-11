@@ -31,7 +31,7 @@ Bytes GenesisSpec::encode() const {
   w.write_u32(max_block_txs);
   w.write_u64(max_block_bytes);
   w.write_u16(assurance_profile);
-  // Accounts, sorted by address → canonical regardless of insertion order.
+  // Accounts, sorted by address -> canonical regardless of insertion order.
   std::vector<GenesisAccount> sorted_accounts = accounts;
   std::sort(sorted_accounts.begin(), sorted_accounts.end(),
             [](const GenesisAccount& a, const GenesisAccount& b) { return a.address < b.address; });
@@ -39,7 +39,7 @@ Bytes GenesisSpec::encode() const {
     w.write_fixed_bytes(hview(a.address), 32);
     w.write_u128(a.balance);
   });
-  // UTXOs in the given order — the position assigns each output's genesis
+  // UTXOs in the given order - the position assigns each output's genesis
   // outpoint, so order is significant and must NOT be re-sorted.
   w.write_list(utxos, [](codec::CodecWriter& w, const GenesisUtxo& u) {
     w.write_fixed_bytes(hview(u.owner), 32);

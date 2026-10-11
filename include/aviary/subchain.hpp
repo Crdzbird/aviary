@@ -10,7 +10,7 @@
 #include "aviary/proofs.hpp"
 #include "aviary/types.hpp"
 
-/// Subchains — docs/design/SUBCHAINS.md. A parent chain ANCHORS its children:
+/// Subchains - docs/design/SUBCHAINS.md. A parent chain ANCHORS its children:
 /// a parent block carries each child's finalized headers + certificates, the
 /// parent's validators verify them exactly as a light client would, and the
 /// child's new tip is recorded in a registry committed into the parent header.
@@ -23,13 +23,13 @@ namespace aviary {
 struct GenesisSpec;
 
 /// A child registered at the parent's genesis: its trusted starting header (the
-/// child's GENESIS HEADER — which commits its chain id, genesis state root and,
+/// child's GENESIS HEADER - which commits its chain id, genesis state root and,
 /// if the child is itself a parent, its own initial registry), its FIXED
 /// validator set, and how deep its own subtree may go.
 ///
 /// Why the genesis HEADER and not the genesis HASH: the child's genesis hash
 /// commits its ParentBinding (the parent's genesis hash), and the parent's
-/// genesis hash commits this registration — a cycle. The genesis header does
+/// genesis hash commits this registration - a cycle. The genesis header does
 /// not depend on the binding, so parent and child can each commit to the other.
 struct ChildRegistration {
   std::uint64_t chain_id = 0;
@@ -53,10 +53,10 @@ struct SubchainPolicy {
   Bytes encode() const;
   static SubchainPolicy decode_all(crypto::ByteView bytes);
   crypto::Hash hash() const;
-  /// Structural validity: sorted unique children, count ≤ max_children, each
-  /// child's chain_id ≠ [own_chain_id], non-empty validator sets, genesis
+  /// Structural validity: sorted unique children, count <= max_children, each
+  /// child's chain_id != [own_chain_id], non-empty validator sets, genesis
   /// header at height 0 with matching chain_id, and each child's subtree fits
-  /// (child_max_depth + 1 ≤ max_depth). Empty string = valid.
+  /// (child_max_depth + 1 <= max_depth). Empty string = valid.
   std::string validate(std::uint64_t own_chain_id) const;
 
   void commit_to(GenesisSpec& g) const;
@@ -79,10 +79,10 @@ Hash registry_root(const std::vector<ChildSummary>& summaries);
 
 /// A cross-chain proof: from a parent's `subchain_root`, hop by hop down the
 /// tree, to a state entry in the last chain. Verification (docs/design/
-/// SUBCHAINS.md §7): for each hop recompute registry_root(summaries) == the
+/// SUBCHAINS.md section 7): for each hop recompute registry_root(summaries) == the
 /// current root, find `child_chain_id`, and continue with that child tip's own
 /// subchain_root; after the last hop verify the state proof against the child
-/// tip's state_root. The same function serves any depth — no new crypto.
+/// tip's state_root. The same function serves any depth - no new crypto.
 struct SubchainProof {
   struct Hop {
     std::vector<ChildSummary> summaries;  ///< the parent's whole registry at that height
@@ -116,7 +116,7 @@ struct ParentBinding {
 
 /// The parent's live view of its children: for each registered child, the
 /// last anchored (finalized) header. Anchor verification IS `LightClient::
-/// accept` — each child header must be the next one (height +1, parent hash,
+/// accept` - each child header must be the next one (height +1, parent hash,
 /// embedded last-commit) under the child's FIXED registered validator set, and
 /// its certificate must reach quorum. Pure and deterministic: the result is a
 /// function of (registry, anchors) only. Copy it, apply, and commit the copy
@@ -139,13 +139,13 @@ class SubchainRegistry {
   /// The last anchored header of [child], or nullptr if not registered.
   const BlockHeader* tip_of(std::uint64_t child_chain_id) const;
 
-  /// Validate a block's anchors (docs/design/SUBCHAINS.md §6: count bound,
+  /// Validate a block's anchors (docs/design/SUBCHAINS.md section 6: count bound,
   /// canonical order, registered child, segment bound, then per header the
   /// light-client rule) and advance the tips. Returns "" on success; on
-  /// failure returns the reason and THIS COPY is unspecified — discard it.
+  /// failure returns the reason and THIS COPY is unspecified - discard it.
   std::string apply_anchors(const std::vector<Anchor>& anchors);
 
-  /// `subchain_root` = registry_root(summaries()) — commits each child's tip AND
+  /// `subchain_root` = registry_root(summaries()) - commits each child's tip AND
   /// its current validator sets, so a parent header attests which set rules the
   /// child next and a snapshot cannot carry a tampered set unnoticed.
   Hash root() const;

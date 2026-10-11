@@ -1,5 +1,5 @@
 // Example: the Aviary Go binding driving a chain, alongside cryptolib's Go
-// binding for off-chain crypto — both from one dependency.
+// binding for off-chain crypto - both from one dependency.
 //
 //	go run ./example
 package main
@@ -13,14 +13,14 @@ import (
 )
 
 func main() {
-	// Background warm-up — fire-and-forget, returns immediately. The API below
+	// Background warm-up - fire-and-forget, returns immediately. The API below
 	// self-initializes regardless, so you never have to wait on it.
 	bc.Preload()
 
-	fmt.Printf("aviary %s · crypto backend %s\n\n",
+	fmt.Printf("aviary %s - crypto backend %s\n\n",
 		bc.Version(), bc.CryptoBackendVersion())
 
-	// ── Off-chain crypto via cryptolib (the same backend aviary links) ──
+	// -- Off-chain crypto via cryptolib (the same backend aviary links) --
 	doc := []byte("settlement-instruction:2026-06-08:EURx:1000000")
 	digest, _ := cryptolib.Blake3(doc, 32)
 	kp := cryptolib.Ed25519Keygen()
@@ -28,7 +28,7 @@ func main() {
 	fmt.Println("cryptolib BLAKE3(doc):", hex.EncodeToString(digest))
 	fmt.Println("cryptolib Ed25519 sig valid:", cryptolib.Ed25519Verify(digest, sig, kp.Public))
 
-	// ── On-chain ledger via aviary ──
+	// -- On-chain ledger via aviary --
 	node := bc.NewNode(1)
 	defer node.Free()
 	aSec, _, aAddr, _ := node.NewAccount()
@@ -40,7 +40,7 @@ func main() {
 	fmt.Printf("\nmempool before block: %d\n", node.MempoolSize())
 	height, _ := node.ProduceBlock(1)
 
-	fmt.Printf("ledger: height %d · alice %d · bob %d · stateRoot %s…\n",
+	fmt.Printf("ledger: height %d - alice %d - bob %d - stateRoot %s...\n",
 		height, node.Balance(aAddr), node.Balance(bAddr),
 		hex.EncodeToString(node.StateRoot())[:16])
 
@@ -65,6 +65,6 @@ func main() {
 	// EVM contract: build + sign an ERC-20 transfer.
 	calldata := bc.EthErc20TransferCalldata(make([]byte, 20), 1_000_000)
 	raw, _ := bc.EthSignLegacy(0, 30_000_000_000, 60_000, make([]byte, 20), 0, calldata, 1, secp)
-	fmt.Printf("  erc20 transfer selector 0x%x · signed tx %d bytes\n",
+	fmt.Printf("  erc20 transfer selector 0x%x - signed tx %d bytes\n",
 		bc.EthSelector("transfer(address,uint256)"), len(raw))
 }

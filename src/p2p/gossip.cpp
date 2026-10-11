@@ -63,7 +63,7 @@ std::vector<GossipOverlay::Relay> GossipOverlay::on_receive(std::uint32_t from,
                                                             const Bytes& message) {
   if (banned_.count(from)) return {};       // ignore anything from a banned peer
   if (!mark_seen(message_id(message))) {
-    return {};  // already seen → drop (stops loops and floods)
+    return {};  // already seen -> drop (stops loops and floods)
   }
   return flood(message, from);
 }

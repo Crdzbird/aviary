@@ -19,7 +19,7 @@ import (
 // hop by hop from a parent header to a state entry on a descendant. v1 anchors
 // BFT children only.
 
-// encodeBlobList encodes items as [count u32]([len u32][bytes])×.
+// encodeBlobList encodes items as [count u32]([len u32][bytes])x.
 func encodeBlobList(items [][]byte) []byte {
 	out := make([]byte, 4, 4+8*len(items))
 	binary.BigEndian.PutUint32(out, uint32(len(items)))
@@ -32,7 +32,7 @@ func encodeBlobList(items [][]byte) []byte {
 	return out
 }
 
-// GenesisHeader is a genesis's genesis HEADER — the identity a parent
+// GenesisHeader is a genesis's genesis HEADER - the identity a parent
 // registers a child by (it does not depend on the child's parent binding).
 func GenesisHeader(genesis []byte) ([]byte, error) {
 	ensure()
@@ -140,7 +140,7 @@ func (c *Chain) ProposeAnchored(timestamp uint64, anchors [][]byte) ([]byte, err
 }
 
 // Certify (BFT engines) aggregates this validator's precommit into a commit
-// certificate for block — the justification for Submit and what a parent
+// certificate for block - the justification for Submit and what a parent
 // anchors. Errors if the engine is not BFT or this validator alone lacks quorum.
 func (c *Chain) Certify(block []byte) ([]byte, error) {
 	return takeBuf(C.aviary_chain_certify(c.h, bp(block), C.size_t(len(block))))
@@ -218,7 +218,7 @@ func (c *Chain) ProveAccount(address []byte) ([]byte, error) {
 	return takeBuf(C.aviary_chain_prove_account(c.h, bp(address)))
 }
 
-// EncodeSubchainProof builds a cross-chain proof from hops (parent → … → the
+// EncodeSubchainProof builds a cross-chain proof from hops (parent -> ... -> the
 // chain holding the entry) and that chain's state proof.
 func EncodeSubchainProof(hops [][]byte, stateProof []byte) ([]byte, error) {
 	ensure()

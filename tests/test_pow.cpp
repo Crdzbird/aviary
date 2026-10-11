@@ -1,5 +1,5 @@
 // Proof-of-work reference engine: a second consensus family behind the same
-// ConsensusEngine seam. A block is justified by work — its header hash must meet
+// ConsensusEngine seam. A block is justified by work - its header hash must meet
 // a difficulty target, with the nonce carried in consensus_data.
 #include <memory>
 #include <vector>
@@ -110,27 +110,27 @@ int main() {
 
   std::printf("== difficulty retargeting tracks block time ==\n");
   {
-    // A mid-range target with the top two bits clear, so ×4 cannot overflow.
+    // A mid-range target with the top two bits clear, so x4 cannot overflow.
     Hash T;
     T.fill(0xFF);
     T[0] = 0x3F;
     const std::uint64_t desired = 600;  // e.g. 10-minute target
 
-    // On-schedule blocks → unchanged target (ratio exactly 1).
+    // On-schedule blocks -> unchanged target (ratio exactly 1).
     CHECK(PowEngine::retarget(T, desired, desired) == T);
 
-    // Blocks too SLOW (2× the interval) → EASIER (larger) target.
+    // Blocks too SLOW (2x the interval) -> EASIER (larger) target.
     Hash slower = PowEngine::retarget(T, 2 * desired, desired);
     CHECK(slower > T);
 
-    // Blocks too FAST (half the interval) → HARDER (smaller) target.
+    // Blocks too FAST (half the interval) -> HARDER (smaller) target.
     Hash faster = PowEngine::retarget(T, desired / 2, desired);
     CHECK(faster < T);
 
-    // The per-step change is clamped to [1/4, 4]×.
+    // The per-step change is clamped to [1/4, 4]x.
     CHECK(PowEngine::retarget(T, 100 * desired, desired) == PowEngine::retarget(T, 4 * desired, desired));
     CHECK(PowEngine::retarget(T, 1, desired) == PowEngine::retarget(T, desired / 4, desired));
-    // The clamped-easy result is 4× the target, still below the all-ones max.
+    // The clamped-easy result is 4x the target, still below the all-ones max.
     Hash max_t;
     max_t.fill(0xFF);
     CHECK(PowEngine::retarget(T, 100 * desired, desired) < max_t);

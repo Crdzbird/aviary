@@ -1,4 +1,4 @@
-// probe — exercises the Interop server end-to-end and checks Go-side
+// probe - exercises the Interop server end-to-end and checks Go-side
 // self-consistency (a local node must reproduce the server's state root).
 package main
 
@@ -38,13 +38,13 @@ func main() {
 		AliceCredit: 1_000_000, TransferAmount: 250_000, Timestamp: 1,
 	}
 
-	// go → flutter analog: server builds + returns proof.
+	// go -> flutter analog: server builds + returns proof.
 	res, err := c.BuildChain(ctx, scn)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("server stateRoot %s  bob=%d  proof=%dB\n",
-		hex.EncodeToString(res.StateRoot)[:16]+"…", res.BobBalance, len(res.Proof))
+		hex.EncodeToString(res.StateRoot)[:16]+"...", res.BobBalance, len(res.Proof))
 
 	// Local replica must match byte-for-byte (determinism).
 	local := bc.NewNode(7)
@@ -55,10 +55,10 @@ func main() {
 	}
 	local.SubmitTransfer(aSec, bAddr, 250_000, local.Nonce(aAddr))
 	local.ProduceBlock(1)
-	fmt.Printf("local  stateRoot %s\n", hex.EncodeToString(local.StateRoot())[:16]+"…")
+	fmt.Printf("local  stateRoot %s\n", hex.EncodeToString(local.StateRoot())[:16]+"...")
 	must("state roots match", bytes.Equal(res.StateRoot, local.StateRoot()))
 
-	// flutter → go analog: server verifies a locally-produced proof.
+	// flutter -> go analog: server verifies a locally-produced proof.
 	vr, err := c.VerifyProof(ctx, &pb.ProofBundle{StateRoot: local.StateRoot(), Proof: local.ProveAccount(bAddr)})
 	if err != nil {
 		log.Fatal(err)
@@ -67,9 +67,9 @@ func main() {
 	must("local verifies server proof", bc.VerifyStateProof(res.StateRoot, res.Proof))
 	local.Free()
 
-	// go ↔ flutter analog: canonical bytes match.
+	// go <-> flutter analog: canonical bytes match.
 	in := &pb.CanonicalInput{
-		Message: []byte("interop"),
+		Message:   []byte("interop"),
 		TxVersion: 3, ChainId: 7, TxBody: []byte{0}, TxAuthor: make([]byte, 32), TxSignature: make([]byte, 64),
 		HdrVersion: 2, Height: 1, ParentHash: make([]byte, 32), Timestamp: 1,
 		TxRoot: make([]byte, 32), StateRoot: make([]byte, 32), Consensus: nil,

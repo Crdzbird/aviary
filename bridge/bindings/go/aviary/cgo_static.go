@@ -13,7 +13,7 @@ package aviary
 //	go build -tags "aviary_static cryptolib_static" ./...
 //
 // The resulting binary has NO dependency on libaviary_c / libcryptolib_c
-// shared libraries — nothing to ship alongside it, no rpath, no
+// shared libraries - nothing to ship alongside it, no rpath, no
 // DYLD_LIBRARY_PATH/LD_LIBRARY_PATH. Only the C++ runtime (-lc++ / -lstdc++) is
 // resolved dynamically (present on every macOS and Linux system).
 

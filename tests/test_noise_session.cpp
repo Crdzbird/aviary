@@ -1,6 +1,6 @@
 // Noise XX tier: standards-based channel + PQ identity proof. Proves the
 // round trip, fail-closed ordering (no traffic before the peer's proof), tamper
-// / reorder rejection, prologue agreement, and — the point of the proof — that a
+// / reorder rejection, prologue agreement, and - the point of the proof - that a
 // MITM holding both legs' Noise keys still cannot relay an honest party's
 // identity into the other session (the proof is bound to the handshake hash).
 #include <cstdio>
@@ -20,7 +20,7 @@ Bytes bytes(const char* s) {
 }
 crypto::ByteView v(const Bytes& b) { return crypto::ByteView(b.data(), b.size()); }
 
-// Full handshake + mutual proofs → two open sessions.
+// Full handshake + mutual proofs -> two open sessions.
 std::pair<NoiseSession, NoiseSession> connect(const NoiseSession::Identity& ini,
                                               const NoiseSession::Identity& res, const Bytes& prologue = {}) {
   auto [I, msg0] = NoiseSession::begin_initiator(ini, prologue);
@@ -102,7 +102,7 @@ int main() {
   {
     auto [I, msg0] = NoiseSession::begin_initiator(alice);
     Bytes bad = msg0;
-    bad[bad.size() - 1] ^= 0x01;              // hello payload flipped → role check fails
+    bad[bad.size() - 1] ^= 0x01;              // hello payload flipped -> role check fails
     CHECK_THROWS(NoiseSession::accept_responder(bob, bad));
   }
 
@@ -130,12 +130,12 @@ int main() {
   std::printf("== MITM with both legs' Noise keys cannot relay an honest proof ==\n");
   {
     // Mallory sits between alice (I) and bob (R) with her own X25519 statics on
-    // both legs — the classical break of Noise XX identity (or a quantum
+    // both legs - the classical break of Noise XX identity (or a quantum
     // recovery of a static). She completes both Noise handshakes and holds both
     // sessions' transport keys. She then tries to forward bob's real identity
-    // proof to alice, re-encrypted under the alice↔mallory keys.
+    // proof to alice, re-encrypted under the alice<->mallory keys.
     auto mallory_static = crypto::x25519_keygen();
-    // Leg 1: alice ↔ mallory-as-responder (raw Noise).
+    // Leg 1: alice <-> mallory-as-responder (raw Noise).
     auto [I, msg0] = NoiseSession::begin_initiator(alice);
     crypto::Noise mr(false, v(mallory_static.public_key), v(mallory_static.secret_key));
     mr.read_message(v(msg0));
@@ -143,7 +143,7 @@ int main() {
     Bytes msg2 = I.complete_initiator(msg1);
     mr.read_message(v(msg2));
     mr.split();
-    // Leg 2: mallory-as-initiator ↔ bob (raw Noise).
+    // Leg 2: mallory-as-initiator <-> bob (raw Noise).
     crypto::Noise mi(true, v(mallory_static.public_key), v(mallory_static.secret_key));
     Bytes m0 = mi.write_message(v(Bytes{0x01, 0x49}));
     auto [R, m1] = NoiseSession::accept_responder(bob, m0);
@@ -157,7 +157,7 @@ int main() {
     Bytes relayed = mr.encrypt(v(bobs_proof_plain));
     CHECK_THROWS(I.verify_identity_proof(relayed));   // bound to bob's session hash, not alice's
     CHECK(!I.open());                                 // alice never opens the channel
-    // Mallory's own hybrid identity would verify — but it is HER key, so
+    // Mallory's own hybrid identity would verify - but it is HER key, so
     // alice's pin (peer_identity == bob.sig.public_key) rejects it.
   }
 

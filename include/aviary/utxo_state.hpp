@@ -13,7 +13,7 @@
 
 namespace aviary {
 
-/// UTXO-model state machine (ARCHITECTURE §5). State is the set of unspent
+/// UTXO-model state machine (ARCHITECTURE section 5). State is the set of unspent
 /// outputs, committed as a Merkle root over canonically encoded, outpoint-sorted
 /// UTXO leaves. Replay protection is intrinsic: an outpoint is spendable once.
 ///
@@ -21,20 +21,20 @@ namespace aviary {
 /// so every input it spends must be owned by that author.
 ///
 /// **Fees.** A transaction may spend more than it creates; the surplus
-/// `sum(inputs) − sum(outputs)` is the fee (burned, no fee output). A chain sets
+/// `sum(inputs) - sum(outputs)` is the fee (burned, no fee output). A chain sets
 /// a minimum via [flat_fee]; 0 (the default) requires exact value conservation,
 /// byte-identical to a chain with no fee concept.
 ///
 /// **Commitment performance (copy-on-write).** Like the account model, the
 /// committed UTXO set and its cached Merkle tree live in an immutable, shared
 /// `Snapshot`; a block's spends/creations accumulate in a small `overlay_` (a
-/// tombstone marks a spent outpoint). So `clone()` — done once per block to
-/// apply it atomically — shares the snapshot and copies only the overlay
+/// tombstone marks a spent outpoint). So `clone()` - done once per block to
+/// apply it atomically - shares the snapshot and copies only the overlay
 /// (O(changed)), not the whole UTXO set. The committed root is byte-identical to
 /// `merkle::compute_root` over the sorted leaves.
 ///
-/// Body layout (canonical): `list<Outpoint> inputs ‖ list<Output> outputs`,
-/// where `Outpoint = fixed32 txid ‖ u32 index` and `Output = fixed32 owner ‖ u128 amount`.
+/// Body layout (canonical): `list<Outpoint> inputs || list<Output> outputs`,
+/// where `Outpoint = fixed32 txid || u32 index` and `Output = fixed32 owner || u128 amount`.
 class UtxoStateMachine : public StateMachine {
  public:
   struct Outpoint {
@@ -114,7 +114,7 @@ class UtxoStateMachine : public StateMachine {
   std::uint64_t genesis_counter_ = 0;
 
   const Output* lookup(const Outpoint& op) const;  // overlay-then-base, nullptr if absent
-  void seal() const;                               // fold overlay → new base_
+  void seal() const;                               // fold overlay -> new base_
   std::map<Outpoint, Output> merged() const;       // base with overlay applied
 };
 

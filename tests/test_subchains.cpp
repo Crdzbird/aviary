@@ -1,5 +1,5 @@
 // Subchains (docs/design/SUBCHAINS.md). Stage 1: types, canonical codec, the
-// version-3 header fence, and genesis commitment — no anchoring behaviour yet.
+// version-3 header fence, and genesis commitment - no anchoring behaviour yet.
 #include <cstdio>
 
 #include "aviary/account_state.hpp"
@@ -26,7 +26,7 @@ crypto::KeyPair bls_key(std::uint8_t seed) {
   return crypto::bls_keygen_from_ikm(v(ikm));
 }
 
-// A real chain: 3 BFT validators finalizing blocks with genuine certificates —
+// A real chain: 3 BFT validators finalizing blocks with genuine certificates - 
 // what a parent anchors. May itself be a parent (policy) and/or a child (binding).
 struct ChildChain {
   GenesisSpec genesis;
@@ -60,7 +60,7 @@ struct ChildChain {
   }
   ChildRegistration registration(std::uint8_t depth = 0) const { return registration_of(genesis, depth); }
 
-  // Propose + certify (all 3 sign) WITHOUT finalizing — for equivocation tests.
+  // Propose + certify (all 3 sign) WITHOUT finalizing - for equivocation tests.
   CertifiedHeader certify(std::uint64_t ts, Block* out = nullptr, std::vector<Anchor> anchors = {},
                           std::vector<Transaction> txs = {}) {
     Block b = engine->propose(std::move(txs), ts, std::move(anchors));
@@ -72,7 +72,7 @@ struct ChildChain {
     if (out) *out = b;
     return CertifiedHeader{b.header, cert->encode()};
   }
-  // Schedule adding a validator (seed) — the next block announces it.
+  // Schedule adding a validator (seed) - the next block announces it.
   void rotate_add(std::uint8_t seed) {
     keys.push_back(bls_key(seed));
     std::vector<consensus::Validator> vs = engine->validators().validators();
@@ -188,7 +188,7 @@ int main() {
     bad = p; bad.children[0].genesis_header.height = 1;       CHECK(!bad.validate(1).empty());
     bad = p; bad.children[0].genesis_header.chain_id = 7;     CHECK(!bad.validate(1).empty());
     bad = p; bad.children[0].child_max_depth = 2;             CHECK(!bad.validate(1).empty());  // I10: 2+1 > max_depth 2
-    bad = p; bad.children[0].child_max_depth = 1;             CHECK(bad.validate(1).empty());   // 1+1 ≤ 2 fits
+    bad = p; bad.children[0].child_max_depth = 1;             CHECK(bad.validate(1).empty());   // 1+1 <= 2 fits
 
     CHECK(!SubchainPolicy::from_genesis(parent).has_value());
     p.commit_to(parent);
@@ -240,7 +240,7 @@ int main() {
     CHECK(ledger->tip().height == 0);
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // --------------------------------------------------------------------------
   std::printf("== STAGE 2: a parent ledger anchoring real BFT children ==\n");
   ChildChain childA(42, 0x10), childB(43, 0x20);
   GenesisSpec pgen;
@@ -316,7 +316,7 @@ int main() {
       const Hash root0 = p->tip().subchain_root;
       BlockError e = p->process_block(b);
       CHECK_MSG(!e.ok, what);
-      if (needle) CHECK_MSG(e.error.find(needle) != std::string::npos, (std::string(what) + " → " + e.error).c_str());
+      if (needle) CHECK_MSG(e.error.find(needle) != std::string::npos, (std::string(what) + " -> " + e.error).c_str());
       CHECK_MSG(p->tip().height == 0 && p->tip().subchain_root == root0 && tip_h(*p, 42) == 0, "untouched");
     };
     auto rebuilt = [&](std::vector<Anchor> anchors) {  // consistent anchor_root, so the ANCHOR rule fires
@@ -372,7 +372,7 @@ int main() {
   {
     // Child B's validators certify TWO different blocks at height 2 (they
     // double-sign). The parent anchors whichever it sees first; the other can
-    // never be anchored (height ≤ tip), so the parent's view cannot flip.
+    // never be anchored (height <= tip), so the parent's view cannot flip.
     auto p = fresh_parent();
     Anchor nb; nb.child_chain_id = 43; nb.headers = {b1};
     CHECK(p->process_block(p->build_block({}, 2, {nb})).ok && tip_h(*p, 43) == 1);
@@ -401,7 +401,7 @@ int main() {
     // A corrupted registry in the snapshot is refused (root no longer matches the tip).
     Bytes bad = snap; bad[bad.size() - 40] ^= 1;
     CHECK_THROWS(Ledger::restore(pgen.chain_spec(), v(bad)));
-    // Replay on a second fresh ledger → identical roots (I8).
+    // Replay on a second fresh ledger -> identical roots (I8).
     auto q = fresh_parent();
     CHECK(q->process_block(good).ok);
     CHECK(q->tip().hash() == p->tip().hash() && q->subchains()->root() == p->subchains()->root());
@@ -414,15 +414,15 @@ int main() {
   }
 
 
-  // ──────────────────────────────────────────────────────────────────────────
-  std::printf("== STAGE 3: three-level tree root ← child ← grandchild, real chains ==\n");
+  // --------------------------------------------------------------------------
+  std::printf("== STAGE 3: three-level tree root <- child <- grandchild, real chains ==\n");
   const crypto::KeyPair alice = crypto::ed25519_keygen_from_seed(v(Bytes(32, 0xA1)));
   const Hash alice_addr = crypto::address_of(v(alice.public_key));
   // Grandchild G (leaf, account model with a funded account).
   std::vector<crypto::KeyPair> gkeys;
   GenesisSpec ggen = ChildChain::make_genesis(420, 0x30, gkeys);
   ggen.accounts.push_back(GenesisAccount{alice_addr, 1000});
-  // Child C: a parent of G (policy) — its genesis HEADER is fixed before any binding.
+  // Child C: a parent of G (policy) - its genesis HEADER is fixed before any binding.
   std::vector<crypto::KeyPair> ckeys;
   GenesisSpec cgen = ChildChain::make_genesis(42, 0x40, ckeys);
   { SubchainPolicy cp; cp.max_children = 1; cp.max_depth = 1; cp.children = {ChildChain::registration_of(ggen)}; cp.commit_to(cgen); }
@@ -432,7 +432,7 @@ int main() {
   rgen.chain_id = 1; rgen.timestamp = 1;
   rgen.validators = {consensus::Validator{bls_key(0x01).public_key, 1}};
   { SubchainPolicy rp; rp.max_children = 1; rp.max_depth = 2; rp.children = {ChildChain::registration_of(cgen, /*depth=*/1)}; rp.commit_to(rgen); }
-  // Bind C → R and G → C (child genesis hashes now commit their parents).
+  // Bind C -> R and G -> C (child genesis hashes now commit their parents).
   ParentBinding{1, rgen.hash()}.commit_to(cgen);
   ParentBinding{42, cgen.hash()}.commit_to(ggen);
   CHECK(ledger_from_genesis(cgen)->tip() == c_header_before_binding);   // no cycle: the binding does not move the header
@@ -446,7 +446,7 @@ int main() {
     CHECK_THROWS(ledger_from_genesis(deep));
   }
 
-  std::printf("== anchors flow upward: G → C → R ==\n");
+  std::printf("== anchors flow upward: G -> C -> R ==\n");
   Transaction pay;
   {
     pay.version = 1; pay.chain_id = 420;
@@ -454,7 +454,7 @@ int main() {
     pay.author = alice.public_key;
     pay.signature = crypto::ed25519_sign(v(pay.signing_bytes()), v(alice.secret_key));
   }
-  CertifiedHeader g1 = G.next(2, {}, {pay});   // alice: 1000 → 750 on G
+  CertifiedHeader g1 = G.next(2, {}, {pay});   // alice: 1000 -> 750 on G
   CertifiedHeader g2 = G.next(3);
   CHECK(g1.header.version == 1);              // a leaf chain is untouched by subchains
   Anchor ga; ga.child_chain_id = 420; ga.headers = {g1, g2};
@@ -484,7 +484,7 @@ int main() {
     CHECK(!verify_subchain_proof(R->tip().subchain_root, one));  // but not from R (wrong level)
   }
 
-  std::printf("== tamper each link → rejected ==\n");
+  std::printf("== tamper each link -> rejected ==\n");
   {
     auto bad = [&](const char* what, auto mutate) {
       SubchainProof t = proof; mutate(t);
@@ -492,7 +492,7 @@ int main() {
     };
     CHECK(!verify_subchain_proof(fill(0x01), proof));                                        // wrong root
     bad("no hops", [](SubchainProof& t) { t.hops.clear(); });
-    bad("hop dropped", [](SubchainProof& t) { t.hops.pop_back(); });                          // proves G's state against C's tip → root mismatch
+    bad("hop dropped", [](SubchainProof& t) { t.hops.pop_back(); });                          // proves G's state against C's tip -> root mismatch
     bad("descend into unknown child", [](SubchainProof& t) { t.hops[0].child_chain_id = 7; });
     bad("child tip height forged", [](SubchainProof& t) { t.hops[0].summaries[0].tip.height += 1; });
     bad("child tip subchain_root forged", [](SubchainProof& t) { t.hops[0].summaries[0].tip.subchain_root = fill(0x9); });
@@ -520,7 +520,7 @@ int main() {
   }
 
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // --------------------------------------------------------------------------
   std::printf("== STAGE 4: relay from a child's archive; any engine as parent ==\n");
   {
     // A fresh BFT child with an archive of finalized (block, cert) pairs.
@@ -593,7 +593,7 @@ int main() {
   }
 
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // --------------------------------------------------------------------------
   std::printf("== VALIDATOR ROTATION on a child: the parent follows it through anchors and snapshots ==\n");
   {
     ChildChain K(88, 0x70);
@@ -604,7 +604,7 @@ int main() {
     pp.commit_to(pg);
     auto P = ledger_from_genesis(pg);
     CertifiedHeader k1 = K.next(2);
-    K.rotate_add(0x73);                        // 3 → 4 validators
+    K.rotate_add(0x73);                        // 3 -> 4 validators
     CertifiedHeader k2 = K.next(3);            // announces the rotation, certified by the 3
     CHECK(K.engine->validators().size() == 4);
     CertifiedHeader k3 = K.next(4);            // certified by the 4

@@ -46,10 +46,10 @@ int main() {
     for (std::uint64_t h = 1; h <= 10000; ++h) counts[stake_weighted_proposer(h, vset)]++;
     // Deterministic + within a sane band of the 10/20/70 split.
     CHECK(counts[3] == 0);                                  // slashed never leads
-    CHECK(counts[2] > counts[1] && counts[1] > counts[0]);  // more stake → more slots
+    CHECK(counts[2] > counts[1] && counts[1] > counts[0]);  // more stake -> more slots
     CHECK(counts[2] > 6000 && counts[2] < 8000);            // ~70%
     CHECK(counts[0] > 600 && counts[0] < 1400);             // ~10%
-    // Determinism: same height → same leader.
+    // Determinism: same height -> same leader.
     CHECK(stake_weighted_proposer(42, vset) == stake_weighted_proposer(42, vset));
   }
 
@@ -99,7 +99,7 @@ int main() {
     forged.header.consensus_data = PosData{impostor}.encode();
     // Re-sign as the impostor over the forged block id.
     PosEngine imp(vset, impostor, bls(static_cast<std::uint8_t>(10 + impostor)), genesis(alice_addr));
-    // imp isn't the leader for height 1, so it can't propose — but it can still
+    // imp isn't the leader for height 1, so it can't propose - but it can still
     // try to sign a forged block; submit must reject (wrong leader for height).
     const Bytes imp_sig = imp.seal(forged);
     CHECK(!verifier2.submit(forged, view(imp_sig)).ok);
@@ -123,7 +123,7 @@ int main() {
       nodes.push_back(
           std::make_unique<PosEngine>(vset, i, keys[i], genesis(alice_addr), round_robin));
     }
-    // Heights 1,2,3 → leaders 0,1,2 in strict rotation.
+    // Heights 1,2,3 -> leaders 0,1,2 in strict rotation.
     for (std::uint64_t h = 1; h <= 3; ++h) {
       const std::uint32_t leader = static_cast<std::uint32_t>((h - 1) % 3);
       CHECK(nodes[leader]->proposer_for(h) == leader);

@@ -9,8 +9,8 @@
 #include "aviary/codec.hpp"
 #include "aviary/ledger.hpp"
 
-/// On-disk persistence (ARCHITECTURE §13). A [FileStore] is a minimal, crash-safe
-/// key→bytes backend: each key is a file in a directory, and writes are atomic
+/// On-disk persistence (ARCHITECTURE section 13). A [FileStore] is a minimal, crash-safe
+/// key->bytes backend: each key is a file in a directory, and writes are atomic
 /// (temp file + rename) so a crash mid-write never corrupts an existing value.
 /// The chain helpers layer the existing serialization (BlockStore::serialize,
 /// Ledger::snapshot) on top, so a node can persist its whole chain and reload it
@@ -38,7 +38,7 @@ class FileStore {
   std::filesystem::path path_for(const std::string& key) const { return dir_ / key; }
 };
 
-// ── Chain persistence ──────────────────────────────────────────────────────────
+// -- Chain persistence ----------------------------------------------------------
 
 /// Keys used for the block archive and the state snapshot.
 inline constexpr const char* kBlocksKey = "blocks";

@@ -20,7 +20,7 @@ LightClient::Result LightClient::accept(const BlockHeader& h,
   }
 
   // The header must bind to the set in force at its height and carry a valid
-  // last commit for the current tip under the set that certified THAT — so a
+  // last commit for the current tip under the set that certified THAT - so a
   // follower detects an unannounced validator-set swap and confirms every
   // ancestor was finalized, not merely linked. An announced change (checked
   // well-formed here) takes effect for the header after this one.
@@ -71,7 +71,7 @@ LightClient::Result LightClient::check_skip(const BlockHeader& h, const consensu
     if (idx >= h_set.size()) return Result::failure("signer index out of range");
     if (auto mine = vset_.index_of(h_set.at(idx).bls_pubkey)) overlap += vset_.at(*mine).power;
   }
-  // overlap / total > num / den  ⇔  overlap * den > total * num  (no floats, no rounding)
+  // overlap / total > num / den  <=>  overlap * den > total * num  (no floats, no rounding)
   const unsigned __int128 lhs = static_cast<unsigned __int128>(overlap) * trust_den_;
   const unsigned __int128 rhs = static_cast<unsigned __int128>(vset_.total_power()) * trust_num_;
   if (!(lhs > rhs)) return Result::thin_overlap("insufficient overlap with the trusted validator set");

@@ -7,12 +7,12 @@
 
 #include "aviary/crypto.hpp"
 
-/// Binary Merkle tree over leaf hashes (ARCHITECTURE §4, docs/CODEC_SPEC.md).
+/// Binary Merkle tree over leaf hashes (ARCHITECTURE section 4, docs/CODEC_SPEC.md).
 ///
 /// Odd-node rule: a lone node is **carried up unchanged** (never duplicated),
 /// which avoids the CVE-2012-2459 duplicate-node malleability class. Node hashes
-/// are domain-separated (`hash_node` = H(0x01 ‖ left ‖ right)); leaves are
-/// expected to already be domain-separated by the caller (`hash_tagged(kLeaf,…)`).
+/// are domain-separated (`hash_node` = H(0x01 || left || right)); leaves are
+/// expected to already be domain-separated by the caller (`hash_tagged(kLeaf,...)`).
 namespace aviary::merkle {
 
 using crypto::Hash;
@@ -37,13 +37,13 @@ bool verify_proof(const Hash& root, const Hash& leaf, const Proof& proof,
                   std::uint32_t leaf_count);
 
 /// A cached, incrementally-updatable binary Merkle tree over an ordered leaf
-/// array. Its root is **byte-identical** to `compute_root(leaves)` — same odd-
-/// node carry-up rule — so it is a drop-in acceleration for state commitments
+/// array. Its root is **byte-identical** to `compute_root(leaves)` - same odd-
+/// node carry-up rule - so it is a drop-in acceleration for state commitments
 /// that mostly mutate existing leaves rather than resizing.
 ///
 /// `reset` builds all levels once (O(N)). `root_with_updates` answers "what
-/// would the root be if these leaf positions changed?" in O(K·log N) WITHOUT
-/// mutating the cache — untouched siblings are read straight from the cached
+/// would the root be if these leaf positions changed?" in O(K-log N) WITHOUT
+/// mutating the cache - untouched siblings are read straight from the cached
 /// levels. This lets a working state snapshot commit a block's handful of
 /// account changes without rehashing the whole tree.
 class MerkleIndex {
@@ -53,16 +53,16 @@ class MerkleIndex {
 
   std::size_t leaf_count() const { return levels_.empty() ? 0 : levels_.front().size(); }
 
-  /// Current cached root. Empty tree → the fixed domain-separated empty root.
+  /// Current cached root. Empty tree -> the fixed domain-separated empty root.
   Hash root() const;
 
   /// Root that WOULD result if leaf[i] became changes[i], for each i. Positions
-  /// must be existing leaves (no resize). Pure — does not touch the cache.
+  /// must be existing leaves (no resize). Pure - does not touch the cache.
   Hash root_with_updates(const std::map<std::size_t, Hash>& changes) const;
 
  private:
   // levels_[0] == leaves; each level up is next_level() of the one below;
-  // levels_.back() == {root}. Empty tree → levels_ is empty.
+  // levels_.back() == {root}. Empty tree -> levels_ is empty.
   std::vector<std::vector<Hash>> levels_;
 };
 

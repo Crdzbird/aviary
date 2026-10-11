@@ -25,7 +25,7 @@ constexpr std::uint8_t kPrecommit = 0x01;
 
 ValidatorSet::ValidatorSet(std::vector<Validator> validators)
     : validators_(std::move(validators)) {
-  // Reject malformed sets at construction — a bad set is a consensus footgun.
+  // Reject malformed sets at construction - a bad set is a consensus footgun.
   // (A zero-power *validator* is allowed: that is exactly a slashed validator;
   // what is rejected is a set with no live power at all.)
   if (validators_.empty()) throw std::invalid_argument("ValidatorSet: empty set");
@@ -152,7 +152,7 @@ std::optional<CommitCertificate> aggregate_commit(
   if (power < vset.quorum()) return std::nullopt;
 
   // Sort (index, signature) together so signers ascend and the aggregated
-  // signatures stay aligned — O(n log n), no per-signer re-scan.
+  // signatures stay aligned - O(n log n), no per-signer re-scan.
   std::sort(collected.begin(), collected.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });
   std::vector<std::uint32_t> signers;
@@ -177,7 +177,7 @@ CommitError verify_commit(std::uint64_t chain_id, const ValidatorSet& vset,
                           const CommitCertificate& cert) {
   if (cert.signers.empty()) return CommitError::failure("no signers");
 
-  // Signers must be strictly ascending (→ unique) and in range.
+  // Signers must be strictly ascending (-> unique) and in range.
   std::uint64_t power = 0;
   std::vector<Bytes> msgs, pks;
   msgs.reserve(cert.signers.size());
@@ -202,7 +202,7 @@ CommitError verify_commit(std::uint64_t chain_id, const ValidatorSet& vset,
   return CommitError::success();
 }
 
-// ── Consensus header payload (S4) ───────────────────────────────────────────
+// -- Consensus header payload (S4) -------------------------------------------
 
 std::optional<std::uint32_t> ValidatorSet::index_of(const Bytes& bls_pubkey) const {
   for (std::size_t i = 0; i < validators_.size(); ++i)
@@ -293,7 +293,7 @@ CommitError validate_consensus_data(std::uint64_t chain_id, const ValidatorSet& 
   return verify_commit(chain_id, vset, lc);
 }
 
-// ── Equivocation evidence (S4) ──────────────────────────────────────────────
+// -- Equivocation evidence (S4) ----------------------------------------------
 
 Bytes Evidence::encode() const {
   codec::CodecWriter w;
@@ -349,7 +349,7 @@ std::optional<Evidence> detect_equivocation(std::uint64_t height, std::uint32_t 
   for (const auto& av : votes) {
     auto [it, fresh] = seen.emplace(av.vote.validator_index, av);
     if (fresh) continue;
-    if (it->second.block_id == av.block_id) continue;  // same block → not a conflict
+    if (it->second.block_id == av.block_id) continue;  // same block -> not a conflict
     Evidence ev;
     ev.validator_index = av.vote.validator_index;
     ev.height = height;

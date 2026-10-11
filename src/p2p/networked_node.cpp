@@ -18,7 +18,7 @@ NetworkedNode::Outbound NetworkedNode::emit(const consensus::RoundDriver::Output
 
   // The round driver expects to receive its OWN messages back (its vote counting
   // happens on delivery, not on broadcast). Over gossip we send to peers but
-  // never to ourselves, so we self-deliver each of our broadcasts here — feeding
+  // never to ourselves, so we self-deliver each of our broadcasts here - feeding
   // it to our own driver AND originating it to the mesh. Self-delivery can emit
   // further broadcasts (e.g. our own prevote lets us reach a precommit), so we
   // drain a work-list to a fixpoint.
@@ -28,7 +28,7 @@ NetworkedNode::Outbound NetworkedNode::emit(const consensus::RoundDriver::Output
     pending.pop_front();
     const Bytes payload = m.encode();
 
-    auto relays = gossip_.originate(payload);  // marks seen → peers' echoes dedup
+    auto relays = gossip_.originate(payload);  // marks seen -> peers' echoes dedup
     o.relays.insert(o.relays.end(), relays.begin(), relays.end());
     replay_.push_back(payload);  // catch-up log for links that (re)connect later
 
@@ -87,7 +87,7 @@ NetworkedNode::Outbound NetworkedNode::on_gossip(std::uint32_t from, const Bytes
   try {
     wire::Message m = wire::Message::decode_all(view(payload));
     if (m.type == wire::MessageType::kConsensus) {
-      replay_.push_back(payload);  // valid consensus payload → part of the catch-up log
+      replay_.push_back(payload);  // valid consensus payload -> part of the catch-up log
       Outbound produced = emit(driver_.deliver(wire::as_consensus(m)));
       o.relays.insert(o.relays.end(), produced.relays.begin(), produced.relays.end());
       o.timeouts = std::move(produced.timeouts);

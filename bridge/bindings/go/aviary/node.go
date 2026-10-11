@@ -90,12 +90,12 @@ func (n *Node) SubmitTransferHybrid(secret, public, to []byte, amount, nonce uin
 		bp(to), C.uint64_t(amount), C.uint64_t(nonce)))
 }
 
-// ErrGenesisSealed is returned by Credit once a block has been produced —
+// ErrGenesisSealed is returned by Credit once a block has been produced -
 // genesis credits are no longer valid; fund accounts with transfers instead.
 var ErrGenesisSealed = errors.New("aviary: genesis is sealed (a block was produced); fund accounts with transfers")
 
 // Credit credits an address at genesis. Valid until the first block is produced
-// (reads do NOT seal genesis). Returns ErrGenesisSealed afterwards — never a
+// (reads do NOT seal genesis). Returns ErrGenesisSealed afterwards - never a
 // silent no-op.
 func (n *Node) Credit(address []byte, amount uint64) error {
 	switch C.aviary_node_credit(n.h, bp(address), C.uint64_t(amount)) {
@@ -147,7 +147,7 @@ func (n *Node) ProveAccount(a []byte) []byte {
 	return b
 }
 
-// ── Interop ───────────────────────────────────────────────────────────────────
+// -- Interop -------------------------------------------------------------------
 
 func EthAddress(secret32 []byte) string {
 	ensure()

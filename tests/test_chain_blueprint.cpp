@@ -2,7 +2,7 @@
 // pluggable components named by stable ids, committed into the genesis hash.
 // Built-ins assemble by id; a custom subclass of a seam registers under its
 // own id and joins the mixture; anything unknown, or a mix the assurance
-// posture forbids, is rejected at boot (fail-closed) — integrity preserved.
+// posture forbids, is rejected at boot (fail-closed) - integrity preserved.
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -38,7 +38,7 @@ GenesisSpec genesis(const AssuranceProfile& profile) {
   return g;
 }
 
-// A CUSTOM engine — the extensibility proof. Subclasses the ConsensusEngine seam
+// A CUSTOM engine - the extensibility proof. Subclasses the ConsensusEngine seam
 // with the simplest possible justification (none) and rides the unchanged
 // Ledger pipeline (build_block / process_block keep atomicity + determinism).
 class TrivialEngine : public consensus::ConsensusEngine {
@@ -62,7 +62,7 @@ bool throws(F&& f) { return ::bctest::throws(std::forward<F>(f)); }
 int main() {
   init();
 
-  // ── Blueprint codec + genesis commitment (the integrity anchor) ────────────
+  // -- Blueprint codec + genesis commitment (the integrity anchor) ------------
   {
     ChainBlueprint b;
     b.consensus_id = "pos";
@@ -83,7 +83,7 @@ int main() {
     CHECK(mixed.assurance_profile == plain.assurance_profile && mixed.membership_policy.empty());
   }
 
-  // ── Registry discovery: the built-ins are always nameable ──────────────────
+  // -- Registry discovery: the built-ins are always nameable ------------------
   {
     auto has = [](const std::vector<std::string>& v, const char* s) {
       for (const auto& x : v) if (x == s) return true;
@@ -97,7 +97,7 @@ int main() {
     CHECK(has(p, "stake-weighted") && has(p, "round-robin"));
   }
 
-  // ── Default assembly: a genesis WITHOUT a blueprint still assembles ────────
+  // -- Default assembly: a genesis WITHOUT a blueprint still assembles --------
   {
     GenesisSpec g = genesis(AssuranceProfile::standard());
     ChainBlueprint d = ChainAssembler::default_blueprint(g);
@@ -107,7 +107,7 @@ int main() {
     CHECK(chain.engine->height() == 0);
   }
 
-  // ── Built-in PoS via an explicit blueprint (+ a chosen proposer policy) ─────
+  // -- Built-in PoS via an explicit blueprint (+ a chosen proposer policy) -----
   {
     GenesisSpec g = genesis(AssuranceProfile::standard());
     ChainBlueprint b;
@@ -123,7 +123,7 @@ int main() {
     CHECK(chain.engine->height() == 1);
   }
 
-  // ── Built-in PoW via a blueprint carrying a difficulty target in params ─────
+  // -- Built-in PoW via a blueprint carrying a difficulty target in params -----
   {
     GenesisSpec g = genesis(AssuranceProfile::standard());
     ChainBlueprint b;
@@ -140,7 +140,7 @@ int main() {
     CHECK(chain.engine->height() == 1);
   }
 
-  // ── EXTENSIBILITY: a custom engine subclass joins the mixture by id ────────
+  // -- EXTENSIBILITY: a custom engine subclass joins the mixture by id --------
   {
     ComponentRegistry::register_engine(
         "trivial",
@@ -177,8 +177,8 @@ int main() {
     CHECK(ChainAssembler::assemble(g2, 0, bls(0x60)).engine->height() == 0);
   }
 
-  // ── FOREIGN components: justification + proposer policies supplied from
-  //    outside C++ (here: lambdas standing in for FFI callbacks) ─────────────
+  // -- FOREIGN components: justification + proposer policies supplied from
+  //    outside C++ (here: lambdas standing in for FFI callbacks) -------------
   {
     // Justification = the block's own header hash; verify = it must match.
     node::register_foreign_engine(
@@ -202,7 +202,7 @@ int main() {
     Block blk = chain.engine->propose({}, 2);
     Bytes just = fe->justify(blk);
     CHECK(just.size() == 32);
-    // A tampered justification is refused by the FOREIGN verifier — and the
+    // A tampered justification is refused by the FOREIGN verifier - and the
     // ledger is untouched (fail-closed, atomic).
     Bytes bad = just; bad[0] ^= 1;
     CHECK(!chain.engine->submit(blk, view(bad)).ok);
@@ -220,7 +220,7 @@ int main() {
     CHECK(ChainAssembler::assemble(g2, 0, bls(0x60)).engine->height() == 0);
   }
 
-  // ── FAIL-CLOSED: unknown ids are rejected, never substituted ───────────────
+  // -- FAIL-CLOSED: unknown ids are rejected, never substituted ---------------
   {
     GenesisSpec g = genesis(AssuranceProfile::standard());
     ChainBlueprint b;
@@ -240,7 +240,7 @@ int main() {
     CHECK(throws([&] { (void)ChainAssembler::assemble(g, 0, bls(0x60)); }));
   }
 
-  // ── FAIL-CLOSED: the posture constrains the mix ────────────────────────────
+  // -- FAIL-CLOSED: the posture constrains the mix ----------------------------
   {
     // A hardened (VRF) posture forbids a predictable-leader engine.
     GenesisSpec g = genesis(AssuranceProfile::hardened());
@@ -260,7 +260,7 @@ int main() {
     CHECK(chain.engine->height() == 0);
   }
 
-  // ── FAIL-CLOSED: the state id must match how the genesis is seeded ─────────
+  // -- FAIL-CLOSED: the state id must match how the genesis is seeded ---------
   {
     GenesisSpec g = genesis(AssuranceProfile::standard());  // seeded as ACCOUNT
     ChainBlueprint b;

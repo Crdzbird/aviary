@@ -912,7 +912,7 @@ class LedgerStatus extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $fixnum.Int64> get kindCounts => $_getMap(7);
 }
 
-/// ── Fleet (chain tree) ─────────────────────────────────────────────────────────
+/// -- Fleet (chain tree) ---------------------------------------------------------
 class FleetSpec extends $pb.GeneratedMessage {
   factory FleetSpec({
     $core.Iterable<$core.String>? deviceLabels,

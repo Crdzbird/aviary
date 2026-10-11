@@ -24,7 +24,7 @@ int main() {
   CHECK(hex(encode(Item::string(Bytes{0x04, 0x00}))) == "820400");
 
   std::printf("== integer encodings ==\n");
-  CHECK(hex(encode(Item::string(uint_bytes(0)))) == "80");      // 0 → empty string
+  CHECK(hex(encode(Item::string(uint_bytes(0)))) == "80");      // 0 -> empty string
   CHECK(hex(encode(Item::string(uint_bytes(15)))) == "0f");
   CHECK(hex(encode(Item::string(uint_bytes(1024)))) == "820400");
 
@@ -35,7 +35,7 @@ int main() {
 
   std::printf("== long string (>55 bytes) uses the b8 form ==\n");
   {
-    Bytes long_str(56, 0x61);  // 56 × 'a'
+    Bytes long_str(56, 0x61);  // 56 x 'a'
     Bytes enc = encode(Item::string(long_str));
     CHECK(enc[0] == 0xb8);
     CHECK(enc[1] == 56);

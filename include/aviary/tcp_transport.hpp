@@ -10,7 +10,7 @@
 #include "aviary/noise_session.hpp"
 #include "aviary/secure_session.hpp"
 
-/// Real-socket transport for a [NetworkedNode] — the last mile that turns the
+/// Real-socket transport for a [NetworkedNode] - the last mile that turns the
 /// pure in/out validator into one that runs over the network.
 ///
 /// [NetworkedNode] is deliberately clockless and socketless: it returns the
@@ -24,7 +24,7 @@
 /// Topology is formed deterministically: for an edge, the lower id dials the
 /// higher id (so each node dials its higher-id peers and accepts its lower-id
 /// peers). The node waits until every expected peer connection is up, then
-/// begins consensus — so the round-0 proposer never broadcasts into the void.
+/// begins consensus - so the round-0 proposer never broadcasts into the void.
 namespace aviary::p2p {
 
 /// Where to reach a peer validator.
@@ -39,12 +39,12 @@ struct PeerAddr {
 /// before any consensus byte flows, and every frame is then encrypted; an
 /// unknown identity is dropped (an allow-list). The [tier] picks which channel:
 ///
-///   - `kMutual` — the SIGMA [SecureSession]: one-shot hybrid-KEM + signed
+///  - `kMutual` - the SIGMA [SecureSession]: one-shot hybrid-KEM + signed
 ///     transcript. Confidential, mutually authenticated, PQ.
-///   - `kRatcheted` — the [ArmoredChannel] hybrid-KEM Double Ratchet: adds
+///  - `kRatcheted` - the [ArmoredChannel] hybrid-KEM Double Ratchet: adds
 ///     per-message forward secrecy + post-compromise healing on long-lived
 ///     links. The dialer encapsulates to the peer's published ratchet prekey.
-///   - `kNoiseXX` — the standards-based [NoiseSession]: Noise_XX_25519_ChaChaPoly
+///  - `kNoiseXX` - the standards-based [NoiseSession]: Noise_XX_25519_ChaChaPoly
 ///     _SHA256 (interoperable with any Noise stack) plus a PQ-hybrid identity
 ///     proof bound to the handshake hash. PQ-authenticated; confidentiality is
 ///     classical. Needs no peer key up front beyond the sig allow-list.
@@ -57,16 +57,16 @@ enum class TransportTier { kMutual, kRatcheted, kNoiseXX };
 struct SecureConfig {
   TransportTier tier = TransportTier::kMutual;
   SecureSession::Identity identity;              ///< this node's long-term identity (its .sig authenticates)
-  std::map<std::uint32_t, Bytes> peer_sig_pk;   ///< peer id → signing public key (pin / allow-list; both tiers)
+  std::map<std::uint32_t, Bytes> peer_sig_pk;   ///< peer id -> signing public key (pin / allow-list; both tiers)
 
   // kMutual: the SIGMA KEM keys.
-  std::map<std::uint32_t, Bytes> peer_kem_pk;   ///< peer id → hybrid-KEM public key (to dial)
+  std::map<std::uint32_t, Bytes> peer_kem_pk;   ///< peer id -> hybrid-KEM public key (to dial)
 
   // kRatcheted: the ratchet prekeys.
   crypto::KeyPair ratchet_prekey;               ///< this node's ratchet prekey (to accept)
-  std::map<std::uint32_t, Bytes> peer_prekey;   ///< peer id → ratchet prekey public key (to dial)
+  std::map<std::uint32_t, Bytes> peer_prekey;   ///< peer id -> ratchet prekey public key (to dial)
 
-  // kNoiseXX: the X25519 static (fresh per boot when empty — identity is .sig)
+  // kNoiseXX: the X25519 static (fresh per boot when empty - identity is .sig)
   // and an optional prologue both sides must share (e.g. the genesis hash).
   crypto::KeyPair noise_static;
   Bytes noise_prologue;
@@ -75,11 +75,11 @@ struct SecureConfig {
 /// Assemble the transport [SecureConfig] for validator [self_id] at [tier] from
 /// its long-term [identity], its ratchet [prekey], and the authenticated peer
 /// [records] (each supplying the peer's KEM key, signing key, and ratchet
-/// prekey). This is the boot-time bridge from an `AssuranceProfile` — a node
+/// prekey). This is the boot-time bridge from an `AssuranceProfile` - a node
 /// maps `profile.transport()` to a [TransportTier] and passes its address book:
 ///
-///   AssuranceProfile::Transport::kMutual    → TransportTier::kMutual
-///   AssuranceProfile::Transport::kRatcheted → TransportTier::kRatcheted
+///   AssuranceProfile::Transport::kMutual    -> TransportTier::kMutual
+///   AssuranceProfile::Transport::kRatcheted -> TransportTier::kRatcheted
 ///
 /// Peers with `id == self_id` are skipped; a record missing the material the
 /// tier needs simply contributes nothing for that peer.
@@ -88,7 +88,7 @@ SecureConfig secure_config_from_records(TransportTier tier, SecureSession::Ident
                                         const std::vector<PeerRecord>& records);
 
 /// Fault injection for tests: after [after_frames] complete frames have arrived
-/// from [peer], the node closes that connection once — simulating a mid-consensus
+/// from [peer], the node closes that connection once - simulating a mid-consensus
 /// link drop. The lifecycle machinery (dialer-side redial with backoff) must then
 /// heal the link for consensus to finish.
 struct ChaosConfig {
@@ -99,13 +99,13 @@ struct ChaosConfig {
 /// Drive [node] over TCP: listen on [listen_port], connect the topology implied
 /// by [peers], then run the reactor until the node commits or [deadline_ms]
 /// elapses. If [secure] is non-null, the channel is encrypted + mutually
-/// authenticated (see [SecureConfig]); otherwise it is plaintext. Blocking — run
+/// authenticated (see [SecureConfig]); otherwise it is plaintext. Blocking - run
 /// one per thread. Returns true iff the node committed.
 ///
 /// Lifecycle: sockets are non-blocking; sends go through bounded per-connection
 /// outbound queues flushed on POLLOUT (a peer that stops reading past the cap is
 /// disconnected, not allowed to wedge the reactor). A dropped connection to a
-/// peer this node dials is automatically re-dialed with backoff — the handshake
+/// peer this node dials is automatically re-dialed with backoff - the handshake
 /// (id hello / secure session) reruns on the fresh socket. Messages lost on the
 /// dead link are NOT replayed; consensus recovers via its own round changes.
 bool run_tcp_bft_node(NetworkedNode& node, std::uint16_t listen_port,

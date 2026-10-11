@@ -36,7 +36,7 @@ func encodeValidatorSet(vs []GenesisValidator) ([]byte, error) {
 		}
 		items = append(items, v.PublicKey)
 	}
-	// [count]([len][pk][power u64])× — the canonical ValidatorSet encoding.
+	// [count]([len][pk][power u64])x - the canonical ValidatorSet encoding.
 	out := make([]byte, 4, 4+len(vs)*60)
 	out[0], out[1], out[2], out[3] = byte(len(vs)>>24), byte(len(vs)>>16), byte(len(vs)>>8), byte(len(vs))
 	for i, v := range vs {
@@ -63,8 +63,8 @@ func NewLightClient(chainID uint64, validators []GenesisValidator, trustedHeader
 	return &LightClient{h}, nil
 }
 
-func (l *LightClient) Free()          { C.aviary_light_client_free(l.h) }
-func (l *LightClient) Height() uint64 { return uint64(C.aviary_light_client_height(l.h)) }
+func (l *LightClient) Free()                { C.aviary_light_client_free(l.h) }
+func (l *LightClient) Height() uint64       { return uint64(C.aviary_light_client_height(l.h)) }
 func (l *LightClient) Tip() ([]byte, error) { return takeBuf(C.aviary_light_client_tip(l.h)) }
 
 // Validators is the set in force for the next header (follows rotations).
@@ -82,7 +82,9 @@ func (l *LightClient) SetTrustLevel(numerator, denominator uint32) {
 }
 
 // SetMaxSkip bounds a single jump in blocks (0 = unbounded).
-func (l *LightClient) SetMaxSkip(blocks uint64) { C.aviary_light_client_set_max_skip(l.h, C.uint64_t(blocks)) }
+func (l *LightClient) SetMaxSkip(blocks uint64) {
+	C.aviary_light_client_set_max_skip(l.h, C.uint64_t(blocks))
+}
 
 // Accept applies the sequential rule.
 func (l *LightClient) Accept(header, certificate []byte) bool {

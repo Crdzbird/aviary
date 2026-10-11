@@ -22,7 +22,7 @@ std::string base58_encode(const Bytes& bytes) {
   std::size_t zeros = 0;
   while (zeros < bytes.size() && bytes[zeros] == 0) ++zeros;
 
-  // Upper bound on size: log(256)/log(58) ≈ 1.38.
+  // Upper bound on size: log(256)/log(58) ~ 1.38.
   std::vector<std::uint8_t> b58((bytes.size() - zeros) * 138 / 100 + 1, 0);
   std::size_t length = 0;
   for (std::size_t i = zeros; i < bytes.size(); ++i) {

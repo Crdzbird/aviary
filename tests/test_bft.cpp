@@ -38,7 +38,7 @@ int main() {
   init();
   constexpr std::uint64_t kChain = 7;
 
-  // 4 BLS validators (power 1 each → quorum 3).
+  // 4 BLS validators (power 1 each -> quorum 3).
   std::vector<crypto::KeyPair> vkeys = {bls_key(10), bls_key(11), bls_key(12), bls_key(13)};
   std::vector<Validator> vs;
   for (auto& k : vkeys) vs.push_back(Validator{k.public_key, 1});
@@ -90,7 +90,7 @@ int main() {
     auto cert2 = engine.try_commit(b2, votes2);
     CHECK(cert2.has_value());
 
-    // Any change to the block changes its id → the certificate no longer matches.
+    // Any change to the block changes its id -> the certificate no longer matches.
     Block tampered = b2;
     tampered.header.timestamp ^= 0x55;
     CHECK(!engine.check_finalization(tampered, *cert2).ok);
@@ -118,7 +118,7 @@ int main() {
         b3, {engine.precommit(b3, 0, vkeys[0]), engine.precommit(b3, 1, vkeys[1]),
              engine.precommit(b3, 2, vkeys[2])});
     CHECK(cert3.has_value());
-    // The justification is the encoded certificate — engine-specific bytes.
+    // The justification is the encoded certificate - engine-specific bytes.
     const Bytes justification = cert3->encode();
     CHECK_MSG(ce.submit(b3, view(justification)).ok, "submit(block, cert) commits");
     CHECK(ce.height() == 3);

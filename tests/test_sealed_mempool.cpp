@@ -1,5 +1,5 @@
 // SealedMempool: transactions stay sealed to the block proposer until it opens
-// them at build time — a front-runner watching the pool sees only ciphertext and
+// them at build time - a front-runner watching the pool sees only ciphertext and
 // a fee hint, never the contents. Ordering by fee is preserved; a lying fee hint
 // or a tampered envelope is dropped on reveal.
 #include <vector>
@@ -73,13 +73,13 @@ int main() {
     pool.add(SealedTx::seal(transfer(alice, 0, 100), view(proposer.public_key)));
     const crypto::KeyPair stranger = crypto::hybrid_kem_keygen();
     CHECK_MSG(pool.reveal(view(stranger.secret_key), 10).empty(),
-              "a non-proposer key opens nothing — the pool is confidential to it");
+              "a non-proposer key opens nothing - the pool is confidential to it");
   }
 
   std::printf("== a lying fee hint is dropped on reveal (can't buy priority) ==\n");
   {
     // Seal a low-fee tx but advertise a huge hint. To even decrypt, the envelope
-    // must have been sealed under that inflated hint (the AAD) — and then the
+    // must have been sealed under that inflated hint (the AAD) - and then the
     // real fee (5) won't match the hint (100000), so reveal drops it.
     Transaction cheap = transfer(alice, 0, 5);
     codec::CodecWriter w;

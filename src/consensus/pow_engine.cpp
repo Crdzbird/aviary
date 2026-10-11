@@ -39,10 +39,10 @@ Hash from_limbs(const std::array<std::uint64_t, 4>& l) {
   return h;
 }
 
-// (256-bit target × m) / d, big-endian, saturating to all-ones on overflow.
+// (256-bit target x m) / d, big-endian, saturating to all-ones on overflow.
 Hash mul_div_target(const Hash& target, std::uint64_t m, std::uint64_t d) {
   const auto l = to_limbs(target);
-  // 256 × 64 → up to 320-bit product in five limbs (p[0] most significant).
+  // 256 x 64 -> up to 320-bit product in five limbs (p[0] most significant).
   std::array<std::uint64_t, 5> p{};
   unsigned __int128 carry = 0;
   for (int i = 3; i >= 0; --i) {
@@ -59,7 +59,7 @@ Hash mul_div_target(const Hash& target, std::uint64_t m, std::uint64_t d) {
     q[i] = static_cast<std::uint64_t>(acc / d);
     rem = acc % d;
   }
-  if (q[0] != 0) {  // result exceeds 256 bits → clamp to the easiest possible target
+  if (q[0] != 0) {  // result exceeds 256 bits -> clamp to the easiest possible target
     Hash mx;
     mx.fill(0xFF);
     return mx;

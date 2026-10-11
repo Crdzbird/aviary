@@ -8,9 +8,9 @@
 #include "aviary/interop/evm.hpp"
 
 /// Minimal Ethereum ABI encoding/decoding for **static** types (address,
-/// uintN, bool, bytes32) — enough to build contract calls like ERC-20
-/// transfer/balanceOf and decode their returns (ARCHITECTURE §11). Dynamic types
-/// (string, bytes, arrays) are deferred — see docs/IMPROVEMENTS.md.
+/// uintN, bool, bytes32) - enough to build contract calls like ERC-20
+/// transfer/balanceOf and decode their returns (ARCHITECTURE section 11). Dynamic types
+/// (string, bytes, arrays) are deferred - see docs/IMPROVEMENTS.md.
 namespace aviary::interop::abi {
 
 using Bytes = std::vector<std::uint8_t>;
@@ -26,7 +26,7 @@ Bytes encode_bytes32(codec::ByteView b);  // exactly 32 bytes, right-padded? no:
 /// e.g. selector("transfer(address,uint256)").
 Bytes selector(const std::string& signature);
 
-/// Encode a function call: selector ‖ concatenated 32-byte argument words.
+/// Encode a function call: selector || concatenated 32-byte argument words.
 Bytes encode_call(const std::string& signature, const std::vector<Bytes>& arg_words);
 
 /// Decode a 32-byte word.
