@@ -3,7 +3,8 @@
 # place it where the aviary_dart build hook bundles it from:
 #   bridge/bindings/dart/native/linux-<x64|arm64>/libaviary_c.so
 # The CipherBird engine is linked in from its merged static archive, produced
-# in the CipherBird checkout by scripts/build_static_archive_linux.sh.
+# in the CipherBird checkout by scripts/build_static_archive_linux.sh. Links
+# with lld so link time optimization and identical code folding apply.
 # Usage: bash scripts/linux/build_so.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -23,7 +24,8 @@ cmake -S "$ROOT" -B "$BUILD" -G Ninja \
   -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
   -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" \
   -DCRYPTOLIB_C_LIBRARY="$ENGINE" \
-  -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--exclude-libs,ALL -Wl,-z,defs" >/dev/null
+  -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
+  -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld -Wl,--exclude-libs,ALL -Wl,-z,defs -Wl,--icf=all" >/dev/null
 cmake --build "$BUILD" --target aviary_c
 strip --strip-unneeded "$BUILD/libaviary_c.so"
 OUT="$ROOT/bridge/bindings/dart/native/$SLOT"

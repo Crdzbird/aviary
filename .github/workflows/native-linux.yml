@@ -41,7 +41,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build git pkg-config build-essential ca-certificates libsodium-dev libssl-dev
+          sudo apt-get install -y clang cmake ninja-build git pkg-config build-essential ca-certificates libsodium-dev libssl-dev lld
 
       # Ubuntu's OpenSSL 3.0 lacks AES-256-GCM-SIV, which the sealed mempool
       # needs, so the engine links CipherBird's from-source OpenSSL (3.6, static,

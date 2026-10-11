@@ -42,8 +42,33 @@ endif()
 
 # Cross-compiles only want the library; skip tests/tools/example.
 option(AVIARY_BUILD_TESTS "Build the test suite + tools" ON)
+
 if(AVIARY_STATIC OR CMAKE_CROSSCOMPILING)
   set(AVIARY_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+endif()
+# Distribution builds (tests off) default to link time optimization and dead
+# section elimination so the shipped engines carry only what the C ABI reaches.
+# Host builds with the test suite keep LTO off: every test links the core and
+# would repeat the whole program optimization.
+if(AVIARY_BUILD_TESTS)
+  set(_aviary_lto_default OFF)
+else()
+  set(_aviary_lto_default ON)
+endif()
+option(AVIARY_LTO "Link time optimization for the core and the C ABI library" ${_aviary_lto_default})
+option(AVIARY_GC_SECTIONS "Compile with function and data sections and let the linker drop unreferenced ones (ELF targets)" ON)
+# A static archive must hold machine code: LTO would leave LLVM bitcode in it,
+# which xcodebuild and app linkers of other toolchains refuse.
+if(AVIARY_LTO AND NOT AVIARY_STATIC AND NOT AVIARY_SANITIZE AND NOT AVIARY_SANITIZE_THREAD AND NOT AVIARY_BUILD_FUZZERS)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT _aviary_ipo OUTPUT _aviary_ipo_msg LANGUAGES CXX)
+  if(_aviary_ipo)
+    message(STATUS "aviary: link time optimization ON")
+  else()
+    message(STATUS "aviary: link time optimization unavailable: ${_aviary_ipo_msg}")
+  endif()
+else()
+  set(_aviary_ipo OFF)
 endif()
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,6 +190,12 @@ endif()
 # tests inherit it.
 find_package(Threads REQUIRED)
 target_link_libraries(aviary_core PUBLIC Threads::Threads)
+if(_aviary_ipo)
+  set_target_properties(aviary_core PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+endif()
+if(AVIARY_GC_SECTIONS AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android"))
+  target_compile_options(aviary_core PRIVATE -ffunction-sections -fdata-sections)
+endif()
 
 # ── C ABI library: SHARED on host (loaded by bindings), STATIC for XCFramework ─
 if(AVIARY_STATIC)
@@ -180,6 +211,16 @@ else()
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(aviary_c PRIVATE -Wl,--exclude-libs,ALL)
   endif()
+  if(AVIARY_GC_SECTIONS AND (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android"))
+    target_compile_options(aviary_c PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(aviary_c PRIVATE -Wl,--gc-sections)
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    target_link_options(aviary_c PRIVATE -Wl,--icf=all)
+  endif()
+endif()
+if(_aviary_ipo)
+  set_target_properties(aviary_c PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
 endif()
 target_include_directories(aviary_c
   PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/bridge"

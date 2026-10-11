@@ -1503,3 +1503,42 @@ selectors — validated against real-world vectors). Deferred:
 - **[ ] [L]** Only `BlockFinalized` and `BlockRejected` are emitted by chains
   and networked nodes; transaction admission lives in the node's mempool.
 
+## Binary size of the shipped engines - DONE (2026-10-11)
+- **[x] Where the bytes were:** the Linux engine was 21 MB stripped against
+  1 MB on macOS, where CipherBird is a separate dylib. Section sizes showed
+  16.7 MB of text on Linux and 4.6 MB on Android for the same code. Three
+  causes, all in the statically folded CipherBird dependencies: the Linux
+  archive script built liboqs with every algorithm (the Android and iOS
+  scripts already restricted it), OpenSSL carried every algorithm family
+  although the engine reaches only EVP AES-256-GCM-SIV and liboqs only AES,
+  SHA-2 and SHA-3, and libsecp256k1 shipped its 1 MiB default ecmult table.
+- **[x] CipherBird (scripts, same repository as the engine):**
+  `scripts/lib_openssl_trim.txt` holds the configure exclusions (EC, DH, DSA,
+  legacy ciphers and digests, CMS, OCSP, CT, TS, CMP, SRP, HTTP, engines,
+  modules, error strings) and is read by the Linux sealed OpenSSL build and
+  the Android and iOS dependency builds; the Linux archive builds liboqs with
+  `OQS_MINIMAL_BUILD` (ML-KEM, ML-DSA, SLH-DSA, sntrup761); libsecp256k1 uses
+  an ecmult window of 12 and a 22 KiB generator table on Linux, Android and
+  iOS. Android libcrypto text 3.7 MB to 1.8 MB, libsecp256k1 1.34 MB to
+  0.36 MB. Documented in CipherBird's `docs/SELF_CONTAINMENT.md`.
+- **[x] Aviary CMake:** `AVIARY_LTO` (default on when the test suite is off,
+  so for every distribution build) applies interprocedural optimization to
+  the core and the C ABI library; `AVIARY_GC_SECTIONS` (default on) compiles
+  with function and data sections and links with `--gc-sections` on Linux and
+  Android; Android adds `--icf=all`. The Linux script links with lld (`lld`
+  added to the Native Linux apt list) so LTO and identical code folding apply
+  there too. The default is computed after the cross compile block that forces
+  tests off, otherwise Android would have kept LTO off.
+- **[x] Results:** Android arm64 lite 9.0 MB to 5.7 MB, x86_64 9.8 MB to
+  7.1 MB; the iOS and macOS lite slices and the Linux engines follow from the
+  rebuilt CipherBird slices and the Native Linux workflow (numbers in the
+  follow up commit).
+- **[ ] [L]** The macOS slice of the lite archive still links Homebrew's full
+  liboqs and secp256k1 through `build_static_archive.sh`; the Apple lite
+  archives are static, so only what an app references reaches it, but a
+  vendored minimal liboqs would make the macOS slice match iOS.
+- **[ ] [L]** The remaining libcrypto text is a long tail (object database,
+  X.509 verification, parameter translation) that OpenSSL cannot configure out
+  without `no-deprecated` style surgery; a provider-only build or a different
+  AES-GCM-SIV implementation would be the next step.
+
