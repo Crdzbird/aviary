@@ -1,6 +1,7 @@
 part of '../../../aviary.dart';
 
 /// A transaction left the mempool, included in a block or evicted.
+/// {@category Observability}
 abstract final class TxRemoved extends ChainEvent {
   /// Describes a removed transaction.
   const factory TxRemoved({required Uint8List txid, required int mempoolSize}) =

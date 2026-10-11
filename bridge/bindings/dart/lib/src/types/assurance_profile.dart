@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// The security posture a chain commits to at genesis. Higher tiers only
 /// ever tighten the tier below them.
+/// {@category Assurance and credentials}
 abstract final class AssuranceProfile {
   /// Describes a posture from its tiers and admitted algorithms.
   const factory AssuranceProfile({

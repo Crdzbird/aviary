@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// A two round threshold signing ceremony over one message and roster.
+/// {@category Custody}
 final class Ceremony extends _NativeHandle {
   Ceremony._(Aviary bc, Pointer<Void> h)
     : super(bc, h, 'aviary_threshold_ceremony_free');

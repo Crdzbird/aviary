@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Portable account export: sealing an account for transport.
+/// {@category Custody}
 extension AviaryPortableSeal on Aviary {
   /// A hybrid KEM device key pair for the recipient bound tiers.
   PortableAccount hybridKemKeypair() {

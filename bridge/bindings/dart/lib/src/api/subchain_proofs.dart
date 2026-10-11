@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Subchain anchors and cross chain proofs.
+/// {@category Subchains and trees}
 extension AviarySubchainProofs on Aviary {
   /// The encoded header of an encoded block.
   Uint8List blockHeader(Uint8List block) =>

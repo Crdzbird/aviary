@@ -1563,3 +1563,14 @@ selectors — validated against real-world vectors). Deferred:
 - **[ ] [L]** The other bindings still carry their own mesh loops in tests; a
   Go `PeerMesh` and an npm one would make their networking examples as short.
 
+## dartdoc categories - DONE (2026-10-11)
+- **[x]** Every public declaration of aviary_dart (89 classes, enums,
+  extensions, typedefs and one function) carries a `{@category}` tag:
+  Ledger, Chains, Subchains and trees, Light clients, Networking, Custody,
+  Assurance and credentials, Observability, Interop, Errors and helpers.
+  `dartdoc_options.yaml` orders them and points each at a one paragraph
+  `doc/<topic>.md`; the same options and topic files sit in aviary_lite and
+  aviary, which re-export the library. `dart doc` renders ten topic pages
+  with zero warnings (three pre-existing unresolved `[field]` references in
+  record typedef docs became code spans).
+

@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// Signing and inventory on a key store. The sealed secret is used inside
 /// the engine and wiped; it never reaches Dart.
+/// {@category Custody}
 extension KeyStoreSigning on KeyStore {
   /// A signed, encoded transfer of [amount] from the stored account at
   /// [from] to [to]. The scheme follows the stored key (Ed25519 or hybrid);

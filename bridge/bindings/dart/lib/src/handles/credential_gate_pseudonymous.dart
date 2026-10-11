@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// The pseudonymous admission flow of a gate.
+/// {@category Assurance and credentials}
 extension CredentialGatePseudonymous on CredentialGate {
   /// Admits a pseudonymous presentation and returns the 48 byte pseudonym,
   /// or null on any reject. Never throws.

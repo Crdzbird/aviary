@@ -2,6 +2,9 @@
 
 ## 0.1.0
 
+- dartdoc categories: Ledger, Chains, Subchains and trees, Light clients,
+  Networking, Custody, Assurance and credentials, Observability, Interop,
+  Errors and helpers.
 - `PeerMesh`: a deterministic in-memory mesh of `NetNode`s (`link`,
   `linkAll`, `start`, `settle`, `advance`, `run`, `step`, `deliver`) for
   tests, simulations and single process networks.

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Canonical bytes that are identical across every binding.
+/// {@category Ledger}
 extension AviaryCanonical on Aviary {
   /// The 32 byte BLAKE3 digest of [msg].
   Uint8List hash(Uint8List msg) => _scoped(
@@ -68,6 +69,7 @@ extension AviaryCanonical on Aviary {
 }
 
 /// Light client verification of proofs and certificates.
+/// {@category Light clients}
 extension AviaryProofs on Aviary {
   bool _verify(String fn, Uint8List root, Uint8List proof) => _scoped(
     [root, proof],

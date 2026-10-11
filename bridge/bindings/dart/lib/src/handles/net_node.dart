@@ -6,6 +6,7 @@ part of '../../aviary.dart';
 /// duration you choose, and feed what arrives back through [onGossip] and
 /// [onTimeout]. Blocks carry the transactions from [setTransactions] when
 /// this node proposes.
+/// {@category Networking}
 final class NetNode extends _NativeHandle {
   NetNode._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_net_node_free');
 

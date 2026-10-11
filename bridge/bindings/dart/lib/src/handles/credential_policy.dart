@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// A membership policy: issuer key, attribute schema and tier threshold.
 /// Build one with [AviaryCredentials.makeCredentialPolicy].
+/// {@category Assurance and credentials}
 final class CredentialPolicy {
   CredentialPolicy._(this._bc, this.encoded);
 

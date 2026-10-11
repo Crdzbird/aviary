@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// Consensus over a network the app owns: nodes that return what to send and
 /// what to arm, and the authenticated session that protects each link.
+/// {@category Networking}
 extension AviaryNetwork on Aviary {
   /// The validator index that follows a chain without voting.
   static const int observer = 0xFFFFFFFF;

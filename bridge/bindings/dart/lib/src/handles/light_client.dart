@@ -4,6 +4,7 @@ part of '../../aviary.dart';
 /// Sequential [accept], plus the overlap rule in [acceptSkipping]: a far
 /// header is trusted when its own set certifies it and the signers hold
 /// more than the trust level of the set already trusted.
+/// {@category Light clients}
 final class LightClient extends _NativeHandle {
   LightClient._(Aviary bc, Pointer<Void> h)
     : super(bc, h, 'aviary_light_client_free');

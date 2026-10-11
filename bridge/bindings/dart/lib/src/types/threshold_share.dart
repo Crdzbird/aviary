@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// One participant's share of a threshold account. Persist [bytes] sealed.
+/// {@category Custody}
 abstract final class ThresholdShare {
   /// Wraps a share card and the facts read from it.
   const factory ThresholdShare(

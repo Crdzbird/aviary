@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Multi chain address derivation and EVM calldata helpers.
+/// {@category Interop}
 extension AviaryInterop on Aviary {
   String _addr(String fn, Uint8List secret) => _scoped([
     secret,

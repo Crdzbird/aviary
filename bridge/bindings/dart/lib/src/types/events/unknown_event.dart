@@ -2,6 +2,7 @@ part of '../../../aviary.dart';
 
 /// An event kind this version of the binding does not model. [json] holds
 /// the fields as the engine sent them.
+/// {@category Observability}
 abstract final class UnknownEvent extends ChainEvent {
   /// Wraps an unmodelled event.
   const factory UnknownEvent(String type, Map<String, Object?> json) =

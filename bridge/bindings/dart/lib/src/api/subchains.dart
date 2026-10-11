@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Subchains: registering children and binding them to a parent.
+/// {@category Subchains and trees}
 extension AviarySubchains on Aviary {
   /// The genesis header of a genesis, the identity a parent registers by.
   Uint8List genesisHeader(Uint8List genesis) =>

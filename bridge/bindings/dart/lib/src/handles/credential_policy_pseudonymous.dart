@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// The pseudonymous issuance and presentation flow of a policy.
+/// {@category Assurance and credentials}
 extension CredentialPolicyPseudonymous on CredentialPolicy {
   /// Holder step one: a blinded membership commit. Holder secret; send
   /// [extractCommitment] of it to the issuer.

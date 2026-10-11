@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Threshold accounts: any t of n share holders can sign.
+/// {@category Custody}
 extension AviaryThreshold on Aviary {
   /// Deals a t of n account as [n] share cards. The group secret is erased.
   List<ThresholdShare> createThresholdAccount(int n, int t) {

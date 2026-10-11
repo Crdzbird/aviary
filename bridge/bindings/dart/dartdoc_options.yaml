@@ -1,0 +1,33 @@
+dartdoc:
+  categories:
+    "Ledger":
+      markdown: doc/ledger.md
+    "Chains":
+      markdown: doc/chains.md
+    "Subchains and trees":
+      markdown: doc/subchains.md
+    "Light clients":
+      markdown: doc/light_clients.md
+    "Networking":
+      markdown: doc/networking.md
+    "Custody":
+      markdown: doc/custody.md
+    "Assurance and credentials":
+      markdown: doc/assurance.md
+    "Observability":
+      markdown: doc/observability.md
+    "Interop":
+      markdown: doc/interop.md
+    "Errors and helpers":
+      markdown: doc/errors.md
+  categoryOrder:
+    - "Ledger"
+    - "Chains"
+    - "Subchains and trees"
+    - "Light clients"
+    - "Networking"
+    - "Custody"
+    - "Assurance and credentials"
+    - "Observability"
+    - "Interop"
+    - "Errors and helpers"

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Chain trees: a declared family of chains built and driven together.
+/// {@category Subchains and trees}
 extension AviaryTrees on Aviary {
   /// Canonically encodes a tree node, children first.
   Uint8List encodeTreeNode(TreeNode n) {

@@ -4,6 +4,7 @@ part of '../../../aviary.dart';
 /// ([BlockFinalized], [BlockRejected], [TxAdmitted], [TxRemoved],
 /// [UnknownEvent]) exhaustively; [UnknownEvent] keeps a newer engine's event
 /// kinds readable.
+/// {@category Observability}
 sealed class ChainEvent {
   const ChainEvent();
 

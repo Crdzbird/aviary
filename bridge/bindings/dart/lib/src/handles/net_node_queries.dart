@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Read only views of a networked node's chain and mesh.
+/// {@category Networking}
 extension NetNodeQueries on NetNode {
   /// The committed chain height.
   int get height => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(

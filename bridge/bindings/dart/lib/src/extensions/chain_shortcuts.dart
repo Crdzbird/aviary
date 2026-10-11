@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// Turning a validator key pair into the entries the genesis, rotation and
 /// tree APIs take.
+/// {@category Ledger}
 extension ValidatorKeyPair on KeyPairBytes {
   /// A validator set entry with [power].
   ValidatorEntry entry(int power) => (publicKey: public, power: power);
@@ -13,6 +14,7 @@ extension ValidatorKeyPair on KeyPairBytes {
 }
 
 /// The propose, justify and submit flow in one call.
+/// {@category Chains}
 extension ChainBlocks on Chain {
   /// Proposes, justifies and applies the next block, returning it. [justify]
   /// defaults to [certify], which is right for a BFT chain whose only
@@ -33,6 +35,7 @@ extension ChainBlocks on Chain {
 }
 
 /// Fluent construction and inspection of chain families.
+/// {@category Subchains and trees}
 extension TreeNodeBuilding on TreeNode {
   /// A copy with [child] appended to [children].
   TreeNode withChild(TreeNode child) =>
@@ -53,6 +56,7 @@ extension TreeNodeBuilding on TreeNode {
 }
 
 /// Driving every chain of a family together.
+/// {@category Subchains and trees}
 extension ChainTreeRounds on ChainTree {
   /// Produces one block on every chain, children before parents, so each
   /// parent anchors what its children just finalized. Returns the blocks in

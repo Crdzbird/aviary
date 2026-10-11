@@ -1,6 +1,7 @@
 part of '../../../aviary.dart';
 
 /// A transaction entered the mempool.
+/// {@category Observability}
 abstract final class TxAdmitted extends ChainEvent {
   /// Describes an admitted transaction.
   const factory TxAdmitted({

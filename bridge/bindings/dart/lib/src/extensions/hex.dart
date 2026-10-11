@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// Hex rendering and comparison for byte strings such as addresses, hashes
 /// and transaction ids. Not constant time; do not compare secrets with it.
+/// {@category Errors and helpers}
 extension HexBytes on Uint8List {
   /// Lowercase hex, two characters per byte.
   String get hex {
@@ -33,6 +34,7 @@ extension HexBytes on Uint8List {
 final RegExp _hexPattern = RegExp(r'^[0-9a-fA-F]*$');
 
 /// Decoding of hex and text into bytes.
+/// {@category Errors and helpers}
 extension HexString on String {
   /// The bytes of a hex string, with or without a 0x prefix. Throws a
   /// [FormatException] on an odd length or a character that is not hex.
@@ -52,6 +54,7 @@ extension HexString on String {
 }
 
 /// Convenience views of an account.
+/// {@category Ledger}
 extension AccountTools on Account {
   /// The chain address in lowercase hex.
   String get addressHex => address.hex;

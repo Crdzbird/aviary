@@ -4,6 +4,7 @@ part of '../../aviary.dart';
 /// The pipeline stays native; Dart supplies the justification policy. Both
 /// methods run synchronously inside consensus, must be deterministic, and
 /// must not call back into the chain.
+/// {@category Chains}
 abstract class ForeignEngine {
   /// Allows subclasses to be const.
   const ForeignEngine();
@@ -17,6 +18,7 @@ abstract class ForeignEngine {
 }
 
 /// Foreign components: engines and proposer policies implemented in Dart.
+/// {@category Chains}
 extension AviaryForeign on Aviary {
   /// Registers [engine] under [id]. The id is chain identity; never rename
   /// it. [grindProof] declares an unpredictable leader election.

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Signed transfers admitted to a node's mempool.
+/// {@category Ledger}
 extension NodeTransfers on Node {
   /// Submits an Ed25519 transfer and returns its transaction id.
   Uint8List submitTransfer(

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Portable account import: opening a sealed account.
+/// {@category Custody}
 extension AviaryPortableOpen on Aviary {
   PortableAccount _account(Uint8List blob) {
     final kp = _splitKeyBlob(blob);

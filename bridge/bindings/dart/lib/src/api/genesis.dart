@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Genesis construction and identity.
+/// {@category Ledger}
 extension AviaryGenesis on Aviary {
   /// A minimal genesis: chain params, posture, seeded state and validators.
   Uint8List buildGenesis({

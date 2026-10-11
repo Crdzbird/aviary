@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Read only views of a node.
+/// {@category Ledger}
 extension NodeQueries on Node {
   int _u64(String fn) =>
       _lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(fn)(_h);
@@ -49,6 +50,7 @@ extension NodeQueries on Node {
 }
 
 /// Typed chain events, pulled or pushed.
+/// {@category Observability}
 extension NodeEvents on Node {
   /// Chain events buffered since the last call, decoded. Returns nothing
   /// while [eventStream] is live, because events then go to the stream.

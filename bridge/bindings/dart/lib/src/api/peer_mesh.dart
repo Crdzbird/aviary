@@ -1,8 +1,8 @@
 part of '../../aviary.dart';
 
-/// A deterministic in-memory mesh of [NetNode]s for tests, simulations and
-/// single process networks: relays are delivered in emission order, a timeout
-/// fires only when none is pending, so the same inputs always take one path.
+/// A deterministic in-memory mesh of [NetNode]s for tests and single process
+/// networks: relays go in emission order, timeouts fire only when none pends.
+/// {@category Networking}
 final class PeerMesh {
   /// Wraps [nodes]; a node's index is its mesh id and must match its `me`.
   PeerMesh(this.nodes);

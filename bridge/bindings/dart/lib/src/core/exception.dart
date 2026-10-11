@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Raised when a native call reports an error.
+/// {@category Errors and helpers}
 abstract final class AviaryException implements Exception {
   /// An error carrying the native [message] and its [status]; calls that only
   /// report a message use [AviaryStatus.failure].

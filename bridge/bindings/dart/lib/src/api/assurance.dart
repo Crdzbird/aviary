@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Assurance postures and the sealed mempool.
+/// {@category Assurance and credentials}
 extension AviaryAssurance on Aviary {
   /// Describes the posture at [level]: 1 standard, 2 hardened, 3 fortress.
   AssuranceProfile describeAssurance(int level) {

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Shortcuts for the common single validator setups.
+/// {@category Ledger}
 extension AviaryQuick on Aviary {
   /// A BLS validator key pair from 32 bytes of fresh random key material.
   KeyPairBytes newValidator() {
@@ -43,6 +44,7 @@ extension AviaryQuick on Aviary {
 }
 
 /// Handles released at the end of a scope, whatever [body] does.
+/// {@category Errors and helpers}
 extension AviaryScopes on Aviary {
   /// Runs [body] with a fresh single validator node and disposes it after.
   R withNode<R>(int chainId, R Function(Node node) body) {

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Composable chains: mixtures, registry discovery and assembly.
+/// {@category Chains}
 extension AviaryMixtures on Aviary {
   /// A validator BLS key pair from [keyMaterial].
   KeyPairBytes newBLSValidator(Uint8List keyMaterial) => _scoped(

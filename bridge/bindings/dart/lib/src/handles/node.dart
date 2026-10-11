@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// A running single validator chain node.
+/// {@category Ledger}
 final class Node extends _NativeHandle {
   Node._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_node_free');
 

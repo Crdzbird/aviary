@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// One chain of a family; [children] are subchains and must be BFT.
+/// {@category Subchains and trees}
 abstract final class TreeNode {
   /// Declares one chain and its subchains.
   const factory TreeNode({

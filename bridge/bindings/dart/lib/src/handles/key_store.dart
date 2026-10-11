@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// A custodial store that seals signing secrets at rest. Create one with
 /// [AviaryNodes.createKeyStore] or [AviaryNodes.loadKeyStore].
+/// {@category Custody}
 final class KeyStore extends _NativeHandle {
   KeyStore._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_keystore_free');
 

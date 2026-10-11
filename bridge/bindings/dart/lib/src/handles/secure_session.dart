@@ -6,6 +6,7 @@ part of '../../aviary.dart';
 /// wrap every frame with [encrypt] and [decrypt]. Always check
 /// [peerIdentity] against the peers you expect: the handshake proves the
 /// peer holds that key, not that it is the peer you wanted.
+/// {@category Networking}
 final class SecureSession extends _NativeHandle {
   SecureSession._(Aviary bc, Pointer<Void> h)
     : super(bc, h, 'aviary_secure_free');

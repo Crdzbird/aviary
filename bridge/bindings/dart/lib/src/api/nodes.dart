@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Single validator chain nodes and custodial key stores.
+/// {@category Ledger}
 extension AviaryNodes on Aviary {
   /// Creates an in memory single validator chain.
   Node createNode(int chainId) {
@@ -30,6 +31,7 @@ extension AviaryNodes on Aviary {
 }
 
 /// Durable state: the whole chain as one blob, and files around it.
+/// {@category Ledger}
 extension NodeStorage on Node {
   /// The chain id, the genesis credits and every finalized block with its
   /// certificate as one blob. Pending mempool transactions are not included.
@@ -55,6 +57,7 @@ extension NodeStorage on Node {
 }
 
 /// Rebuilding nodes from durable state.
+/// {@category Ledger}
 extension AviaryNodeStorage on Aviary {
   /// A node rebuilt from [snapshot]. A current snapshot carries the ledger
   /// state and resumes from the tip at once; [replay] forces every block

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Read only views and proofs of a chain tree.
+/// {@category Subchains and trees}
 extension ChainTreeQueries on ChainTree {
   /// The family's chain ids, parents first.
   List<int> chainIds() {

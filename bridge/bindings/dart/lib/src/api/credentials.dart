@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Anonymous membership credentials: issuers, policies and gates.
+/// {@category Assurance and credentials}
 extension AviaryCredentials on Aviary {
   /// A BBS issuer key pair from at least 32 bytes of key material.
   KeyPairBytes newBBSIssuer(Uint8List keyMaterial) => _scoped(

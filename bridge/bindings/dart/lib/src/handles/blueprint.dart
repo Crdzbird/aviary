@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// A declared mixture of engine, state model and proposer ids plus params.
 /// Commit it with [AviaryGenesis.commitBlueprint].
+/// {@category Chains}
 final class Blueprint {
   Blueprint._(this._bc, this.encoded);
 

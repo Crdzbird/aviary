@@ -1,6 +1,7 @@
 part of '../../../aviary.dart';
 
 /// A block was finalized and applied.
+/// {@category Observability}
 abstract final class BlockFinalized extends ChainEvent {
   /// Describes a finalized block.
   const factory BlockFinalized({

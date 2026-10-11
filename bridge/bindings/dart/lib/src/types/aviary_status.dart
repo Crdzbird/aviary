@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// The stable status codes of the C ABI. Values never change.
+/// {@category Errors and helpers}
 enum AviaryStatus {
   /// Success.
   ok(0),

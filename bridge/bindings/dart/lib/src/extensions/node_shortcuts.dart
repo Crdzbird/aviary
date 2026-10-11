@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Account creation with genesis funding in one step.
+/// {@category Ledger}
 extension NodeFunding on Node {
   /// A fresh Ed25519 account credited with [amount] at genesis. Throws once
   /// the first block has been produced.
@@ -19,6 +20,7 @@ extension NodeFunding on Node {
 }
 
 /// Transfers that pick the nonce and the signature scheme for you.
+/// {@category Ledger}
 extension NodeSending on Node {
   /// Sends [amount] from [from] to the address [to]. The nonce comes from
   /// [NodeQueries.nextNonce], so several transfers from one account may be
@@ -63,6 +65,7 @@ extension NodeSending on Node {
 }
 
 /// Decoded views of a node's state.
+/// {@category Ledger}
 extension NodeViews on Node {
   /// Whether [proof] from [NodeQueries.proveAccount] holds under the
   /// current state root.

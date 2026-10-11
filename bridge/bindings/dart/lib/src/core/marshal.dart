@@ -86,5 +86,6 @@ Uint8List _concat(Iterable<Uint8List> parts) {
 }
 
 /// The commitment part of a membership commit blob, for the issuer.
+/// {@category Assurance and credentials}
 Uint8List extractCommitment(Uint8List membershipCommit) =>
     Uint8List.sublistView(membershipCommit, 4, 4 + _u32be(membershipCommit, 0));

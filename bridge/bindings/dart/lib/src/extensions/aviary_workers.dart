@@ -3,6 +3,7 @@ part of '../../aviary.dart';
 /// The Argon2 bound custody operations on a worker isolate, so the calling
 /// isolate stays responsive. The worker loads the engine the way this
 /// instance was loaded: the same explicit path, or the platform default.
+/// {@category Custody}
 extension AviaryAsync on Aviary {
   /// [AviaryThreshold.sealShare] on a worker isolate.
   Future<Uint8List> sealShareAsync(
@@ -48,6 +49,7 @@ extension AviaryAsync on Aviary {
 }
 
 /// A whole threshold signing ceremony run in one process.
+/// {@category Custody}
 extension ThresholdSigning on Aviary {
   /// Signs [message] with [shares], at least the account's threshold of
   /// them, and returns the 64 byte Ed25519 signature. Every share commits,

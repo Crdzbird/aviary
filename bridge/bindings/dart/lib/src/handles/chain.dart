@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// An assembled node behind the uniform propose, justify, submit flow.
+/// {@category Chains}
 final class Chain extends _NativeHandle {
   Chain._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_chain_free');
 

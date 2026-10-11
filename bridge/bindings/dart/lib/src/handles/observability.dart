@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// Events and metrics of an assembled chain: every [Chain.submit] reports a
 /// [BlockFinalized] or a [BlockRejected], and the metrics count them.
+/// {@category Observability}
 extension ChainObservability on Chain {
   /// Events buffered since the last call. Empty while [eventStream] is live.
   List<ChainEvent> events() => _chainEventsFromJsonArray(
@@ -29,6 +30,7 @@ extension ChainObservability on Chain {
 /// Events and metrics of a networked node: a [BlockFinalized] per committed
 /// height, and counters for gossip received, relayed and dropped, timeouts
 /// fired and peers banned.
+/// {@category Observability}
 extension NetNodeObservability on NetNode {
   /// Events buffered since the last call. Empty while [eventStream] is live.
   List<ChainEvent> events() => _chainEventsFromJsonArray(

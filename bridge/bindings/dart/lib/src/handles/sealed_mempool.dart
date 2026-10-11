@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// A mempool of sealed transactions only the block proposer can open.
+/// {@category Assurance and credentials}
 final class SealedMempool extends _NativeHandle {
   SealedMempool._(Aviary bc, Pointer<Void> h)
     : super(bc, h, 'aviary_sealed_mempool_free');

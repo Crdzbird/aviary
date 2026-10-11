@@ -1,6 +1,7 @@
 part of '../../../aviary.dart';
 
 /// A block failed consensus or state validation.
+/// {@category Observability}
 abstract final class BlockRejected extends ChainEvent {
   /// Describes a rejected block.
   const factory BlockRejected({

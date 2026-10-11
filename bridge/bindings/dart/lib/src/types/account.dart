@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// A generated account: the signing secret, public key and chain address.
+/// {@category Ledger}
 abstract final class Account {
   /// Wraps the three byte strings of an account.
   const factory Account(

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// Light clients that follow a header chain with certificates only.
+/// {@category Light clients}
 extension AviaryLightClients on Aviary {
   /// A light client trusting [trustedHeader] and the set in force for the
   /// next header. Null when the input is malformed.
@@ -25,6 +26,7 @@ extension AviaryLightClients on Aviary {
 }
 
 /// Bisection sync for a light client.
+/// {@category Light clients}
 extension LightClientSync on LightClient {
   /// Reaches [target] at [targetHeight], fetching intermediate checkpoints
   /// while the overlap is too thin. Throws on a hard refusal or a missing

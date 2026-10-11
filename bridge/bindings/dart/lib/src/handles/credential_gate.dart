@@ -2,6 +2,7 @@ part of '../../aviary.dart';
 
 /// A verifier's anonymous membership admission gate. It admits a holder by a
 /// zero knowledge proof of an issuer signed credential clearing the policy.
+/// {@category Assurance and credentials}
 final class CredentialGate extends _NativeHandle {
   CredentialGate._(Aviary bc, Pointer<Void> h)
     : super(bc, h, 'aviary_credential_gate_free');

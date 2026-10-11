@@ -3,6 +3,7 @@ part of '../../aviary.dart';
 /// The loaded native library and the stateless entry points. Feature
 /// surfaces are extensions on this class; stateful objects are created
 /// through it.
+/// {@category Ledger}
 final class Aviary {
   Aviary._(this.lib, [this._path]);
 

@@ -3,6 +3,7 @@ part of '../../aviary.dart';
 /// A built family of chains driven in process. [produce] anchors children
 /// upward automatically; [ChainTreeQueries.proveAccount] proves any
 /// descendant from the root header.
+/// {@category Subchains and trees}
 final class ChainTree extends _NativeHandle {
   ChainTree._(Aviary bc, Pointer<Void> h)
     : _handle = _nextTreeHandle++,

@@ -1,6 +1,7 @@
 part of '../../aviary.dart';
 
 /// The parent side of a chain: anchoring children and proving into them.
+/// {@category Subchains and trees}
 extension ChainSubchains on Chain {
   /// Proposes the next block anchoring encoded anchors in ascending child
   /// id order. Throws on an invalid anchor.
