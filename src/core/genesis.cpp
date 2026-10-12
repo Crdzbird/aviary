@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "aviary/account_state.hpp"
+#include "aviary/record_state.hpp"
 #include "aviary/utxo_state.hpp"
 
 namespace aviary {
@@ -113,6 +114,7 @@ ChainSpec GenesisSpec::chain_spec() const {
 }
 
 std::unique_ptr<StateMachine> GenesisSpec::build_state() const {
+  if (state_model == StateModel::kRecord) return std::make_unique<RecordStateMachine>();
   if (state_model == StateModel::kAccount) {
     auto state = std::make_unique<AccountStateMachine>(flat_fee);
     for (const auto& a : accounts) state->credit_genesis(a.address, a.balance);

@@ -61,9 +61,9 @@ Extensions that collapse the common flows into one call:
 | `String` | `hexBytes` (with or without 0x), `utf8Bytes` |
 | `Account` | `addressHex`, `isHybrid` |
 | `Node` | `fundAccount`, `fundHybridAccount`, `send`, `sendTo` (nonce from `nextNonce`, scheme follows the account), `sendFromStore`, `submitTx`, `submitTransferFromStore`, `commit`, `events`, `eventStream`, `metricValues`, `verifyAccountProof`, `snapshot`, `blockAt`, `saveTo` |
-| `Aviary` | `newValidator`, `assembleSingleValidator`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `newNetNode`, `generateSecureIdentity`, `initiateSecureSession`, `acceptSecureSession`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
+| `Aviary` | `newValidator`, `assembleSingleValidator`, `assembleRecordChain`, `signRecordTx`, `addressOf`, `recordFromProof`, `signWithShares`, `restoreNode`, `restoreNodeFrom`, `newNetNode`, `generateSecureIdentity`, `initiateSecureSession`, `acceptSecureSession`, `withNode`, `withKeyStore`, `withTree`, `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync`, `openAccountPassphraseAsync` |
 | `KeyPairBytes` | `entry(power)`, `treeValidator(power)` |
-| `Chain` | `produceBlock(timestamp, justify:)`, `events`, `eventStream`, `metrics`, `metricValues` |
+| `Chain` | `produceBlock(timestamp, justify:)`, `events`, `eventStream`, `metrics`, `metricValues`, `addTx`, `write`, `record`, `proveRecord`, `recordNonce`, `pendingCount` |
 | `NetNode` | `events`, `eventStream`, `metrics`, `metricValues` |
 | `TreeNode` | `withChild`, `find`, `chainIds` |
 | `KeyStore` | `signTransfer`, `publicKey`, `has`, `addresses`, `lock` |
@@ -93,9 +93,36 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 - Light clients: `newLightClient`, `acceptSkipping`, `syncTo`.
 - Networking: `newNetNode`, `NetNode`, `PeerMesh`, `SecureSession`,
   `generateSecureIdentity`.
+- Records: `assembleRecordChain`, `ChainRecords` (`write`, `record`,
+  `proveRecord`, `addTx`), `RecordOp`, `recordFromProof`.
 - Chain trees: `TreeNode`, `buildChainTree`, `ChainTree`.
 - Custody: `KeyStore`, portable accounts, threshold accounts, `Ceremony`.
 - Assurance and sealed mempools; anonymous membership credentials.
+
+## Records
+
+A chain does not have to carry money. `assembleRecordChain` builds a chain
+whose state is a signed key value store: each record has a 32 byte key the
+application chooses, an owner, a version and an opaque value of up to 64 KiB.
+`chain.write(secret, key, op, value)` signs and queues a write (the nonce
+comes from the chain, so several writes can be queued before a block);
+`produceBlock` finalizes them. Only the owner may `put`, `transfer` or
+`delete`. `record(key)` reads the committed record, `proveRecord(key)` proves
+it to someone who holds only the state root, and `recordFromProof` reads it
+back out of a verified proof.
+
+```dart
+final chain = bc.assembleRecordChain(chainId: 31, validator: bc.newValidator());
+final key = bc.hash(utf8.encode('asset:PUMP-0042'));
+chain.write(owner.secret, key, RecordOp.put, utf8.encode('{"status":"in service"}'));
+chain.produceBlock(1);
+final proof = chain.proveRecord(key);
+assert(bc.verifyStateProof(chain.stateRoot(), proof));
+print(bc.recordFromProof(proof).version); // 1
+```
+
+`addTx` queues any signed, encoded transaction on any assembled chain, for
+the account and UTXO models as well.
 
 ## Events
 

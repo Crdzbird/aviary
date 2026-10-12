@@ -8,6 +8,8 @@ dartdoc:
       markdown: doc/subchains.md
     "Light clients":
       markdown: doc/light_clients.md
+    "Records":
+      markdown: doc/records.md
     "Networking":
       markdown: doc/networking.md
     "Custody":
@@ -25,6 +27,7 @@ dartdoc:
     - "Chains"
     - "Subchains and trees"
     - "Light clients"
+    - "Records"
     - "Networking"
     - "Custody"
     - "Assurance and credentials"

@@ -173,6 +173,43 @@ let powChain = Aviary.assembleChain(genesis: powGen, me: 0, blsPub: val.publicKe
 let cand = try powChain.propose(timestamp: 2)
 let solved = try powChain.mine(cand)
 precondition(powChain.submit(block: solved) && powChain.height == 1, "PoW block committed")
+
+// Application records: a chain that stores objects instead of balances.
+do {
+    let rv = try Aviary.newBLSValidator(keyMaterial: Data(repeating: 0x70, count: 32))
+    let recGen = try Aviary.commitBlueprint(
+        genesis: try Aviary.buildGenesis(chainID: 31, stateModel: 2, accounts: [], validators: [Aviary.GenesisValidator(publicKey: rv.publicKey, power: 1)]),
+        blueprint: try Aviary.Blueprint(consensus: "bft", stateModel: "record"))
+    let rc = Aviary.assembleChain(genesis: recGen, me: 0, blsPub: rv.publicKey, blsSec: rv.secret)!
+    precondition(rc.chainID == 31, "record chain id")
+    let rn = try Aviary.makeNode(chainID: 1)
+    let ra = try rn.newAccount(), rb = try rn.newAccount()
+    let rkey = try Aviary.hash(Data("asset:PUMP-0042".utf8))
+    try rc.write(secret: ra.secret, key: rkey, op: .put, value: Data("{\"status\":\"in service\"}".utf8))
+    try rc.write(secret: ra.secret, key: rkey, op: .put, value: Data("{\"status\":\"serviced\"}".utf8))
+    let queuedOnly = try rc.record(key: rkey)
+    precondition(rc.pendingCount == 2 && queuedOnly == nil, "queued, not committed")
+    precondition((try? rc.write(secret: rb.secret, key: rkey, op: .put, value: Data([1]))) == nil, "non-owner refused")
+    var rblk = try rc.propose(timestamp: 2)
+    let rcert = try rc.certify(rblk)
+    precondition(rc.submit(block: rblk, justification: rcert) && rc.pendingCount == 0, "record block")
+    let rec = try rc.record(key: rkey)!
+    precondition(rec.version == 2 && rec.owner == ra.address, "record committed")
+    let rproof = try rc.proveRecord(key: rkey)
+    let rroot = try rc.stateRoot()
+    precondition(Aviary.verifyStateProof(stateRoot: rroot, proof: rproof), "record proof")
+    let rleaf = try Aviary.recordFromProof(rproof)
+    precondition(rleaf.version == 2, "record from proof")
+    try rc.write(secret: ra.secret, key: rkey, op: .transfer, value: rb.address)
+    rblk = try rc.propose(timestamp: 3); _ = rc.submit(block: rblk, justification: try rc.certify(rblk))
+    let moved = try rc.record(key: rkey)
+    precondition(moved?.owner == rb.address, "transfer")
+    try rc.write(secret: rb.secret, key: rkey, op: .delete)
+    rblk = try rc.propose(timestamp: 4); _ = rc.submit(block: rblk, justification: try rc.certify(rblk))
+    let gone = try rc.record(key: rkey)
+    precondition(gone == nil, "delete")
+    print("records OK")
+}
 try ensure("chain events") { try powChain.drainEvents().contains("block_finalized") }
 try ensure("chain metrics") { try powChain.metrics().contains("aviary_chain_height 1") }
 var powPushed: [String] = []

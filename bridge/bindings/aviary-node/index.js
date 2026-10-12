@@ -190,6 +190,16 @@ function ensureLoaded() {
     chainValidators: f('AviaryBufferResult aviary_chain_validators(void*)'),
     chainSubchainHop: f('AviaryBufferResult aviary_chain_subchain_hop(void*, uint64_t)'),
     chainProveAccount: f('AviaryBufferResult aviary_chain_prove_account(void*, uint8_t*)'),
+    chainChainId: f('uint64_t aviary_chain_chain_id(void*)'),
+    chainStateRoot: f('AviaryBufferResult aviary_chain_state_root(void*)'),
+    chainAddTx: f('AviaryBufferResult aviary_chain_add_tx(void*, uint8_t*, size_t)'),
+    chainPendingCount: f('uint64_t aviary_chain_pending_count(void*)'),
+    chainRecord: f('AviaryBufferResult aviary_chain_record(void*, uint8_t*)'),
+    chainRecordNonce: f('uint64_t aviary_chain_record_nonce(void*, uint8_t*)'),
+    chainProveRecord: f('AviaryBufferResult aviary_chain_prove_record(void*, uint8_t*)'),
+    recordTxSign: f('AviaryBufferResult aviary_record_tx_sign(uint64_t, uint64_t, uint8_t*, uint8_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    recordFromProof: f('AviaryBufferResult aviary_record_from_proof(uint8_t*, size_t)'),
+    addressOf: f('AviaryBufferResult aviary_address_of(uint8_t*, size_t)'),
     subchainProofEncode: f('AviaryBufferResult aviary_subchain_proof_encode(uint8_t*, size_t, uint8_t*, size_t)'),
     subchainProofVerify: f('int aviary_subchain_proof_verify(uint8_t*, uint8_t*, size_t)'),
     // Foreign components (engines / proposers implemented in JavaScript)
@@ -584,6 +594,26 @@ function hookEvents(setter, h, previous, cb) {
   setter(h, reg, null);
   return reg;
 }
+/** Record operations. */
+const RecordOp = Object.freeze({ PUT: 0, TRANSFER: 1, DELETE: 2 });
+function decodeRecord(b, withKey) {
+  let o = 0;
+  const key = withKey ? b.subarray(0, 32) : undefined; if (withKey) o = 32;
+  const owner = b.subarray(o, o + 32); o += 32;
+  const version = Number(b.readBigUInt64BE(o)); o += 8;
+  const len = b.readUInt32BE(o); o += 4;
+  const value = b.subarray(o, o + len);
+  return withKey ? { key, owner, version, value } : { owner, version, value };
+}
+/** A signed, encoded record transaction from a 64 byte Ed25519 secret. */
+function signRecordTx({ chainId, nonce, key, op, value = Buffer.alloc(0), secret }) {
+  const v = u8(value), s = u8(secret);
+  return consume(fn.recordTxSign(BigInt(chainId), BigInt(nonce), u8(key), op, v, v.length, s, s.length), 'record_tx_sign');
+}
+/** The 32 byte chain address of a public key. */
+function addressOf(publicKey) { return consume(fn.addressOf(u8(publicKey), u8(publicKey).length), 'address_of'); }
+/** The record a verified state proof commits to: { key, owner, version, value }. */
+function recordFromProof(proof) { return decodeRecord(consume(fn.recordFromProof(u8(proof), u8(proof).length), 'record_from_proof'), true); }
 class Chain {
   constructor(h) { this._h = h; this._event = null; }
   get height() { return Number(fn.chainHeight(this._h)); }
@@ -626,6 +656,28 @@ class Chain {
   subchainHop(childChainId) { return consume(fn.chainSubchainHop(this._h, BigInt(childChainId)), 'chain_subchain_hop'); }
   /** State-inclusion proof for a 32-byte address on this account-model chain. */
   proveAccount(address) { return consume(fn.chainProveAccount(this._h, u8(address)), 'chain_prove_account'); }
+  /** The chain id this chain runs. */
+  get chainId() { return Number(fn.chainChainId(this._h)); }
+  /** The committed 32 byte state root. */
+  stateRoot() { return consume(fn.chainStateRoot(this._h), 'chain_state_root'); }
+  /** Queues a signed, encoded transaction for the next proposal (validated against the chain and the earlier queued ones); returns the txid. */
+  addTx(tx) { return consume(fn.chainAddTx(this._h, u8(tx), u8(tx).length), 'chain_add_tx'); }
+  /** Transactions waiting for the next proposal. */
+  get pendingCount() { return Number(fn.chainPendingCount(this._h)); }
+  /** Signs a record write with a 64 byte Ed25519 secret (nonce from the chain) and queues it; returns the txid. */
+  write(secret, key, op, value = Buffer.alloc(0)) {
+    const author = addressOf(u8(secret).subarray(32));
+    return this.addTx(signRecordTx({ chainId: this.chainId, nonce: this.recordNonce(author), key, op, value, secret }));
+  }
+  /** The committed record at key: { owner, version, value }, or null. Record-model chains only. */
+  record(key) {
+    try { return decodeRecord(consume(fn.chainRecord(this._h, u8(key)), 'chain_record'), false); }
+    catch (e) { if (String(e.message).includes('no such record')) return null; throw e; }
+  }
+  /** The next nonce an author address must use on this record chain, counting queued writes. */
+  recordNonce(address) { return Number(fn.chainRecordNonce(this._h, u8(address))); }
+  /** A state inclusion proof for the record at key; verify with verifyStateProof(stateRoot(), proof). */
+  proveRecord(key) { return consume(fn.chainProveRecord(this._h, u8(key)), 'chain_prove_record'); }
 }
 // The canonical ValidatorSet encoding: [count]([len][pk][power u64])x.
 function decodeValidatorSet(b) {
@@ -1001,6 +1053,7 @@ module.exports = {
   commitBlueprint: (genesis, bp) => consume(fn.genesisCommitBp(u8(genesis), u8(genesis).length, bp.encoded, bp.encoded.length), 'genesis_commit_blueprint'),
   genesisHash: (genesis) => consume(fn.genesisHash(u8(genesis), u8(genesis).length), 'genesis_hash'),
   assembleChain,
+  RecordOp, signRecordTx, addressOf, recordFromProof,
   Chain,
   registerEngine,
   registerProposer,

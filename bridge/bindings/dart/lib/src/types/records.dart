@@ -79,3 +79,7 @@ typedef Outbound = ({List<Relay> relays, List<TimeoutRequest> timeouts});
 /// hybrid signature pair to authenticate.
 /// {@category Networking}
 typedef SecureIdentity = ({KeyPairBytes kem, KeyPairBytes sig});
+
+/// Outcome of [LightClient.acceptSkipping].
+/// {@category Light clients}
+enum SkipResult { refused, accepted, insufficientOverlap }

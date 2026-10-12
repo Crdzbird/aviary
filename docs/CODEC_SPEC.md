@@ -85,3 +85,20 @@ with an internal node or a header:
 1. `u128` vs arbitrary-precision for value fields (ARCHITECTURE section 17.1).
 2. State-trie key/proof format (section 17.2).
 3. Final domain-tag table and any additional roots (receipts).
+
+## Record model (state model 2)
+
+Transaction body: `u64 nonce || fixed32 key || u8 op || bytes value`, with
+op 0 put, 1 transfer (value is the new 32 byte owner address), 2 delete
+(value empty). The value is at most 65536 bytes.
+
+State leaves, in this order: for every record in key order
+`0x01 || fixed32 key || fixed32 owner || u64 version || bytes value`; then
+for every author in address order `0x02 || fixed32 address || u64 nonce`.
+The state root is the Merkle root over `hash_tagged(kLeaf, leaf)` of those
+leaves, the same construction as the account model. A record proof is a
+`StateProof` whose leaf preimage is the record leaf.
+
+Snapshot: `u32 count || (key || owner || u64 version || bytes value)* ||
+u32 count || (address || u64 nonce)*`.
+

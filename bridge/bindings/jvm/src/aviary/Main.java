@@ -415,6 +415,39 @@ public final class Main {
             }
             System.out.println("custody signing OK");
 
+            // Application records: a chain that stores objects instead of balances.
+            {
+                Aviary.PortableAccount v = bc.newBLSValidator(new byte[]{0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70,0x70});
+                byte[] genesis = bc.commitBlueprint(
+                        bc.buildGenesis(31, 1, 1, 2, new byte[0][], new long[0], new byte[][]{v.publicKey()}, new long[]{1}),
+                        bc.new Blueprint("bft", "record", "", new byte[0]));
+                Aviary.Chain rchain = bc.assembleChain(genesis, 0, v.publicKey(), v.secret());
+                if (rchain.chainId() != 31) throw new IllegalStateException("chain id");
+                Aviary.Node rn = bc.createNode(1);
+                Aviary.Account ra = rn.newAccount(), rb = rn.newAccount();
+                byte[] rkey = new byte[32]; java.util.Arrays.fill(rkey, (byte) 0x42);
+                rchain.write(ra.secret(), rkey, Aviary.RecordOp.PUT, "{\"status\":\"in service\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                rchain.write(ra.secret(), rkey, Aviary.RecordOp.PUT, "{\"status\":\"serviced\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                if (rchain.pendingCount() != 2 || rchain.record(rkey) != null) throw new IllegalStateException("queue");
+                boolean refused = false;
+                try { rchain.write(rb.secret(), rkey, Aviary.RecordOp.PUT, new byte[]{1}); } catch (RuntimeException e) { refused = String.valueOf(e.getMessage()).contains("not the record owner"); }
+                if (!refused) throw new IllegalStateException("non-owner must be refused");
+                byte[] rblk = rchain.propose(2);
+                if (!rchain.submit(rblk, rchain.certify(rblk)) || rchain.pendingCount() != 0) throw new IllegalStateException("record block");
+                Aviary.RecordEntry rec = rchain.record(rkey);
+                if (rec.version() != 2 || !java.util.Arrays.equals(rec.owner(), ra.address())) throw new IllegalStateException("record " + rec);
+                byte[] rproof = rchain.proveRecord(rkey);
+                if (!bc.verifyStateProof(rchain.stateRoot(), rproof) || bc.recordFromProof(rproof).version() != 2) throw new IllegalStateException("record proof");
+                rchain.write(ra.secret(), rkey, Aviary.RecordOp.TRANSFER, rb.address());
+                rblk = rchain.propose(3); rchain.submit(rblk, rchain.certify(rblk));
+                if (!java.util.Arrays.equals(rchain.record(rkey).owner(), rb.address())) throw new IllegalStateException("transfer");
+                rchain.write(rb.secret(), rkey, Aviary.RecordOp.DELETE, new byte[0]);
+                rblk = rchain.propose(4); rchain.submit(rblk, rchain.certify(rblk));
+                if (rchain.record(rkey) != null) throw new IllegalStateException("delete");
+                rchain.close(); rn.close();
+                System.out.println("records OK");
+            }
+
             // Push events through the native hook.
             {
                 Aviary.Node n = bc.createNode(0x7703);

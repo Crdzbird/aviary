@@ -15,6 +15,18 @@ extension AviaryQuick on Aviary {
   /// Builds a genesis for [validator] alone, commits [blueprint] (bft over
   /// the account model when null) and assembles the chain for it. Throws
   /// when the registry or posture refuses the mixture.
+  /// A single validator BFT chain that stores application records instead of
+  /// balances; see [ChainRecords].
+  Chain assembleRecordChain({
+    required int chainId,
+    required KeyPairBytes validator,
+  }) => assembleSingleValidator(
+    chainId: chainId,
+    validator: validator,
+    stateModel: 2,
+    blueprint: makeBlueprint(consensus: 'bft', stateModel: 'record'),
+  );
+
   Chain assembleSingleValidator({
     required int chainId,
     required KeyPairBytes validator,

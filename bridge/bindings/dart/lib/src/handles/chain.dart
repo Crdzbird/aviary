@@ -10,6 +10,11 @@ final class Chain extends _NativeHandle {
     'aviary_chain_height',
   )(_h);
 
+  /// The chain id this chain runs.
+  int get chainId => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(
+    'aviary_chain_chain_id',
+  )(_h);
+
   Uint8List _buf(String fn) => _bc._take(
     _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
     fn,
@@ -29,6 +34,9 @@ final class Chain extends _NativeHandle {
 
   /// The encoded mixture this chain runs.
   Uint8List blueprint() => _buf('aviary_chain_blueprint');
+
+  /// The committed 32 byte state root.
+  Uint8List stateRoot() => _buf('aviary_chain_state_root');
 
   /// Proposes the next block. Throws when this node may not propose now.
   Uint8List propose(int timestamp) => _bc._take(

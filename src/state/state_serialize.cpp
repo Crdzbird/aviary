@@ -1,5 +1,6 @@
 #include <memory>
 #include "aviary/account_state.hpp"
+#include "aviary/record_state.hpp"
 #include "aviary/state.hpp"
 #include "aviary/utxo_state.hpp"
 
@@ -11,6 +12,8 @@ std::unique_ptr<StateMachine> deserialize_state(StateModel model, codec::ByteVie
       return AccountStateMachine::deserialize(bytes);
     case StateModel::kUtxo:
       return UtxoStateMachine::deserialize(bytes);
+    case StateModel::kRecord:
+      return RecordStateMachine::deserialize(bytes);
   }
   return AccountStateMachine::deserialize(bytes);  // unreachable; keeps the compiler happy
 }

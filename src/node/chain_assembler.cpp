@@ -74,6 +74,11 @@ void register_builtins_locked(Registries& r) {
       throw std::runtime_error("chain-assembler: state 'utxo' but genesis is seeded as account");
     return g.build_state();
   };
+  r.states["record"] = [](const GenesisSpec& g) {
+    if (g.state_model != StateModel::kRecord)
+      throw std::runtime_error("chain-assembler: state 'record' but genesis is not seeded as record");
+    return g.build_state();
+  };
   // Proposer policies.
   r.proposers["stake-weighted"] = [] { return consensus::ProposerPolicy(consensus::stake_weighted_proposer); };
   r.proposers["round-robin"] = [] {
@@ -161,7 +166,8 @@ ChainBlueprint ChainAssembler::default_blueprint(const GenesisSpec& genesis) {
   ChainBlueprint b;
   b.consensus_id =
       profile.consensus() == AssuranceProfile::Consensus::kVrf ? "vrf-pos" : "pos";
-  b.state_model_id = genesis.state_model == StateModel::kAccount ? "account" : "utxo";
+  b.state_model_id = genesis.state_model == StateModel::kAccount ? "account"
+                     : genesis.state_model == StateModel::kUtxo ? "utxo" : "record";
   return b;
 }
 

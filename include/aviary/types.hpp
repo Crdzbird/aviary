@@ -16,7 +16,7 @@ using crypto::Hash;
 using Bytes = std::vector<std::uint8_t>;
 
 /// Genesis-selected ledger model.
-enum class StateModel : std::uint8_t { kAccount = 0, kUtxo = 1 };
+enum class StateModel : std::uint8_t { kAccount = 0, kUtxo = 1, kRecord = 2 };
 
 /// A signed transaction. The signature (Ed25519) covers [signing_bytes]
 /// (everything but the signature itself). [chain_id] is bound in, giving

@@ -241,6 +241,36 @@ mesh.free();
   allows targeted revocation (`revokeNym`) without identifying anyone.
   Blind issuance keeps the member secret away from the issuer.
 
+### Application records
+
+Not every chain moves money. A chain assembled with the `record` state model
+stores application objects instead of balances: a 32 byte key chosen by the
+application, an owner, a version that grows by one per write, and an opaque
+value of up to 64 KiB (JSON, protobuf, CBOR, a content hash). Only the owner
+may update, transfer or delete a record, replay protection is a per author
+nonce, and consensus, proofs, snapshots and events work exactly as they do
+for balances.
+
+```dart
+final chain = bc.assembleRecordChain(chainId: 31, validator: bc.newValidator());
+final key = bc.hash(utf8.encode('asset:PUMP-0042'));
+chain.write(facilities.secret, key, RecordOp.put, utf8.encode('{"status":"in service"}'));
+chain.produceBlock(1);
+final record = chain.record(key)!;            // owner, version 1, the JSON bytes
+chain.write(facilities.secret, key, RecordOp.transfer, lab.address);
+chain.produceBlock(2);                         // the lab owns it now
+
+final proof = chain.proveRecord(key);          // for someone who only trusts the root
+bc.verifyStateProof(chain.stateRoot(), proof);
+print(bc.recordFromProof(proof).version);
+```
+
+`addTx` queues any signed transaction on any assembled chain, so the same
+path carries hand built transactions for the account and UTXO models too.
+The [Registry example](examples/registry) runs a whole equipment registry
+this way. Custom models beyond records are a C++ `StateMachine` subclass
+registered in the component registry under its own id.
+
 ### Observability
 
 Nodes, assembled chains and networked nodes all expose typed events and
@@ -296,9 +326,9 @@ lock-mint and burn-release) connects an Aviary chain to those networks.
 
 ## Example apps
 
-Each example is a real scenario with a Go gRPC server over the Go binding
-and a Flutter client, except the dashboard, which drives the engine directly
-from Flutter. Build the host library first from the repository root:
+Each example is a real scenario. Atlas, Sentinel and Interop pair a Go gRPC
+server over the Go binding with a Flutter client; the dashboard drives the
+engine directly from Flutter; the registry is a pure Dart program. Build the host library first from the repository root:
 
 ```bash
 cmake -S . -B build && cmake --build build
@@ -309,6 +339,7 @@ cmake -S . -B build && cmake --build build
 | [Atlas](examples/atlas) | Wholesale settlement network: per currency BFT rails, institutional wallets with cross chain receive addresses, issuance and settlement with finality, balance proofs, signed ERC-20 transfers, a validator council with an auditor light client | `cd examples/atlas && ./run.sh` |
 | [Sentinel](examples/sentinel) | Device provenance ledger: a chain born from a device's enrollment, content hashes of photos, video, GPS and sensor data anchored with finality, proofs that data existed unaltered, a fleet root anchoring one subchain per device | `cd examples/sentinel && ./run.sh` |
 | [Interop](examples/interop) | Go and Flutter run the same ledger independently and cross check canonical bytes, state roots, light client proofs and a chain tree in both directions | `cd examples/interop && ./run.sh` |
+| [Registry](examples/registry) | An equipment registry on a record chain, no money involved: JSON documents as records, signed writes finalized in blocks, ownership transfer, versions, an auditor verifying a record from the state root alone, deletion | `cd examples/registry && dart run bin/registry.dart` |
 | [Dashboard](examples/aviary_demo) | One Flutter screen driving every capability live: accounts, transactions, blocks, the event stream, metrics, proofs, interop addresses, and the mixture, subchain and membership demos | `cd examples/aviary_demo && flutter run -d macos` |
 
 `run.sh` starts the server and the Flutter client on macOS; pass
@@ -362,7 +393,7 @@ bridge/aviary_c.{h,cpp}  the C ABI every binding marshals over
 bridge/bindings/dart     aviary_dart (pub package)
 bridge/bindings/aviary_lite, aviary   the two Flutter plugins
 bridge/bindings/go, aviary-node, jvm, swift, aviary-android
-examples/                Atlas, Sentinel, Interop, the Flutter dashboard
+examples/                Atlas, Sentinel, Interop, the Flutter dashboard, the registry
 tests/                   69 C++ suites (ctest)
 fuzz/                    libFuzzer harnesses
 vectors/                 golden vectors replayed by every binding

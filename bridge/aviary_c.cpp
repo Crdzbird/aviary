@@ -22,6 +22,7 @@
 #include "aviary/chain_blueprint.hpp"
 #include "aviary/foreign_engine.hpp"
 #include "aviary/account_state.hpp"
+#include "aviary/record_state.hpp"
 #include "aviary/bft_engine.hpp"
 #include "aviary/subchain.hpp"
 #include "aviary/light_client.hpp"
@@ -220,10 +221,21 @@ struct ChainBox {
   aviary::observe::EventBus bus;
   aviary::observe::MetricsRegistry metrics;
   std::unique_ptr<aviary::observe::JsonEventLog> log;
+  std::vector<aviary::Transaction> pending;
+  std::unique_ptr<aviary::StateMachine> staged;
   ChainBox(aviary::node::AssembledChain c, std::uint32_t m, aviary::crypto::KeyPair k)
       : chain(std::move(c)), me(m), key(std::move(k)), log(std::make_unique<aviary::observe::JsonEventLog>(bus)) {}
+  aviary::StateMachine& staged_state() {
+    if (!staged) staged = chain.engine->ledger().state().clone();
+    return *staged;
+  }
+  void clear_pending() {
+    pending.clear();
+    staged.reset();
+  }
   void report(const aviary::Block& b, bool applied) {
     if (applied) {
+      clear_pending();
       bus.publish(aviary::observe::BlockFinalized{b.header.height, b.header.hash(), b.header.state_root, b.transactions.size()});
       metrics.gauge("aviary_chain_height", "current finalized height").set(static_cast<std::int64_t>(b.header.height));
       metrics.counter("aviary_blocks_finalized_total", "blocks finalized").inc();
@@ -1324,7 +1336,8 @@ AviaryBufferResult aviary_genesis_build(uint64_t chain_id, uint64_t timestamp,
     g.timestamp = timestamp;
     if (state_model == 0) g.state_model = aviary::StateModel::kAccount;
     else if (state_model == 1) g.state_model = aviary::StateModel::kUtxo;
-    else return error_result("genesis: state_model must be 0 (account) or 1 (utxo)");
+    else if (state_model == 2) g.state_model = aviary::StateModel::kRecord;
+    else return error_result("genesis: state_model must be 0 (account), 1 (utxo) or 2 (record)");
     for (size_t i = 0; i < account_count; ++i) {
       aviary::crypto::Hash a = to_hash32(account_addrs + 32 * i);
       if (state_model == 0) g.accounts.push_back({a, account_balances[i]});
@@ -1395,8 +1408,9 @@ AviaryBufferResult aviary_chain_blueprint(AviaryChain c) {
 AviaryBufferResult aviary_chain_propose(AviaryChain c, uint64_t timestamp) {
   if (!c) return error_result("null chain");
   try {
-    return bytes_result(as_chain(c)->engine->propose({}, timestamp).encode());
+    return bytes_result(as_chain(c)->engine->propose(as_box(c)->pending, timestamp).encode());
   } catch (const std::exception& e) {
+    as_box(c)->clear_pending();
     return error_result(e.what());
   }
 }
@@ -1457,6 +1471,131 @@ AviaryBufferResult aviary_chain_metrics(AviaryChain c) {
   as_box(c)->metrics.gauge("aviary_chain_height", "current finalized height")
       .set(static_cast<std::int64_t>(as_chain(c)->engine->height()));
   return string_result(as_box(c)->metrics.prometheus_text());
+}
+
+// -- Record model ---------------------------------------------------------------
+
+namespace {
+aviary::RecordStateMachine::Write record_write(uint64_t nonce, const uint8_t* key, uint8_t op,
+                                               const uint8_t* value, size_t value_len) {
+  aviary::RecordStateMachine::Write w;
+  w.nonce = nonce;
+  w.key = to_hash32(key);
+  w.op = op;
+  if (value_len) w.value.assign(value, value + value_len);
+  return w;
+}
+const aviary::RecordStateMachine* as_records(AviaryChain c) {
+  return dynamic_cast<const aviary::RecordStateMachine*>(&as_chain(c)->engine->ledger().state());
+}
+aviary::Bytes record_bytes(const aviary::Hash* key, const aviary::Hash& owner, std::uint64_t version,
+                           const aviary::Bytes& value) {
+  aviary::codec::CodecWriter w;
+  if (key) w.write_fixed_bytes(aviary::codec::ByteView(key->data(), key->size()), 32);
+  w.write_fixed_bytes(aviary::codec::ByteView(owner.data(), owner.size()), 32);
+  w.write_u64(version);
+  w.write_bytes(aviary::codec::ByteView(value.data(), value.size()));
+  return w.take();
+}
+}  // namespace
+
+uint64_t aviary_chain_chain_id(AviaryChain c) {
+  return c ? as_chain(c)->engine->ledger().spec().chain_id : 0;
+}
+
+AviaryBufferResult aviary_chain_state_root(AviaryChain c) {
+  if (!c) return error_result("null chain");
+  const aviary::Hash r = as_chain(c)->engine->ledger().state().state_root();
+  return bytes_result(aviary::Bytes(r.begin(), r.end()));
+}
+
+AviaryBufferResult aviary_address_of(const uint8_t* public_key, size_t public_key_len) {
+  if (!public_key || public_key_len == 0) return error_result("empty public key");
+  const aviary::Hash a = aviary::crypto::address_of(aviary::codec::ByteView(public_key, public_key_len));
+  return bytes_result(aviary::Bytes(a.begin(), a.end()));
+}
+
+AviaryBufferResult aviary_record_write_encode(uint64_t nonce, const uint8_t* key, uint8_t op,
+                                              const uint8_t* value, size_t value_len) {
+  if (!key) return error_result("null key");
+  try {
+    return bytes_result(aviary::RecordStateMachine::encode_write(record_write(nonce, key, op, value, value_len)));
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_record_tx_sign(uint64_t chain_id, uint64_t nonce, const uint8_t* key, uint8_t op,
+                                         const uint8_t* value, size_t value_len, const uint8_t* secret,
+                                         size_t secret_len) {
+  if (!key || !secret) return error_result("null key or secret");
+  if (secret_len != 64) return error_result("ed25519 secret must be 64 bytes (seed || public)");
+  try {
+    aviary::crypto::KeyPair kp;
+    kp.secret_key.assign(secret, secret + 64);
+    kp.public_key.assign(secret + 32, secret + 64);
+    aviary::Transaction tx;
+    tx.version = 1;
+    tx.chain_id = chain_id;
+    tx.body = aviary::RecordStateMachine::encode_write(record_write(nonce, key, op, value, value_len));
+    aviary::sign_transaction(tx, kp);
+    return bytes_result(tx.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_chain_add_tx(AviaryChain c, const uint8_t* tx, size_t tx_len) {
+  if (!c) return error_result("null chain");
+  try {
+    aviary::Transaction t = aviary::Transaction::decode_all(cbv(tx, tx_len));
+    const aviary::Ledger& ledger = as_chain(c)->engine->ledger();
+    if (t.chain_id != ledger.spec().chain_id) return error_result("chain: transaction is for another chain");
+    if (!ledger.spec().accepts(t.algo())) return error_result("chain: signature scheme not accepted");
+    if (!aviary::verify_transaction_signature(t)) return error_result("chain: bad signature");
+    aviary::StateMachine& staged = as_box(c)->staged_state();
+    const aviary::ValidationResult vr = staged.validate(t);
+    if (!vr.ok) return error_result("chain: invalid transaction: " + vr.error);
+    staged.apply(t);
+    const aviary::Hash id = t.txid();
+    as_box(c)->pending.push_back(std::move(t));
+    return bytes_result(aviary::Bytes(id.begin(), id.end()));
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+uint64_t aviary_chain_pending_count(AviaryChain c) {
+  return c ? static_cast<uint64_t>(as_box(c)->pending.size()) : 0;
+}
+
+AviaryBufferResult aviary_chain_record(AviaryChain c, const uint8_t* key) {
+  if (!c || !key) return error_result("null chain or key");
+  const auto* rs = as_records(c);
+  if (!rs) return error_result("chain: not a record-model chain");
+  const auto* rec = rs->record(to_hash32(key));
+  if (!rec) return error_result("chain: no such record");
+  return bytes_result(record_bytes(nullptr, rec->owner, rec->version, rec->value));
+}
+
+uint64_t aviary_chain_record_nonce(AviaryChain c, const uint8_t* address) {
+  if (!c || !address) return 0;
+  const auto* rs = as_records(c);
+  if (!rs) return 0;
+  const auto* srs = as_box(c)->staged
+      ? dynamic_cast<const aviary::RecordStateMachine*>(as_box(c)->staged.get()) : nullptr;
+  return (srs ? srs : rs)->nonce(to_hash32(address));
+}
+
+AviaryBufferResult aviary_chain_prove_record(AviaryChain c, const uint8_t* key) {
+  if (!c || !key) return error_result("null chain or key");
+  const auto* rs = as_records(c);
+  if (!rs) return error_result("chain: not a record-model chain");
+  try { return bytes_result(rs->prove_record(to_hash32(key)).encode()); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_record_from_proof(const uint8_t* proof, size_t proof_len) {
+  try {
+    const aviary::StateProof p = aviary::StateProof::decode_all(cbv(proof, proof_len));
+    if (!p.present) return error_result("proof: absence proof carries no record");
+    const auto leaf = aviary::RecordStateMachine::decode_record_leaf(p.leaf_preimage);
+    return bytes_result(record_bytes(&leaf.key, leaf.owner, leaf.version, leaf.value));
+  } catch (const std::exception& e) { return error_result(e.what()); }
 }
 
 void aviary_chain_free(AviaryChain c) { delete as_box(c); }
@@ -1560,7 +1699,7 @@ AviaryBufferResult aviary_chain_propose_anchored(AviaryChain c, uint64_t timesta
                                                              const uint8_t* anchors, size_t anchors_len) {
   if (!c) return error_result("null chain");
   try {
-    return bytes_result(as_chain(c)->engine->propose_anchored({}, timestamp, decode_anchors(cbv(anchors, anchors_len))).encode());
+    return bytes_result(as_chain(c)->engine->propose_anchored(as_box(c)->pending, timestamp, decode_anchors(cbv(anchors, anchors_len))).encode());
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
 

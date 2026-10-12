@@ -1606,3 +1606,37 @@ selectors - validated against real-world vectors). Deferred:
   shipped xcframeworks were synced from the source header. A pre-commit
   guard against non-ASCII in tracked text is the natural follow up.
 
+## Record model: application objects on a chain - DONE (2026-10-12)
+- **[x] `RecordStateMachine`** (record_state.hpp, state model id `record`,
+  enum value 2): a signed key value store. Records have a 32 byte key, an
+  owner (the creating author's address), a version and a value of up to
+  64 KiB; ops put, transfer, delete; per author nonces; Merkle root over
+  record leaves then nonce leaves; `prove_record` yields an ordinary
+  `StateProof` whose leaf decodes back to the record; snapshot round trips.
+  Registered in the component registry and the genesis seeding, so a
+  blueprint naming `record` assembles like any other mixture.
+- **[x] Assembled chains carry transactions.** `ChainBox` keeps a validated
+  queue (`aviary_chain_add_tx` checks chain id, signature scheme, signature
+  and the state the earlier queued transactions leave, via a staged clone)
+  that `propose` and `propose_anchored` include and a successful submit
+  clears. Until now assembled chains proposed empty blocks from the bindings.
+- **[x] C ABI:** `aviary_record_write_encode`, `aviary_record_tx_sign`,
+  `aviary_chain_add_tx`, `aviary_chain_pending_count`, `aviary_chain_record`,
+  `aviary_chain_record_nonce`, `aviary_chain_prove_record`,
+  `aviary_record_from_proof`, `aviary_chain_chain_id`,
+  `aviary_chain_state_root`, `aviary_address_of`; `aviary_genesis_build`
+  accepts state model 2.
+- **[x] Bindings:** Dart `assembleRecordChain`, `ChainRecords` (`write`,
+  `record`, `proveRecord`, `recordNonce`, `addTx`, `pendingCount`),
+  `AviaryRecords` (`signRecordTx`, `addressOf`, `recordFromProof`),
+  `RecordOp`, `RecordEntry`, `RecordLeaf`, dartdoc category Records; Go
+  `records.go`; npm, JVM and Swift wrappers. Tests: `test_record_state`
+  (70 C++ suites), Dart `records_test` (30 suites), Go `TestRecords`, npm
+  `records.test.js`, the JVM and Swift demos.
+- **[x] Example:** `examples/registry`, a pure Dart equipment registry with
+  JSON documents as records, ownership transfer, an auditor verifying from
+  the state root, deletion.
+- **[ ] [M]** Record writes from a `KeyStore` (today the signer is a raw
+  Ed25519 secret), hybrid post quantum record authors, and a networked record
+  chain example.
+

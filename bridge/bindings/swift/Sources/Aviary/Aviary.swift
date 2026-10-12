@@ -50,6 +50,44 @@ public enum Aviary {
     }
 
     /// Verify a state-inclusion proof against a 32-byte state root.
+    /// What a record transaction does.
+    public enum RecordOp: UInt8 { case put = 0, transfer = 1, delete = 2 }
+    /// A committed application record: owner, write count and bytes.
+    public struct RecordEntry { public let owner: Data; public let version: UInt64; public let value: Data }
+    /// A record read out of a verified state proof, with its key.
+    public struct RecordLeaf { public let key: Data; public let owner: Data; public let version: UInt64; public let value: Data }
+
+    static func decodeRecord(_ b: Data, withKey: Bool) throws -> RecordLeaf {
+        var o = b.startIndex
+        func take(_ n: Int) throws -> Data {
+            guard b.endIndex - o >= n else { throw AviaryError(message: "record: short") }
+            defer { o += n }
+            return b.subdata(in: o..<(o + n))
+        }
+        let key = withKey ? try take(32) : Data()
+        let owner = try take(32)
+        let version = try take(8).reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+        let len = Int(try take(4).reduce(UInt32(0)) { $0 << 8 | UInt32($1) })
+        let value = try take(len)
+        return RecordLeaf(key: key, owner: owner, version: version, value: value)
+    }
+    /// A signed, encoded record transaction from a 64 byte Ed25519 secret.
+    public static func signRecordTx(chainID: UInt64, nonce: UInt64, key: Data, op: RecordOp, value: Data, secret: Data) throws -> Data {
+        ensureReady()
+        return try consume(key.withC { kp, _ in value.withC { vp, vl in secret.withC { sp, sl in
+            aviary_record_tx_sign(chainID, nonce, kp, op.rawValue, vp, vl, sp, sl) } } }, "record_tx_sign")
+    }
+    /// The 32 byte chain address of a public key.
+    public static func addressOf(_ publicKey: Data) throws -> Data {
+        ensureReady()
+        return try consume(publicKey.withC { aviary_address_of($0, $1) }, "address_of")
+    }
+    /// The record a verified state proof commits to.
+    public static func recordFromProof(_ proof: Data) throws -> RecordLeaf {
+        ensureReady()
+        return try decodeRecord(try consume(proof.withC { aviary_record_from_proof($0, $1) }, "record_from_proof"), withKey: true)
+    }
+
     public static func verifyStateProof(stateRoot: Data, proof: Data) -> Bool {
         ensureReady()
         return stateRoot.withC { rootPtr, _ in
@@ -512,6 +550,40 @@ public enum Aviary {
             aviary_chain_free(UnsafeMutableRawPointer(h))
         }
         public var height: UInt64 { aviary_chain_height(UnsafeMutableRawPointer(h)) }
+        /// The chain id this chain runs.
+        public var chainID: UInt64 { aviary_chain_chain_id(UnsafeMutableRawPointer(h)) }
+        /// The committed 32 byte state root.
+        public func stateRoot() throws -> Data { try consume(aviary_chain_state_root(UnsafeMutableRawPointer(h)), "chain_state_root") }
+        /// Queues a signed, encoded transaction for the next proposal, validated against the chain
+        /// and the earlier queued ones; returns the txid.
+        @discardableResult
+        public func addTx(_ tx: Data) throws -> Data {
+            try consume(tx.withC { p, l in aviary_chain_add_tx(UnsafeMutableRawPointer(h), p, l) }, "chain_add_tx")
+        }
+        /// Transactions waiting for the next proposal.
+        public var pendingCount: UInt64 { aviary_chain_pending_count(UnsafeMutableRawPointer(h)) }
+        /// Signs a record write with a 64 byte Ed25519 secret (nonce from the chain) and queues it.
+        @discardableResult
+        public func write(secret: Data, key: Data, op: RecordOp, value: Data = Data()) throws -> Data {
+            let author = try Aviary.addressOf(secret.suffix(32))
+            return try addTx(Aviary.signRecordTx(chainID: chainID, nonce: recordNonce(address: author), key: key, op: op, value: value, secret: secret))
+        }
+        /// The committed record at key, or nil when none exists (record model chains only).
+        public func record(key: Data) throws -> RecordEntry? {
+            do {
+                let b = try consume(key.withC { p, _ in aviary_chain_record(UnsafeMutableRawPointer(h), p) }, "chain_record")
+                let leaf = try Aviary.decodeRecord(b, withKey: false)
+                return RecordEntry(owner: leaf.owner, version: leaf.version, value: leaf.value)
+            } catch let e as AviaryError where e.message.contains("no such record") { return nil }
+        }
+        /// The next nonce an author must use on this record chain, counting queued writes.
+        public func recordNonce(address: Data) -> UInt64 {
+            address.withC { p, _ in aviary_chain_record_nonce(UnsafeMutableRawPointer(h), p) }
+        }
+        /// A state inclusion proof for the record at key; verify with verifyStateProof.
+        public func proveRecord(key: Data) throws -> Data {
+            try consume(key.withC { p, _ in aviary_chain_prove_record(UnsafeMutableRawPointer(h), p) }, "chain_prove_record")
+        }
         /// Buffered block events (block_finalized or block_rejected per submit) as a JSON
         /// array; empty while a hook is set.
         public func drainEvents() throws -> String { try consumeString(aviary_chain_drain_events(UnsafeMutableRawPointer(h)), "chain_drain_events") }

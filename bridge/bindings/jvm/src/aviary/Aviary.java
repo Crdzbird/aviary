@@ -38,6 +38,7 @@ public final class Aviary implements AutoCloseable {
             genesisHeaderH, childRegEncode, subchainPolicyEncode, genesisCommitSubchains, genesisCommitBinding,
             blockHeaderH, headerSubchainRootH, certifiedHeaderEncode, anchorEncode, chainProposeAnchored, chainCertify,
             chainChildTip, chainSubchainHop, chainProveAccount, subchainProofEncode, subchainProofVerify,
+            chainChainId, chainStateRoot, chainAddTx, chainPendingCount, chainRecord, chainRecordNonce, chainProveRecord, recordTxSign, recordFromProofH, addressOfH,
             chainScheduleValidators, chainValidatorsH,
             lcNew, lcAccept, lcAcceptSkipping, lcHeight, lcTip, lcValidators, lcSetTrust, lcSetMaxSkip, lcFree,
             treeNodeEncode, treeSpecError, treeBuild, treeChainIds, treeHeight, treeGenesis, treeTip, treePending, treeProduce,
@@ -145,6 +146,16 @@ public final class Aviary implements AutoCloseable {
         chainDrainEvents = h("aviary_chain_drain_events", FunctionDescriptor.of(RES, ADDRESS));
         chainSetEventHook = h("aviary_chain_set_event_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
         chainMetrics = h("aviary_chain_metrics", FunctionDescriptor.of(RES, ADDRESS));
+        chainChainId = h("aviary_chain_chain_id", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        chainStateRoot = h("aviary_chain_state_root", FunctionDescriptor.of(RES, ADDRESS));
+        chainAddTx = h("aviary_chain_add_tx", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        chainPendingCount = h("aviary_chain_pending_count", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        chainRecord = h("aviary_chain_record", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        chainRecordNonce = h("aviary_chain_record_nonce", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
+        chainProveRecord = h("aviary_chain_prove_record", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        recordTxSign = h("aviary_record_tx_sign", FunctionDescriptor.of(RES, JAVA_LONG, JAVA_LONG, ADDRESS, JAVA_BYTE, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        recordFromProofH = h("aviary_record_from_proof", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        addressOfH = h("aviary_address_of", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
         regAddEngine = h("aviary_registry_add_engine", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_INT));
         regAddProposer = h("aviary_registry_add_proposer", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS));
         genesisHeaderH = h("aviary_genesis_header", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
@@ -671,6 +682,28 @@ public final class Aviary implements AutoCloseable {
         public byte[] subchainHop(long childChainId) { try { return consume((MemorySegment) chainSubchainHop.invoke(arena.allocate(RES), h, childChainId)); } catch (Throwable e) { throw new RuntimeException(e); } }
         /** State-inclusion proof for a 32-byte address on this account-model chain. */
         public byte[] proveAccount(byte[] address) { try { return consume((MemorySegment) chainProveAccount.invoke(arena.allocate(RES), h, seg(address))); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** The chain id this chain runs. */
+        public long chainId() { try { return (long) chainChainId.invoke(h); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** The committed 32 byte state root. */
+        public byte[] stateRoot() { return call(chainStateRoot, h); }
+        /** Queues a signed, encoded transaction for the next proposal, validated against the chain and the earlier queued ones; returns the txid. */
+        public byte[] addTx(byte[] tx) { return call(chainAddTx, h, seg(tx), (long) tx.length); }
+        /** Transactions waiting for the next proposal. */
+        public long pendingCount() { try { return (long) chainPendingCount.invoke(h); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** Signs a record write with a 64 byte Ed25519 secret (nonce from the chain) and queues it; returns the txid. */
+        public byte[] write(byte[] secret, byte[] key, RecordOp op, byte[] value) {
+            byte[] author = addressOf(java.util.Arrays.copyOfRange(secret, 32, 64));
+            return addTx(signRecordTx(chainId(), recordNonce(author), key, op, value, secret));
+        }
+        /** The committed record at key, or null when none exists (record model chains only). */
+        public RecordEntry record(byte[] key) {
+            try { return decodeRecord(call(chainRecord, h, seg(key)), false).entry(); }
+            catch (RuntimeException e) { if (String.valueOf(e.getMessage()).contains("no such record")) return null; throw e; }
+        }
+        /** The next nonce an author must use on this record chain, counting queued writes. */
+        public long recordNonce(byte[] address) { try { return (long) chainRecordNonce.invoke(h, seg(address)); } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** A state inclusion proof for the record at key; verify with verifyStateProof(stateRoot(), proof). */
+        public byte[] proveRecord(byte[] key) { return call(chainProveRecord, h, seg(key)); }
     }
 
     /** The canonical ValidatorSet encoding: [count]([len][pk][power u64])x. */
@@ -926,6 +959,31 @@ public final class Aviary implements AutoCloseable {
         } catch (Throwable e) { throw new RuntimeException(e); }
     }
 
+    /** What a record transaction does. */
+    public enum RecordOp { PUT, TRANSFER, DELETE }
+    /** A committed application record: owner, write count and bytes. */
+    public record RecordEntry(byte[] owner, long version, byte[] value) {}
+    /** A record read out of a verified state proof, with its key. */
+    public record RecordLeaf(byte[] key, byte[] owner, long version, byte[] value) {
+        RecordEntry entry() { return new RecordEntry(owner, version, value); }
+    }
+    static RecordLeaf decodeRecord(byte[] b, boolean withKey) {
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
+        byte[] key = null;
+        if (withKey) { key = new byte[32]; bb.get(key); }
+        byte[] owner = new byte[32]; bb.get(owner);
+        long version = bb.getLong();
+        byte[] value = new byte[bb.getInt()]; bb.get(value);
+        return new RecordLeaf(key, owner, version, value);
+    }
+    /** A signed, encoded record transaction from a 64 byte Ed25519 secret. */
+    public byte[] signRecordTx(long chainId, long nonce, byte[] key, RecordOp op, byte[] value, byte[] secret) {
+        return call(recordTxSign, chainId, nonce, seg(key), (byte) op.ordinal(), seg(value), (long) value.length, seg(secret), (long) secret.length);
+    }
+    /** The 32 byte chain address of a public key. */
+    public byte[] addressOf(byte[] publicKey) { return call(addressOfH, seg(publicKey), (long) publicKey.length); }
+    /** The record a verified state proof commits to. */
+    public RecordLeaf recordFromProof(byte[] proof) { return decodeRecord(call(recordFromProofH, seg(proof), (long) proof.length), true); }
     public boolean verifyStateProof(byte[] root, byte[] proof) {
         try { return (int) verifyProof.invoke(seg(root), seg(proof), (long) proof.length) == 1; }
         catch (Throwable t) { throw new RuntimeException(t); }

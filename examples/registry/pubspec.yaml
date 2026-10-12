@@ -1,0 +1,8 @@
+name: registry
+description: An equipment registry on an Aviary record chain, with no money involved.
+publish_to: none
+environment:
+  sdk: ^3.10.0
+dependencies:
+  aviary_dart:
+    path: ../../bridge/bindings/dart

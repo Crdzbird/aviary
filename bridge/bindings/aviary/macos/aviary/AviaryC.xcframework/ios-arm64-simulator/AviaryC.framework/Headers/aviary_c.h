@@ -796,6 +796,50 @@ typedef int (*AviaryTxSourceFn)(void* ctx, uint64_t chain_id, uint64_t timestamp
 AVIARY_API AviaryBufferResult aviary_chain_drain_events(AviaryChain c);
 AVIARY_API void aviary_chain_set_event_hook(AviaryChain c, AviaryEventFn fn, void* ctx);
 AVIARY_API AviaryBufferResult aviary_chain_metrics(AviaryChain c);
+
+/* -- Record model: signed application objects -----------------------------------
+ * A chain whose mixture names the "record" state model stores application
+ * objects instead of balances: a 32 byte key chosen by the application, the
+ * owner (the address of the author that created it), a version that grows by
+ * one per write, and an opaque value of up to 64 KiB. Only the owner may update
+ * (op 0, value = new content), transfer (op 1, value = new 32 byte owner
+ * address) or delete (op 2, empty value) a record; replay protection is a per
+ * author nonce. Build the genesis with state_model 2 and a blueprint naming
+ * "record", assemble it, add signed transactions, propose and submit. */
+
+/** The chain id this assembled chain runs. */
+AVIARY_API uint64_t aviary_chain_chain_id(AviaryChain c);
+/** The committed 32 byte state root of this assembled chain. */
+AVIARY_API AviaryBufferResult aviary_chain_state_root(AviaryChain c);
+/** The 32 byte chain address of a public key (any signature scheme). */
+AVIARY_API AviaryBufferResult aviary_address_of(const uint8_t* public_key, size_t public_key_len);
+/** Canonical record transaction body: u64 nonce || key || u8 op || bytes value. */
+AVIARY_API AviaryBufferResult aviary_record_write_encode(uint64_t nonce, const uint8_t* key, uint8_t op,
+                                                         const uint8_t* value, size_t value_len);
+/** A signed, encoded record transaction from a 64 byte Ed25519 secret
+ *  (seed || public, as every other Ed25519 secret in this ABI). */
+AVIARY_API AviaryBufferResult aviary_record_tx_sign(uint64_t chain_id, uint64_t nonce, const uint8_t* key,
+                                                    uint8_t op, const uint8_t* value, size_t value_len,
+                                                    const uint8_t* secret, size_t secret_len);
+/** Queues an encoded, signed transaction for this chain's next proposal after
+ *  checking it against the chain id, the accepted signature schemes and the
+ *  state as it will be once the earlier queued transactions apply. Returns the
+ *  32 byte txid, or an error naming the reason. Works for every state model. */
+AVIARY_API AviaryBufferResult aviary_chain_add_tx(AviaryChain c, const uint8_t* tx, size_t tx_len);
+/** Transactions queued for the next proposal. */
+AVIARY_API uint64_t aviary_chain_pending_count(AviaryChain c);
+/** The committed record at [key]: owner(32) || u64 version || bytes value.
+ *  An error when the chain is not a record chain or no such record exists. */
+AVIARY_API AviaryBufferResult aviary_chain_record(AviaryChain c, const uint8_t* key);
+/** The next nonce [address] must use on a record chain. */
+AVIARY_API uint64_t aviary_chain_record_nonce(AviaryChain c, const uint8_t* address);
+/** A state inclusion proof for the record at [key] (verify with
+ *  aviary_verify_state_proof against the chain's state root). */
+AVIARY_API AviaryBufferResult aviary_chain_prove_record(AviaryChain c, const uint8_t* key);
+/** Reads the record a state proof commits to: key(32) || owner(32) || u64
+ *  version || bytes value. Verify the proof first. */
+AVIARY_API AviaryBufferResult aviary_record_from_proof(const uint8_t* proof, size_t proof_len);
+
 /** Observer: a block was finalized on [chain_id]. */
 typedef void (*AviaryFinalizedFn)(void* ctx, uint64_t chain_id, const uint8_t* block, size_t block_len);
 #define AVIARY_MAX_TX_LIST (1u << 20)

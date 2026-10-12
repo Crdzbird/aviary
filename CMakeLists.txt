@@ -124,6 +124,7 @@ add_library(aviary_core STATIC
   src/core/types.cpp
   src/state/account_state.cpp
   src/state/utxo_state.cpp
+  src/state/record_state.cpp
   src/state/state_serialize.cpp
   src/core/ledger.cpp
   src/core/genesis.cpp
@@ -260,6 +261,7 @@ aviary_add_test(test_merkle tests/test_merkle.cpp)
 aviary_add_test(test_types tests/test_types.cpp)
 aviary_add_test(test_ledger tests/test_ledger.cpp)
 aviary_add_test(test_utxo tests/test_utxo.cpp)
+aviary_add_test(test_record_state tests/test_record_state.cpp)
 aviary_add_test(test_codec_fuzz tests/test_codec_fuzz.cpp)
 aviary_add_test(test_bls tests/test_bls.cpp)
 aviary_add_test(test_consensus tests/test_consensus.cpp)

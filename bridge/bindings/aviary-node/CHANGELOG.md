@@ -2,6 +2,9 @@
 
 ## 0.1.0
 
+- Records: `Chain.write`, `record`, `proveRecord`, `recordNonce`, `addTx`,
+  `pendingCount`, `chainId`, `stateRoot`; `signRecordTx`, `addressOf`,
+  `recordFromProof`.
 - `Chain` and `NetNode` gain `drainEvents()`, `onEvent(cb)` and `metrics()`,
   matching `Node`.
 - First release of aviary-ledger. The Aviary ledger (accounts, signed
