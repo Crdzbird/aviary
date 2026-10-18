@@ -60,6 +60,11 @@ class MerkleIndex {
   /// must be existing leaves (no resize). Pure - does not touch the cache.
   Hash root_with_updates(const std::map<std::size_t, Hash>& changes) const;
 
+  /// Inclusion proof for leaf [index], read from the cached levels in
+  /// O(log N). Byte-identical to `make_proof(leaves, index)`. Throws
+  /// std::out_of_range if the index is not a leaf.
+  Proof proof(std::uint32_t index) const;
+
  private:
   // levels_[0] == leaves; each level up is next_level() of the one below;
   // levels_.back() == {root}. Empty tree -> levels_ is empty.

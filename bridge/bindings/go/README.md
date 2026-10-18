@@ -116,6 +116,47 @@ go run  ./cmd/demo           # cross-language golden-vector determinism check
   `InitiateSecureSession`, `AcceptSecureSession`, `Encrypt`, `Decrypt`).
   Names follow each language's casing.
 
+## Records, peering and admission
+
+- Records: a chain built from a genesis with state model 2 stores 32 byte
+  keys, each with an owner, a version and a value of up to 64 KiB.
+  `Chain.Write(secret, key, op, value)` signs and queues a write with the
+  nonce taken from the chain; the ops are `RecordPut`, `RecordTransfer` and
+  `RecordDelete`, and only the owner may update, transfer or delete.
+  `Chain.Record`, `Chain.RecordNonce` and `Chain.ProveRecord` read the
+  committed state, and `RecordFromProof(proof)` reads the record out of a
+  state proof that verified. `SignRecordTx` signs a write without a chain
+  handle.
+- Custody and post quantum authors: `Chain.WriteFromStore(store, from, key,
+  op, value)` and `KeyStore.SignRecord` sign record writes from the sealed key
+  store, with the scheme taken from the stored key. `Node.NewAccountHybrid`,
+  `Node.SubmitTransferHybrid` and `SignRecordTxHybrid` sign with Ed25519 and
+  ML-DSA-65 together in the version 2 envelope.
+- Networked records: on a record model network `NetNode.Record`,
+  `NetNode.RecordNonce` and `NetNode.ProveRecord` answer on every node,
+  observers included. A proposer includes the list given to `SetTransactions`;
+  the list is cleared when the height commits, so set the next height's list
+  after the commit and before `Advance`.
+- In process meshes: `NewPeerMesh(nodes...)` with `Link`, `LinkAll`, `Start`,
+  `Advance`, `Step` and `Settle(validators...)` relay in emission order and
+  fire timeouts only when nothing is pending, for tests and single process
+  networks.
+- Peer exchange: `SignPeerRecord`, `VerifyPeerRecord` and `ReadPeerRecord`
+  handle self signed peer records (id, host, port, KEM and signature keys,
+  optional prekey). `NewAddressBook` / `DecodeAddressBook` give an
+  `AddressBook` with `Add`, `Merge`, `Record(id)`, `Records` and `Encode`; a
+  merge verifies every record and never overwrites a known id.
+- Noise links: `GenerateNoiseIdentity`, `InitiateNoiseSession(me, prologue)`
+  and `AcceptNoiseSession(me, msg0, prologue)`; the session runs
+  `HandshakeMessage`, `CompleteInitiator` / `CompleteResponder`, exchanges
+  `IdentityProof` / `VerifyIdentityProof`, then `Encrypt` and `Decrypt`. Pin
+  `PeerIdentity` so a reconnecting peer cannot change keys.
+- Admission: `NewAdmissionChallenge(epoch)` gives a nonce to keep and a wire
+  to send; the peer answers with `CredentialPolicy.AdmissionAnswer(credential,
+  wire)` and the verifier checks it with
+  `CredentialGate.AdmissionGranted(epoch, nonce, answer, now)`, so only
+  credential holders get past the handshake.
+
 ## Install
 
 ```bash

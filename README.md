@@ -19,9 +19,10 @@ surface with the same names.
 2. [Five minute tour](#five-minute-tour)
 3. [Feature guide](#feature-guide)
 4. [Example apps](#example-apps)
-5. [Build from source](#build-from-source)
-6. [Repository layout](#repository-layout)
-7. [Documentation](#documentation)
+5. [Performance](#performance)
+6. [Build from source](#build-from-source)
+7. [Repository layout](#repository-layout)
+8. [Documentation](#documentation)
 
 ## Pick a binding
 
@@ -359,7 +360,7 @@ cmake -S . -B build && cmake --build build
 | [Atlas](examples/atlas) | Wholesale settlement network: per currency BFT rails, institutional wallets with cross chain receive addresses, issuance and settlement with finality, balance proofs, signed ERC-20 transfers, a validator council with an auditor light client | `cd examples/atlas && ./run.sh` |
 | [Sentinel](examples/sentinel) | Device provenance ledger: a chain born from a device's enrollment, content hashes of photos, video, GPS and sensor data anchored with finality, proofs that data existed unaltered, a fleet root anchoring one subchain per device | `cd examples/sentinel && ./run.sh` |
 | [Interop](examples/interop) | Go and Flutter run the same ledger independently and cross check canonical bytes, state roots, light client proofs and a chain tree in both directions | `cd examples/interop && ./run.sh` |
-| [Registry](examples/registry) | An equipment registry on a record chain, no money involved: JSON documents as records, signed writes finalized in blocks, ownership transfer, versions, an auditor verifying a record from the state root alone, deletion | `cd examples/registry && dart run bin/registry.dart` |
+| [Registry](examples/registry) | An equipment registry on a record chain, no money involved: JSON documents as records, signed writes finalized in blocks, ownership transfer, versions, an auditor verifying a record from the state root alone, deletion; `bin/network.dart` runs it on four networked validators and an observer | `cd examples/registry && dart run bin/registry.dart` |
 | [Dashboard](examples/aviary_demo) | One Flutter screen driving every capability live: accounts, transactions, blocks, the event stream, metrics, proofs, interop addresses, and the mixture, subchain and membership demos | `cd examples/aviary_demo && flutter run -d macos` |
 
 `run.sh` starts the server and the Flutter client on macOS; pass
@@ -373,6 +374,45 @@ records, network) under its `example/` folder, the one pub.dev shows.
 Console demos without Flutter: `dart run bin/node_demo.dart` in
 `bridge/bindings/dart`, `go run ./cmd/demo` in `bridge/bindings/go`, and
 `swift run AviaryDemo` from the repository root.
+
+## Performance
+
+Measured with `tools/bench_engine.cpp` on an Apple M3 Max (one core of 14,
+36 GB), Release build, Aviary 0.1.0 on CipherBird 1.1.1. Medians of three runs;
+runs vary by about 20 percent.
+
+| Work | Result |
+|---|---|
+| Ed25519 transfer, sign and admit to the mempool | 11,300 tx/s (88 us each) |
+| BFT block of 1,000 transfers: build, validate, apply, certify | 6,300 tx/s (160 ms per block) |
+| Admit and finalize, end to end | 4,000 tx/s |
+| Follower replay, every certificate and signature verified | 13,400 tx/s |
+| Restore a 5 block snapshot without replay | 22 ms |
+| Account state proof over 1,000 accounts | under 1 us to prove, 30 us to verify, 393 bytes |
+| Hybrid Ed25519 + ML-DSA-65 transfer, admit and finalize | 1,340 tx/s |
+| Record writes of 64 bytes, sign and finalize | 5,900 writes/s |
+| One height of a 4 validator BFT mesh, in process | 110 ms (81 gossip deliveries) |
+
+Reproduce:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target bench_engine
+./build/bench_engine
+```
+
+What the numbers are and are not:
+
+- Single threaded and in process. There is no network, no disk and no
+  parallel signature verification; a deployment adds its transport and
+  storage costs and can verify signatures on other cores.
+- The transfer and record figures include the client side signing, so they
+  are the cost of the whole path, not of validation alone.
+- The mesh figure is dominated by BLS pairings: every validator verifies each
+  vote and the aggregated commit certificate. Empty blocks, so it is the floor
+  of consensus latency rather than a throughput figure.
+- Every run checks its own results (proofs verify, replay reaches the same
+  height, the mesh reaches the target height) and exits non zero otherwise.
 
 ## Build from source
 

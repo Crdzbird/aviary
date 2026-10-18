@@ -15,6 +15,10 @@
 - Peer records and `AddressBook`, `NoiseSession`, and the admission
   handshake (`NewAdmissionChallenge`, `CredentialPolicy.AdmissionAnswer`,
   `CredentialGate.AdmissionGranted`).
+- `NetNode.Record`, `RecordNonce` and `ProveRecord` on record model
+  networks. `SetTransactions` lists are cleared when the height commits, so
+  the next height's list is set before `Advance` and reaches its round 0
+  proposal.
 
 ## 0.1.0
 

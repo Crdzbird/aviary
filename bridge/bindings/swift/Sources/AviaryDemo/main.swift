@@ -552,5 +552,37 @@ do {
 }
 print("network + secure session OK")
 
+do {
+    let keys = try (0..<4).map { try Aviary.newBLSValidator(keyMaterial: Data(repeating: UInt8(0x50 + $0), count: 32)) }
+    let genesis = try Aviary.buildGenesis(chainID: 77, stateModel: 2, accounts: [],
+                                          validators: keys.map { Aviary.GenesisValidator(publicKey: $0.publicKey, power: 1) })
+    let mesh = Aviary.PeerMesh(try (0..<4).map { try Aviary.newNetNode(genesis: genesis, me: UInt32($0), blsKey: keys[$0]) })
+    mesh.append(try Aviary.newNetNode(genesis: genesis, me: Aviary.netObserver))
+    mesh.linkAll()
+    let nodes = mesh.nodes, observer = nodes[4]
+    let author = try node.newAccount(), heir = try node.newAccount()
+    let key = Data(repeating: 0x42, count: 32)
+    let put = try Aviary.signRecordTx(chainID: 77, nonce: 0, key: key, op: .put, value: Data("v1".utf8), secret: author.secret)
+    for n in nodes.prefix(4) { try n.setTransactions([put]) }
+    try mesh.start()
+    let first = try mesh.settle(validators: [0, 1, 2, 3])
+    precondition(first, "record mesh height 1")
+    for n in nodes {
+        try ensure("record on every node") { let r = try n.record(key: key); return r?.version == 1 && r?.owner == author.address }
+    }
+    precondition(observer.recordNonce(address: author.address) == 1, "observer record nonce")
+    try ensure("record proof under the observer root") {
+        Aviary.verifyStateProof(stateRoot: try observer.stateRoot(), proof: try nodes[1].proveRecord(key: key))
+    }
+    try ensure("unknown record key") { try nodes[2].record(key: Data(count: 32)) == nil }
+    let move = try Aviary.signRecordTx(chainID: 77, nonce: 1, key: key, op: .transfer, value: heir.address, secret: author.secret)
+    for n in nodes.prefix(4) { try n.setTransactions([move]) }
+    try mesh.advance()
+    let second = try mesh.settle(validators: [0, 1, 2, 3])
+    precondition(second, "record mesh height 2")
+    try ensure("next height list proposed") { try observer.record(key: key)?.owner == heir.address }
+}
+print("networked records OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")

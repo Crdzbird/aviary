@@ -1273,7 +1273,7 @@ extension Aviary {
         /// Prometheus text: chain height, blocks finalized, gossip received, relayed and
         /// dropped, timeouts fired, peers banned.
         public func metrics() throws -> String { try consumeString(aviary_net_node_metrics(h), "net_node_metrics") }
-        /// Encoded transactions this node proposes at the current height; cleared by `advance`.
+        /// Encoded transactions this node proposes at the current height; cleared when it commits, so set the next height's list before `advance`.
         public func setTransactions(_ encodedTxs: [Data]) throws {
             let blob = Aviary.blobList(encodedTxs)
             if blob.withC({ p, l in aviary_net_node_set_transactions(h, p, l) }) != 1 {
@@ -1298,6 +1298,22 @@ extension Aviary {
         public func balance(address: Data) -> UInt64 { address.withC { p, _ in aviary_net_node_balance(h, p) } }
         public func proveAccount(address: Data) throws -> Data {
             try consume(address.withC { p, _ in aviary_net_node_prove_account(h, p) }, "net_node_prove_account")
+        }
+        /// Record model networks: the committed record at `key`, or nil.
+        public func record(key: Data) throws -> RecordEntry? {
+            do {
+                let b = try consume(key.withC { p, _ in aviary_net_node_record(h, p) }, "net_node_record")
+                let leaf = try Aviary.decodeRecord(b, withKey: false)
+                return RecordEntry(owner: leaf.owner, version: leaf.version, value: leaf.value)
+            } catch let e as AviaryError where e.message.contains("no such record") { return nil }
+        }
+        /// Record model networks: the next nonce an author must use.
+        public func recordNonce(address: Data) -> UInt64 {
+            address.withC { p, _ in aviary_net_node_record_nonce(h, p) }
+        }
+        /// Record model networks: a state inclusion proof for the record at `key`.
+        public func proveRecord(key: Data) throws -> Data {
+            try consume(key.withC { p, _ in aviary_net_node_prove_record(h, p) }, "net_node_prove_record")
         }
     }
     /// A consensus node for validator `me` of `genesis`, or an observer when `me` is `netObserver`.

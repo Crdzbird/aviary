@@ -59,16 +59,16 @@ jobs:
             -DCRYPTOLIB_ROOT="$GITHUB_WORKSPACE/cryptolib" \
             -DCRYPTOLIB_C_INCLUDE_DIR="$GITHUB_WORKSPACE/cryptolib/bridge" \
             -DCRYPTOLIB_C_LIBRARY="$GITHUB_WORKSPACE/cryptolib/build/static/libcryptolib_c.a"
-          cmake --build build-fuzz --target fuzz_codec fuzz_restore fuzz_c_abi
+          cmake --build build-fuzz --target fuzz_codec fuzz_restore fuzz_c_abi fuzz_peering
 
       - name: Run each target for two minutes
         working-directory: aviary
         env:
           ASAN_OPTIONS: detect_leaks=0
         run: |
-          for t in fuzz_codec fuzz_restore fuzz_c_abi; do
+          for t in fuzz_codec fuzz_restore fuzz_c_abi fuzz_peering; do
             mkdir -p "corpus/$t"
-            ./build-fuzz/$t -max_total_time=120 -max_len=4096 -print_final_stats=1 "corpus/$t"
+            ./build-fuzz/$t -max_total_time=120 -max_len=16384 -print_final_stats=1 "corpus/$t" fuzz/seeds/peering
           done
 
       - name: Keep the corpus and any crash

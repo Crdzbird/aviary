@@ -142,28 +142,15 @@ Hash AccountStateMachine::state_root() const {
 }
 
 StateProof AccountStateMachine::prove_account(const Hash& address) const {
-  // Proofs are off the hot path; materialise so we prove against a coherent
-  // committed tree.
-  const std::map<Hash, Account> accounts = merged();
-  std::vector<Hash> leaves;
-  leaves.reserve(accounts.size());
+  seal();
   StateProof proof;
-  bool found = false;
-  std::uint32_t found_index = 0;
-  std::uint32_t i = 0;
-  for (const auto& [addr, acc] : accounts) {
-    Bytes preimage = account_leaf_preimage(addr, acc);
-    leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, preimage));
-    if (addr == address) {
-      found = true;
-      found_index = i;
-      proof.leaf_preimage = std::move(preimage);
-    }
-    ++i;
-  }
-  proof.leaf_count = static_cast<std::uint32_t>(leaves.size());
-  proof.present = found;
-  if (found) proof.proof = merkle::make_proof(leaves, found_index);
+  proof.leaf_count = static_cast<std::uint32_t>(base_->sorted_addrs.size());
+  auto it = base_->accounts.find(address);
+  proof.present = it != base_->accounts.end();
+  if (!proof.present) return proof;
+  proof.leaf_preimage = account_leaf_preimage(address, it->second);
+  const auto pos = std::lower_bound(base_->sorted_addrs.begin(), base_->sorted_addrs.end(), address);
+  proof.proof = base_->tree.proof(static_cast<std::uint32_t>(pos - base_->sorted_addrs.begin()));
   return proof;
 }
 

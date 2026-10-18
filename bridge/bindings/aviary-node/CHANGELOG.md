@@ -15,7 +15,10 @@ built on the CipherBird 1.1.1 crypto engine.
   validator rotation, light clients and chain trees.
 - Networking: `NetNode` over an application owned transport, `PeerMesh`
   for in-process meshes, `SecureSession` and `NoiseSession` links, peer
-  records and `AddressBook`, and the admission handshake.
+  records and `AddressBook`, and the admission handshake. On record model
+  networks `NetNode.record`, `recordNonce` and `proveRecord` answer on every
+  node; `setTransactions` lists are cleared when the height commits, so the
+  next height's list is set before `advance`.
 - Custody: key stores that sign without revealing secrets, portable and
   threshold accounts. Assurance postures, sealed mempools and anonymous
   membership credentials.

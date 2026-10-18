@@ -58,6 +58,47 @@ automatically; a packaged JAR should ship both natives side by side.
   `InitiateSecureSession`, `AcceptSecureSession`, `Encrypt`, `Decrypt`).
   Names follow each language's casing.
 
+## Records, peering and admission
+
+- Records: a chain built from a genesis with state model 2 stores 32 byte
+  keys, each with an owner, a version and a value of up to 64 KiB.
+  `chain.write(secret, key, op, value)` signs and queues a write with the
+  nonce taken from the chain; the ops are `RecordOp.PUT`, `RecordOp.TRANSFER`
+  and `RecordOp.DELETE`, and only the owner may update, transfer or delete.
+  `chain.record`, `chain.recordNonce` and `chain.proveRecord` read the
+  committed state, and `aviary.recordFromProof(proof)` reads the record out of
+  a state proof that verified. `aviary.signRecordTx` signs a write without a
+  chain handle.
+- Custody and post quantum authors: `chain.writeFromStore(store, from, key,
+  op, value)` and `keyStore.signRecord` sign record writes from the sealed key
+  store, with the scheme taken from the stored key. `node.newAccountHybrid`,
+  `node.submitTransferHybrid` and `aviary.signRecordTxHybrid` sign with
+  Ed25519 and ML-DSA-65 together in the version 2 envelope.
+- Networked records: on a record model network `netNode.record`,
+  `netNode.recordNonce` and `netNode.proveRecord` answer on every node,
+  observers included. A proposer includes the list given to `setTransactions`;
+  the list is cleared when the height commits, so set the next height's list
+  after the commit and before `advance`.
+- In process meshes: `new Aviary.PeerMesh(nodes)` with `link`, `linkAll`,
+  `start`, `advance`, `step` and `settle` relay in emission order and fire
+  timeouts only when nothing is pending, for tests and single process
+  networks.
+- Peer exchange: `aviary.signPeerRecord`, `verifyPeerRecord` and
+  `readPeerRecord` handle self signed peer records (id, host, port, KEM and
+  signature keys, optional prekey). `aviary.newAddressBook()` /
+  `decodeAddressBook(bytes)` give an `AddressBook` with `add`, `merge`,
+  `record(id)`, `records` and `encode`; a merge verifies every record and
+  never overwrites a known id.
+- Noise links: `aviary.generateNoiseIdentity`, `initiateNoiseSession(me,
+  prologue)` and `acceptNoiseSession(me, msg0, prologue)`; the session runs
+  `handshakeMessage`, `completeInitiator` / `completeResponder`, exchanges
+  `identityProof` / `verifyIdentityProof`, then `encrypt` and `decrypt`. Pin
+  `peerIdentity` so a reconnecting peer cannot change keys.
+- Admission: `gate.admissionChallenge(epoch)` gives a nonce to keep and a wire
+  to send; the peer answers with `policy.admissionAnswer(credential, wire)`
+  and the verifier checks it with `gate.admissionGranted(epoch, nonce, answer,
+  now)`, so only credential holders get past the handshake.
+
 ## Self contained jar
 
 ```bash

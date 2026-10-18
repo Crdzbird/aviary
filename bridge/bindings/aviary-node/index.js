@@ -285,6 +285,9 @@ function ensureLoaded() {
     netStateRoot: f('AviaryBufferResult aviary_net_node_state_root(void*)'),
     netBalance: f('uint64_t aviary_net_node_balance(void*, uint8_t*)'),
     netProve: f('AviaryBufferResult aviary_net_node_prove_account(void*, uint8_t*)'),
+    netRecord: f('AviaryBufferResult aviary_net_node_record(void*, uint8_t*)'),
+    netRecordNonce: f('uint64_t aviary_net_node_record_nonce(void*, uint8_t*)'),
+    netProveRecord: f('AviaryBufferResult aviary_net_node_prove_record(void*, uint8_t*)'),
     netFree: f('void aviary_net_node_free(void*)'),
     netDrainEvents: f('AviaryBufferResult aviary_net_node_drain_events(void*)'),
     netSetEventHook: f('void aviary_net_node_set_event_hook(void*, AviaryEventFn*, void*)'),
@@ -973,6 +976,15 @@ class NetNode {
   stateRoot() { return consume(fn.netStateRoot(this._h), 'net_node_state_root'); }
   balance(address) { return Number(fn.netBalance(this._h, u8(address))); }
   proveAccount(address) { return consume(fn.netProve(this._h, u8(address)), 'net_node_prove_account'); }
+  /** Record model networks: the committed record at key, or null. */
+  record(key) {
+    try { return decodeRecord(consume(fn.netRecord(this._h, u8(key)), 'net_node_record'), false); }
+    catch (e) { if (String(e.message).includes('no such record')) return null; throw e; }
+  }
+  /** Record model networks: the next nonce an author address must use. */
+  recordNonce(address) { return Number(fn.netRecordNonce(this._h, u8(address))); }
+  /** Record model networks: a state inclusion proof for the record at key. */
+  proveRecord(key) { return consume(fn.netProveRecord(this._h, u8(key)), 'net_node_prove_record'); }
   /** Buffered events (a block_finalized per committed height) as a JSON array; empty while onEvent is set. */
   drainEvents() { return consume(fn.netDrainEvents(this._h), 'net_node_drain_events').toString('utf8'); }
   /** cb(json) for every event, synchronously from the input that caused it; null removes the hook. */

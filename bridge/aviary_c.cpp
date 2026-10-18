@@ -2140,6 +2140,35 @@ AviaryBufferResult aviary_net_node_prove_account(AviaryNetNode n, const uint8_t*
     return bytes_result(acc->prove_account(to_hash32(address)).encode());
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
+namespace {
+const aviary::RecordStateMachine* net_records(AviaryNetNode n) {
+  return dynamic_cast<const aviary::RecordStateMachine*>(&as_net(n)->ledger().state());
+}
+}  // namespace
+
+AviaryBufferResult aviary_net_node_record(AviaryNetNode n, const uint8_t* key) {
+  if (!n || !key) return error_result("null net node or key");
+  const auto* rs = net_records(n);
+  if (!rs) return error_result("net node: not a record-model chain");
+  const auto* rec = rs->record(to_hash32(key));
+  if (!rec) return error_result("net node: no such record");
+  return bytes_result(record_bytes(nullptr, rec->owner, rec->version, rec->value));
+}
+
+uint64_t aviary_net_node_record_nonce(AviaryNetNode n, const uint8_t* address) {
+  if (!n || !address) return 0;
+  const auto* rs = net_records(n);
+  return rs ? rs->nonce(to_hash32(address)) : 0;
+}
+
+AviaryBufferResult aviary_net_node_prove_record(AviaryNetNode n, const uint8_t* key) {
+  if (!n || !key) return error_result("null net node or key");
+  const auto* rs = net_records(n);
+  if (!rs) return error_result("net node: not a record-model chain");
+  try { return bytes_result(rs->prove_record(to_hash32(key)).encode()); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
 AviaryBufferResult aviary_net_node_drain_events(AviaryNetNode n) {
   if (!n) return error_result("null net node");
   return string_result(as_net(n)->drain_events_json());

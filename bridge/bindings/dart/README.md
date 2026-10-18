@@ -225,8 +225,15 @@ peer's KEM public key, the listener `acceptSecureSession` with its own
 `generateSecureIdentity()`, the two handshake messages cross, then `encrypt`
 and `decrypt` wrap every frame. Always compare `peerIdentity` with the key
 you expected. Blocks carry the encoded transactions passed to
-`setTransactions` when this node is the proposer; `replayLog` catches up a
-peer that connects after consensus started.
+`setTransactions` when this node is the proposer. The list is cleared when
+the height commits, so hand over the next height's transactions after the
+commit and before `advance`. `replayLog` catches up a peer that connects
+after consensus started.
+
+On a record model network (`buildGenesis(stateModel: 2)`) every node answers
+`record(key)`, `recordNonce(address)` and `proveRecord(key)`, observers
+included; `examples/registry/bin/network.dart` runs a registry that way on
+four validators and an auditor.
 
 ## Persistence
 

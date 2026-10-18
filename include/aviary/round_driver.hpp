@@ -49,7 +49,8 @@ class RoundDriver {
   void set_anchors(std::vector<Anchor> anchors) { anchors_ = std::move(anchors); }
   /// The transactions this node includes when IT proposes at this height.
   /// Validated by every validator on receipt like any other block content.
-  /// Replaced wholesale; cleared by advance().
+  /// Replaced wholesale; cleared when the height commits, so the next
+  /// height's list is set after the commit and before advance().
   void set_transactions(std::vector<Transaction> txs) { txs_ = std::move(txs); }
 
   /// Coordinated validator-set change (see BftEngine): the set this node

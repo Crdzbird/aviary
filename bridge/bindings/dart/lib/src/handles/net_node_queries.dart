@@ -44,31 +44,54 @@ extension NetNodeQueries on NetNode {
       'net_node_prove_account',
     ),
   );
+
+  /// Record model networks: the committed record at [key], or null.
+  RecordEntry? record(Uint8List key) {
+    try {
+      return _decodeRecord(
+            _byKey('aviary_net_node_record', key),
+            withKey: false,
+          )
+          as RecordEntry;
+    } on AviaryException catch (e) {
+      if (e.message.contains('no such record')) return null;
+      rethrow;
+    }
+  }
+
+  /// Record model networks: the next nonce [address] must use.
+  int recordNonce(Uint8List address) => _scoped(
+    [address],
+    (p) => _bc.lib.lookupFunction<_RecAddrU64C, _RecAddrU64D>(
+      'aviary_net_node_record_nonce',
+    )(_h, p[0]),
+  );
+
+  /// Record model networks: a state inclusion proof for the record at [key].
+  Uint8List proveRecord(Uint8List key) =>
+      _byKey('aviary_net_node_prove_record', key);
+
+  Uint8List _byKey(String fn, Uint8List key) => _scoped(
+    [key],
+    (p) => _bc._take(
+      _bc.lib.lookupFunction<_BufNodeAddrC, _BufNodeAddrD>(fn)(_h, p[0]),
+      fn,
+    ),
+  );
 }
 
 Outbound _decodeOutbound(Uint8List b) {
-  var off = 0;
-  final relayCount = _u32be(b, off);
-  off += 4;
-  final relays = <Relay>[];
-  for (var i = 0; i < relayCount; i++) {
-    final to = _u32be(b, off);
-    final len = _u32be(b, off + 4);
-    relays.add((
-      to: to,
-      message: Uint8List.sublistView(b, off + 8, off + 8 + len),
-    ));
+  var off = 4;
+  final relays = List<Relay>.generate(_u32be(b, 0), (_) {
+    final at = off, len = _u32be(b, at + 4);
     off += 8 + len;
-  }
-  final timeoutCount = _u32be(b, off);
-  off += 4;
-  final timeouts = <TimeoutRequest>[];
-  for (var i = 0; i < timeoutCount; i++) {
-    timeouts.add((
-      step: ConsensusStep.fromCode(b[off]),
-      round: _u32be(b, off + 1),
-    ));
-    off += 5;
-  }
+    return (to: _u32be(b, at), message: Uint8List.sublistView(b, at + 8, off));
+  });
+  final count = _u32be(b, off);
+  final base = off + 4;
+  final timeouts = List<TimeoutRequest>.generate(count, (i) {
+    final at = base + i * 5;
+    return (step: ConsensusStep.fromCode(b[at]), round: _u32be(b, at + 1));
+  });
   return (relays: relays, timeouts: timeouts);
 }

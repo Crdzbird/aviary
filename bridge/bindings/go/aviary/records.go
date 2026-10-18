@@ -166,3 +166,40 @@ func RecordFromProof(proof []byte) (RecordLeaf, error) {
 	}
 	return decodeRecord(b, true)
 }
+
+// Record returns the committed record at key on a record model network, or
+// nil when none exists.
+func (n *NetNode) Record(key []byte) (*RecordEntry, error) {
+	if len(key) != 32 {
+		return nil, errors.New("record: key must be 32 bytes")
+	}
+	b, err := takeBuf(C.aviary_net_node_record(n.h, bp(key)))
+	if err != nil {
+		if containsNoRecord(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	leaf, err := decodeRecord(b, false)
+	if err != nil {
+		return nil, err
+	}
+	return &RecordEntry{Owner: leaf.Owner, Version: leaf.Version, Value: leaf.Value}, nil
+}
+
+// RecordNonce is the next nonce address must use on a record model network.
+func (n *NetNode) RecordNonce(address []byte) uint64 {
+	if len(address) != 32 {
+		return 0
+	}
+	return uint64(C.aviary_net_node_record_nonce(n.h, bp(address)))
+}
+
+// ProveRecord is a state inclusion proof for the record at key on a record
+// model network.
+func (n *NetNode) ProveRecord(key []byte) ([]byte, error) {
+	if len(key) != 32 {
+		return nil, errors.New("prove: key must be 32 bytes")
+	}
+	return takeBuf(C.aviary_net_node_prove_record(n.h, bp(key)))
+}

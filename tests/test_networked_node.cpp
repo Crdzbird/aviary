@@ -196,5 +196,35 @@ int main() {
     CHECK(hooked == 1 && net.nodes[0]->drain_events_json() == "[]");
   }
 
+  std::printf("== transactions set after a commit land in the next height ==\n");
+  {
+    Net net(4, {{0, 1}, {1, 2}, {2, 3}, {3, 0}}, alice_addr);
+    auto all_committed = [&] {
+      for (std::uint32_t i = 0; i < 4; ++i)
+        if (!net.nodes[i]->committed()) return false;
+      return true;
+    };
+    net.run(all_committed);
+    CHECK(all_committed());
+    const Hash bob = crypto::address_of(view(ed(2).public_key));
+    Transaction tx;
+    tx.chain_id = kChain;
+    tx.body = AccountStateMachine::encode_transfer({0, bob, 25});
+    sign_transaction(tx, ed(1));
+    for (std::uint32_t i = 0; i < 4; ++i) net.nodes[i]->set_transactions({tx});
+    for (std::uint32_t i = 0; i < 4; ++i) net.apply(i, net.nodes[i]->advance());
+    net.run(all_committed);
+    CHECK_MSG(all_committed(), "the second height commits");
+    for (std::uint32_t i = 0; i < 4; ++i) {
+      const auto& st = dynamic_cast<const AccountStateMachine&>(net.nodes[i]->ledger().state());
+      CHECK_MSG(st.account(bob).balance == 25, "the transfer set before advance was proposed");
+    }
+    for (std::uint32_t i = 0; i < 4; ++i) net.apply(i, net.nodes[i]->advance());
+    net.run(all_committed);
+    CHECK_MSG(all_committed(), "a third height commits with the list spent");
+    const auto& st = dynamic_cast<const AccountStateMachine&>(net.nodes[0]->ledger().state());
+    CHECK(st.account(bob).balance == 25);
+  }
+
   return bctest::summary();
 }

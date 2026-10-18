@@ -15,7 +15,7 @@ jobs:
       # drawing, check marks or other symbols in code, docs or scripts.
       - name: Plain ASCII in tracked text
         run: |
-          bad="$(git ls-files -z | xargs -0 grep -lIP '[^\x00-\x7F]' || true)"
+          bad="$(git ls-files -z -- ':!fuzz/seeds' | xargs -0 grep -lIP '[^\x00-\x7F]' || true)"
           if [ -n "$bad" ]; then echo "non-ASCII characters in:"; echo "$bad"; exit 1; fi
       # The C ABI header is copied into every shipped xcframework; the copies
       # must match the source header.

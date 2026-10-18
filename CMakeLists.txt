@@ -242,6 +242,11 @@ add_executable(bench_state tools/bench_state.cpp)
 target_link_libraries(bench_state PRIVATE aviary_core)
 set_target_properties(bench_state PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
 
+# End to end engine throughput for the README's performance table.
+add_executable(bench_engine tools/bench_engine.cpp)
+target_link_libraries(bench_engine PRIVATE aviary_core)
+set_target_properties(bench_engine PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+
 # -- Tests (zero-dependency runner, matching cryptolib's convention) ----------
 enable_testing()
 
@@ -350,4 +355,5 @@ if(AVIARY_BUILD_FUZZERS)
   aviary_add_fuzzer(fuzz_codec fuzz/fuzz_codec.cpp)
   aviary_add_fuzzer(fuzz_restore fuzz/fuzz_restore.cpp)
   aviary_add_fuzzer(fuzz_c_abi fuzz/fuzz_c_abi.cpp aviary_c)
+  aviary_add_fuzzer(fuzz_peering fuzz/fuzz_peering.cpp aviary_c)
 endif()

@@ -173,3 +173,83 @@ func TestNoiseSessionAndAdmission(t *testing.T) {
 		t.Fatal("admission")
 	}
 }
+
+func TestNetNodeRecords(t *testing.T) {
+	must := ok(t)
+	keys := make([]*bc.PortableAccount, 4)
+	vset := make([]bc.GenesisValidator, 4)
+	for i := range keys {
+		keys[i], _ = bc.NewBLSValidator(bytes.Repeat([]byte{byte(0x50 + i)}, 32))
+		vset[i] = bc.GenesisValidator{PublicKey: keys[i].Public, Power: 1}
+	}
+	genesis := must(bc.BuildGenesis(77, 1, 1, 2, nil, vset))
+	m := bc.NewPeerMesh()
+	for i := range keys {
+		n, err := bc.NewNetNode(genesis, uint32(i), keys[i].Public, keys[i].Secret, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.Nodes = append(m.Nodes, n)
+	}
+	observer, err := bc.NewNetNode(genesis, bc.Observer, nil, nil, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Nodes = append(m.Nodes, observer)
+	defer m.Free()
+	m.LinkAll()
+	node := bc.NewNode(1)
+	defer node.Free()
+	secret, _, author, _ := node.NewAccount()
+	_, _, heir, _ := node.NewAccount()
+	key := bytes.Repeat([]byte{0x42}, 32)
+	give := func(nonce uint64, op uint8, value []byte) {
+		tx := must(bc.SignRecordTx(77, nonce, key, op, value, secret))
+		for _, n := range m.Nodes[:4] {
+			if err := n.SetTransactions([][]byte{tx}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	give(0, bc.RecordPut, []byte("v1"))
+	if err := m.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Settle(0, 1, 2, 3); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range m.Nodes {
+		rec, err := n.Record(key)
+		if err != nil || rec == nil || rec.Version != 1 || !bytes.Equal(rec.Owner, author) {
+			t.Fatalf("record on every node: %v %v", rec, err)
+		}
+	}
+	if observer.RecordNonce(author) != 1 {
+		t.Fatal("observer nonce")
+	}
+	proof := must(m.Nodes[1].ProveRecord(key))
+	if !bc.VerifyStateProof(must(observer.StateRoot()), proof) {
+		t.Fatal("validator proof under the observer root")
+	}
+	if rec, err := m.Nodes[2].Record(make([]byte, 32)); err != nil || rec != nil {
+		t.Fatal("unknown key reads nil")
+	}
+	give(1, bc.RecordTransfer, heir)
+	if err := m.Advance(); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Settle(0, 1, 2, 3); err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := observer.Record(key); rec == nil || !bytes.Equal(rec.Owner, heir) {
+		t.Fatal("a list set after the commit lands in the next height")
+	}
+	account, err := bc.NewNetNode(must(bc.BuildGenesis(78, 1, 1, 0, nil, vset[:1])), 0, keys[0].Public, keys[0].Secret, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer account.Free()
+	if _, err := account.Record(key); err == nil || !strings.Contains(err.Error(), "not a record-model chain") {
+		t.Fatal("account network refuses record queries")
+	}
+}

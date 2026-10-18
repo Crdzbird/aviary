@@ -167,7 +167,6 @@ RoundDriver::Output RoundDriver::advance() {
   if (!committed_) return {};  // nothing finalized yet
   last_commit_ = cert_;        // certifies the block we just committed
   height_ = ledger_->tip().height + 1;
-  txs_.clear();
   sm_ = RoundStateMachine(make_config());
   blocks_.clear();
   precommit_sigs_.clear();
@@ -197,6 +196,7 @@ void RoundDriver::commit(std::uint32_t round, const Value& value) {
   if (ledger_->process_block(bit->second).ok) {
     cert_ = std::move(cert);
     committed_ = true;
+    txs_.clear();
     // A finalized rotation takes effect NOW for the next height: validators()
     // answers "in force next" immediately, and any late message for this
     // (decided) height simply no longer verifies - harmless.

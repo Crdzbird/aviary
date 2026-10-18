@@ -24,7 +24,8 @@ final class NetNode extends _NativeHandle {
   )(_h, peer);
 
   /// The encoded transactions this node includes when it proposes at the
-  /// current height; cleared by [advance]. Throws on a malformed transaction.
+  /// current height; cleared when it commits, so set the next height's list
+  /// before [advance]. Throws on a malformed transaction.
   void setTransactions(List<Uint8List> encodedTxs) {
     final blob = _blobList(encodedTxs);
     final ok = _scoped(

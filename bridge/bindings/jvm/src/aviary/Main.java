@@ -550,6 +550,36 @@ public final class Main {
             }
             System.out.println("network + secure session OK");
 
+            {
+                Aviary.PortableAccount[] keys = new Aviary.PortableAccount[4];
+                byte[][] pks = new byte[4][]; long[] powers = {1, 1, 1, 1};
+                for (int i = 0; i < 4; i++) { byte[] ikm = new byte[32]; java.util.Arrays.fill(ikm, (byte) (0x50 + i)); keys[i] = bc.newBLSValidator(ikm); pks[i] = keys[i].publicKey(); }
+                byte[] genesis = bc.buildGenesis(77, 1, 1, 2, new byte[0][], new long[0], pks, powers);
+                var built = new java.util.ArrayList<Aviary.NetNode>();
+                for (int i = 0; i < 4; i++) built.add(bc.newNetNode(genesis, i, keys[i], 1));
+                built.add(bc.newNetNode(genesis, Aviary.NET_OBSERVER, null, 1));
+                try (Aviary.PeerMesh mesh = new Aviary.PeerMesh(built); Aviary.Node people = bc.createNode(1)) {
+                    mesh.linkAll();
+                    var nodes = mesh.nodes; var observer = nodes.get(4);
+                    Aviary.Account author = people.newAccount(), heir = people.newAccount();
+                    byte[] key = new byte[32]; java.util.Arrays.fill(key, (byte) 0x42);
+                    byte[] put = bc.signRecordTx(77, 0, key, Aviary.RecordOp.PUT, "v1".getBytes(), author.secret());
+                    for (int i = 0; i < 4; i++) nodes.get(i).setTransactions(new byte[][]{put});
+                    mesh.start();
+                    if (!mesh.settle(0, 1, 2, 3)) throw new IllegalStateException("record mesh height 1");
+                    for (var nn : nodes) { var rec = nn.record(key); if (rec == null || rec.version() != 1 || !java.util.Arrays.equals(rec.owner(), author.address())) throw new IllegalStateException("record on every node"); }
+                    if (observer.recordNonce(author.address()) != 1) throw new IllegalStateException("observer record nonce");
+                    if (!bc.verifyStateProof(observer.stateRoot(), nodes.get(1).proveRecord(key))) throw new IllegalStateException("record proof under the observer root");
+                    if (nodes.get(2).record(new byte[32]) != null) throw new IllegalStateException("unknown record key");
+                    byte[] move = bc.signRecordTx(77, 1, key, Aviary.RecordOp.TRANSFER, heir.address(), author.secret());
+                    for (int i = 0; i < 4; i++) nodes.get(i).setTransactions(new byte[][]{move});
+                    mesh.advance();
+                    if (!mesh.settle(0, 1, 2, 3)) throw new IllegalStateException("record mesh height 2");
+                    if (!java.util.Arrays.equals(observer.record(key).owner(), heir.address())) throw new IllegalStateException("next height list not proposed");
+                }
+            }
+            System.out.println("networked records OK");
+
             System.out.println("\nALL GOOD");
         }
     }

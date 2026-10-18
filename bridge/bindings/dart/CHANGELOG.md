@@ -45,6 +45,10 @@ CipherBird 1.1.1 crypto engine.
   `NoiseSession` (Noise XX with a post quantum identity proof), and the
   anonymous membership admission handshake (`admissionChallenge`,
   `admissionAnswer`, `admissionGranted`).
+- Record model networks: `NetNode.record`, `recordNonce` and `proveRecord`
+  answer on every node, observers included. `setTransactions` lists are
+  cleared when the height commits, so the next height's list is set before
+  `advance` and reaches its round 0 proposal.
 
 **Custody, assurance and credentials**
 

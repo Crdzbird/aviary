@@ -100,7 +100,8 @@ int main() {
     CHECK(take(aviary_chain_add_tx(c, tx1.data(), tx1.size())).size() == 32);
     CHECK(take(aviary_chain_add_tx(c, tx2.data(), tx2.size())).size() == 32);
     CHECK(take(aviary_chain_add_tx(c, tx3.data(), tx3.size())).size() == 32);
-    const std::string queued(reinterpret_cast<const char*>(take(aviary_chain_drain_events(c)).data()));
+    const Bytes queued_bytes = take(aviary_chain_drain_events(c));
+    const std::string queued(queued_bytes.begin(), queued_bytes.end());
     CHECK(queued.find("tx_admitted") != std::string::npos && queued.find("\"mempool_size\":3") != std::string::npos);
     CHECK(produce(c, 2) && aviary_chain_pending_count(c) == 0);
     Bytes ev = take(aviary_chain_drain_events(c));
@@ -114,11 +115,41 @@ int main() {
     CHECK(take_error(aviary_keystore_sign_record(ks, 41, unknown.data(), 0, k1.data(), 0, nullptr, 0)).find("unknown") != std::string::npos);
     aviary_keystore_lock(ks);
     CHECK(!take_error(aviary_keystore_sign_record(ks, 41, ed_addr, 1, k1.data(), 0, nullptr, 0)).empty());
-    std::string metrics(reinterpret_cast<const char*>(take(aviary_chain_metrics(c)).data()));
+    const Bytes metrics_bytes = take(aviary_chain_metrics(c));
+    const std::string metrics(metrics_bytes.begin(), metrics_bytes.end());
     CHECK(metrics.find("aviary_mempool_size 0") != std::string::npos);
     aviary_keystore_free(ks);
     aviary_node_free(n);
     aviary_chain_free(c);
+  }
+
+  {
+    Bytes ikm(32, 0x62);
+    auto [bls_pub, bls_sec] = split(take(aviary_bls_keygen(ikm.data(), ikm.size())));
+    const std::uint64_t power = 1;
+    Bytes g = take(aviary_genesis_build(43, 1, 1, 2, nullptr, nullptr, 0, bls_pub.data(), &power, 1));
+    AviaryNetNode net = aviary_net_node_new(g.data(), g.size(), 0, bls_pub.data(), bls_pub.size(), bls_sec.data(), bls_sec.size(), 1);
+    CHECK(net != nullptr);
+    AviaryNode n = aviary_node_new(1);
+    Bytes ed = take(aviary_node_new_account(n));
+    Bytes ed_pub(ed.begin() + 32, ed.end());
+    Bytes key(32, 0x0A);
+    const char* v = "{\"site\":\"north\"}";
+    Bytes tx = take(aviary_record_tx_sign(43, 0, key.data(), 0, reinterpret_cast<const std::uint8_t*>(v), std::strlen(v), ed.data(), ed.size()));
+    Bytes list = cat({tx});
+    CHECK(aviary_net_node_set_transactions(net, list.data(), list.size()) == 1);
+    take(aviary_net_node_start(net));
+    CHECK(aviary_net_node_committed(net) == 1);
+    Bytes rec = take(aviary_net_node_record(net, key.data()));
+    CHECK(rec.size() > 44 && Bytes(rec.begin(), rec.begin() + 32) == address_of(ed_pub));
+    CHECK(aviary_net_node_record_nonce(net, address_of(ed_pub).data()) == 1);
+    Bytes proof = take(aviary_net_node_prove_record(net, key.data()));
+    Bytes root = take(aviary_net_node_state_root(net));
+    CHECK(aviary_verify_state_proof(root.data(), proof.data(), proof.size()) == 1);
+    Bytes missing(32, 0x0B);
+    CHECK(!take_error(aviary_net_node_record(net, missing.data())).empty());
+    aviary_node_free(n);
+    aviary_net_node_free(net);
   }
 
   // -- Address book: signed records, trusted add, verified merge ---------------

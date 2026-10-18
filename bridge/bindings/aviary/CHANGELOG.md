@@ -8,7 +8,8 @@ First release: the Aviary ledger for Flutter on Android, iOS and macOS.
   chains with application records, subchains, validator rotation, light
   clients, chain trees, networking with `NetNode`, `SecureSession` and
   `PeerMesh`, custody, assurance postures, sealed mempools, anonymous
-  membership credentials, typed event streams and metrics.
+  membership credentials, typed event streams and metrics, and record
+  queries on networked nodes.
 - Shares the native engine with the `cipherbird` package (1.1.1 or later)
   and re-exports its Dart API, so the engine exists once in the app.
 - `AviaryShared` entry point (`ensureInitialized`, `instance`) and the shortcut

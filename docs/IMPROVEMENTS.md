@@ -937,8 +937,14 @@ selectors - validated against real-world vectors). Deferred:
 - **[L] Cross-language coverage is hash-level only.** Dart/Go agree on
   hash/txid/header_hash, not full block processing (single C++ impl makes deep
   differential testing unnecessary, but note the boundary of what's proven).
-- **[L] No benchmarks.** `ARCHITECTURE.md` section 8 native-path work is profile-driven;
-  no profiling/benchmarks exist yet.
+- **[x] Benchmarks - DONE.** `tools/bench_engine.cpp` measures signing and
+  admission, BFT blocks of 1,000 transfers, follower replay, state proofs,
+  hybrid transfers, record writes and a 4 validator in-process mesh; the README
+  Performance section has the table. Profiling it found account proofs rebuilt
+  the whole tree per call (now O(log N) from the cached `MerkleIndex`, about
+  10 ms to under 1 us over 1,000 accounts) and that CipherBird's unkeyed
+  BLAKE3 returns an mlocked `SecureBuffer`, two syscalls per public hash
+  (open: fixing it in CipherBird doubles replay and record throughput).
 
 ## Build & packaging
 
@@ -1643,7 +1649,8 @@ selectors - validated against real-world vectors). Deferred:
   the state root, deletion.
 - **[x]** Record writes from a `KeyStore` and hybrid post quantum record
   authors: see the engine batch of 2026-10-18 below.
-- **[ ] [L]** A networked record chain example.
+- **[x]** A networked record chain example: `examples/registry/bin/network.dart`,
+  see the batch below.
 
 ## Release refinement on CipherBird 1.1.1 - DONE (2026-10-18)
 - **[x] Engine.** CipherBird 1.1.1 keeps the C ABI at 265 functions and
@@ -1748,3 +1755,39 @@ selectors - validated against real-world vectors). Deferred:
   every copy of `aviary_c.h` must match the source header. The Flutter CI
   job also formats, analyzes and tests each example app.
 
+## Networked records, peer fuzzing, benchmarks - DONE (2026-10-18)
+- **[x] Networked record queries.** `aviary_net_node_record`,
+  `aviary_net_node_record_nonce` and `aviary_net_node_prove_record` answer
+  record lookups, nonces and state proofs on a record model `NetNode`, with
+  "not a record-model chain" and "no such record" errors. Dart
+  `record`/`recordNonce`/`proveRecord`, Go `Record`/`RecordNonce`/
+  `ProveRecord`, npm `record`/`recordNonce`/`proveRecord`, JVM and Swift
+  wrappers; `test_c_abi_extras` covers a single validator record network.
+- **[x] Transactions on later heights.** `RoundDriver::advance()` cleared the
+  proposer's transaction list and then proposed at once, so after height 1 a
+  round 0 proposal never carried what `set_transactions` gave it. The list is
+  now cleared when the height commits; the app sets the next height's list
+  between the commit and `advance()`. `test_networked_node` checks a
+  transfer set after a commit lands in the next height and fails on the old
+  code. Proposer side only: validation is unchanged.
+- **[x] Fuzzing the peer facing parsers.** `fuzz/fuzz_peering.cpp` drives
+  peer records, address book decode and merge, every Noise XX step, identity
+  proofs, transport decryption, membership admission (both directions),
+  record proofs and the chain transaction queue from one input, over a
+  fixture with live sessions and a record chain. Thirteen seeds in
+  `fuzz/seeds/peering` (generated from real encodings) seed the CI corpus;
+  the standalone driver gained a deterministic mutation mode
+  (`AVIARY_FUZZ_MUTATIONS=N`) for toolchains without libFuzzer. 520,000
+  mutated inputs under ASan and UBSan over `fuzz_peering` and `fuzz_c_abi`
+  found nothing; the CI job runs both under libFuzzer.
+- **[x] Benchmarks** (see the backlog item above and the README Performance
+  section), with the account proof fix they found. The ASan run in CI also
+  caught a test that built a string with `strlen` over a buffer without a
+  terminator; fixed.
+- **[x] Example:** `examples/registry/bin/network.dart`, four sites as
+  validators plus an auditor observer on a record genesis over a `PeerMesh`,
+  every node answering the same records and proofs.
+- **[ ] [M] Unlocked hash outputs in CipherBird.** `Blake3::digest` returns
+  an mlocked `SecureBuffer`; a public hash needs neither the lock nor the
+  wipe. Measured with a patched engine: replay 2x, record writes 2x, BFT
+  blocks 1.47x, snapshot restore 4x. Needs a CipherBird release.

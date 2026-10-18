@@ -48,7 +48,7 @@ public final class Aviary implements AutoCloseable {
     private final MethodHandle nodeSetEventHook, nodeSnapshot, nodeRestore, nodeRestoreReplay, nodeNextNonce, nodeBlockAt, nodeSubmitTx, nodeSubmitKs,
             ksSign, ksPublicKey, ksHas, ksAddresses, ksLock,
             netNew, netAddPeer, netSetTxs, netStart, netOnGossip, netOnTimeout, netAdvance, netCommitted, netHeight,
-            netPeerBanned, netReplayLog, netTip, netStateRoot, netBalance, netProve, netFree, netDrainEvents, netSetEventHook, netMetrics,
+            netPeerBanned, netReplayLog, netTip, netStateRoot, netBalance, netProve, netRecordH, netRecordNonceH, netProveRecordH, netFree, netDrainEvents, netSetEventHook, netMetrics,
             secIdentity, secInitiate, secAccept, secHandshake, secComplete, secOpen, secPeer, secEncrypt, secDecrypt, secFree;
 
     public Aviary() {
@@ -262,6 +262,9 @@ public final class Aviary implements AutoCloseable {
         netStateRoot = h("aviary_net_node_state_root", FunctionDescriptor.of(RES, ADDRESS));
         netBalance = h("aviary_net_node_balance", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
         netProve = h("aviary_net_node_prove_account", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        netRecordH = h("aviary_net_node_record", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
+        netRecordNonceH = h("aviary_net_node_record_nonce", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS));
+        netProveRecordH = h("aviary_net_node_prove_record", FunctionDescriptor.of(RES, ADDRESS, ADDRESS));
         netFree = h("aviary_net_node_free", FunctionDescriptor.ofVoid(ADDRESS));
         netDrainEvents = h("aviary_net_node_drain_events", FunctionDescriptor.of(RES, ADDRESS));
         netSetEventHook = h("aviary_net_node_set_event_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
@@ -1294,7 +1297,7 @@ public final class Aviary implements AutoCloseable {
         private final MemorySegment h;
         private NetNode(MemorySegment h) { this.h = h; }
         public void addPeer(int peer) { try { netAddPeer.invoke(h, peer); } catch (Throwable t) { throw new RuntimeException(t); } }
-        /** Encoded transactions this node proposes at the current height; cleared by advance. */
+        /** Encoded transactions this node proposes at the current height; cleared when it commits, so set the next height's list before advance. */
         public void setTransactions(byte[][] encodedTxs) {
             byte[] blob = blobList(encodedTxs);
             try { if ((int) netSetTxs.invoke(h, seg(blob), (long) blob.length) != 1) throw new IllegalArgumentException("net node: malformed transaction"); }
@@ -1312,6 +1315,15 @@ public final class Aviary implements AutoCloseable {
         public byte[] stateRoot() { return consume(invokeRes(netStateRoot, h)); }
         public long balance(byte[] address) { try { return (long) netBalance.invoke(h, seg(address)); } catch (Throwable t) { throw new RuntimeException(t); } }
         public byte[] proveAccount(byte[] address) { return call(netProve, h, seg(address)); }
+        /** Record model networks: the committed record at key, or null. */
+        public RecordEntry record(byte[] key) {
+            try { return decodeRecord(call(netRecordH, h, seg(key)), false).entry(); }
+            catch (RuntimeException e) { if (String.valueOf(e.getMessage()).contains("no such record")) return null; throw e; }
+        }
+        /** Record model networks: the next nonce an author must use. */
+        public long recordNonce(byte[] address) { try { return (long) netRecordNonceH.invoke(h, seg(address)); } catch (Throwable t) { throw new RuntimeException(t); } }
+        /** Record model networks: a state inclusion proof for the record at key. */
+        public byte[] proveRecord(byte[] key) { return call(netProveRecordH, h, seg(key)); }
         private long eventHandle;
         /** Buffered events (a block_finalized per committed height) as a JSON array; empty while a hook is set. */
         public String drainEvents() { return new String(consume(invokeRes(netDrainEvents, h)), StandardCharsets.UTF_8); }

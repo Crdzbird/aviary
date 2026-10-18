@@ -75,7 +75,8 @@ func (n *NetNode) Free() {
 func (n *NetNode) AddPeer(peer uint32) { C.aviary_net_node_add_peer(n.h, C.uint32_t(peer)) }
 
 // SetTransactions sets the encoded transactions this node proposes at the
-// current height; cleared by Advance.
+// current height; cleared when it commits, so set the next height's list
+// before Advance.
 func (n *NetNode) SetTransactions(encodedTxs [][]byte) error {
 	blob := encodeBlobList(encodedTxs)
 	if C.aviary_net_node_set_transactions(n.h, bp(blob), C.size_t(len(blob))) != 1 {

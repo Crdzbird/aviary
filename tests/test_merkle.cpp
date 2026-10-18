@@ -85,5 +85,19 @@ int main() {
   // Out-of-range proof request throws.
   CHECK_THROWS(make_proof(leaves(4), 4));
 
+  for (std::uint32_t n = 1; n <= 40; ++n) {
+    auto ls = leaves(n);
+    MerkleIndex index;
+    index.reset(ls);
+    for (std::uint32_t i = 0; i < n; ++i) {
+      const Proof want = make_proof(ls, i);
+      const Proof got = index.proof(i);
+      CHECK(got.index == want.index);
+      CHECK(got.siblings == want.siblings);
+    }
+    CHECK_THROWS(index.proof(n));
+  }
+  CHECK_THROWS(MerkleIndex{}.proof(0));
+
   return bctest::summary();
 }

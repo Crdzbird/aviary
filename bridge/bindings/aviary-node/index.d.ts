@@ -108,6 +108,10 @@ export class NetNode {
   stateRoot(): Buffer;
   balance(address: Buffer | Uint8Array): number;
   proveAccount(address: Buffer | Uint8Array): Buffer;
+  /** Record model networks: the committed record at key, or null. */
+  record(key: Bytes): RecordEntry | null;
+  recordNonce(address: Bytes): number;
+  proveRecord(key: Bytes): Buffer;
   /** Buffered events (a block_finalized per committed height) as a JSON array; empty while onEvent is set. */
   drainEvents(): string;
   /** cb(json) for every event, synchronously from the input that caused it; null removes the hook. */

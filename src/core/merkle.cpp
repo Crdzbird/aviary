@@ -98,6 +98,24 @@ Hash MerkleIndex::root() const {
   return levels_.back().front();
 }
 
+Proof MerkleIndex::proof(std::uint32_t index) const {
+  if (levels_.empty() || index >= levels_.front().size()) {
+    throw std::out_of_range("MerkleIndex::proof: index out of range");
+  }
+  Proof proof;
+  proof.index = index;
+  std::size_t idx = index;
+  for (std::size_t L = 0; L + 1 < levels_.size(); ++L, idx /= 2) {
+    const auto& level = levels_[L];
+    if (idx % 2 == 1) {
+      proof.siblings.push_back(level[idx - 1]);
+    } else if (idx + 1 < level.size()) {
+      proof.siblings.push_back(level[idx + 1]);
+    }
+  }
+  return proof;
+}
+
 Hash MerkleIndex::root_with_updates(const std::map<std::size_t, Hash>& changes) const {
   if (levels_.empty() || levels_.front().empty()) {
     return crypto::hash_tagged(crypto::Domain::kNode, {});

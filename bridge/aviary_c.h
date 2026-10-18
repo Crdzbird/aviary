@@ -892,7 +892,9 @@ AVIARY_API AviaryNetNode aviary_net_node_new(const uint8_t* genesis, size_t gene
                                              const uint8_t* bls_secret, size_t bls_secret_len,
                                              uint64_t timestamp);
 AVIARY_API void aviary_net_node_add_peer(AviaryNetNode n, uint32_t peer);
-/** Encoded transactions as a blob list [count u32]([len u32][tx])*. 1 ok, 0 malformed. */
+/** Encoded transactions as a blob list [count u32]([len u32][tx])*. 1 ok, 0 malformed.
+ *  Cleared when the height commits: set the next height's list after the
+ *  commit and before aviary_net_node_advance, which proposes it. */
 AVIARY_API int aviary_net_node_set_transactions(AviaryNetNode n, const uint8_t* txs, size_t txs_len);
 AVIARY_API AviaryBufferResult aviary_net_node_start(AviaryNetNode n);
 AVIARY_API AviaryBufferResult aviary_net_node_on_gossip(AviaryNetNode n, uint32_t from,
@@ -910,6 +912,14 @@ AVIARY_API AviaryBufferResult aviary_net_node_tip(AviaryNetNode n);
 AVIARY_API AviaryBufferResult aviary_net_node_state_root(AviaryNetNode n);
 AVIARY_API uint64_t aviary_net_node_balance(AviaryNetNode n, const uint8_t* address);
 AVIARY_API AviaryBufferResult aviary_net_node_prove_account(AviaryNetNode n, const uint8_t* address);
+/** Record model networks: the committed record at [key] as owner(32) || u64
+ *  version || bytes value; an error when the network is not a record chain
+ *  or no such record exists. */
+AVIARY_API AviaryBufferResult aviary_net_node_record(AviaryNetNode n, const uint8_t* key);
+/** Record model networks: the next nonce [address] must use. */
+AVIARY_API uint64_t aviary_net_node_record_nonce(AviaryNetNode n, const uint8_t* address);
+/** Record model networks: a state inclusion proof for the record at [key]. */
+AVIARY_API AviaryBufferResult aviary_net_node_prove_record(AviaryNetNode n, const uint8_t* key);
 /** Events (block_finalized per committed height) and metrics (chain height,
  *  blocks finalized, gossip received / relayed / dropped, timeouts, peers
  *  banned) of a networked node, in the node's JSON and Prometheus formats. */
