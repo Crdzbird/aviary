@@ -1,4 +1,9 @@
-// Type definitions for the Aviary Node.js binding.
+// Type definitions for the Aviary Node.js binding (aviary-ledger).
+
+/** Byte input accepted everywhere a binary argument is taken. */
+export type Bytes = Buffer | Uint8Array;
+/** Integer input accepted for heights, amounts, nonces and timestamps. */
+export type Int = number | bigint;
 
 export interface Account {
   /** 64-byte Ed25519 secret (public key = secret[32:64]). */
@@ -29,9 +34,15 @@ export class Node {
   constructor(chainId: number | bigint);
   free(): void;
   newAccount(): Account;
+  /** A hybrid Ed25519 + ML-DSA-65 account. */
+  newAccountHybrid(): Account;
   static accountAddress(publicKey: Buffer | Uint8Array): Buffer;
   credit(address: Buffer | Uint8Array, amount: number | bigint): void;
   submitTransfer(secret: Buffer | Uint8Array, toAddress: Buffer | Uint8Array, amount: number | bigint, nonce: number | bigint): Buffer;
+  /** An Ed25519 transfer carrying a priority fee tip. */
+  submitTransferFee(secret: Bytes, toAddress: Bytes, amount: Int, nonce: Int, fee: Int): Buffer;
+  /** A transfer signed by a hybrid post quantum account. */
+  submitTransferHybrid(secret: Bytes, publicKey: Bytes, toAddress: Bytes, amount: Int, nonce: Int): Buffer;
   produceBlock(timestamp: number | bigint): number;
   height(): number;
   mempoolSize(): number;
@@ -95,6 +106,12 @@ export class NetNode {
   stateRoot(): Buffer;
   balance(address: Buffer | Uint8Array): number;
   proveAccount(address: Buffer | Uint8Array): Buffer;
+  /** Buffered events (a block_finalized per committed height) as a JSON array; empty while onEvent is set. */
+  drainEvents(): string;
+  /** cb(json) for every event, synchronously from the input that caused it; null removes the hook. */
+  onEvent(cb: ((json: string) => void) | null): void;
+  /** Prometheus text: height, blocks finalized, gossip received, relayed and dropped, timeouts, bans. */
+  metrics(): string;
   free(): void;
 }
 export function newNetNode(opts: ConstructorParameters<typeof NetNode>[0]): NetNode;
@@ -138,3 +155,242 @@ export function solAddress(edSecret64: Buffer | Uint8Array): string;
 export function erc20TransferCalldata(to20: Buffer | Uint8Array, amount: number | bigint): Buffer;
 export function functionSelector(signature: string): Buffer;
 export function signLegacyTx(params: SignLegacyTxParams): Buffer;
+
+// -- Composable chains ---------------------------------------------------------
+
+export interface ValidatorEntry { publicKey: Bytes; power: Int }
+export interface ValidatorInfo { publicKey: Buffer; power: number }
+export interface GenesisAccount { address: Bytes; balance: Int }
+
+/** A declared mixture: consensus engine, state model, proposer policy and params. */
+export class Blueprint {
+  constructor(consensus: string, stateModel: string, proposer?: string, params?: Bytes);
+  readonly consensus: string;
+  readonly stateModel: string;
+  readonly proposer: string;
+  readonly params: Buffer;
+  /** The canonical encoding committed into a genesis. */
+  readonly encoded: Buffer;
+  hash(): Buffer;
+}
+
+/**
+ * Builds a canonical genesis. stateModel 0 = account, 1 = UTXO, 2 = record;
+ * assuranceLevel 1 = standard, 2 = hardened, 3 = fortress.
+ */
+export function buildGenesis(opts: {
+  chainId: Int;
+  timestamp?: Int;
+  assuranceLevel?: number;
+  stateModel?: number;
+  accounts?: GenesisAccount[];
+  validators?: ValidatorEntry[];
+}): Buffer;
+/** Commits a mixture into a genesis; the genesis hash changes because the mixture is chain identity. */
+export function commitBlueprint(genesis: Bytes, blueprint: Blueprint): Buffer;
+export function genesisHash(genesis: Bytes): Buffer;
+export function engineIds(): string[];
+export function stateModelIds(): string[];
+export function proposerIds(): string[];
+/** A BLS12-381 validator key derived from at least 32 bytes of key material. */
+export function newBLSValidator(keyMaterial: Bytes): KeyPair;
+/** Assembles a chain from a genesis; null when the mixture is unknown, mismatched or forbidden by the posture. */
+export function assembleChain(genesis: Bytes, me: number, blsPublic: Bytes, blsSecret: Bytes): Chain | null;
+
+/** A consensus engine written in JavaScript. */
+export interface ForeignEngine {
+  /** The justification for a block this node proposes, or null to refuse. */
+  justify(block: Buffer): Bytes | null;
+  verify(block: Buffer, justification: Buffer): boolean;
+}
+export function registerEngine(id: string, engine: ForeignEngine, grindProof?: boolean): boolean;
+/** policy(height, validatorCount) returns the proposer index. */
+export function registerProposer(id: string, policy: (height: number, validatorCount: number) => number): boolean;
+/** Largest justification a foreign engine may return, in bytes. */
+export const MAX_JUSTIFICATION: number;
+
+/** An assembled chain behind the uniform propose, seal or mine, submit flow. */
+export class Chain {
+  readonly height: number;
+  /** The chain id this chain runs. */
+  readonly chainId: number;
+  /** Transactions waiting for the next proposal. */
+  readonly pendingCount: number;
+  blueprint(): Buffer;
+  /** The next block, carrying every queued transaction. */
+  propose(timestamp: Int): Buffer;
+  /** PoS and VRF justification; empty for engines that do not seal. */
+  seal(block: Bytes): Buffer;
+  /** PoW: the solved block. */
+  mine(block: Bytes): Buffer;
+  /** BFT: this validator's precommit as a commit certificate. */
+  certify(block: Bytes): Buffer;
+  submit(block: Bytes, justification?: Bytes): boolean;
+  stateRoot(): Buffer;
+  /** Queues a signed, encoded transaction for the next proposal after validating it; returns the txid. */
+  addTx(tx: Bytes): Buffer;
+  /** BFT: schedules the next validator set; the next proposal announces it. */
+  scheduleValidators(validators: ValidatorEntry[]): void;
+  validators(): ValidatorInfo[];
+  /** Parent chains: the next block anchoring encoded anchors in ascending child id order. */
+  proposeAnchored(timestamp: Int, anchors: Bytes[]): Buffer;
+  childTip(childChainId: Int): Buffer;
+  subchainHop(childChainId: Int): Buffer;
+  /** Account model chains: a state inclusion proof for an address. */
+  proveAccount(address: Bytes): Buffer;
+  /** Record model chains: signs a write with a 64 byte Ed25519 secret, nonce from the chain, and queues it. */
+  write(secret: Bytes, key: Bytes, op: RecordOpValue, value?: Bytes): Buffer;
+  /** Record model chains: the committed record at key, or null. */
+  record(key: Bytes): RecordEntry | null;
+  recordNonce(address: Bytes): number;
+  proveRecord(key: Bytes): Buffer;
+  /** Buffered block events as a JSON array; empty while onEvent is set. */
+  drainEvents(): string;
+  onEvent(cb: ((json: string) => void) | null): void;
+  /** Prometheus text: height, blocks finalized and rejected, transactions applied. */
+  metrics(): string;
+  free(): void;
+}
+
+// -- Records -------------------------------------------------------------------
+
+export type RecordOpValue = 0 | 1 | 2;
+export const RecordOp: { readonly PUT: 0; readonly TRANSFER: 1; readonly DELETE: 2 };
+export interface RecordEntry { owner: Buffer; version: number; value: Buffer }
+export interface RecordLeaf extends RecordEntry { key: Buffer }
+export function signRecordTx(opts: { chainId: Int; nonce: Int; key: Bytes; op: RecordOpValue; value?: Bytes; secret: Bytes }): Buffer;
+export function addressOf(publicKey: Bytes): Buffer;
+/** The record a verified state proof commits to. */
+export function recordFromProof(proof: Bytes): RecordLeaf;
+
+// -- Light client ---------------------------------------------------------------
+
+export interface Checkpoint { header: Bytes; certificate: Bytes; validators: ValidatorEntry[] }
+export const SkipRefused: 0;
+export const SkipAccepted: 1;
+export const SkipInsufficientOverlap: 2;
+export class LightClient {
+  constructor(chainId: Int, validators: ValidatorEntry[], trustedHeader: Bytes);
+  readonly height: number;
+  tip(): Buffer;
+  validators(): ValidatorInfo[];
+  setTrustLevel(numerator: number, denominator: number): void;
+  setMaxSkip(blocks: Int): void;
+  accept(header: Bytes, certificate: Bytes): boolean;
+  /** SkipRefused, SkipAccepted or SkipInsufficientOverlap. */
+  acceptSkipping(checkpoint: Checkpoint): number;
+  /** Bisects towards target, fetching intermediate checkpoints on demand. Throws on a refusal. */
+  syncTo(target: Checkpoint, targetHeight: number, fetch: (height: number) => Checkpoint | null): void;
+  free(): void;
+}
+
+// -- Subchains and chain trees ----------------------------------------------
+
+export function genesisHeader(genesis: Bytes): Buffer;
+export function encodeChildRegistration(opts: { chainId: Int; genesisHeader: Bytes; validators: ValidatorEntry[]; maxDepth?: number }): Buffer;
+export function encodeSubchainPolicy(opts: { maxChildren: number; maxDepth?: number; maxAnchorsPerBlock?: number; maxHeadersPerAnchor?: number; children?: Bytes[] }): Buffer;
+export function commitSubchainPolicy(genesis: Bytes, policy: Bytes): Buffer;
+export function commitParentBinding(genesis: Bytes, parentChainId: Int, parentGenesisHash: Bytes): Buffer;
+export function blockHeader(block: Bytes): Buffer;
+export function headerSubchainRoot(header: Bytes): Buffer;
+export function certifiedHeader(header: Bytes, certificate: Bytes): Buffer;
+export function encodeAnchor(childChainId: Int, certifiedHeaders: Bytes[]): Buffer;
+export function encodeSubchainProof(hops: Bytes[], stateProof: Bytes): Buffer;
+export function verifySubchainProof(parentSubchainRoot: Bytes, proof: Bytes): boolean;
+
+export interface TreeValidator { publicKey: Bytes; secret?: Bytes | null; power: Int }
+export interface TreeNode {
+  chainId: Int;
+  blueprint?: Blueprint;
+  assuranceLevel?: number;
+  accounts?: GenesisAccount[];
+  validators?: TreeValidator[];
+  maxAnchorsPerBlock?: number;
+  maxHeadersPerAnchor?: number;
+  children?: TreeNode[];
+}
+export function encodeTreeNode(node: TreeNode): Buffer;
+/** Why a spec is structurally invalid; empty when valid. */
+export function chainTreeSpecError(spec: Bytes): string;
+/** A family of chains built and produced together. */
+export class ChainTree {
+  constructor(root: TreeNode);
+  chainIds(): number[];
+  height(chainId: Int): number;
+  genesis(chainId: Int): Buffer;
+  tip(chainId: Int): Buffer;
+  pendingAnchors(chainId: Int): number;
+  produce(chainId: Int, timestamp: Int): Buffer;
+  proveAccount(chainId: Int, address: Bytes): Buffer;
+  verify(proof: Bytes): boolean;
+  onFinalized(cb: (chainId: number, block: Buffer) => void): void;
+  txSource(cb: (chainId: number, timestamp: number) => Bytes[]): void;
+  free(): void;
+}
+
+// -- Custody: threshold and portable accounts --------------------------------
+
+/** Creates a t of n threshold account; returns one share card per participant. */
+export function createThresholdAccount(n: number, t: number): Buffer[];
+export function shareInfo(card: Bytes): { index: number; groupPublicKey: Buffer; publicShare: Buffer };
+/** Round one of a threshold signature: keep the nonces, share the commitment. */
+export function commit(card: Bytes): { nonces: Buffer; commitment: Buffer };
+export function sealShare(card: Bytes, passphrase: string, ops?: Int, mem?: number): Buffer;
+export function unsealShare(envelope: Bytes, passphrase: string): Buffer;
+export class Ceremony {
+  constructor(groupPublicKey: Bytes, message: Bytes, commitments: Bytes[]);
+  sign(card: Bytes, nonces: Bytes): Buffer;
+  verifyShare(id: number, publicShare: Bytes, sigShare: Bytes): boolean;
+  /** The aggregated Ed25519 signature. */
+  aggregate(ids: number[], sigShares: Bytes[]): Buffer;
+  free(): void;
+}
+export function hybridKemKeypair(): KeyPair;
+export function sealAccountPassphrase(publicKey: Bytes, secret: Bytes, passphrase: string, ops?: Int, mem?: number): Buffer;
+export function openAccountPassphrase(envelope: Bytes, passphrase: string): KeyPair;
+export function sealAccountTo(publicKey: Bytes, secret: Bytes, recipientKemPublic: Bytes): Buffer;
+export function openAccountTo(envelope: Bytes, recipientKemSecret: Bytes): KeyPair;
+export function sealAccountSignedTo(publicKey: Bytes, secret: Bytes, recipientKemPublic: Bytes, senderSigSecret: Bytes): Buffer;
+export function openAccountSignedFrom(envelope: Bytes, recipientKemSecret: Bytes, senderSigPublic: Bytes): KeyPair;
+
+// -- Assurance, sealed mempools and credentials ------------------------------
+
+export function describeAssurance(level: number): { ratcheted: boolean; vrf: boolean; thresholdCustody: boolean; sealedMempool: boolean; sigAlgos: number[] };
+/** Encodes a transaction from its fields. */
+export function encodeTx(opts: { version?: number; chainId?: Int; sigAlgo?: number; fee?: Int; body: Bytes; author: Bytes; signature: Bytes }): Buffer;
+/** Seals an encoded transaction to the proposer's hybrid KEM public key. */
+export function sealTx(txEncoded: Bytes, proposerKemPublic: Bytes): Buffer;
+export class SealedMempool {
+  constructor(capacity?: number);
+  readonly size: number;
+  add(sealedTx: Bytes): boolean;
+  /** The proposer opens up to max sealed transactions, highest fee first. */
+  reveal(proposerKemSecret: Bytes, max: number): Buffer[];
+  free(): void;
+}
+export function newBBSIssuer(keyMaterial: Bytes): KeyPair;
+export const CredentialModePseudonymous: 1;
+export class CredentialPolicy {
+  constructor(chainId: Int, issuerPublic: Bytes, header: Bytes, attributeCount?: number, minTier?: number, mode?: number);
+  readonly encoded: Buffer;
+  hash(): Buffer;
+  issue(issuerSecret: Bytes, memberSecret: Bytes, tier: number, notAfter: Int, issuerEpoch: number): Buffer;
+  present(credential: Bytes, epoch: number, scope: string, challenge: Bytes): Buffer;
+  membershipCommit(memberSecret: Bytes): Buffer;
+  blindIssue(issuerSecret: Bytes, commitment: Bytes, tier: number, notAfter: Int, issuerEpoch: number): Buffer;
+  presentPseudonymous(credential: Bytes, epoch: number, scope: string, challenge: Bytes): Buffer;
+}
+export function extractCommitment(membershipCommit: Bytes): Buffer;
+export function finalizeMembership(membershipCommit: Bytes, blindIssuance: Bytes): Buffer;
+export class CredentialGate {
+  constructor(policy: CredentialPolicy);
+  admit(epoch: number, scope: string, challenge: Bytes, presentation: Bytes, now: Int): boolean;
+  /** The 48 byte pseudonym on admission, or null. */
+  admitPseudonymous(epoch: number, scope: string, challenge: Bytes, presentation: Bytes, now: Int): Buffer | null;
+  revokeIssuerEpoch(epoch: number): void;
+  revokeNym(nym: Bytes): void;
+  /** Records an admission; false when this nym was already admitted for the epoch and scope. */
+  noteAdmission(epoch: number, scope: string, nym: Bytes): boolean;
+  free(): void;
+}
+

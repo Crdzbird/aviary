@@ -1,0 +1,4 @@
+# The bundled engines under native/<os>-<arch>/ are part of the package; the
+# repository wide rules that ignore native libraries do not apply here.
+!native/
+!native/**

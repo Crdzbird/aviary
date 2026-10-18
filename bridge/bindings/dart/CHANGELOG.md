@@ -2,57 +2,69 @@
 
 ## 0.1.0
 
-- Records: `assembleRecordChain`, `Chain.write`, `record`, `proveRecord`,
-  `recordNonce`, `addTx`, `pendingCount`, `chainId`, `stateRoot`;
-  `signRecordTx`, `addressOf`, `recordFromProof`; `RecordOp`, `RecordEntry`,
-  `RecordLeaf`.
-- Tests: every suite under 100 lines, shared fixtures in `test/support`.
-- dartdoc categories: Ledger, Chains, Subchains and trees, Light clients,
-  Networking, Custody, Assurance and credentials, Observability, Interop,
-  Errors and helpers.
-- `PeerMesh`: a deterministic in-memory mesh of `NetNode`s (`link`,
-  `linkAll`, `start`, `settle`, `advance`, `run`, `step`, `deliver`) for
-  tests, simulations and single process networks.
-- Events and metrics on `Chain` and `NetNode`: `events()`, `eventStream`,
-  `metrics()` and `metricValues()`, matching `Node`. `Chain.free` and
-  `NetNode.free` close a live stream.
-- First release. The ledger (accounts, signed transfers, BFT finality,
-  mempool, events, metrics, state and inclusion proofs), composable chains
-  (mixtures of engine, state model and proposer; foreign components written
-  in Dart), subchains (anchoring, cross chain proofs), validator rotation,
-  light clients with the overlap rule and bisection, chain trees, custody
-  (key stores, portable accounts, threshold accounts), assurance postures,
-  sealed mempools and anonymous membership credentials.
-- Shortcut extensions: hex helpers on Uint8List and String, funded
-  accounts, auto nonce transfers and one call blocks on Node, single
-  validator chain assembly, whole threshold ceremonies, fluent chain trees.
-- The smoke scripts are `package:test` suites: `dart test` runs them.
-- Linux x64 and arm64 engines ship in the package and are bundled by the
-  build hook (`hook/build.dart`) as a code asset; a Windows one follows the
-  same path once it exists;
-  `Aviary.loadedFrom` reports how the engine was found. Requires Dart 3.10.
-- Custody signing: `KeyStore.signTransfer`, `Node.sendFromStore`,
-  `Node.submitTransferFromStore` and `Node.submitTx`; the sealed secret is
-  used inside the engine and wiped. `KeyStore` gains `publicKey`, `has`,
-  `addresses` and `lock`.
-- Networking: `NetNode` runs BFT consensus over a gossip mesh with the app
-  owning sockets and timers (`start`, `onGossip`, `onTimeout`, `advance`,
-  `setTransactions`, `replayLog`); `SecureSession` protects each link.
-- Persistence: `snapshot`, `restoreNode` (constant time from the carried
-  ledger state, or `replay: true` to audit the archive), `saveTo`,
+First release of the Dart API for the Aviary ledger, built on the
+CipherBird 1.1.1 crypto engine.
+
+**Ledger**
+
+- `Node`: accounts (Ed25519 and hybrid Ed25519 + ML-DSA-65), signed
+  transfers, a mempool, BFT finality with BLS aggregated certificates,
+  state and transaction inclusion proofs.
+- `nextNonce` counts transfers still pending, and `send`, `sendTo` and
+  `sendFromStore` use it, so several transfers per account can be queued
+  before a block.
+- Persistence: `snapshot`, `restoreNode` (resumes from the carried ledger
+  state, or `replay: true` to audit every block), `saveTo`,
   `restoreNodeFrom` and `blockAt`.
-- `nextNonce` counts pending transfers; `send`, `sendTo` and `sendFromStore`
-  use it, so several transfers per account can be queued before a block.
-- Typed chain events (`BlockFinalized`, `BlockRejected`, `TxAdmitted`,
-  `TxRemoved`, `UnknownEvent`) from `events()` and the push based
-  `eventStream`, fed by a native hook instead of polling.
-- Native handles are freed by a finalizer when their Dart object is
-  collected; releasing twice is a no-op and `isReleased` reports the state.
-  `withNode`, `withKeyStore` and `withTree` run a body and release after.
-- `AviaryException.status` carries the C ABI status (`AviaryStatus`), so
-  a credit after the first block is distinguishable as `genesisSealed`.
-- `sealShareAsync`, `unsealShareAsync`, `sealAccountPassphraseAsync` and
-  `openAccountPassphraseAsync` run the Argon2 bound operations on a worker
-  isolate.
-- The CipherBird engine is bundled for macOS arm64; other hosts load the
-  library from AVIARY_DYLIB.
+
+**Chains**
+
+- Composable chains: blueprints that mix a consensus engine (`bft`, `pos`,
+  `vrf-pos`, `pow`), a state model (`account`, `utxo`, `record`) and a
+  proposer policy, committed into the genesis hash. Foreign engines and
+  proposers written in Dart.
+- Application records: `assembleRecordChain` builds a chain that stores
+  owned, versioned objects instead of balances. `Chain.write`, `record`,
+  `proveRecord` and `recordFromProof` cover the whole lifecycle, and
+  `Chain.addTx` queues any signed transaction on any assembled chain.
+- Subchains with anchoring and cross chain proofs, validator rotation,
+  light clients with the overlap rule and bisection, and chain trees that
+  build and produce a whole family of chains.
+
+**Networking**
+
+- `NetNode` runs BFT consensus over a gossip mesh while the app owns
+  sockets and timers; `SecureSession` gives each link a mutually
+  authenticated, post quantum hybrid channel.
+- `PeerMesh`: a deterministic in-memory mesh of `NetNode`s for tests,
+  simulations and single process networks.
+
+**Custody, assurance and credentials**
+
+- `KeyStore` seals secrets at rest and signs inside the engine
+  (`signTransfer`, `sendFromStore`, `submitTransferFromStore`), with
+  `lock`, `unlock`, `publicKey`, `has` and `addresses`.
+- Portable accounts sealed to a passphrase, a recipient or with a
+  signature; threshold accounts with ceremonies and sealed shares. Argon2
+  bound operations have async variants that run on a worker isolate.
+- Assurance postures, sealed mempools and anonymous membership credentials
+  with an optional pseudonymous mode.
+
+**Observability**
+
+- Typed events (`BlockFinalized`, `BlockRejected`, `TxAdmitted`,
+  `TxRemoved`, `UnknownEvent`) from `events()` and a push based
+  `eventStream`, plus Prometheus metrics, on `Node`, `Chain` and `NetNode`.
+
+**Packaging and ergonomics**
+
+- The engine ships for macOS arm64 and Linux x64 and arm64; the build hook
+  bundles the Linux library as a code asset, and `Aviary.loadedFrom`
+  reports which library was loaded. `AVIARY_DYLIB` points at any other
+  build.
+- Native handles are released by a finalizer; releasing twice is a no-op.
+  `withNode`, `withKeyStore` and `withTree` release at the end of a scope.
+- `AviaryException.status` carries the C ABI status (`AviaryStatus`).
+- Shortcut extensions: hex helpers, funded accounts, one call blocks,
+  single validator chains, whole threshold ceremonies, fluent chain trees.
+- API docs are grouped into dartdoc categories. Requires Dart 3.10.

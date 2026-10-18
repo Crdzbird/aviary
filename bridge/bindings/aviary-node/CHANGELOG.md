@@ -2,18 +2,24 @@
 
 ## 0.1.0
 
-- Records: `Chain.write`, `record`, `proveRecord`, `recordNonce`, `addTx`,
-  `pendingCount`, `chainId`, `stateRoot`; `signRecordTx`, `addressOf`,
-  `recordFromProof`.
-- `Chain` and `NetNode` gain `drainEvents()`, `onEvent(cb)` and `metrics()`,
-  matching `Node`.
-- First release of aviary-ledger. The Aviary ledger (accounts, signed
-  transfers, BFT finality, mempool, events, metrics, state and inclusion
-  proofs), composable chains and foreign components, subchains, validator
-  rotation, light clients, chain trees, custody (key stores, portable and
-  threshold accounts, key store backed signing), assurance postures, sealed
-  mempools, anonymous membership credentials, node snapshots, the push event
-  hook, and networking (NetNode over an application owned transport,
-  SecureSession links).
-- Native libraries bundled for macOS arm64 and Linux x64 and arm64; the
-  engine loads on first use or through preload().
+First release of aviary-ledger, the Aviary ledger for Node.js over koffi,
+built on the CipherBird 1.1.1 crypto engine.
+
+- The ledger: accounts (Ed25519 and hybrid post quantum), signed transfers,
+  a mempool, BFT finality, state and inclusion proofs, snapshots and
+  restore.
+- Composable chains with foreign engines and proposers written in
+  JavaScript, application records (`Chain.write`, `record`, `proveRecord`,
+  `recordFromProof`), `Chain.addTx` for any signed transaction, subchains,
+  validator rotation, light clients and chain trees.
+- Networking: `NetNode` over an application owned transport and
+  `SecureSession` links.
+- Custody: key stores that sign without revealing secrets, portable and
+  threshold accounts. Assurance postures, sealed mempools and anonymous
+  membership credentials.
+- Events (`drainEvents`, `onEvent`) and Prometheus metrics on `Node`,
+  `Chain` and `NetNode`.
+- EVM, Bitcoin and Solana addresses and signing.
+- TypeScript declarations for the whole API in `index.d.ts`.
+- Native libraries for macOS arm64 and Linux x64 and arm64 are bundled;
+  the engine loads on first use or through `preload()`.

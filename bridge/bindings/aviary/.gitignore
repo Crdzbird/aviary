@@ -1,0 +1,8 @@
+# The prebuilt engines this plugin ships are part of the package; the
+# repository wide rules that ignore native libraries do not apply here.
+!android/src/main/jniLibs/
+!android/src/main/jniLibs/**
+!ios/*/*.xcframework/
+!ios/*/*.xcframework/**
+!macos/*/*.xcframework/
+!macos/*/*.xcframework/**

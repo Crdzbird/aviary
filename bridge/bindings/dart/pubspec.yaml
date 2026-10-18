@@ -1,5 +1,5 @@
 name: aviary_dart
-description: "Dart API of the Aviary ledger over dart:ffi: BFT finality, composable chains, subchains, light clients and chain trees."
+description: "Dart API of the Aviary ledger over dart:ffi: BFT finality, composable chains, application records, subchains, light clients and chain trees."
 version: 0.1.0
 homepage: https://github.com/Crdzbird/aviary
 repository: https://github.com/Crdzbird/aviary

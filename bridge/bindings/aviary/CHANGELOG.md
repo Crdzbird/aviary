@@ -2,12 +2,18 @@
 
 ## 0.1.0
 
-- First release of aviary: the Aviary ledger, composable chains,
-  subchains, validator rotation, light clients, chain trees, custody and
-  anonymous membership credentials for Flutter over dart:ffi.
-- Shares the native engine with the cipherbird package and re-exports its Dart API.
-- `AviaryShared` entry point (`ensureInitialized`, `instance`) and the
-  shortcut extensions of aviary_dart.
-- Requires iOS 15 and macOS 12, matching the CipherBird engine inside.
-- Ships an Apple privacy manifest (no tracking, no collected data, file
-  timestamp and system boot time reasons declared).
+First release: the Aviary ledger for Flutter on Android, iOS and macOS.
+
+- The whole `aviary_dart` API: the ledger with BFT finality, composable
+  chains with application records, subchains, validator rotation, light
+  clients, chain trees, networking with `NetNode`, `SecureSession` and
+  `PeerMesh`, custody, assurance postures, sealed mempools, anonymous
+  membership credentials, typed event streams and metrics.
+- Shares the native engine with the `cipherbird` package (1.1.1 or later)
+  and re-exports its Dart API, so the engine exists once in the app.
+- `AviaryShared` entry point (`ensureInitialized`, `instance`) and the shortcut
+  extensions of `aviary_dart`.
+- Requires Android API 24, iOS 15 and macOS 12, matching the CipherBird
+  engine.
+- Ships an Apple privacy manifest: no tracking, no collected data, and the
+  file timestamp and system boot time reasons declared.

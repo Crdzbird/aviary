@@ -1640,3 +1640,37 @@ selectors - validated against real-world vectors). Deferred:
   Ed25519 secret), hybrid post quantum record authors, and a networked record
   chain example.
 
+## Release refinement on CipherBird 1.1.1 - DONE (2026-10-18)
+- **[x] Engine.** CipherBird 1.1.1 keeps the C ABI at 265 functions and
+  fixes two crash class parsing bugs (short vault signatures reached the
+  verifier; length checks could wrap near 2^32), on libsodium 1.0.22 and
+  OpenSSL 3.5.9. Every Aviary artifact that carries the engine is rebuilt on
+  it: the host library, the macOS engine shipped in aviary_dart and the npm
+  prebuilds (the same binary cipherbird_dart 1.1.1 ships), the Apple static
+  and dynamic xcframeworks, both Android engines, the vendored Swift
+  CipherBird xcframework and the Swift release zips with new checksums in
+  Package.swift. CipherBird's Android static archives had not been rebuilt
+  for 1.1.1 and were. All suites pass on 1.1.1: 70 C++, 30 Dart, both
+  Flutter packages, Go, 18 npm on the bundled prebuilds, the JVM and Swift
+  demos.
+- **[x] Size note.** The self contained Android engine grows from 5.8 MB to
+  6.3 MB on arm64 because OpenSSL 3.5 is larger than 3.3 under the same
+  trim list (libcrypto text 1.8 MB to 2.1 MB); the 3.5 LTS line was
+  CipherBird's deliberate choice.
+- **[x] Packages.** `aviary` requires `cipherbird: ^1.1.1`. The Go module
+  pins the CipherBird 1.1.1 commit and its changelog opens 0.1.1, since the
+  v0.1.0 tag is already fixed in the Go proxy. The changelogs are rewritten
+  as one coherent first release entry per package. Package descriptions
+  mention application records.
+- **[x] npm types.** `index.d.ts` declared only Node, KeyStore, NetNode and
+  SecureSession; it now declares the whole module (chains, records, light
+  clients, chain trees, subchains, threshold and portable custody, sealed
+  mempools, credentials, assurance) and passes `tsc --strict`, with a
+  negative probe rejected and the typed probe run against the engine.
+- **[x] Publish hygiene.** The bundled engines were tracked but matched by
+  the repository's ignore rules, which pub flags; each package now has a
+  `.gitignore` that re-includes its engines, and no tracked file in the
+  three pub packages is treated as ignored. pana scores aviary_dart
+  160/160; the dry runs show the engines in every archive (aviary_dart
+  10 MB, aviary_lite 16 MB, aviary 5 MB, aviary-ledger 10.4 MB).
+
