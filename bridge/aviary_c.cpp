@@ -23,6 +23,9 @@
 #include "aviary/foreign_engine.hpp"
 #include "aviary/account_state.hpp"
 #include "aviary/record_state.hpp"
+#include "aviary/admission.hpp"
+#include "aviary/noise_session.hpp"
+#include "aviary/peer_book.hpp"
 #include "aviary/bft_engine.hpp"
 #include "aviary/subchain.hpp"
 #include "aviary/light_client.hpp"
@@ -235,7 +238,10 @@ struct ChainBox {
   }
   void report(const aviary::Block& b, bool applied) {
     if (applied) {
+      std::uint64_t left = pending.size();
+      for (const auto& t : pending) bus.publish(aviary::observe::TxRemoved{t.txid(), --left});
       clear_pending();
+      metrics.gauge("aviary_mempool_size", "pending transactions").set(0);
       bus.publish(aviary::observe::BlockFinalized{b.header.height, b.header.hash(), b.header.state_root, b.transactions.size()});
       metrics.gauge("aviary_chain_height", "current finalized height").set(static_cast<std::int64_t>(b.header.height));
       metrics.counter("aviary_blocks_finalized_total", "blocks finalized").inc();
@@ -1554,7 +1560,10 @@ AviaryBufferResult aviary_chain_add_tx(AviaryChain c, const uint8_t* tx, size_t 
     if (!vr.ok) return error_result("chain: invalid transaction: " + vr.error);
     staged.apply(t);
     const aviary::Hash id = t.txid();
-    as_box(c)->pending.push_back(std::move(t));
+    ChainBox* box = as_box(c);
+    box->pending.push_back(std::move(t));
+    box->metrics.gauge("aviary_mempool_size", "pending transactions").set(static_cast<std::int64_t>(box->pending.size()));
+    box->bus.publish(aviary::observe::TxAdmitted{id, box->pending.size()});
     return bytes_result(aviary::Bytes(id.begin(), id.end()));
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
@@ -1595,6 +1604,35 @@ AviaryBufferResult aviary_record_from_proof(const uint8_t* proof, size_t proof_l
     if (!p.present) return error_result("proof: absence proof carries no record");
     const auto leaf = aviary::RecordStateMachine::decode_record_leaf(p.leaf_preimage);
     return bytes_result(record_bytes(&leaf.key, leaf.owner, leaf.version, leaf.value));
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_keystore_sign_record(AviaryKeyStore ks, uint64_t chain_id, const uint8_t* from,
+                                               uint64_t nonce, const uint8_t* key, uint8_t op,
+                                               const uint8_t* value, size_t value_len) {
+  if (!ks || !from || !key) return error_result("null key store, author or key");
+  try {
+    aviary::Bytes v = value_len ? aviary::Bytes(value, value + value_len) : aviary::Bytes{};
+    return bytes_result(aviary::custody::sign_record(*as_ks(ks), to_hash32(from), chain_id, nonce,
+                                                     to_hash32(key), op, v).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_record_tx_sign_hybrid(uint64_t chain_id, uint64_t nonce, const uint8_t* key,
+                                                uint8_t op, const uint8_t* value, size_t value_len,
+                                                const uint8_t* public_key, size_t public_len,
+                                                const uint8_t* secret, size_t secret_len) {
+  if (!key || !public_key || !secret || public_len == 0 || secret_len == 0) return error_result("null key or hybrid key pair");
+  try {
+    aviary::crypto::KeyPair kp{aviary::Bytes(public_key, public_key + public_len), aviary::Bytes(secret, secret + secret_len)};
+    aviary::Transaction tx;
+    tx.version = 2;
+    tx.chain_id = chain_id;
+    tx.sig_algo = static_cast<std::uint8_t>(aviary::SigAlgo::kHybridEd25519MlDsa);
+    tx.body = aviary::RecordStateMachine::encode_write(record_write(nonce, key, op, value, value_len));
+    aviary::sign_transaction(tx, kp);
+    aviary::custody::wipe(kp.secret_key);
+    return bytes_result(tx.encode());
   } catch (const std::exception& e) { return error_result(e.what()); }
 }
 
@@ -2185,6 +2223,235 @@ AviaryBufferResult aviary_secure_decrypt(AviarySecureSession s, const uint8_t* f
   catch (const std::exception& e) { return error_result(e.what()); }
 }
 void aviary_secure_free(AviarySecureSession s) { delete as_secure(s); }
+
+// -- Address book, Noise session, admission handshake ----------------------------
+
+namespace {
+aviary::p2p::AddressBook* as_book(AviaryAddressBook b) { return static_cast<aviary::p2p::AddressBook*>(b); }
+
+struct NoiseBox {
+  aviary::p2p::NoiseSession session;
+  aviary::Bytes handshake;
+};
+NoiseBox* as_noise(AviaryNoiseSession s) { return static_cast<NoiseBox*>(s); }
+
+aviary::Bytes encode_blobs(const std::vector<aviary::Bytes>& parts) {
+  aviary::codec::CodecWriter w;
+  w.write_list(parts, [](aviary::codec::CodecWriter& ww, const aviary::Bytes& b) { ww.write_bytes(cbv(b.data(), b.size())); });
+  return w.take();
+}
+
+aviary::p2p::NoiseSession::Identity noise_identity(const uint8_t* blob, size_t len) {
+  const auto parts = decode_blob_list(cbv(blob, len));
+  if (parts.size() != 4) throw std::runtime_error("noise: identity must hold four keys");
+  return aviary::p2p::NoiseSession::Identity{{parts[0], parts[1]}, {parts[2], parts[3]}};
+}
+
+aviary::Bytes be(std::uint64_t v, int width) {
+  aviary::Bytes out(static_cast<std::size_t>(width));
+  for (int i = width - 1; i >= 0; --i) { out[static_cast<std::size_t>(i)] = static_cast<std::uint8_t>(v & 0xff); v >>= 8; }
+  return out;
+}
+}  // namespace
+
+AviaryBufferResult aviary_peer_record_sign(uint32_t id, const char* host, uint16_t port,
+                                           const uint8_t* kem_pk, size_t kem_len,
+                                           const uint8_t* sig_pk, size_t sig_len,
+                                           const uint8_t* prekey, size_t prekey_len,
+                                           const uint8_t* sig_secret, size_t secret_len) {
+  if (!host || !kem_pk || !sig_pk || !sig_secret) return error_result("null host or key");
+  try {
+    aviary::p2p::PeerRecord r;
+    r.id = id;
+    r.host = host;
+    r.port = port;
+    r.kem_pk.assign(kem_pk, kem_pk + kem_len);
+    r.sig_pk.assign(sig_pk, sig_pk + sig_len);
+    if (prekey && prekey_len) r.prekey.assign(prekey, prekey + prekey_len);
+    r.sign(aviary::Bytes(sig_secret, sig_secret + secret_len));
+    if (!r.verify()) return error_result("peer record: the secret does not match sig_pk");
+    return bytes_result(r.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int aviary_peer_record_verify(const uint8_t* record, size_t len) {
+  if (!record) return 0;
+  try { return aviary::p2p::PeerRecord::decode_all(cbv(record, len)).verify() ? 1 : 0; } catch (...) { return 0; }
+}
+
+AviaryBufferResult aviary_peer_record_fields(const uint8_t* record, size_t len) {
+  if (!record) return error_result("null record");
+  try {
+    const auto r = aviary::p2p::PeerRecord::decode_all(cbv(record, len));
+    return bytes_result(encode_blobs({be(r.id, 4), aviary::Bytes(r.host.begin(), r.host.end()), be(r.port, 2),
+                                      r.kem_pk, r.sig_pk, r.prekey, r.signature}));
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryAddressBook aviary_address_book_new(void) { return new aviary::p2p::AddressBook(); }
+
+AviaryAddressBook aviary_address_book_decode(const uint8_t* book, size_t len) {
+  if (!book && len) return nullptr;
+  try { return new aviary::p2p::AddressBook(aviary::p2p::AddressBook::decode(cbv(book, len))); } catch (...) { return nullptr; }
+}
+
+AviaryBufferResult aviary_address_book_encode(AviaryAddressBook b) {
+  if (!b) return error_result("null address book");
+  return bytes_result(as_book(b)->encode());
+}
+
+int aviary_address_book_add(AviaryAddressBook b, const uint8_t* record, size_t len) {
+  if (!b || !record) return AVIARY_ERR_BAD_INPUT;
+  try { as_book(b)->add(aviary::p2p::PeerRecord::decode_all(cbv(record, len))); return AVIARY_OK; }
+  catch (...) { return AVIARY_ERR_BAD_INPUT; }
+}
+
+int64_t aviary_address_book_merge(AviaryAddressBook b, const uint8_t* book, size_t len) {
+  if (!b) return -1;
+  try { return static_cast<int64_t>(as_book(b)->merge(aviary::p2p::AddressBook::decode(cbv(book, len)))); }
+  catch (...) { return -1; }
+}
+
+AviaryBufferResult aviary_address_book_get(AviaryAddressBook b, uint32_t id) {
+  if (!b) return error_result("null address book");
+  const auto* r = as_book(b)->get(id);
+  if (!r) return error_result("address book: unknown peer");
+  return bytes_result(r->encode());
+}
+
+int aviary_address_book_contains(AviaryAddressBook b, uint32_t id) { return b && as_book(b)->contains(id) ? 1 : 0; }
+
+uint64_t aviary_address_book_size(AviaryAddressBook b) { return b ? static_cast<uint64_t>(as_book(b)->size()) : 0; }
+
+AviaryBufferResult aviary_address_book_records(AviaryAddressBook b) {
+  if (!b) return error_result("null address book");
+  std::vector<aviary::Bytes> parts;
+  for (const auto& r : as_book(b)->all()) parts.push_back(r.encode());
+  return bytes_result(encode_blobs(parts));
+}
+
+void aviary_address_book_free(AviaryAddressBook b) { delete as_book(b); }
+
+AviaryBufferResult aviary_noise_identity_generate(void) {
+  try {
+    const auto id = aviary::p2p::NoiseSession::generate_identity();
+    return bytes_result(encode_blobs({id.noise_static.public_key, id.noise_static.secret_key,
+                                      id.sig.public_key, id.sig.secret_key}));
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryNoiseSession aviary_noise_initiate(const uint8_t* identity, size_t identity_len,
+                                         const uint8_t* prologue, size_t prologue_len) {
+  if (!identity) return nullptr;
+  try {
+    auto [session, msg0] = aviary::p2p::NoiseSession::begin_initiator(
+        noise_identity(identity, identity_len), prologue_len ? aviary::Bytes(prologue, prologue + prologue_len) : aviary::Bytes{});
+    return new NoiseBox{std::move(session), std::move(msg0)};
+  } catch (...) { return nullptr; }
+}
+
+AviaryNoiseSession aviary_noise_accept(const uint8_t* identity, size_t identity_len,
+                                       const uint8_t* msg0, size_t msg0_len,
+                                       const uint8_t* prologue, size_t prologue_len) {
+  if (!identity || !msg0) return nullptr;
+  try {
+    auto [session, msg1] = aviary::p2p::NoiseSession::accept_responder(
+        noise_identity(identity, identity_len), aviary::Bytes(msg0, msg0 + msg0_len),
+        prologue_len ? aviary::Bytes(prologue, prologue + prologue_len) : aviary::Bytes{});
+    return new NoiseBox{std::move(session), std::move(msg1)};
+  } catch (...) { return nullptr; }
+}
+
+AviaryBufferResult aviary_noise_handshake_message(AviaryNoiseSession s) {
+  if (!s) return error_result("null noise session");
+  return bytes_result(as_noise(s)->handshake);
+}
+
+AviaryBufferResult aviary_noise_complete_initiator(AviaryNoiseSession s, const uint8_t* msg1, size_t len) {
+  if (!s || !msg1) return error_result("null noise session or message");
+  try { return bytes_result(as_noise(s)->session.complete_initiator(aviary::Bytes(msg1, msg1 + len))); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int aviary_noise_complete_responder(AviaryNoiseSession s, const uint8_t* msg2, size_t len) {
+  if (!s || !msg2) return AVIARY_ERR_BAD_INPUT;
+  try { as_noise(s)->session.complete_responder(aviary::Bytes(msg2, msg2 + len)); return AVIARY_OK; }
+  catch (...) { return AVIARY_ERR; }
+}
+
+AviaryBufferResult aviary_noise_identity_proof(AviaryNoiseSession s) {
+  if (!s) return error_result("null noise session");
+  try { return bytes_result(as_noise(s)->session.identity_proof()); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int aviary_noise_verify_identity_proof(AviaryNoiseSession s, const uint8_t* proof, size_t len) {
+  if (!s || !proof) return AVIARY_ERR_BAD_INPUT;
+  try { as_noise(s)->session.verify_identity_proof(aviary::Bytes(proof, proof + len)); return AVIARY_OK; }
+  catch (...) { return AVIARY_ERR; }
+}
+
+int aviary_noise_open(AviaryNoiseSession s) { return s && as_noise(s)->session.open() ? 1 : 0; }
+
+AviaryBufferResult aviary_noise_peer_identity(AviaryNoiseSession s) {
+  if (!s) return error_result("null noise session");
+  return bytes_result(as_noise(s)->session.peer_identity());
+}
+
+AviaryBufferResult aviary_noise_peer_static(AviaryNoiseSession s) {
+  if (!s) return error_result("null noise session");
+  try { return bytes_result(as_noise(s)->session.peer_static()); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_noise_handshake_hash(AviaryNoiseSession s) {
+  if (!s) return error_result("null noise session");
+  try { const auto h = as_noise(s)->session.handshake_hash(); return bytes_result(aviary::Bytes(h.begin(), h.end())); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_noise_encrypt(AviaryNoiseSession s, const uint8_t* plaintext, size_t len) {
+  if (!s || (!plaintext && len)) return error_result("null noise session or plaintext");
+  try { return bytes_result(as_noise(s)->session.encrypt(len ? aviary::Bytes(plaintext, plaintext + len) : aviary::Bytes{})); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_noise_decrypt(AviaryNoiseSession s, const uint8_t* record, size_t len) {
+  if (!s || !record) return error_result("null noise session or record");
+  try { return bytes_result(as_noise(s)->session.decrypt(aviary::Bytes(record, record + len))); }
+  catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+void aviary_noise_free(AviaryNoiseSession s) { delete as_noise(s); }
+
+AviaryBufferResult aviary_admission_challenge(uint32_t epoch) {
+  try {
+    const auto c = aviary::p2p::make_admission_challenge(epoch);
+    aviary::Bytes out = c.nonce;
+    out.insert(out.end(), c.wire.begin(), c.wire.end());
+    return bytes_result(out);
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_admission_answer(const uint8_t* policy, size_t policy_len,
+                                           const uint8_t* credential, size_t credential_len,
+                                           const uint8_t* challenge, size_t challenge_len) {
+  if (!policy || !credential || !challenge) return error_result("null policy, credential or challenge");
+  try {
+    const auto p = cg::CredentialPolicy::decode_all(cbv(policy, policy_len));
+    const auto cred = decode_credential(credential, credential_len);
+    return bytes_result(aviary::p2p::answer_admission_challenge(p, cred, cbv(challenge, challenge_len)));
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int aviary_admission_granted(AviaryCredentialGate gate, uint32_t epoch, const uint8_t* nonce, size_t nonce_len,
+                             const uint8_t* presentation, size_t presentation_len, uint64_t now) {
+  if (!gate || !nonce || !presentation) return 0;
+  try {
+    return aviary::p2p::admission_granted(*as_gate(gate), epoch, cbv(nonce, nonce_len),
+                                          cbv(presentation, presentation_len), now) ? 1 : 0;
+  } catch (...) { return 0; }
+}
 
 // -- Foreign components (C callbacks -> registry) -------------------------------
 

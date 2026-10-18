@@ -31,6 +31,24 @@ extension KeyStoreSigning on KeyStore {
     ),
   );
 
+  /// A signed, encoded record write by the stored account at [from]
+  /// (record state model). The scheme follows the stored key, so a hybrid key
+  /// signs with Ed25519 + ML-DSA-65. Throws when locked or [from] is unknown.
+  Uint8List signRecord({
+    required int chainId,
+    required Uint8List from,
+    required int nonce,
+    required Uint8List key,
+    required RecordOp op,
+    required Uint8List value,
+  }) => _scoped([from, key, value], (p) {
+    final f = _lib.lookupFunction<_KsSignRecC, _KsSignRecD>(
+      'aviary_keystore_sign_record',
+    );
+    final r = f(_h, chainId, p[0], nonce, p[1], op.index, p[2], value.length);
+    return _bc._take(r, 'keystore_sign_record');
+  });
+
   /// The stored public key for [address]. Throws when unknown.
   Uint8List publicKey(Uint8List address) => _scoped(
     [address],

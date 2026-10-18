@@ -35,6 +35,25 @@ extension ChainRecords on Chain {
     );
   }
 
+  /// Signs a record write with the key store account at [from] (the secret
+  /// stays in the engine) and queues it; the nonce comes from the chain.
+  Uint8List writeFromStore(
+    KeyStore store,
+    Uint8List from,
+    Uint8List key,
+    RecordOp op,
+    Uint8List value,
+  ) => addTx(
+    store.signRecord(
+      chainId: chainId,
+      from: from,
+      nonce: recordNonce(from),
+      key: key,
+      op: op,
+      value: value,
+    ),
+  );
+
   /// The committed record at [key], or null when none exists.
   RecordEntry? record(Uint8List key) {
     try {

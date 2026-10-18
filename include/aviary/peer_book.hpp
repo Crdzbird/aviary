@@ -47,6 +47,11 @@ struct PeerRecord {
   void sign(const Bytes& sig_secret_key);
   /// Verify [signature] against this record's own [sig_pk]. Never throws.
   bool verify() const;
+  /// Canonical wire form (the unsigned fields followed by the signature).
+  Bytes encode() const;
+  /// Strict inverse of encode(); throws codec::CodecError on malformed input.
+  /// Does not verify the signature.
+  static PeerRecord decode_all(codec::ByteView bytes);
 };
 
 class AddressBook {

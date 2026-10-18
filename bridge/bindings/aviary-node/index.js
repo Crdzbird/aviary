@@ -37,13 +37,11 @@ function resolveAviary() {
     path.join(__dirname, 'prebuilds', triple(), `libaviary_c.${ext()}`);
 }
 function resolveCryptolib() {
-  // Optional: load the CipherBird engine first so its symbols are present in
-  // the process. The bundled darwin pair ships it as libcipherbird next to
-  // libaviary_c; the Linux library is self contained and has no sibling.
-  if (process.env.CRYPTOLIB_DYLIB) return process.env.CRYPTOLIB_DYLIB;
-  const dir = path.join(__dirname, 'prebuilds', triple());
-  const sibling = path.join(dir, `libcipherbird.${ext()}`);
-  return fs.existsSync(sibling) ? sibling : path.join(dir, `libcryptolib_c.${ext()}`);
+  // The bundled libraries are self contained: CipherBird is linked into
+  // libaviary_c on every platform. A development build of libaviary_c (named
+  // by AVIARY_DYLIB) links CipherBird dynamically; CRYPTOLIB_DYLIB loads it
+  // first when the library's rpath cannot find it.
+  return process.env.CRYPTOLIB_DYLIB || null;
 }
 
 // -- Lazy native binding ------------------------------------------------------
@@ -57,7 +55,8 @@ function ensureLoaded() {
 
   // Load cryptolib first (best-effort) so libaviary_c's cryptolib_*
   // imports resolve. dlopen is process-global.
-  try { koffi.load(resolveCryptolib()); } catch { /* may already be linked via rpath */ }
+  const cryptolib = resolveCryptolib();
+  if (cryptolib) { try { koffi.load(cryptolib); } catch { /* may already be linked via rpath */ } }
   const lib = koffi.load(resolveAviary());
 
   const Buf = koffi.struct('AviaryBuffer', { data: 'void *', len: 'size_t' });
@@ -193,6 +192,39 @@ function ensureLoaded() {
     chainChainId: f('uint64_t aviary_chain_chain_id(void*)'),
     chainStateRoot: f('AviaryBufferResult aviary_chain_state_root(void*)'),
     chainAddTx: f('AviaryBufferResult aviary_chain_add_tx(void*, uint8_t*, size_t)'),
+    ksSignRecord: f('AviaryBufferResult aviary_keystore_sign_record(void*, uint64_t, uint8_t*, uint64_t, uint8_t*, uint8_t, uint8_t*, size_t)'),
+    recordTxSignHybrid: f('AviaryBufferResult aviary_record_tx_sign_hybrid(uint64_t, uint64_t, uint8_t*, uint8_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    peerRecordSign: f('AviaryBufferResult aviary_peer_record_sign(uint32_t, const char*, uint16_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    peerRecordVerify: f('int aviary_peer_record_verify(uint8_t*, size_t)'),
+    peerRecordFields: f('AviaryBufferResult aviary_peer_record_fields(uint8_t*, size_t)'),
+    bookNew: f('void *aviary_address_book_new()'),
+    bookDecode: f('void *aviary_address_book_decode(uint8_t*, size_t)'),
+    bookEncode: f('AviaryBufferResult aviary_address_book_encode(void*)'),
+    bookAdd: f('int aviary_address_book_add(void*, uint8_t*, size_t)'),
+    bookMerge: f('int64_t aviary_address_book_merge(void*, uint8_t*, size_t)'),
+    bookGet: f('AviaryBufferResult aviary_address_book_get(void*, uint32_t)'),
+    bookContains: f('int aviary_address_book_contains(void*, uint32_t)'),
+    bookSize: f('uint64_t aviary_address_book_size(void*)'),
+    bookRecords: f('AviaryBufferResult aviary_address_book_records(void*)'),
+    bookFree: f('void aviary_address_book_free(void*)'),
+    noiseIdentity: f('AviaryBufferResult aviary_noise_identity_generate()'),
+    noiseInitiate: f('void *aviary_noise_initiate(uint8_t*, size_t, uint8_t*, size_t)'),
+    noiseAccept: f('void *aviary_noise_accept(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    noiseMessage: f('AviaryBufferResult aviary_noise_handshake_message(void*)'),
+    noiseCompleteInit: f('AviaryBufferResult aviary_noise_complete_initiator(void*, uint8_t*, size_t)'),
+    noiseCompleteResp: f('int aviary_noise_complete_responder(void*, uint8_t*, size_t)'),
+    noiseProof: f('AviaryBufferResult aviary_noise_identity_proof(void*)'),
+    noiseVerifyProof: f('int aviary_noise_verify_identity_proof(void*, uint8_t*, size_t)'),
+    noiseOpen: f('int aviary_noise_open(void*)'),
+    noisePeerIdentity: f('AviaryBufferResult aviary_noise_peer_identity(void*)'),
+    noisePeerStatic: f('AviaryBufferResult aviary_noise_peer_static(void*)'),
+    noiseHash: f('AviaryBufferResult aviary_noise_handshake_hash(void*)'),
+    noiseEncrypt: f('AviaryBufferResult aviary_noise_encrypt(void*, uint8_t*, size_t)'),
+    noiseDecrypt: f('AviaryBufferResult aviary_noise_decrypt(void*, uint8_t*, size_t)'),
+    noiseFree: f('void aviary_noise_free(void*)'),
+    admChallenge: f('AviaryBufferResult aviary_admission_challenge(uint32_t)'),
+    admAnswer: f('AviaryBufferResult aviary_admission_answer(uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    admGranted: f('int aviary_admission_granted(void*, uint32_t, uint8_t*, size_t, uint8_t*, size_t, uint64_t)'),
     chainPendingCount: f('uint64_t aviary_chain_pending_count(void*)'),
     chainRecord: f('AviaryBufferResult aviary_chain_record(void*, uint8_t*)'),
     chainRecordNonce: f('uint64_t aviary_chain_record_nonce(void*, uint8_t*)'),
@@ -442,6 +474,11 @@ class KeyStore {
   signTransfer({ chainId, from, to, amount, nonce, fee = 0 }) {
     return consume(fn.ksSign(this._h, BigInt(chainId), u8(from), u8(to), BigInt(amount), BigInt(nonce), BigInt(fee)), 'keystore_sign_transfer');
   }
+  /** A record write signed by the stored account at from (record state model); the scheme follows the stored key. */
+  signRecord({ chainId, from, nonce, key, op, value = Buffer.alloc(0) }) {
+    const v = u8(value);
+    return consume(fn.ksSignRecord(this._h, BigInt(chainId), u8(from), BigInt(nonce), u8(key), op, v, v.length), 'keystore_sign_record');
+  }
   publicKey(address) { return consume(fn.ksPublicKey(this._h, u8(address)), 'keystore_public_key'); }
   has(address) { return fn.ksHas(this._h, u8(address)) === 1; }
   addresses() { return splitBlobList(consume(fn.ksAddresses(this._h), 'keystore_addresses')); }
@@ -532,6 +569,10 @@ class CredentialPolicy {
     return consume(fn.credPresentPseud(this.encoded, this.encoded.length, u8(credential), u8(credential).length,
       epoch, scope, u8(challenge), u8(challenge).length), 'credential_present_pseudonymous');
   }
+  /** The answer to an admission challenge wire from a peer that holds credential under this policy. */
+  admissionAnswer(credential, wire) {
+    return consume(fn.admAnswer(this.encoded, this.encoded.length, u8(credential), u8(credential).length, u8(wire), u8(wire).length), 'admission_answer');
+  }
 }
 // The commitment is the first length-prefixed field of a membership-commit blob.
 function extractCommitment(membershipCommit) {
@@ -546,6 +587,15 @@ function finalizeMembership(membershipCommit, blindIssuance) {
 }
 class CredentialGate {
   constructor(policy) { this._h = fn.credGateNew(policy.encoded, policy.encoded.length); }
+  /** A fresh admission challenge for epoch: keep nonce, send wire to the peer. */
+  admissionChallenge(epoch) {
+    const b = consume(fn.admChallenge(epoch), 'admission_challenge');
+    return { nonce: b.subarray(0, 32), wire: b.subarray(32) };
+  }
+  /** Whether presentation, answering the challenge whose nonce this gate issued, admits for epoch at now. */
+  admissionGranted(epoch, nonce, presentation, now) {
+    return fn.admGranted(this._h, epoch, u8(nonce), u8(nonce).length, u8(presentation), u8(presentation).length, BigInt(now)) === 1;
+  }
   revokeIssuerEpoch(epoch) { fn.credGateRevoke(this._h, epoch); }
   // Verifier side: admit? Total 1/0 - a malformed presentation is a quiet false.
   admit(epoch, scope, challenge, presentation, now) {
@@ -668,6 +718,10 @@ class Chain {
   write(secret, key, op, value = Buffer.alloc(0)) {
     const author = addressOf(u8(secret).subarray(32));
     return this.addTx(signRecordTx({ chainId: this.chainId, nonce: this.recordNonce(author), key, op, value, secret }));
+  }
+  /** Signs a record write with the key store account at from (the secret stays in the engine) and queues it. */
+  writeFromStore(store, from, key, op, value = Buffer.alloc(0)) {
+    return this.addTx(store.signRecord({ chainId: this.chainId, from, nonce: this.recordNonce(from), key, op, value }));
   }
   /** The committed record at key: { owner, version, value }, or null. Record-model chains only. */
   record(key) {
@@ -930,6 +984,123 @@ class NetNode {
   }
 }
 /** A fresh long term identity: { kem: {public, secret}, sig: {public, secret} }. */
+/** A record write signed by a hybrid Ed25519 + ML-DSA-65 account (version 2 envelope). */
+function signRecordTxHybrid({ chainId, nonce, key, op, value = Buffer.alloc(0), publicKey, secret }) {
+  const v = u8(value), pk = u8(publicKey), sk = u8(secret);
+  return consume(fn.recordTxSignHybrid(BigInt(chainId), BigInt(nonce), u8(key), op, v, v.length, pk, pk.length, sk, sk.length), 'record_tx_sign_hybrid');
+}
+
+/** A peer record for validator id at host:port, signed with identity's hybrid signature key. */
+function signPeerRecord({ id, host, port, identity, prekey = Buffer.alloc(0) }) {
+  const kem = u8(identity.kem.public), sp = u8(identity.sig.public), ss = u8(identity.sig.secret), pre = u8(prekey);
+  return consume(fn.peerRecordSign(id, host, port, kem, kem.length, sp, sp.length, pre, pre.length, ss, ss.length), 'peer_record_sign');
+}
+const verifyPeerRecord = (record) => fn.peerRecordVerify(u8(record), u8(record).length) === 1;
+/** The fields of an encoded peer record. */
+function readPeerRecord(record) {
+  const f = splitBlobList(consume(fn.peerRecordFields(u8(record), u8(record).length), 'peer_record_fields'));
+  return { id: f[0].readUInt32BE(0), host: f[1].toString('utf8'), port: f[2].readUInt16BE(0), kemPublic: f[3], sigPublic: f[4], prekey: f[5], signature: f[6] };
+}
+
+/** The peer records a node knows. add() is the trusted local path; merge() verifies every record and never overwrites a known id. */
+class AddressBook {
+  /** An empty book, or one decoded from encoded (verified only when merged). */
+  constructor(encoded = null) {
+    this._h = encoded ? fn.bookDecode(u8(encoded), u8(encoded).length) : fn.bookNew();
+    if (!this._h) throw new Error('address book: malformed encoding');
+  }
+  add(record) { if (fn.bookAdd(this._h, u8(record), u8(record).length) !== 0) throw new Error('address book: malformed record'); }
+  /** Learns the verified records of an encoded book that are not yet known; returns how many were added. */
+  merge(encoded) {
+    const n = Number(fn.bookMerge(this._h, u8(encoded), u8(encoded).length));
+    if (n < 0) throw new Error('address book: malformed book');
+    return n;
+  }
+  record(id) { return this.contains(id) ? consume(fn.bookGet(this._h, id), 'address_book_get') : null; }
+  contains(id) { return fn.bookContains(this._h, id) === 1; }
+  get size() { return Number(fn.bookSize(this._h)); }
+  records() { return splitBlobList(consume(fn.bookRecords(this._h), 'address_book_records')); }
+  encode() { return consume(fn.bookEncode(this._h), 'address_book_encode'); }
+  free() { if (this._h) { fn.bookFree(this._h); this._h = null; } }
+}
+
+/** A fresh Noise identity: { noiseStatic: {public, secret}, sig: {public, secret} }. */
+function generateNoiseIdentity() {
+  const p = splitBlobList(consume(fn.noiseIdentity(), 'noise_identity_generate'));
+  return { noiseStatic: { public: p[0], secret: p[1] }, sig: { public: p[2], secret: p[3] } };
+}
+const noiseBlob = (me) => blobList([me.noiseStatic.public, me.noiseStatic.secret, me.sig.public, me.sig.secret]);
+
+/** A Noise XX link with a post quantum identity proof; confidentiality is X25519. Pin peerIdentity. */
+class NoiseSession {
+  constructor(h) { if (!h) throw new Error('noise: session refused'); this._h = h; }
+  static initiate(me, prologue = Buffer.alloc(0)) {
+    const id = noiseBlob(me), p = u8(prologue);
+    return new NoiseSession(fn.noiseInitiate(id, id.length, p, p.length));
+  }
+  static accept(me, msg0, prologue = Buffer.alloc(0)) {
+    const id = noiseBlob(me), p = u8(prologue);
+    return new NoiseSession(fn.noiseAccept(id, id.length, u8(msg0), u8(msg0).length, p, p.length));
+  }
+  get handshakeMessage() { return consume(fn.noiseMessage(this._h), 'noise_handshake_message'); }
+  completeInitiator(msg1) { return consume(fn.noiseCompleteInit(this._h, u8(msg1), u8(msg1).length), 'noise_complete_initiator'); }
+  completeResponder(msg2) { if (fn.noiseCompleteResp(this._h, u8(msg2), u8(msg2).length) !== 0) throw new Error('noise: handshake refused'); }
+  identityProof() { return consume(fn.noiseProof(this._h), 'noise_identity_proof'); }
+  verifyIdentityProof(proof) { if (fn.noiseVerifyProof(this._h, u8(proof), u8(proof).length) !== 0) throw new Error('noise: identity proof refused'); }
+  get open() { return fn.noiseOpen(this._h) === 1; }
+  get peerIdentity() { return consume(fn.noisePeerIdentity(this._h), 'noise_peer_identity'); }
+  get peerStatic() { return consume(fn.noisePeerStatic(this._h), 'noise_peer_static'); }
+  get handshakeHash() { return consume(fn.noiseHash(this._h), 'noise_handshake_hash'); }
+  encrypt(plaintext) { return consume(fn.noiseEncrypt(this._h, u8(plaintext), u8(plaintext).length), 'noise_encrypt'); }
+  decrypt(record) { return consume(fn.noiseDecrypt(this._h, u8(record), u8(record).length), 'noise_decrypt'); }
+  free() { if (this._h) { fn.noiseFree(this._h); this._h = null; } }
+}
+
+/**
+ * A deterministic in-memory mesh of NetNodes for tests, simulations and single process networks.
+ * Relays go in emission order; a timeout fires only when none is pending, earliest round and step first.
+ * A node's index in nodes is its mesh id and must match the me it was created with.
+ */
+class PeerMesh {
+  constructor(nodes = []) { this.nodes = nodes; this._queue = []; this._timeouts = []; }
+  link(a, b) { this.nodes[a].addPeer(b); this.nodes[b].addPeer(a); }
+  linkAll() { for (let a = 0; a < this.nodes.length; a++) for (let b = a + 1; b < this.nodes.length; b++) this.link(a, b); }
+  apply(node, out) {
+    for (const r of out.relays) this._queue.push([node, r.to, r.message]);
+    for (const t of out.timeouts) this._timeouts.push([t.round, t.step, node]);
+  }
+  start() { this.nodes.forEach((n, i) => this.apply(i, n.start())); }
+  advance() { this.nodes.forEach((n, i) => this.apply(i, n.advance())); }
+  /** Delivers the next relay; false when none is pending. */
+  deliver() {
+    if (!this._queue.length) return false;
+    const [from, to, payload] = this._queue.shift();
+    this.apply(to, this.nodes[to].onGossip(from, payload));
+    return true;
+  }
+  /** Delivers one relay, or fires the earliest armed timeout when none is pending. */
+  step() {
+    if (this.deliver()) return true;
+    if (!this._timeouts.length) return false;
+    this._timeouts.sort((p, q) => p[0] - q[0] || p[1] - q[1] || p[2] - q[2]);
+    const [round, step, node] = this._timeouts.shift();
+    this.apply(node, this.nodes[node].onTimeout({ step, round }));
+    return true;
+  }
+  /** Steps until until() holds or budget steps passed; returns until(). */
+  run(until, budget = 20000) {
+    for (let i = 0; i < budget && !until(); i++) if (!this.step()) break;
+    return until();
+  }
+  /** Runs until the given validators (all by default) committed, then drains the relays; armed timeouts are left alone. */
+  settle(validators = this.nodes.map((_, i) => i)) {
+    const ok = this.run(() => validators.every((i) => this.nodes[i].committed));
+    while (this.deliver());
+    return ok;
+  }
+  free() { this.nodes.forEach((n) => n.free()); }
+}
+
 function generateSecureIdentity() {
   const p = splitBlobList(consume(fn.secIdentity(), 'secure_identity_generate'));
   return { kem: { public: p[0], secret: p[1] }, sig: { public: p[2], secret: p[3] } };
@@ -1053,7 +1224,10 @@ module.exports = {
   commitBlueprint: (genesis, bp) => consume(fn.genesisCommitBp(u8(genesis), u8(genesis).length, bp.encoded, bp.encoded.length), 'genesis_commit_blueprint'),
   genesisHash: (genesis) => consume(fn.genesisHash(u8(genesis), u8(genesis).length), 'genesis_hash'),
   assembleChain,
-  RecordOp, signRecordTx, addressOf, recordFromProof,
+  RecordOp, signRecordTx, addressOf, recordFromProof, signRecordTxHybrid,
+  signPeerRecord, verifyPeerRecord, readPeerRecord, AddressBook,
+  generateNoiseIdentity, NoiseSession, initiateNoiseSession: NoiseSession.initiate, acceptNoiseSession: NoiseSession.accept,
+  PeerMesh,
   Chain,
   registerEngine,
   registerProposer,

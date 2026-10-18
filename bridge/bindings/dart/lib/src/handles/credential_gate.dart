@@ -1,5 +1,9 @@
 part of '../../aviary.dart';
 
+/// An admission challenge: keep [nonce], send [wire] to the peer.
+/// {@category Networking}
+typedef AdmissionChallenge = ({Uint8List nonce, Uint8List wire});
+
 /// A verifier's anonymous membership admission gate. It admits a holder by a
 /// zero knowledge proof of an issuer signed credential clearing the policy.
 /// {@category Assurance and credentials}
@@ -41,6 +45,32 @@ final class CredentialGate extends _NativeHandle {
           1,
     ),
   );
+
+  /// A fresh admission challenge for [epoch]: keep the nonce, send the wire
+  /// message to the connecting peer.
+  AdmissionChallenge admissionChallenge(int epoch) {
+    final f = _bc.lib.lookupFunction<_AdmChalC, _AdmChalD>(
+      'aviary_admission_challenge',
+    );
+    final b = _bc._take(f(epoch), 'admission_challenge');
+    return (nonce: b.sublist(0, 32), wire: b.sublist(32));
+  }
+
+  /// Whether a peer's [presentation], answering the challenge whose [nonce]
+  /// this gate issued ([admissionChallenge]), admits for [epoch] at [now].
+  /// Never throws.
+  bool admissionGranted(
+    int epoch,
+    Uint8List nonce,
+    Uint8List presentation,
+    int now,
+  ) => _scoped([nonce, presentation], (p) {
+    final f = _bc.lib.lookupFunction<_AdmGrantC, _AdmGrantD>(
+      'aviary_admission_granted',
+    );
+    return f(_h, epoch, p[0], nonce.length, p[1], presentation.length, now) ==
+        1;
+  });
 
   /// Releases the native gate.
   void free() => _release();

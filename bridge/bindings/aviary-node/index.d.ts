@@ -73,6 +73,8 @@ export class KeyStore {
   unlock(passphrase: string): void;
   readonly unlocked: boolean;
   signTransfer(args: { chainId: number | bigint; from: Buffer | Uint8Array; to: Buffer | Uint8Array; amount: number | bigint; nonce: number | bigint; fee?: number | bigint }): Buffer;
+  /** A record write signed by the stored account at from; the scheme follows the stored key. */
+  signRecord(args: { chainId: Int; from: Bytes; nonce: Int; key: Bytes; op: RecordOpValue; value?: Bytes }): Buffer;
   publicKey(address: Buffer | Uint8Array): Buffer;
   has(address: Buffer | Uint8Array): boolean;
   addresses(): Buffer[];
@@ -240,6 +242,8 @@ export class Chain {
   proveAccount(address: Bytes): Buffer;
   /** Record model chains: signs a write with a 64 byte Ed25519 secret, nonce from the chain, and queues it. */
   write(secret: Bytes, key: Bytes, op: RecordOpValue, value?: Bytes): Buffer;
+  /** Record model chains: signs with the key store account at from and queues it. */
+  writeFromStore(store: KeyStore, from: Bytes, key: Bytes, op: RecordOpValue, value?: Bytes): Buffer;
   /** Record model chains: the committed record at key, or null. */
   record(key: Bytes): RecordEntry | null;
   recordNonce(address: Bytes): number;
@@ -262,6 +266,8 @@ export function signRecordTx(opts: { chainId: Int; nonce: Int; key: Bytes; op: R
 export function addressOf(publicKey: Bytes): Buffer;
 /** The record a verified state proof commits to. */
 export function recordFromProof(proof: Bytes): RecordLeaf;
+/** A record write signed by a hybrid Ed25519 + ML-DSA-65 account. */
+export function signRecordTxHybrid(opts: { chainId: Int; nonce: Int; key: Bytes; op: RecordOpValue; value?: Bytes; publicKey: Bytes; secret: Bytes }): Buffer;
 
 // -- Light client ---------------------------------------------------------------
 
@@ -379,6 +385,8 @@ export class CredentialPolicy {
   membershipCommit(memberSecret: Bytes): Buffer;
   blindIssue(issuerSecret: Bytes, commitment: Bytes, tier: number, notAfter: Int, issuerEpoch: number): Buffer;
   presentPseudonymous(credential: Bytes, epoch: number, scope: string, challenge: Bytes): Buffer;
+  /** The answer to an admission challenge wire from a peer holding credential. */
+  admissionAnswer(credential: Bytes, wire: Bytes): Buffer;
 }
 export function extractCommitment(membershipCommit: Bytes): Buffer;
 export function finalizeMembership(membershipCommit: Bytes, blindIssuance: Bytes): Buffer;
@@ -391,6 +399,67 @@ export class CredentialGate {
   revokeNym(nym: Bytes): void;
   /** Records an admission; false when this nym was already admitted for the epoch and scope. */
   noteAdmission(epoch: number, scope: string, nym: Bytes): boolean;
+  /** A fresh admission challenge: keep nonce, send wire. */
+  admissionChallenge(epoch: number): { nonce: Buffer; wire: Buffer };
+  admissionGranted(epoch: number, nonce: Bytes, presentation: Bytes, now: Int): boolean;
+  free(): void;
+}
+
+// -- Peer records, address books, Noise sessions, PeerMesh ---------------------
+
+export function signPeerRecord(opts: { id: number; host: string; port: number; identity: SecureIdentity; prekey?: Bytes }): Buffer;
+export function verifyPeerRecord(record: Bytes): boolean;
+export interface PeerRecordInfo { id: number; host: string; port: number; kemPublic: Buffer; sigPublic: Buffer; prekey: Buffer; signature: Buffer }
+export function readPeerRecord(record: Bytes): PeerRecordInfo;
+/** The peer records a node knows; merge verifies every record and never overwrites a known id. */
+export class AddressBook {
+  constructor(encoded?: Bytes | null);
+  readonly size: number;
+  add(record: Bytes): void;
+  merge(encoded: Bytes): number;
+  record(id: number): Buffer | null;
+  contains(id: number): boolean;
+  records(): Buffer[];
+  encode(): Buffer;
+  free(): void;
+}
+
+export interface NoiseIdentity { noiseStatic: KeyPair; sig: KeyPair }
+export function generateNoiseIdentity(): NoiseIdentity;
+/** A Noise XX link with a post quantum identity proof; confidentiality is X25519. Pin peerIdentity. */
+export class NoiseSession {
+  static initiate(me: NoiseIdentity, prologue?: Bytes): NoiseSession;
+  static accept(me: NoiseIdentity, msg0: Bytes, prologue?: Bytes): NoiseSession;
+  readonly handshakeMessage: Buffer;
+  completeInitiator(msg1: Bytes): Buffer;
+  completeResponder(msg2: Bytes): void;
+  identityProof(): Buffer;
+  verifyIdentityProof(proof: Bytes): void;
+  readonly open: boolean;
+  readonly peerIdentity: Buffer;
+  readonly peerStatic: Buffer;
+  readonly handshakeHash: Buffer;
+  encrypt(plaintext: Bytes): Buffer;
+  decrypt(record: Bytes): Buffer;
+  free(): void;
+}
+export function initiateNoiseSession(me: NoiseIdentity, prologue?: Bytes): NoiseSession;
+export function acceptNoiseSession(me: NoiseIdentity, msg0: Bytes, prologue?: Bytes): NoiseSession;
+
+/** A deterministic in-memory mesh of NetNodes; a node's index is its mesh id. */
+export class PeerMesh {
+  constructor(nodes?: NetNode[]);
+  nodes: NetNode[];
+  link(a: number, b: number): void;
+  linkAll(): void;
+  apply(node: number, out: Outbound): void;
+  start(): void;
+  advance(): void;
+  deliver(): boolean;
+  step(): boolean;
+  run(until: () => boolean, budget?: number): boolean;
+  /** Runs until the validators (all by default) committed, then drains the relays. */
+  settle(validators?: number[]): boolean;
   free(): void;
 }
 

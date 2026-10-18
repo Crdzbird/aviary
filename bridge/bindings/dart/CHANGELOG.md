@@ -25,8 +25,11 @@ CipherBird 1.1.1 crypto engine.
   proposers written in Dart.
 - Application records: `assembleRecordChain` builds a chain that stores
   owned, versioned objects instead of balances. `Chain.write`, `record`,
-  `proveRecord` and `recordFromProof` cover the whole lifecycle, and
-  `Chain.addTx` queues any signed transaction on any assembled chain.
+  `proveRecord` and `recordFromProof` cover the whole lifecycle;
+  `writeFromStore` signs inside the engine from a `KeyStore` and
+  `signRecordTxHybrid` signs with a hybrid post quantum account.
+  `Chain.addTx` queues any signed transaction on any assembled chain, and
+  the queue reports `TxAdmitted` and `TxRemoved` events.
 - Subchains with anchoring and cross chain proofs, validator rotation,
   light clients with the overlap rule and bisection, and chain trees that
   build and produce a whole family of chains.
@@ -38,6 +41,10 @@ CipherBird 1.1.1 crypto engine.
   authenticated, post quantum hybrid channel.
 - `PeerMesh`: a deterministic in-memory mesh of `NetNode`s for tests,
   simulations and single process networks.
+- `AddressBook` and self signed peer records with verified peer exchange,
+  `NoiseSession` (Noise XX with a post quantum identity proof), and the
+  anonymous membership admission handshake (`admissionChallenge`,
+  `admissionAnswer`, `admissionGranted`).
 
 **Custody, assurance and credentials**
 
@@ -58,7 +65,8 @@ CipherBird 1.1.1 crypto engine.
 
 **Packaging and ergonomics**
 
-- The engine ships for macOS arm64 and Linux x64 and arm64; the build hook
+- The engine ships as one self contained library per platform (macOS arm64
+  2.8 MB, Linux x64 and arm64); the build hook
   bundles the Linux library as a code asset, and `Aviary.loadedFrom`
   reports which library was loaded. `AVIARY_DYLIB` points at any other
   build.

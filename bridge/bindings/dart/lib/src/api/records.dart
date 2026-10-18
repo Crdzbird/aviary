@@ -28,6 +28,35 @@ extension AviaryRecords on Aviary {
     ),
   );
 
+  /// A signed, encoded record transaction from a hybrid Ed25519 + ML-DSA-65
+  /// account ([Node.newAccountHybrid]), in the version 2 envelope.
+  Uint8List signRecordTxHybrid({
+    required int chainId,
+    required int nonce,
+    required Uint8List key,
+    required RecordOp op,
+    required Uint8List value,
+    required Uint8List publicKey,
+    required Uint8List secret,
+  }) => _scoped([key, value, publicKey, secret], (p) {
+    final f = lib.lookupFunction<_RecSignHybC, _RecSignHybD>(
+      'aviary_record_tx_sign_hybrid',
+    );
+    final r = f(
+      chainId,
+      nonce,
+      p[0],
+      op.index,
+      p[1],
+      value.length,
+      p[2],
+      publicKey.length,
+      p[3],
+      secret.length,
+    );
+    return _take(r, 'record_tx_sign_hybrid');
+  });
+
   /// The 32 byte chain address of [publicKey].
   Uint8List addressOf(Uint8List publicKey) => _scoped(
     [publicKey],
@@ -56,39 +85,3 @@ extension AviaryRecords on Aviary {
             as RecordLeaf,
   );
 }
-
-Object _decodeRecord(Uint8List b, {required bool withKey}) {
-  var o = 0;
-  Uint8List take(int n) {
-    final out = b.sublist(o, o + n);
-    o += n;
-    return out;
-  }
-
-  final key = withKey ? take(32) : null;
-  final owner = take(32);
-  final version = ByteData.sublistView(b, o, o + 8).getUint64(0);
-  o += 8;
-  final len = ByteData.sublistView(b, o, o + 4).getUint32(0);
-  o += 4;
-  final value = take(len);
-  if (withKey) return (key: key!, owner: owner, version: version, value: value);
-  return (owner: owner, version: version, value: value);
-}
-
-/// What a record transaction does: write, hand over to a new owner, or remove.
-/// {@category Records}
-enum RecordOp { put, transfer, delete }
-
-/// A committed application record: owner, write count and current bytes.
-/// {@category Records}
-typedef RecordEntry = ({Uint8List owner, int version, Uint8List value});
-
-/// A record read out of a verified state proof, with its key.
-/// {@category Records}
-typedef RecordLeaf = ({
-  Uint8List key,
-  Uint8List owner,
-  int version,
-  Uint8List value,
-});

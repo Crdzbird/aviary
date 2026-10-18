@@ -53,6 +53,19 @@ bool PeerRecord::verify() const {
   return crypto::hybrid_sig_verify(codec::ByteView(h.data(), h.size()), view(signature), view(sig_pk));
 }
 
+Bytes PeerRecord::encode() const {
+  codec::CodecWriter w;
+  encode_record(w, *this);
+  return w.take();
+}
+
+PeerRecord PeerRecord::decode_all(codec::ByteView bytes) {
+  codec::CodecReader rd(bytes);
+  PeerRecord r = decode_record(rd);
+  rd.assert_fully_consumed();
+  return r;
+}
+
 const PeerRecord* AddressBook::get(std::uint32_t id) const {
   auto it = peers_.find(id);
   return it == peers_.end() ? nullptr : &it->second;

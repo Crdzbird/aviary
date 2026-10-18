@@ -39,6 +39,8 @@ public final class Aviary implements AutoCloseable {
             blockHeaderH, headerSubchainRootH, certifiedHeaderEncode, anchorEncode, chainProposeAnchored, chainCertify,
             chainChildTip, chainSubchainHop, chainProveAccount, subchainProofEncode, subchainProofVerify,
             chainChainId, chainStateRoot, chainAddTx, chainPendingCount, chainRecord, chainRecordNonce, chainProveRecord, recordTxSign, recordFromProofH, addressOfH,
+            ksSignRecord, recordTxSignHybrid, peerRecordSign, peerRecordVerify, peerRecordFields, bookNew, bookDecode, bookEncode, bookAdd, bookMerge, bookGet, bookContains, bookSize, bookRecords, bookFree,
+            noiseIdentity, noiseInitiate, noiseAccept, noiseMessage, noiseCompleteInit, noiseCompleteResp, noiseProof, noiseVerifyProof, noiseOpen, noisePeerIdentity, noisePeerStatic, noiseHash, noiseEncrypt, noiseDecrypt, noiseFree, admChallenge, admAnswer, admGranted,
             chainScheduleValidators, chainValidatorsH,
             lcNew, lcAccept, lcAcceptSkipping, lcHeight, lcTip, lcValidators, lcSetTrust, lcSetMaxSkip, lcFree,
             treeNodeEncode, treeSpecError, treeBuild, treeChainIds, treeHeight, treeGenesis, treeTip, treePending, treeProduce,
@@ -147,6 +149,39 @@ public final class Aviary implements AutoCloseable {
         chainSetEventHook = h("aviary_chain_set_event_hook", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
         chainMetrics = h("aviary_chain_metrics", FunctionDescriptor.of(RES, ADDRESS));
         chainChainId = h("aviary_chain_chain_id", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        ksSignRecord = h("aviary_keystore_sign_record", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_BYTE, ADDRESS, JAVA_LONG));
+        recordTxSignHybrid = h("aviary_record_tx_sign_hybrid", FunctionDescriptor.of(RES, JAVA_LONG, JAVA_LONG, ADDRESS, JAVA_BYTE, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        peerRecordSign = h("aviary_peer_record_sign", FunctionDescriptor.of(RES, JAVA_INT, ADDRESS, JAVA_SHORT, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        peerRecordVerify = h("aviary_peer_record_verify", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG));
+        peerRecordFields = h("aviary_peer_record_fields", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        bookNew = h("aviary_address_book_new", FunctionDescriptor.of(ADDRESS));
+        bookDecode = h("aviary_address_book_decode", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG));
+        bookEncode = h("aviary_address_book_encode", FunctionDescriptor.of(RES, ADDRESS));
+        bookAdd = h("aviary_address_book_add", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        bookMerge = h("aviary_address_book_merge", FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS, JAVA_LONG));
+        bookGet = h("aviary_address_book_get", FunctionDescriptor.of(RES, ADDRESS, JAVA_INT));
+        bookContains = h("aviary_address_book_contains", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT));
+        bookSize = h("aviary_address_book_size", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
+        bookRecords = h("aviary_address_book_records", FunctionDescriptor.of(RES, ADDRESS));
+        bookFree = h("aviary_address_book_free", FunctionDescriptor.ofVoid(ADDRESS));
+        noiseIdentity = h("aviary_noise_identity_generate", FunctionDescriptor.of(RES));
+        noiseInitiate = h("aviary_noise_initiate", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        noiseAccept = h("aviary_noise_accept", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        noiseMessage = h("aviary_noise_handshake_message", FunctionDescriptor.of(RES, ADDRESS));
+        noiseCompleteInit = h("aviary_noise_complete_initiator", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        noiseCompleteResp = h("aviary_noise_complete_responder", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        noiseProof = h("aviary_noise_identity_proof", FunctionDescriptor.of(RES, ADDRESS));
+        noiseVerifyProof = h("aviary_noise_verify_identity_proof", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        noiseOpen = h("aviary_noise_open", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+        noisePeerIdentity = h("aviary_noise_peer_identity", FunctionDescriptor.of(RES, ADDRESS));
+        noisePeerStatic = h("aviary_noise_peer_static", FunctionDescriptor.of(RES, ADDRESS));
+        noiseHash = h("aviary_noise_handshake_hash", FunctionDescriptor.of(RES, ADDRESS));
+        noiseEncrypt = h("aviary_noise_encrypt", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        noiseDecrypt = h("aviary_noise_decrypt", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        noiseFree = h("aviary_noise_free", FunctionDescriptor.ofVoid(ADDRESS));
+        admChallenge = h("aviary_admission_challenge", FunctionDescriptor.of(RES, JAVA_INT));
+        admAnswer = h("aviary_admission_answer", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        admGranted = h("aviary_admission_granted", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, JAVA_LONG));
         chainStateRoot = h("aviary_chain_state_root", FunctionDescriptor.of(RES, ADDRESS));
         chainAddTx = h("aviary_chain_add_tx", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
         chainPendingCount = h("aviary_chain_pending_count", FunctionDescriptor.of(JAVA_LONG, ADDRESS));
@@ -479,6 +514,10 @@ public final class Aviary implements AutoCloseable {
         }
         public byte[] encoded() { return encoded; }
         /** The 32-byte commitment to commit into genesis. */
+        /** The answer to an admission challenge wire from a peer holding credential under this policy. */
+        public byte[] admissionAnswer(byte[] credential, byte[] wire) {
+            return call(admAnswer, seg(encoded), (long) encoded.length, seg(credential), (long) credential.length, seg(wire), (long) wire.length);
+        }
         public byte[] hash() {
             try { return consume((MemorySegment) credPolicyHash.invoke(arena.allocate(RES), seg(encoded), (long) encoded.length)); }
             catch (Throwable e) { throw new RuntimeException(e); }
@@ -537,6 +576,18 @@ public final class Aviary implements AutoCloseable {
         CredentialGate(CredentialPolicy policy) {
             try { h = (MemorySegment) credGateNew.invoke(seg(policy.encoded), (long) policy.encoded.length); }
             catch (Throwable e) { throw new RuntimeException(e); }
+        }
+        /** A fresh admission challenge for epoch: keep the nonce, send the wire message. */
+        public AdmissionChallenge admissionChallenge(int epoch) {
+            try {
+                byte[] b = consume((MemorySegment) admChallenge.invoke(arena.allocate(RES), epoch));
+                return new AdmissionChallenge(java.util.Arrays.copyOfRange(b, 0, 32), java.util.Arrays.copyOfRange(b, 32, b.length));
+            } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+        /** Whether presentation, answering the challenge whose nonce this gate issued, admits for epoch at now. */
+        public boolean admissionGranted(int epoch, byte[] nonce, byte[] presentation, long now) {
+            try { return (int) admGranted.invoke(h, epoch, seg(nonce), (long) nonce.length, seg(presentation), (long) presentation.length, now) == 1; }
+            catch (Throwable t) { throw new RuntimeException(t); }
         }
         /** Bulk revocation: refuse every credential issued in this epoch. */
         public void revokeIssuerEpoch(int epoch) {
@@ -694,6 +745,10 @@ public final class Aviary implements AutoCloseable {
         public byte[] write(byte[] secret, byte[] key, RecordOp op, byte[] value) {
             byte[] author = addressOf(java.util.Arrays.copyOfRange(secret, 32, 64));
             return addTx(signRecordTx(chainId(), recordNonce(author), key, op, value, secret));
+        }
+        /** Signs a record write with the key store account at from (the secret stays in the engine) and queues it. */
+        public byte[] writeFromStore(KeyStore store, byte[] from, byte[] key, RecordOp op, byte[] value) {
+            return addTx(store.signRecord(chainId(), from, recordNonce(from), key, op, value));
         }
         /** The committed record at key, or null when none exists (record model chains only). */
         public RecordEntry record(byte[] key) {
@@ -1056,6 +1111,10 @@ public final class Aviary implements AutoCloseable {
         public byte[] signTransfer(long chainId, byte[] from, byte[] to, long amount, long nonce, long fee) {
             return call(ksSign, ks, chainId, seg(from), seg(to), amount, nonce, fee);
         }
+        /** A record write signed by the stored account at from; the scheme follows the stored key. */
+        public byte[] signRecord(long chainId, byte[] from, long nonce, byte[] key, RecordOp op, byte[] value) {
+            return call(ksSignRecord, ks, chainId, seg(from), nonce, seg(key), (byte) op.ordinal(), seg(value), (long) value.length);
+        }
         /** The stored public key for address. */
         public byte[] publicKey(byte[] address) { return call(ksPublicKey, ks, seg(address)); }
         /** Whether the store holds address. */
@@ -1276,6 +1335,159 @@ public final class Aviary implements AutoCloseable {
     }
 
     /** A fresh long term identity. */
+    /** A record write signed by a hybrid Ed25519 + ML-DSA-65 account (version 2 envelope). */
+    public byte[] signRecordTxHybrid(long chainId, long nonce, byte[] key, RecordOp op, byte[] value, byte[] publicKey, byte[] secret) {
+        return call(recordTxSignHybrid, chainId, nonce, seg(key), (byte) op.ordinal(), seg(value), (long) value.length,
+                seg(publicKey), (long) publicKey.length, seg(secret), (long) secret.length);
+    }
+    /** An admission challenge: keep nonce, send wire. */
+    public record AdmissionChallenge(byte[] nonce, byte[] wire) {}
+    /** A peer record's fields. */
+    public record PeerRecordInfo(int id, String host, int port, byte[] kemPublic, byte[] sigPublic, byte[] prekey, byte[] signature) {}
+    /** A record for validator id at host:port signed with identity's hybrid signature key; prekey may be empty. */
+    public byte[] signPeerRecord(int id, String host, int port, SecureIdentity identity, byte[] prekey) {
+        byte[] kem = identity.kem().publicKey(), sp = identity.sig().publicKey(), ss = identity.sig().secret();
+        return call(peerRecordSign, id, arena.allocateFrom(host), (short) port, seg(kem), (long) kem.length, seg(sp), (long) sp.length,
+                seg(prekey), (long) prekey.length, seg(ss), (long) ss.length);
+    }
+    public boolean verifyPeerRecord(byte[] record) {
+        try { return (int) peerRecordVerify.invoke(seg(record), (long) record.length) == 1; } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    public PeerRecordInfo readPeerRecord(byte[] record) {
+        byte[][] f = splitBlobList(call(peerRecordFields, seg(record), (long) record.length));
+        return new PeerRecordInfo(java.nio.ByteBuffer.wrap(f[0]).getInt(), new String(f[1], StandardCharsets.UTF_8),
+                java.nio.ByteBuffer.wrap(f[2]).getShort() & 0xFFFF, f[3], f[4], f[5], f[6]);
+    }
+    /** An empty address book. */
+    public AddressBook newAddressBook() { return new AddressBook((MemorySegment) invokeNoArg(bookNew)); }
+    /** A book decoded from its canonical encoding; records are verified only when merged. */
+    public AddressBook decodeAddressBook(byte[] encoded) {
+        try {
+            MemorySegment b = (MemorySegment) bookDecode.invoke(seg(encoded), (long) encoded.length);
+            if (b.address() == 0) throw new IllegalArgumentException("address book: malformed encoding");
+            return new AddressBook(b);
+        } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    private Object invokeNoArg(MethodHandle mh) { try { return mh.invoke(); } catch (Throwable t) { throw new RuntimeException(t); } }
+    /** The peer records a node knows. add is the trusted local path; merge verifies every record and never overwrites a known id. */
+    public final class AddressBook implements AutoCloseable {
+        private final MemorySegment h;
+        private AddressBook(MemorySegment h) { this.h = h; }
+        public void add(byte[] record) {
+            try { if ((int) bookAdd.invoke(h, seg(record), (long) record.length) != 0) throw new IllegalArgumentException("address book: malformed record"); }
+            catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+        /** Learns the verified records of an encoded book that are not yet known; returns how many were added. */
+        public int merge(byte[] encoded) {
+            try {
+                long n = (long) bookMerge.invoke(h, seg(encoded), (long) encoded.length);
+                if (n < 0) throw new IllegalArgumentException("address book: malformed book");
+                return (int) n;
+            } catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+        public byte[] record(int id) { return contains(id) ? call(bookGet, h, id) : null; }
+        public boolean contains(int id) { try { return (int) bookContains.invoke(h, id) == 1; } catch (Throwable t) { throw new RuntimeException(t); } }
+        public long size() { try { return (long) bookSize.invoke(h); } catch (Throwable t) { throw new RuntimeException(t); } }
+        public byte[][] records() { return splitBlobList(consume(invokeRes(bookRecords, h))); }
+        public byte[] encode() { return consume(invokeRes(bookEncode, h)); }
+        @Override public void close() { try { bookFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    /** A Noise identity: the X25519 static pair and the hybrid signature pair. */
+    public record NoiseIdentity(PortableAccount noiseStatic, PortableAccount sig) {}
+    public NoiseIdentity generateNoiseIdentity() {
+        byte[][] p = splitBlobList(consume(invokePtrRes(noiseIdentity)));
+        return new NoiseIdentity(new PortableAccount(p[0], p[1]), new PortableAccount(p[2], p[3]));
+    }
+    private byte[] noiseBlob(NoiseIdentity me) {
+        return blobList(new byte[][]{me.noiseStatic().publicKey(), me.noiseStatic().secret(), me.sig().publicKey(), me.sig().secret()});
+    }
+    /** The dialing side of a Noise link: its handshakeMessage is msg0. */
+    public NoiseSession initiateNoiseSession(NoiseIdentity me, byte[] prologue) {
+        byte[] id = noiseBlob(me);
+        try { return NoiseSession.of(this, (MemorySegment) noiseInitiate.invoke(seg(id), (long) id.length, seg(prologue), (long) prologue.length)); }
+        catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    /** The accepting side, from msg0: its handshakeMessage is msg1. */
+    public NoiseSession acceptNoiseSession(NoiseIdentity me, byte[] msg0, byte[] prologue) {
+        byte[] id = noiseBlob(me);
+        try { return NoiseSession.of(this, (MemorySegment) noiseAccept.invoke(seg(id), (long) id.length, seg(msg0), (long) msg0.length, seg(prologue), (long) prologue.length)); }
+        catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+    }
+    /** A Noise XX link with a post quantum identity proof; confidentiality is X25519. Pin peerIdentity. */
+    public static final class NoiseSession implements AutoCloseable {
+        private final Aviary bc;
+        private final MemorySegment h;
+        private NoiseSession(Aviary bc, MemorySegment h) { this.bc = bc; this.h = h; }
+        static NoiseSession of(Aviary bc, MemorySegment h) {
+            if (h.address() == 0) throw new IllegalArgumentException("noise: session refused");
+            return new NoiseSession(bc, h);
+        }
+        private void check(MethodHandle mh, byte[] in, String what) {
+            try { if ((int) mh.invoke(h, bc.seg(in), (long) in.length) != 0) throw new IllegalArgumentException("noise: " + what); }
+            catch (RuntimeException e) { throw e; } catch (Throwable t) { throw new RuntimeException(t); }
+        }
+        public byte[] handshakeMessage() { return bc.consume(bc.invokeRes(bc.noiseMessage, h)); }
+        public byte[] completeInitiator(byte[] msg1) { return bc.call(bc.noiseCompleteInit, h, bc.seg(msg1), (long) msg1.length); }
+        public void completeResponder(byte[] msg2) { check(bc.noiseCompleteResp, msg2, "handshake refused"); }
+        public byte[] identityProof() { return bc.consume(bc.invokeRes(bc.noiseProof, h)); }
+        public void verifyIdentityProof(byte[] proof) { check(bc.noiseVerifyProof, proof, "identity proof refused"); }
+        public boolean open() { try { return (int) bc.noiseOpen.invoke(h) == 1; } catch (Throwable t) { throw new RuntimeException(t); } }
+        public byte[] peerIdentity() { return bc.consume(bc.invokeRes(bc.noisePeerIdentity, h)); }
+        public byte[] peerStatic() { return bc.consume(bc.invokeRes(bc.noisePeerStatic, h)); }
+        public byte[] handshakeHash() { return bc.consume(bc.invokeRes(bc.noiseHash, h)); }
+        public byte[] encrypt(byte[] plaintext) { return bc.call(bc.noiseEncrypt, h, bc.seg(plaintext), (long) plaintext.length); }
+        public byte[] decrypt(byte[] record) { return bc.call(bc.noiseDecrypt, h, bc.seg(record), (long) record.length); }
+        @Override public void close() { try { bc.noiseFree.invoke(h); } catch (Throwable ignored) {} }
+    }
+    /**
+     * A deterministic in-memory mesh of NetNodes for tests, simulations and single process networks.
+     * Relays go in emission order; a timeout fires only when none is pending, earliest round and step first.
+     * A node's index is its mesh id and must match the me it was created with.
+     */
+    public static final class PeerMesh implements AutoCloseable {
+        public final java.util.List<NetNode> nodes;
+        private final java.util.ArrayDeque<Object[]> queue = new java.util.ArrayDeque<>();
+        private final java.util.List<int[]> timeouts = new java.util.ArrayList<>();
+        public PeerMesh(java.util.List<NetNode> nodes) { this.nodes = new java.util.ArrayList<>(nodes); }
+        public void link(int a, int b) { nodes.get(a).addPeer(b); nodes.get(b).addPeer(a); }
+        public void linkAll() { for (int a = 0; a < nodes.size(); a++) for (int b = a + 1; b < nodes.size(); b++) link(a, b); }
+        public void apply(int node, Outbound o) {
+            for (Relay r : o.relays()) queue.add(new Object[]{node, r.to(), r.message()});
+            for (TimeoutRequest t : o.timeouts()) timeouts.add(new int[]{t.round(), t.step(), node});
+        }
+        public void start() { for (int i = 0; i < nodes.size(); i++) apply(i, nodes.get(i).start()); }
+        public void advance() { for (int i = 0; i < nodes.size(); i++) apply(i, nodes.get(i).advance()); }
+        /** Delivers the next relay; false when none is pending. */
+        public boolean deliver() {
+            Object[] m = queue.poll();
+            if (m == null) return false;
+            int to = (int) m[1];
+            apply(to, nodes.get(to).onGossip((int) m[0], (byte[]) m[2]));
+            return true;
+        }
+        /** Delivers one relay, or fires the earliest armed timeout when none is pending. */
+        public boolean step() {
+            if (deliver()) return true;
+            if (timeouts.isEmpty()) return false;
+            timeouts.sort((p, q) -> p[0] != q[0] ? Integer.compare(p[0], q[0]) : p[1] != q[1] ? Integer.compare(p[1], q[1]) : Integer.compare(p[2], q[2]));
+            int[] t = timeouts.remove(0);
+            apply(t[2], nodes.get(t[2]).onTimeout(new TimeoutRequest(t[1], t[0])));
+            return true;
+        }
+        /** Steps until until holds or budget steps passed; returns whether it held. */
+        public boolean run(java.util.function.BooleanSupplier until, int budget) {
+            for (int i = 0; i < budget && !until.getAsBoolean(); i++) if (!step()) break;
+            return until.getAsBoolean();
+        }
+        /** Runs until the given validators (all when none) committed, then drains the relays; armed timeouts are left alone. */
+        public boolean settle(int... validators) {
+            int[] v = validators.length == 0 ? java.util.stream.IntStream.range(0, nodes.size()).toArray() : validators;
+            boolean ok = run(() -> java.util.Arrays.stream(v).allMatch(i -> nodes.get(i).committed()), 20000);
+            while (deliver()) { }
+            return ok;
+        }
+        @Override public void close() { nodes.forEach(NetNode::close); }
+    }
     public SecureIdentity generateSecureIdentity() {
         byte[][] p = splitBlobList(consume(invokePtrRes(secIdentity)));
         return new SecureIdentity(new PortableAccount(p[0], p[1]), new PortableAccount(p[2], p[3]));

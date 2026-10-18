@@ -18,6 +18,13 @@ Transaction sign_transfer(const KeyStore& store, const Hash& from, const Hash& t
                           codec::u128 amount, std::uint64_t nonce, codec::u128 fee,
                           std::uint64_t chain_id);
 
+/// A signed record write (record state model) by the stored account at
+/// [from]: put, transfer or delete of [key] with [value]. The scheme follows
+/// the stored key as for transfers; a hybrid key yields a version 2 envelope.
+/// Throws if the store is locked or [from] is unknown.
+Transaction sign_record(const KeyStore& store, const Hash& from, std::uint64_t chain_id,
+                        std::uint64_t nonce, const Hash& key, std::uint8_t op,
+                        const Bytes& value);
 /// Overwrites [bytes] with zeros in a way the optimizer keeps.
 void wipe(Bytes& bytes);
 

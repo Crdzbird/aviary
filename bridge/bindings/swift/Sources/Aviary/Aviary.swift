@@ -439,6 +439,17 @@ public enum Aviary {
         }
         deinit { aviary_credential_gate_free(UnsafeMutableRawPointer(h)) }
 
+        /// A fresh admission challenge for `epoch`: keep the nonce, send the wire message.
+        public func admissionChallenge(epoch: UInt32) throws -> AdmissionChallenge {
+            let b = try consume(aviary_admission_challenge(epoch), "admission_challenge")
+            return AdmissionChallenge(nonce: b.prefix(32), wire: b.dropFirst(32))
+        }
+        /// Whether `presentation`, answering the challenge whose nonce this gate issued, admits
+        /// for `epoch` at `now`.
+        public func admissionGranted(epoch: UInt32, nonce: Data, presentation: Data, now: UInt64) -> Bool {
+            nonce.withC { np, nl in presentation.withC { pp, pl in
+                aviary_admission_granted(UnsafeMutableRawPointer(h), epoch, np, nl, pp, pl, now) == 1 } }
+        }
         /// Bulk revocation: refuse every credential issued in this epoch.
         public func revokeIssuerEpoch(_ epoch: UInt32) {
             aviary_credential_gate_revoke_epoch(UnsafeMutableRawPointer(h), epoch)
@@ -1106,7 +1117,7 @@ private func splitAccountBlob(_ blob: Data) -> PortableAccount {
 
 // -- Buffer marshalling helpers -------------------------------------------------
 
-private extension Data {
+extension Data {
     /// Call a C function with (const uint8_t* ptr, size_t len) over these bytes.
     func withC<R>(_ body: (UnsafePointer<UInt8>, Int) -> R) -> R {
         if isEmpty {
@@ -1117,7 +1128,7 @@ private extension Data {
     }
 }
 
-private func consume(_ result: AviaryBufferResult, _ op: String) throws -> Data {
+func consume(_ result: AviaryBufferResult, _ op: String) throws -> Data {
     var r = result
     if r.buf.data == nil {
         if let e = r.error { let m = String(cString: e); aviary_str_free(e); throw AviaryError(message: m) }

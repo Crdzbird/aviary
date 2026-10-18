@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Stage the native libraries into the npm package's prebuilds/<triple>/ so that
 # require('aviary-ledger') works with no environment override. The libraries
-# are the ones aviary_dart ships: the relocatable darwin pair (libaviary_c
-# finds libcipherbird next to it through its loader relative install name) and
-# the self-contained Linux libraries. Re-run after rebuilding the engine.
+# are the ones aviary_dart ships: one self contained libaviary_c per platform,
+# with CipherBird linked in. Re-run after rebuilding an engine.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NATIVE="$ROOT/bridge/bindings/dart/native"

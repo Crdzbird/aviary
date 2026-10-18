@@ -2,7 +2,6 @@ package aviary_test
 
 import (
 	"bytes"
-	"sort"
 	"strings"
 	"testing"
 
@@ -143,63 +142,6 @@ func TestEventHook(t *testing.T) {
 	}
 }
 
-type mesh struct {
-	nodes    []*bc.NetNode
-	queue    [][3]interface{}
-	timeouts []struct {
-		round uint32
-		step  uint8
-		node  int
-	}
-}
-
-func (m *mesh) apply(node int, o bc.Outbound) {
-	for _, r := range o.Relays {
-		m.queue = append(m.queue, [3]interface{}{node, int(r.To), r.Message})
-	}
-	for _, to := range o.Timeouts {
-		m.timeouts = append(m.timeouts, struct {
-			round uint32
-			step  uint8
-			node  int
-		}{to.Round, to.Step, node})
-	}
-}
-
-func (m *mesh) run(t *testing.T, done func() bool) {
-	for step := 0; step < 20000; step++ {
-		if done() {
-			return
-		}
-		if len(m.queue) > 0 {
-			from, to, payload := m.queue[0][0].(int), m.queue[0][1].(int), m.queue[0][2].([]byte)
-			m.queue = m.queue[1:]
-			o, err := m.nodes[to].OnGossip(uint32(from), payload)
-			if err != nil {
-				t.Fatal(err)
-			}
-			m.apply(to, o)
-			continue
-		}
-		if len(m.timeouts) == 0 {
-			return
-		}
-		sort.Slice(m.timeouts, func(i, j int) bool {
-			if m.timeouts[i].round != m.timeouts[j].round {
-				return m.timeouts[i].round < m.timeouts[j].round
-			}
-			return m.timeouts[i].step < m.timeouts[j].step
-		})
-		tm := m.timeouts[0]
-		m.timeouts = m.timeouts[1:]
-		o, err := m.nodes[tm.node].OnTimeout(bc.TimeoutRequest{Step: tm.step, Round: tm.round})
-		if err != nil {
-			t.Fatal(err)
-		}
-		m.apply(tm.node, o)
-	}
-}
-
 func TestNetMeshAndSecureSession(t *testing.T) {
 	must := ok(t)
 	keys := make([]*bc.PortableAccount, 4)
@@ -214,75 +156,59 @@ func TestNetMeshAndSecureSession(t *testing.T) {
 	}
 	alice := bytes.Repeat([]byte{0x11}, 32)
 	genesis := must(bc.BuildGenesis(42, 1, 1, 0, []bc.GenesisAccount{{Address: alice, Balance: 1000}}, vset))
-	m := &mesh{}
+	m := bc.NewPeerMesh()
 	for i := 0; i < 4; i++ {
 		n, err := bc.NewNetNode(genesis, uint32(i), keys[i].Public, keys[i].Secret, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
-		m.nodes = append(m.nodes, n)
+		m.Nodes = append(m.Nodes, n)
 	}
 	obs, err := bc.NewNetNode(genesis, bc.Observer, nil, nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.nodes = append(m.nodes, obs)
-	for _, e := range [][2]uint32{{0, 1}, {1, 2}, {2, 3}, {3, 4}} {
-		m.nodes[e[0]].AddPeer(e[1])
-		m.nodes[e[1]].AddPeer(e[0])
+	m.Nodes = append(m.Nodes, obs)
+	for i := 0; i < 4; i++ {
+		m.Link(i, i+1)
 	}
-	committed := func() bool {
-		for _, n := range m.nodes[:4] {
-			if !n.Committed() {
-				return false
-			}
-		}
-		return true
+	validators := []int{0, 1, 2, 3}
+	if err := m.Start(); err != nil {
+		t.Fatal(err)
 	}
-	for i, n := range m.nodes {
-		o, err := n.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-		m.apply(i, o)
+	if err := m.Settle(validators...); err != nil {
+		t.Fatal(err)
 	}
-	m.run(t, committed)
-	m.run(t, func() bool { return false })
-	for i, n := range m.nodes {
+	for i, n := range m.Nodes {
 		if n.Height() != 1 {
 			t.Fatalf("node %d height %d", i, n.Height())
 		}
 	}
-	if !bytes.Equal(must(m.nodes[0].Tip()), must(obs.Tip())) || obs.Balance(alice) != 1000 {
+	if !bytes.Equal(must(m.Nodes[0].Tip()), must(obs.Tip())) || obs.Balance(alice) != 1000 {
 		t.Fatal("observer did not follow")
 	}
-	if log, _ := m.nodes[0].ReplayLog(); len(log) == 0 {
+	if log, _ := m.Nodes[0].ReplayLog(); len(log) == 0 {
 		t.Fatal("replay log empty")
 	}
-	for i, n := range m.nodes {
-		o, err := n.Advance()
-		if err != nil {
-			t.Fatal(err)
-		}
-		m.apply(i, o)
+	if err := m.Advance(); err != nil {
+		t.Fatal(err)
 	}
-	m.run(t, committed)
-	m.run(t, func() bool { return false })
-	if m.nodes[3].Height() != 2 || obs.Height() != 2 {
+	if err := m.Settle(validators...); err != nil {
+		t.Fatal(err)
+	}
+	if m.Nodes[3].Height() != 2 || obs.Height() != 2 {
 		t.Fatal("second height not reached")
 	}
-	if ev, _ := m.nodes[2].DrainEvents(); !strings.Contains(ev, "block_finalized") {
+	if ev, _ := m.Nodes[2].DrainEvents(); !strings.Contains(ev, "block_finalized") {
 		t.Fatalf("net events: %s", ev)
 	}
-	if mt, _ := m.nodes[2].Metrics(); !strings.Contains(mt, "aviary_gossip_received_total") || !strings.Contains(mt, "aviary_chain_height 2") {
+	if mt, _ := m.Nodes[2].Metrics(); !strings.Contains(mt, "aviary_gossip_received_total") || !strings.Contains(mt, "aviary_chain_height 2") {
 		t.Fatalf("net metrics: %s", mt)
 	}
-	if err := m.nodes[0].SetTransactions([][]byte{{1, 2}}); err == nil {
+	if err := m.Nodes[0].SetTransactions([][]byte{{1, 2}}); err == nil {
 		t.Fatal("malformed transaction accepted")
 	}
-	for _, n := range m.nodes {
-		n.Free()
-	}
+	m.Free()
 
 	a, _ := bc.GenerateSecureIdentity()
 	b, _ := bc.GenerateSecureIdentity()

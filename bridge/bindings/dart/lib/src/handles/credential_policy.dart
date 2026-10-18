@@ -77,4 +77,16 @@ final class CredentialPolicy {
       ),
     ),
   );
+
+  /// The answer to an admission challenge [wire] from a peer that holds
+  /// [credential] under this policy.
+  Uint8List admissionAnswer(Uint8List credential, Uint8List wire) => _scoped(
+    [encoded, credential, wire],
+    (p) => _bc._take(
+      _bc.lib.lookupFunction<_AdmAnswerC, _AdmAnswerD>(
+        'aviary_admission_answer',
+      )(p[0], encoded.length, p[1], credential.length, p[2], wire.length),
+      'admission_answer',
+    ),
+  );
 }

@@ -191,8 +191,23 @@ hybrid channel (`generateSecureIdentity`, `initiateSecureSession`,
 send garbage are scored and banned (`peerBanned`); a late peer catches up
 from `replayLog`.
 
+Around the node sit the pieces an operator needs, all transport agnostic:
+
+- **Address books.** `signPeerRecord` produces a self signed record of where
+  a validator is reached and which keys authenticate it; an `AddressBook`
+  collects them, and `merge` is the peer exchange boundary that verifies
+  every record and never lets a known id be rebound.
+- **Noise sessions.** `NoiseSession` speaks Noise_XX_25519_ChaChaPoly_SHA256
+  for peers that are not Aviary nodes, with a post quantum identity proof
+  bound to the handshake hash. Authentication is post quantum,
+  confidentiality is classical; `SecureSession` stays the choice when
+  confidentiality must be post quantum too.
+- **Admission.** Before a peer joins the mesh, `gate.admissionChallenge`,
+  `policy.admissionAnswer` and `gate.admissionGranted` run the anonymous
+  membership handshake over whatever socket the app holds.
+
 For tests, simulations and single process networks, `PeerMesh` is the whole
-loop: relays are delivered in order and a timeout fires only when nothing is
+loop, in every binding: relays are delivered in order and a timeout fires only when nothing is
 pending, so the same inputs always reach the same commit.
 
 ```dart
@@ -265,8 +280,13 @@ bc.verifyStateProof(chain.stateRoot(), proof);
 print(bc.recordFromProof(proof).version);
 ```
 
-`addTx` queues any signed transaction on any assembled chain, so the same
-path carries hand built transactions for the account and UTXO models too.
+Writes can also be signed inside the engine from a key store
+(`chain.writeFromStore(store, author, key, op, value)`), so the author's
+secret never reaches the app, and by hybrid Ed25519 + ML-DSA-65 accounts
+(`signRecordTxHybrid`). `addTx` queues any signed transaction on any
+assembled chain, so the same path carries hand built transactions for the
+account and UTXO models too; every queued and included transaction shows up
+as a `TxAdmitted` and `TxRemoved` event.
 The [Registry example](examples/registry) runs a whole equipment registry
 this way. Custom models beyond records are a C++ `StateMachine` subclass
 registered in the component registry under its own id.

@@ -1500,8 +1500,9 @@ selectors - validated against real-world vectors). Deferred:
   `hookEvents`. Tests: `test_networked_node`, Dart `observability_test`, Go
   `TestChainObservability` and the mesh test, npm `observability.test.js`,
   the JVM `Main` and Swift demo mesh sections.
-- **[ ] [L]** Only `BlockFinalized` and `BlockRejected` are emitted by chains
-  and networked nodes; transaction admission lives in the node's mempool.
+- **[x]** Chains now also emit `TxAdmitted` and `TxRemoved` from their
+  transaction queue (engine batch of 2026-10-18); networked nodes still emit
+  block events only, since their transactions are set per height.
 
 ## Binary size of the shipped engines - DONE (2026-10-11)
 - **[x] Where the bytes were:** the Linux engine was 21 MB stripped against
@@ -1537,7 +1538,10 @@ selectors - validated against real-world vectors). Deferred:
   slice 1.1 MB to 0.87 MB; the lite static slices 14.2 MB to 13.3 MB (static
   archives, so an app pays only for the objects it references). The Linux
   Dart suite passes on the trimmed engines.
-- **[ ] [L]** The macOS slice of the lite archive still links Homebrew's full
+- **[x] (corrected)** The macOS slice of the lite archive was already built
+  from the trimmed iOS pipeline archive; the Homebrew build was the separate
+  macOS `libcipherbird.dylib` shipped in aviary_dart and npm, replaced by a
+  self contained engine on 2026-10-18. Original note: the macOS slice still links Homebrew's full
   liboqs and secp256k1 through `build_static_archive.sh`; the Apple lite
   archives are static, so only what an app references reaches it, but a
   vendored minimal liboqs would make the macOS slice match iOS.
@@ -1560,7 +1564,8 @@ selectors - validated against real-world vectors). Deferred:
   with an observer and a full mesh. Documented in the README networking
   section. The two observability extension parts were merged into
   `handles/observability.dart` to free the part slot.
-- **[ ] [L]** The other bindings still carry their own mesh loops in tests; a
+- **[x]** PeerMesh exists in Go, npm, JVM and Swift since 2026-10-18; original
+  note: the other bindings still carry their own mesh loops in tests; a
   Go `PeerMesh` and an npm one would make their networking examples as short.
 
 ## dartdoc categories - DONE (2026-10-11)
@@ -1636,9 +1641,9 @@ selectors - validated against real-world vectors). Deferred:
 - **[x] Example:** `examples/registry`, a pure Dart equipment registry with
   JSON documents as records, ownership transfer, an auditor verifying from
   the state root, deletion.
-- **[ ] [M]** Record writes from a `KeyStore` (today the signer is a raw
-  Ed25519 secret), hybrid post quantum record authors, and a networked record
-  chain example.
+- **[x]** Record writes from a `KeyStore` and hybrid post quantum record
+  authors: see the engine batch of 2026-10-18 below.
+- **[ ] [L]** A networked record chain example.
 
 ## Release refinement on CipherBird 1.1.1 - DONE (2026-10-18)
 - **[x] Engine.** CipherBird 1.1.1 keeps the C ABI at 265 functions and
@@ -1678,4 +1683,49 @@ selectors - validated against real-world vectors). Deferred:
   three pub packages is treated as ignored. pana scores aviary_dart
   160/160; the dry runs show the engines in every archive (aviary_dart
   10 MB, aviary_lite 16 MB, aviary 5 MB, aviary-ledger 10.4 MB).
+
+## Engine batch: key store records, networking tiers, chain events, one macOS engine - DONE (2026-10-18)
+- **[x] Records from a key store.** `custody::sign_record` shares one
+  signer with `sign_transfer` (the secret is revealed inside the engine, used
+  once and wiped on every path); the scheme follows the stored key, so a
+  hybrid key yields a version 2 Ed25519 + ML-DSA-65 envelope. C ABI
+  `aviary_keystore_sign_record` and `aviary_record_tx_sign_hybrid`; every
+  binding gains `signRecord` on its key store, `writeFromStore` on chains and
+  a hybrid record signer.
+- **[x] Chain queue events.** `aviary_chain_add_tx` publishes `TxAdmitted`
+  with the queue size and a finalized block publishes `TxRemoved` for each
+  queued transaction, with an `aviary_mempool_size` gauge.
+- **[x] Networking tiers over the C ABI.** Peer records gained a public codec
+  (`PeerRecord::encode`, `decode_all`); the address book (sign, verify, read
+  fields, trusted add, verifying merge, canonical encode and decode), the
+  Noise XX session with its post quantum identity proof, and the anonymous
+  membership admission handshake are exposed in the C ABI and every binding.
+  The TCP reactor and the blocking admission socket stay C++ only on
+  purpose: they own file descriptors and threads, while the bindings follow
+  the locked decision that the application owns its transport; the pure
+  handshake they wrap is what is exposed.
+- **[x] Threading contract** stated at the top of `aviary_c.h`: every handle
+  is single threaded, hooks run synchronously on the calling thread and must
+  not re-enter their handle, the registry and initialisation are thread safe.
+- **[x] One self contained macOS engine.** `scripts/macos/build_dylib.sh`
+  links CipherBird's trimmed macosx archive (the one aviary_lite already
+  merges) into `libaviary_c.dylib` with dead stripping and LTO, exports only
+  the 233 `aviary_*` functions and verifies there are no non system
+  dependencies. It replaces the 1.0 MB + 11.4 MB pair (the second was
+  CipherBird's Homebrew built dylib with full liboqs and untrimmed OpenSSL)
+  with one 2.8 MB file: the npm package drops from 10.4 MB to 6.0 MB and the
+  JVM jar from 10.5 MB to 6.1 MB.
+- **[x] PeerMesh in Go, npm, JVM and Swift**, with each binding's network
+  test moved onto it.
+- **[x] Measured and declined:** OpenSSL `no-deprecated` on top of the trim
+  list saves 2.3% of libcrypto text (about 43 KB) while keeping every cipher
+  and digest the engine needs; not worth a configuration change in
+  CipherBird's release build.
+- **[x] Tests:** `test_c_abi_extras` (links the shared C ABI library and
+  drives every new function, 71 C++ suites), Dart `records_store_test`,
+  `peering_test`, `noise_admission_test` (34 suites), Go
+  `TestFullMeshWithPeerMesh`, `TestRecordsFromStoreAndHybrid`,
+  `TestPeerRecordsAndAddressBook`, `TestNoiseSessionAndAdmission`, npm
+  `peering.test.js` (19 tests), the JVM and Swift demos.
+- **[ ] [L]** Windows: blocked until CipherBird has a Windows build.
 

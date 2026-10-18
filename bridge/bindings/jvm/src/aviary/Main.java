@@ -445,6 +445,27 @@ public final class Main {
                 rblk = rchain.propose(4); rchain.submit(rblk, rchain.certify(rblk));
                 if (rchain.record(rkey) != null) throw new IllegalStateException("delete");
                 rchain.close(); rn.close();
+                Aviary.Chain sc = bc.assembleChain(genesis, 0, v.publicKey(), v.secret());
+                Aviary.Node sn = bc.createNode(2);
+                Aviary.Account ed = sn.newAccount();
+                Aviary.KeyStore store = bc.createKeyStore("pass");
+                byte[] edAddr = store.addAccount(ed.publicKey(), ed.secret());
+                sc.writeFromStore(store, edAddr, rkey, Aviary.RecordOp.PUT, new byte[]{7});
+                if (!sc.drainEvents().contains("tx_admitted")) throw new IllegalStateException("admission event");
+                byte[] sblk = sc.propose(2);
+                if (!sc.submit(sblk, sc.certify(sblk)) || !java.util.Arrays.equals(sc.record(rkey).owner(), edAddr)) throw new IllegalStateException("record from store");
+                if (!sc.drainEvents().contains("tx_removed")) throw new IllegalStateException("removal event");
+                store.close(); sn.close(); sc.close();
+                byte[] issuerKm = new byte[32]; java.util.Arrays.fill(issuerKm, (byte) 0x11);
+                var admIssuer = bc.newBBSIssuer(issuerKm);
+                var admPolicy = bc.new CredentialPolicy(7, admIssuer.publicKey(), "aviary.credential.v1".getBytes(java.nio.charset.StandardCharsets.UTF_8), 4, 2);
+                byte[] member = new byte[32]; java.util.Arrays.fill(member, (byte) 0x77);
+                byte[] admCred = admPolicy.issue(admIssuer.secret(), member, 3, 4102444800L, 1);
+                try (var admGate = bc.newCredentialGate(admPolicy)) {
+                    Aviary.AdmissionChallenge ch = admGate.admissionChallenge(5);
+                    byte[] answer = admPolicy.admissionAnswer(admCred, ch.wire());
+                    if (!admGate.admissionGranted(5, ch.nonce(), answer, 1700000000L) || admGate.admissionGranted(6, ch.nonce(), answer, 1700000000L)) throw new IllegalStateException("admission");
+                }
                 System.out.println("records OK");
             }
 
@@ -472,33 +493,21 @@ public final class Main {
                 for (int i = 0; i < 4; i++) { byte[] ikm = new byte[32]; java.util.Arrays.fill(ikm, (byte) (0x60 + i)); keys[i] = bc.newBLSValidator(ikm); pks[i] = keys[i].publicKey(); }
                 byte[] aliceM = new byte[32]; java.util.Arrays.fill(aliceM, (byte) 0x11);
                 byte[] genesis = bc.buildGenesis(42, 1, 1, 0, new byte[][]{aliceM}, new long[]{1000}, pks, powers);
-                var nodes = new java.util.ArrayList<Aviary.NetNode>();
-                for (int i = 0; i < 4; i++) nodes.add(bc.newNetNode(genesis, i, keys[i], 1));
-                nodes.add(bc.newNetNode(genesis, Aviary.NET_OBSERVER, null, 1));
-                int[][] edges = {{0, 1}, {1, 2}, {2, 3}, {3, 4}};
-                for (int[] e : edges) { nodes.get(e[0]).addPeer(e[1]); nodes.get(e[1]).addPeer(e[0]); }
-                var queue = new java.util.ArrayDeque<Object[]>(); var timeouts = new java.util.ArrayList<int[]>();
-                java.util.function.BiConsumer<Integer, Aviary.Outbound> apply = (i, o) -> {
-                    for (var r : o.relays()) queue.add(new Object[]{i, r.to(), r.message()});
-                    for (var t : o.timeouts()) timeouts.add(new int[]{t.round(), t.step(), i});
-                };
+                var built = new java.util.ArrayList<Aviary.NetNode>();
+                for (int i = 0; i < 4; i++) built.add(bc.newNetNode(genesis, i, keys[i], 1));
+                built.add(bc.newNetNode(genesis, Aviary.NET_OBSERVER, null, 1));
+                Aviary.PeerMesh mesh = new Aviary.PeerMesh(built);
+                for (int i = 0; i < 4; i++) mesh.link(i, i + 1);
+                var nodes = mesh.nodes;
                 java.util.function.Supplier<Boolean> committed = () -> nodes.subList(0, 4).stream().allMatch(Aviary.NetNode::committed);
-                Runnable drain = () -> {
-                    for (int step = 0; step < 20000; step++) {
-                        if (!queue.isEmpty()) { Object[] m = queue.poll(); int to = (int) m[1]; apply.accept(to, nodes.get(to).onGossip((int) m[0], (byte[]) m[2])); continue; }
-                        if (timeouts.isEmpty()) return;
-                        timeouts.sort((p, q) -> p[0] != q[0] ? Integer.compare(p[0], q[0]) : Integer.compare(p[1], q[1]));
-                        int[] t = timeouts.remove(0); apply.accept(t[2], nodes.get(t[2]).onTimeout(new Aviary.TimeoutRequest(t[1], t[0])));
-                    }
-                };
-                for (int i = 0; i < nodes.size(); i++) apply.accept(i, nodes.get(i).start());
-                drain.run();
+                mesh.start();
+                if (!mesh.settle(0, 1, 2, 3)) throw new IllegalStateException("mesh settle");
                 if (!committed.get() || nodes.stream().anyMatch(nn -> nn.height() != 1)) throw new IllegalStateException("mesh height 1");
                 if (!java.util.Arrays.equals(nodes.get(0).tip(), nodes.get(4).tip()) || nodes.get(4).balance(aliceM) != 1000) throw new IllegalStateException("observer follows");
                 if (nodes.get(0).replayLog().length == 0) throw new IllegalStateException("replay log");
                 if (!bc.verifyStateProof(nodes.get(2).stateRoot(), nodes.get(2).proveAccount(aliceM))) throw new IllegalStateException("net proof");
-                for (int i = 0; i < nodes.size(); i++) apply.accept(i, nodes.get(i).advance());
-                drain.run();
+                mesh.advance();
+                if (!mesh.settle(0, 1, 2, 3)) throw new IllegalStateException("mesh settle 2");
                 if (nodes.stream().anyMatch(nn -> nn.height() != 2)) throw new IllegalStateException("mesh height 2");
                 try { nodes.get(0).setTransactions(new byte[][]{{1, 2}}); throw new IllegalStateException("malformed tx accepted"); } catch (IllegalArgumentException expected) {}
                 if (!nodes.get(2).drainEvents().contains("block_finalized")) throw new IllegalStateException("net events");
@@ -507,9 +516,28 @@ public final class Main {
                 var pushed = new java.util.ArrayList<String>();
                 nodes.get(0).setEventHook(pushed::add);
                 nodes.get(0).setEventHook(null);
-                nodes.forEach(Aviary.NetNode::close);
+                mesh.close();
 
                 Aviary.SecureIdentity ia = bc.generateSecureIdentity(), ib = bc.generateSecureIdentity();
+                byte[] ra = bc.signPeerRecord(1, "10.0.0.1", 7001, ia, new byte[0]);
+                byte[] rb = bc.signPeerRecord(2, "10.0.0.2", 7002, ib, new byte[0]);
+                Aviary.PeerRecordInfo info = bc.readPeerRecord(rb);
+                if (info.id() != 2 || !info.host().equals("10.0.0.2") || info.port() != 7002 || !bc.verifyPeerRecord(ra)) throw new IllegalStateException("peer record");
+                byte[] forged = rb.clone(); forged[forged.length - 1] ^= 1;
+                if (bc.verifyPeerRecord(forged)) throw new IllegalStateException("forged record verified");
+                try (Aviary.AddressBook mine = bc.newAddressBook(); Aviary.AddressBook theirs = bc.newAddressBook(); Aviary.AddressBook evil = bc.newAddressBook()) {
+                    mine.add(ra); theirs.add(rb); theirs.add(ra); evil.add(forged);
+                    if (mine.merge(theirs.encode()) != 1 || mine.size() != 2 || !java.util.Arrays.equals(mine.record(2), rb) || mine.record(9) != null) throw new IllegalStateException("address book merge");
+                    try (Aviary.AddressBook fresh = bc.newAddressBook()) { if (fresh.merge(evil.encode()) != 0) throw new IllegalStateException("forged record merged"); }
+                }
+                Aviary.NoiseIdentity na = bc.generateNoiseIdentity(), nb = bc.generateNoiseIdentity();
+                byte[] prologue = "aviary".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                try (Aviary.NoiseSession ni = bc.initiateNoiseSession(na, prologue); Aviary.NoiseSession nr = bc.acceptNoiseSession(nb, ni.handshakeMessage(), prologue)) {
+                    nr.completeResponder(ni.completeInitiator(nr.handshakeMessage()));
+                    nr.verifyIdentityProof(ni.identityProof()); ni.verifyIdentityProof(nr.identityProof());
+                    if (!ni.open() || !java.util.Arrays.equals(ni.peerIdentity(), nb.sig().publicKey())) throw new IllegalStateException("noise pinning");
+                    if (!new String(nr.decrypt(ni.encrypt("hello".getBytes())), java.nio.charset.StandardCharsets.UTF_8).equals("hello")) throw new IllegalStateException("noise round trip");
+                }
                 try (Aviary.SecureSession init = bc.initiateSecureSession(ib.kem().publicKey(), ia.sig());
                      Aviary.SecureSession resp = bc.acceptSecureSession(ib, init.handshakeMessage())) {
                     init.complete(resp.handshakeMessage());

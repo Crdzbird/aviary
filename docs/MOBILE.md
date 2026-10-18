@@ -58,6 +58,7 @@ bash scripts/apple/build_dynamic_xcframework.sh
 # Android, one of:
 bash scripts/android/build_so.sh lite   # self-contained .so
 bash scripts/android/build_so.sh full   # links libcipherbird.so from the cipherbird package
+bash scripts/macos/build_dylib.sh       # self-contained macOS engine for aviary_dart, npm and the jar
 ```
 
 The Android script strips the output with `llvm-strip --strip-unneeded`. The

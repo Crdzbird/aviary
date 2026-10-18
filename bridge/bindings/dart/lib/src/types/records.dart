@@ -80,6 +80,19 @@ typedef Outbound = ({List<Relay> relays, List<TimeoutRequest> timeouts});
 /// {@category Networking}
 typedef SecureIdentity = ({KeyPairBytes kem, KeyPairBytes sig});
 
-/// Outcome of [LightClient.acceptSkipping].
-/// {@category Light clients}
-enum SkipResult { refused, accepted, insufficientOverlap }
+/// What a record transaction does: write, hand over to a new owner, or remove.
+/// {@category Records}
+enum RecordOp { put, transfer, delete }
+
+/// A committed application record: owner, write count and current bytes.
+/// {@category Records}
+typedef RecordEntry = ({Uint8List owner, int version, Uint8List value});
+
+/// A record read out of a verified state proof, with its key.
+/// {@category Records}
+typedef RecordLeaf = ({
+  Uint8List key,
+  Uint8List owner,
+  int version,
+  Uint8List value,
+});

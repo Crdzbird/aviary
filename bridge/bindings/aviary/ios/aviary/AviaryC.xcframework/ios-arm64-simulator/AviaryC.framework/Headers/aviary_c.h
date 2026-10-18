@@ -14,6 +14,17 @@
  *
  * Boundary contract (cpp-crypto-engineer): all C++ exceptions are isolated at
  * this boundary and surfaced as error returns; no exception crosses into C.
+ *
+ * Threading contract:
+ *  - Every handle (node, chain, chain tree, networked node, light client,
+ *    key store, sessions, address book, gates, mempools) is single threaded:
+ *    one thread at a time may call into a given handle. Different handles may
+ *    be used from different threads concurrently.
+ *  - Hooks (event hooks, the chain tree's finalized and transaction source
+ *    hooks, foreign engines and proposers) run synchronously on the thread
+ *    that made the call which triggered them, before that call returns. A
+ *    hook must not call back into the handle that invoked it.
+ *  - The component registry and library initialisation are thread safe.
  */
 #ifndef AVIARY_C_H
 #define AVIARY_C_H
@@ -839,6 +850,20 @@ AVIARY_API AviaryBufferResult aviary_chain_prove_record(AviaryChain c, const uin
 /** Reads the record a state proof commits to: key(32) || owner(32) || u64
  *  version || bytes value. Verify the proof first. */
 AVIARY_API AviaryBufferResult aviary_record_from_proof(const uint8_t* proof, size_t proof_len);
+/** A record write signed by the key store account at [from] (Ed25519 or
+ *  hybrid, following the stored key); the secret never leaves the engine.
+ *  Errors when the store is locked or [from] is unknown. */
+AVIARY_API AviaryBufferResult aviary_keystore_sign_record(AviaryKeyStore ks, uint64_t chain_id,
+                                                          const uint8_t* from, uint64_t nonce,
+                                                          const uint8_t* key, uint8_t op,
+                                                          const uint8_t* value, size_t value_len);
+/** A record write signed by a hybrid Ed25519 + ML-DSA-65 account (version 2
+ *  envelope); [public_key] and [secret] are the hybrid blobs. */
+AVIARY_API AviaryBufferResult aviary_record_tx_sign_hybrid(uint64_t chain_id, uint64_t nonce,
+                                                           const uint8_t* key, uint8_t op,
+                                                           const uint8_t* value, size_t value_len,
+                                                           const uint8_t* public_key, size_t public_len,
+                                                           const uint8_t* secret, size_t secret_len);
 
 /** Observer: a block was finalized on [chain_id]. */
 typedef void (*AviaryFinalizedFn)(void* ctx, uint64_t chain_id, const uint8_t* block, size_t block_len);
@@ -921,6 +946,109 @@ AVIARY_API AviaryBufferResult aviary_secure_peer_identity(AviarySecureSession s)
 AVIARY_API AviaryBufferResult aviary_secure_encrypt(AviarySecureSession s, const uint8_t* plaintext, size_t len);
 AVIARY_API AviaryBufferResult aviary_secure_decrypt(AviarySecureSession s, const uint8_t* frame, size_t len);
 AVIARY_API void aviary_secure_free(AviarySecureSession s);
+
+/* -- Address book: self signed peer records and peer exchange -----------------
+ * A peer record says where to reach a validator (host, port) and which keys
+ * authenticate it (hybrid KEM, hybrid signature, optional ratchet prekey); the
+ * owner signs it. An address book is the set of records a node knows. add is
+ * the trusted local path (no verification); merge is the peer exchange
+ * boundary: it verifies every incoming record and never overwrites a known id.
+ * Records and books use the deterministic codec, so two nodes that learned the
+ * same peers hold byte identical books. */
+
+/** A record signed with the owner's hybrid signature secret (which must match
+ *  [sig_pk]); returns its canonical bytes. [prekey] may be empty. */
+AVIARY_API AviaryBufferResult aviary_peer_record_sign(uint32_t id, const char* host, uint16_t port,
+                                                      const uint8_t* kem_pk, size_t kem_len,
+                                                      const uint8_t* sig_pk, size_t sig_len,
+                                                      const uint8_t* prekey, size_t prekey_len,
+                                                      const uint8_t* sig_secret, size_t secret_len);
+/** 1 when the record decodes and its owner signature verifies, else 0. */
+AVIARY_API int aviary_peer_record_verify(const uint8_t* record, size_t len);
+/** The record's fields as a blob list: id (u32 BE), host, port (u16 BE),
+ *  kem_pk, sig_pk, prekey, signature. */
+AVIARY_API AviaryBufferResult aviary_peer_record_fields(const uint8_t* record, size_t len);
+
+/** Opaque address book handle. */
+typedef void* AviaryAddressBook;
+AVIARY_API AviaryAddressBook aviary_address_book_new(void);
+/** Decodes a canonical book (does not verify; merge it into a book to verify).
+ *  NULL on malformed or non canonical input. */
+AVIARY_API AviaryAddressBook aviary_address_book_decode(const uint8_t* book, size_t len);
+AVIARY_API AviaryBufferResult aviary_address_book_encode(AviaryAddressBook b);
+/** Trusted insert of an encoded record (yours, or a configured seed). */
+AVIARY_API int aviary_address_book_add(AviaryAddressBook b, const uint8_t* record, size_t len);
+/** Learns the verified records of an encoded book that are not yet known.
+ *  Returns how many were added, or -1 when the book does not decode. */
+AVIARY_API int64_t aviary_address_book_merge(AviaryAddressBook b, const uint8_t* book, size_t len);
+/** The encoded record for [id]; an error when the id is unknown. */
+AVIARY_API AviaryBufferResult aviary_address_book_get(AviaryAddressBook b, uint32_t id);
+AVIARY_API int aviary_address_book_contains(AviaryAddressBook b, uint32_t id);
+AVIARY_API uint64_t aviary_address_book_size(AviaryAddressBook b);
+/** Every record in ascending id order, as a blob list of encoded records. */
+AVIARY_API AviaryBufferResult aviary_address_book_records(AviaryAddressBook b);
+AVIARY_API void aviary_address_book_free(AviaryAddressBook b);
+
+/* -- Noise session: Noise_XX_25519_ChaChaPoly_SHA256 with a PQ identity proof --
+ * The standards based link for peers that speak Noise. Three handshake
+ * messages (initiator msg0, responder msg1, initiator msg2), then each side
+ * sends its identity proof, which binds its hybrid signature key to this
+ * handshake hash. encrypt and decrypt refuse until the peer's proof verified.
+ * Authentication is post quantum; confidentiality is classical (X25519); use
+ * SecureSession when post quantum confidentiality is required. Always pin
+ * aviary_noise_peer_identity against your allow list. */
+
+/** A fresh identity as a blob list: noise static public, noise static
+ *  secret (X25519), hybrid signature public, hybrid signature secret. */
+AVIARY_API AviaryBufferResult aviary_noise_identity_generate(void);
+typedef void* AviaryNoiseSession;
+/** Initiator: begins the handshake; aviary_noise_handshake_message holds msg0. */
+AVIARY_API AviaryNoiseSession aviary_noise_initiate(const uint8_t* identity, size_t identity_len,
+                                                    const uint8_t* prologue, size_t prologue_len);
+/** Responder: consumes msg0; aviary_noise_handshake_message holds msg1. NULL on
+ *  a malformed message or identity. */
+AVIARY_API AviaryNoiseSession aviary_noise_accept(const uint8_t* identity, size_t identity_len,
+                                                  const uint8_t* msg0, size_t msg0_len,
+                                                  const uint8_t* prologue, size_t prologue_len);
+/** The handshake message this side produced when it was created. */
+AVIARY_API AviaryBufferResult aviary_noise_handshake_message(AviaryNoiseSession s);
+/** Initiator: consumes msg1 and returns msg2. */
+AVIARY_API AviaryBufferResult aviary_noise_complete_initiator(AviaryNoiseSession s, const uint8_t* msg1, size_t len);
+/** Responder: consumes msg2. */
+AVIARY_API int aviary_noise_complete_responder(AviaryNoiseSession s, const uint8_t* msg2, size_t len);
+/** This side's identity proof, sent once after the handshake. */
+AVIARY_API AviaryBufferResult aviary_noise_identity_proof(AviaryNoiseSession s);
+/** Verifies the peer's identity proof; AVIARY_OK on success. */
+AVIARY_API int aviary_noise_verify_identity_proof(AviaryNoiseSession s, const uint8_t* proof, size_t len);
+/** 1 once the handshake is done and the peer's proof verified. */
+AVIARY_API int aviary_noise_open(AviaryNoiseSession s);
+/** The peer's authenticated hybrid signature key. */
+AVIARY_API AviaryBufferResult aviary_noise_peer_identity(AviaryNoiseSession s);
+/** The peer's X25519 static key learned in the handshake. */
+AVIARY_API AviaryBufferResult aviary_noise_peer_static(AviaryNoiseSession s);
+AVIARY_API AviaryBufferResult aviary_noise_handshake_hash(AviaryNoiseSession s);
+AVIARY_API AviaryBufferResult aviary_noise_encrypt(AviaryNoiseSession s, const uint8_t* plaintext, size_t len);
+AVIARY_API AviaryBufferResult aviary_noise_decrypt(AviaryNoiseSession s, const uint8_t* record, size_t len);
+AVIARY_API void aviary_noise_free(AviaryNoiseSession s);
+
+/* -- Admission handshake: anonymous membership before a peer joins the mesh ---
+ * The verifier sends a fresh challenge, the peer answers with an unlinkable
+ * credential presentation for the "gossip" scope, the verifier admits or
+ * refuses. Transport agnostic: move the bytes over your own socket. */
+
+/** A fresh challenge for [epoch]: nonce (32 bytes, keep it) || wire message. */
+AVIARY_API AviaryBufferResult aviary_admission_challenge(uint32_t epoch);
+/** The peer's answer to an encoded challenge, from its credential under the
+ *  encoded [policy]. */
+AVIARY_API AviaryBufferResult aviary_admission_answer(const uint8_t* policy, size_t policy_len,
+                                                      const uint8_t* credential, size_t credential_len,
+                                                      const uint8_t* challenge, size_t challenge_len);
+/** 1 when [presentation] admits under [gate] for [epoch], the verifier's
+ *  [nonce] and [now]; 0 otherwise. Never fails loudly. */
+AVIARY_API int aviary_admission_granted(AviaryCredentialGate gate, uint32_t epoch,
+                                        const uint8_t* nonce, size_t nonce_len,
+                                        const uint8_t* presentation, size_t presentation_len,
+                                        uint64_t now);
 
 /* -- Foreign components: implement engines / proposers in ANY language --------
  *  The consensus pipeline stays in C++ (a foreign engine proposes and applies

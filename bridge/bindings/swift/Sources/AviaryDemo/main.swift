@@ -208,6 +208,18 @@ do {
     rblk = try rc.propose(timestamp: 4); _ = rc.submit(block: rblk, justification: try rc.certify(rblk))
     let gone = try rc.record(key: rkey)
     precondition(gone == nil, "delete")
+    let store = try Aviary.makeKeyStore(passphrase: "pass")
+    let edAcc = try rn.newAccount()
+    let edAddr = try store.addAccount(publicKey: edAcc.publicKey, secret: edAcc.secret)
+    let skey = try Aviary.hash(Data("asset:STORE".utf8))
+    try rc.writeFromStore(store: store, from: edAddr, key: skey, op: .put, value: Data([7]))
+    let admitted = try rc.drainEvents()
+    precondition(admitted.contains("tx_admitted"), "admission event")
+    rblk = try rc.propose(timestamp: 5); _ = rc.submit(block: rblk, justification: try rc.certify(rblk))
+    let fromStore = try rc.record(key: skey)
+    precondition(fromStore?.owner == edAddr, "record from a key store")
+    let removed = try rc.drainEvents()
+    precondition(removed.contains("tx_removed"), "removal event")
     print("records OK")
 }
 try ensure("chain events") { try powChain.drainEvents().contains("block_finalized") }
@@ -481,31 +493,20 @@ do {
     let aliceM = Data(repeating: 0x11, count: 32)
     let genesis = try Aviary.buildGenesis(chainID: 42, accounts: [Aviary.GenesisAccount(address: aliceM, balance: 1000)],
                                           validators: keys.map { Aviary.GenesisValidator(publicKey: $0.publicKey, power: 1) })
-    var nodes = try (0..<4).map { try Aviary.newNetNode(genesis: genesis, me: UInt32($0), blsKey: keys[$0]) }
-    nodes.append(try Aviary.newNetNode(genesis: genesis, me: Aviary.netObserver, peers: [3]))
-    for (x, y) in [(0, 1), (1, 2), (2, 3), (3, 4)] { nodes[x].addPeer(UInt32(y)); nodes[y].addPeer(UInt32(x)) }
-    var queue: [(Int, Int, Data)] = []; var timeouts: [(UInt32, UInt8, Int)] = []
-    func apply(_ i: Int, _ o: Aviary.Outbound) {
-        for r in o.relays { queue.append((i, Int(r.to), r.message)) }
-        for t in o.timeouts { timeouts.append((t.round, t.step.rawValue, i)) }
-    }
-    func run() throws {
-        for _ in 0..<20000 {
-            if !queue.isEmpty { let (from, to, p) = queue.removeFirst(); apply(to, try nodes[to].onGossip(from: UInt32(from), payload: p)); continue }
-            if timeouts.isEmpty { return }
-            timeouts.sort { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1 < $1.1 }
-            let (round, step, i) = timeouts.removeFirst()
-            apply(i, try nodes[i].onTimeout(Aviary.TimeoutRequest(step: Aviary.ConsensusStep(rawValue: step) ?? .propose, round: round)))
-        }
-    }
-    for (i, n) in nodes.enumerated() { apply(i, try n.start()) }
-    try run()
+    let mesh = Aviary.PeerMesh(try (0..<4).map { try Aviary.newNetNode(genesis: genesis, me: UInt32($0), blsKey: keys[$0]) })
+    mesh.append(try Aviary.newNetNode(genesis: genesis, me: Aviary.netObserver))
+    for i in 0..<4 { mesh.link(i, i + 1) }
+    let nodes = mesh.nodes
+    try mesh.start()
+    let settled = try mesh.settle(validators: [0, 1, 2, 3])
+    precondition(settled, "mesh settles")
     precondition(nodes.prefix(4).allSatisfy { $0.committed } && nodes.allSatisfy { $0.height == 1 }, "mesh height 1")
     try ensure("observer follows") { try nodes[0].tip() == nodes[4].tip() && nodes[4].balance(address: aliceM) == 1000 }
     try ensure("replay log") { try !nodes[0].replayLog().isEmpty }
     try ensure("net proof") { Aviary.verifyStateProof(stateRoot: try nodes[2].stateRoot(), proof: try nodes[2].proveAccount(address: aliceM)) }
-    for (i, n) in nodes.enumerated() { apply(i, try n.advance()) }
-    try run()
+    try mesh.advance()
+    let settledAgain = try mesh.settle(validators: [0, 1, 2, 3])
+    precondition(settledAgain, "mesh settles again")
     precondition(nodes.allSatisfy { $0.height == 2 }, "mesh height 2")
     try ensure("net events") { try nodes[2].drainEvents().contains("block_finalized") }
     try ensure("net metrics") { let m = try nodes[2].metrics(); return m.contains("aviary_gossip_received_total") && m.contains("aviary_chain_height 2") }
@@ -516,6 +517,29 @@ do {
     precondition((try? nodes[0].setTransactions([Data([1, 2])])) == nil, "malformed tx refused")
 
     let ia = try Aviary.generateSecureIdentity(), ib = try Aviary.generateSecureIdentity()
+    let ra = try Aviary.signPeerRecord(id: 1, host: "10.0.0.1", port: 7001, identity: ia)
+    let rb = try Aviary.signPeerRecord(id: 2, host: "10.0.0.2", port: 7002, identity: ib)
+    let info = try Aviary.readPeerRecord(rb)
+    precondition(info.id == 2 && info.host == "10.0.0.2" && info.port == 7002 && Aviary.verifyPeerRecord(ra), "peer record")
+    var forged = rb; forged[forged.count - 1] ^= 1
+    precondition(!Aviary.verifyPeerRecord(forged), "forged record refused")
+    let mine = try Aviary.AddressBook(), theirs = try Aviary.AddressBook(), evil = try Aviary.AddressBook()
+    try mine.add(ra); try theirs.add(rb); try theirs.add(ra); try evil.add(forged)
+    let added = try mine.merge(try theirs.encode())
+    let got = try mine.record(id: 2)
+    precondition(added == 1 && mine.count == 2 && got == rb, "address book merge")
+    let fresh = try Aviary.AddressBook()
+    let none = try fresh.merge(try evil.encode())
+    precondition(none == 0, "forged record not merged")
+    let na = try Aviary.generateNoiseIdentity(), nb = try Aviary.generateNoiseIdentity()
+    let ni = try Aviary.initiateNoiseSession(me: na, prologue: Data("aviary".utf8))
+    let nr = try Aviary.acceptNoiseSession(me: nb, msg0: try ni.handshakeMessage(), prologue: Data("aviary".utf8))
+    try nr.completeResponder(try ni.completeInitiator(try nr.handshakeMessage()))
+    try nr.verifyIdentityProof(try ni.identityProof()); try ni.verifyIdentityProof(try nr.identityProof())
+    let pinned = try ni.peerIdentity()
+    precondition(ni.isOpen && nr.isOpen && pinned == nb.sig.publicKey, "noise open and pinned")
+    let echoed = try nr.decrypt(try ni.encrypt(Data("hello".utf8)))
+    precondition(echoed == Data("hello".utf8), "noise round trip")
     let initiator = try Aviary.initiateSecureSession(responderKemPublic: ib.kem.publicKey, sig: ia.sig)
     let responder = try Aviary.acceptSecureSession(me: ib, firstMessage: try initiator.handshakeMessage())
     try initiator.complete(reply: try responder.handshakeMessage())

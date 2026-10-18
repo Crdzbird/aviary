@@ -8,6 +8,13 @@
   `RecordNonce`, `AddTx`, `PendingCount`, `ChainID`, `StateRoot`;
   `SignRecordTx`, `AddressOf`, `RecordFromProof`.
 - `SetEventHook`, `DrainEvents` and `Metrics` on `Chain` and `NetNode`.
+- Records signed inside the engine from a key store (`KeyStore.SignRecord`,
+  `Chain.WriteFromStore`) and by hybrid accounts (`SignRecordTxHybrid`);
+  the chain queue reports `tx_admitted` and `tx_removed` events.
+- `PeerMesh`, a deterministic in-memory mesh of `NetNode`s.
+- Peer records and `AddressBook`, `NoiseSession`, and the admission
+  handshake (`NewAdmissionChallenge`, `CredentialPolicy.AdmissionAnswer`,
+  `CredentialGate.AdmissionGranted`).
 
 ## 0.1.0
 

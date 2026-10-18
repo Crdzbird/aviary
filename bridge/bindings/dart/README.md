@@ -92,7 +92,9 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 - Validator rotation: `Chain.scheduleValidators`, `Chain.validators`.
 - Light clients: `newLightClient`, `acceptSkipping`, `syncTo`.
 - Networking: `newNetNode`, `NetNode`, `PeerMesh`, `SecureSession`,
-  `generateSecureIdentity`.
+  `generateSecureIdentity`, `signPeerRecord`, `AddressBook`,
+  `NoiseSession`, `generateNoiseIdentity`, and the admission handshake on
+  `CredentialGate` and `CredentialPolicy`.
 - Records: `assembleRecordChain`, `ChainRecords` (`write`, `record`,
   `proveRecord`, `addTx`), `RecordOp`, `recordFromProof`.
 - Chain trees: `TreeNode`, `buildChainTree`, `ChainTree`.
@@ -121,8 +123,11 @@ assert(bc.verifyStateProof(chain.stateRoot(), proof));
 print(bc.recordFromProof(proof).version); // 1
 ```
 
-`addTx` queues any signed, encoded transaction on any assembled chain, for
-the account and UTXO models as well.
+`writeFromStore(store, author, key, op, value)` signs inside the engine from
+a `KeyStore`, and `signRecordTxHybrid` signs with a hybrid post quantum
+account. `addTx` queues any signed, encoded transaction on any assembled
+chain, for the account and UTXO models as well, and each queued and included
+transaction arrives as a `TxAdmitted` and `TxRemoved` event.
 
 ## Events
 
