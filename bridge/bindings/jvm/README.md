@@ -25,7 +25,8 @@ java --enable-native-access=ALL-UNNAMED -cp out:demo.jar -Daviary.path="$LIB" De
 The native library is resolved by `NativeLoader`: `-Daviary.path` / env
 `AVIARY_DYLIB` (dev), else a bundled `/native/<os>-<arch>/` resource, else
 the repo `build/` dir. The dev dylib's embedded rpath resolves `libcryptolib_c`
-automatically; a packaged JAR should ship both natives side by side.
+automatically; the shipped engines are self contained, one library per
+platform.
 
 ## Surface
 
@@ -108,7 +109,7 @@ java --enable-native-access=ALL-UNNAMED -jar dist/jvm/aviary-0.1.0.jar
 
 The jar carries the compiled binding and the native engine for macOS arm64
 and Linux x64 and arm64 under `/native/<os>-<arch>/`; `NativeLoader`
-extracts the whole slot (every file in its `index.txt`) into one temporary
-directory so `libaviary_c` finds its CipherBird sibling, and `-Daviary.path`
-or `AVIARY_DYLIB` still override it. Attach the jar to a GitHub release or
+extracts the slot (every file in its `index.txt`, today one self contained
+library with CipherBird linked in) into a temporary directory, and
+`-Daviary.path` or `AVIARY_DYLIB` still override it. Attach the jar to a GitHub release or
 publish it to a Maven repository with your own coordinates.
