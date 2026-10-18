@@ -1791,3 +1791,14 @@ selectors - validated against real-world vectors). Deferred:
   an mlocked `SecureBuffer`; a public hash needs neither the lock nor the
   wipe. Measured with a patched engine: replay 2x, record writes 2x, BFT
   blocks 1.47x, snapshot restore 4x. Needs a CipherBird release.
+- **[x] Comparison with pub.dev.** No other embeddable Dart ledger engine
+  exists on pub.dev (`lunaris_engine` claims one, but its signatures hash
+  with a placeholder and its PBFT only counts quorums). `benchmarks/
+  pub_compare` measures Aviary from Dart, JIT and AOT, against `crypto`,
+  `hashlib`, `blake3_ffi`, `ed25519_edwards`, `pinenacl`, `cryptography`,
+  `pqcrypto`, `dart_merkle_lib`, and a `HandLedger` built from them. Aviary
+  leads every ledger row; it trails on small hashes because of the
+  CipherBird locked digest above (2.3 of 2.5 us per call).
+- **[ ] [M] macOS engine for `dart build cli`.** The build hook bundles the
+  engine as a code asset only on Linux and Windows; on macOS it is found
+  through the package config, which a copied AOT binary does not have.

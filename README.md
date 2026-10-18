@@ -414,6 +414,15 @@ What the numbers are and are not:
 - Every run checks its own results (proofs verify, replay reaches the same
   height, the mesh reaches the target height) and exits non zero otherwise.
 
+Against the pub.dev packages a Dart ledger would otherwise be built from
+(`crypto`, `hashlib`, `blake3_ffi`, `ed25519_edwards`, `pinenacl`,
+`cryptography`, `pqcrypto`, `dart_merkle_lib`), measured from Dart under JIT
+and AOT: [`benchmarks/pub_compare`](benchmarks/pub_compare). Admitting and
+finalizing a transfer is about 10 times cheaper than in a ledger assembled
+from the fastest of them, verifying received blocks about 30 times, and a
+hybrid post quantum transfer 13 to 15 times. Small hashes are the exception,
+for the reason given there.
+
 ## Build from source
 
 Prerequisite: CipherBird's C ABI, built once from the sibling checkout.

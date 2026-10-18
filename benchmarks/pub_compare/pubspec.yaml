@@ -1,0 +1,16 @@
+name: pub_compare
+description: Aviary against the pub.dev packages a Dart ledger would otherwise be built from.
+publish_to: none
+environment:
+  sdk: ^3.10.0
+dependencies:
+  aviary_dart:
+    path: ../../bridge/bindings/dart
+  crypto: ^3.0.7
+  hashlib: ^2.4.2
+  cryptography: ^2.9.0
+  ed25519_edwards: ^0.3.2
+  pinenacl: ^0.6.0
+  blake3_ffi: ^1.2.5
+  pqcrypto: ^0.4.3
+  dart_merkle_lib: ^1.0.1
