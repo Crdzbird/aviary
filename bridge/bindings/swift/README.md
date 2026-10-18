@@ -32,4 +32,6 @@ AVIARY_LOCAL_XCFRAMEWORKS=1 swift run AviaryDemo
 
 `scripts/apple/package_swift_release.sh swift-vX.Y.Z` zips both xcframeworks
 into `dist/swift/`, computes the checksums and writes them into the manifest;
-attach the zips to the GitHub release of that name.
+attach the zips to the GitHub release of that name. SwiftPM resolves the
+version from a plain `X.Y.Z` tag, so also tag the commit that carries those
+checksums with `X.Y.Z`; the `swift-vX.Y.Z` release only hosts the assets.
