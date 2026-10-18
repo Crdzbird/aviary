@@ -561,7 +561,7 @@ AVIARY_API int aviary_credential_gate_note_admission(
  * --------------------------------------------------------------------------- */
 
 /** A BLS validator keypair from >= 32 bytes of key material -> account blob
- *  [pub 48][sec 32]. */
+ *  [pub_len:4 BE = 48][pub 48][sec 32]. */
 AVIARY_API AviaryBufferResult aviary_bls_keygen(
     const uint8_t* ikm, size_t ikm_len);
 

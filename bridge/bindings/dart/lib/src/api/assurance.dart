@@ -6,9 +6,9 @@ extension AviaryAssurance on Aviary {
   /// Describes the posture at [level]: 1 standard, 2 hardened, 3 fortress.
   AssuranceProfile describeAssurance(int level) {
     final b = _take(
-      lib.lookupFunction<_AsDescribeC, _AsDescribeD>(
-        'aviary_assurance_describe',
-      )(level),
+      lib
+          .fn<_AsDescribeC>('aviary_assurance_describe')
+          .asFunction<_AsDescribeD>()(level),
       'assurance_describe',
     );
     return AssuranceProfile(
@@ -32,7 +32,7 @@ extension AviaryAssurance on Aviary {
   }) => _scoped(
     [body, author, signature],
     (p) => _take(
-      lib.lookupFunction<_TxEncodeC, _TxEncodeD>('aviary_tx_encode')(
+      lib.fn<_TxEncodeC>('aviary_tx_encode').asFunction<_TxEncodeD>()(
         version,
         chainId,
         sigAlgo,
@@ -52,7 +52,7 @@ extension AviaryAssurance on Aviary {
   Uint8List sealTx(Uint8List txEncoded, Uint8List proposerKemPublic) => _scoped(
     [txEncoded, proposerKemPublic],
     (p) => _take(
-      lib.lookupFunction<_Buf2C, _Buf2D>('aviary_sealed_tx_seal')(
+      lib.fn<_Buf2C>('aviary_sealed_tx_seal').asFunction<_Buf2D>()(
         p[0],
         txEncoded.length,
         p[1],
@@ -64,9 +64,10 @@ extension AviaryAssurance on Aviary {
 
   /// Opens a sealed mempool with room for [capacity] transactions.
   SealedMempool makeSealedMempool(int capacity) {
-    final h = lib.lookupFunction<_SmNewC, _SmNewD>('aviary_sealed_mempool_new')(
-      capacity,
-    );
+    final h =
+        lib.fn<_SmNewC>('aviary_sealed_mempool_new').asFunction<_SmNewD>()(
+          capacity,
+        );
     return SealedMempool._(this, _requireHandle(h, 'sealed mempool creation'));
   }
 }

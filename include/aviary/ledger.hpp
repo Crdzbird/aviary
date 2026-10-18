@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "aviary/signature_cache.hpp"
 #include "aviary/state.hpp"
 #include "aviary/subchain.hpp"
 #include "aviary/types.hpp"
@@ -75,6 +76,10 @@ class Ledger {
   const BlockHeader& tip() const { return tip_; }
   const StateMachine& state() const { return *state_; }
 
+  /// Signatures this ledger already verified, shared with a mempool that
+  /// feeds it so a transaction is verified once on its way into a block.
+  std::shared_ptr<SignatureCache> signature_cache() const { return sig_cache_; }
+
   /// Execution receipts of the most recently committed block (empty if that
   /// block was version 1 / carried no receipts). Lets a prover build a
   /// receipt-inclusion proof against the committed receipt_root.
@@ -124,6 +129,7 @@ class Ledger {
   BlockHeader tip_;
   std::vector<Receipt> last_receipts_;
   std::optional<SubchainRegistry> registry_;  // parent chains only
+  std::shared_ptr<SignatureCache> sig_cache_ = std::make_shared<SignatureCache>();
 };
 
 }  // namespace aviary

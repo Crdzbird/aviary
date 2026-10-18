@@ -44,7 +44,8 @@ AddResult Mempool::add(const Transaction& tx, std::uint64_t chain_id) {
   const Hash id = tx.txid();
   if (pool_.count(id) != 0) return AddResult::kDuplicate;
 
-  if (!verify_transaction_signature(tx)) return AddResult::kInvalidSignature;
+  const bool signed_ok = sig_cache_ ? sig_cache_->verify(tx, tx_leaf_hash(enc)) : verify_transaction_signature(tx);
+  if (!signed_ok) return AddResult::kInvalidSignature;
 
   // Per-account cap: one sender cannot flood the pool and starve others.
   const std::optional<Hash> bucket = sender_bucket(tx);

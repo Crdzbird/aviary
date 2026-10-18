@@ -18,9 +18,9 @@ extension AviaryGenesis on Aviary {
       (pow) => _scoped(
         [_concat(accounts.map((a) => a.address)), _publicKeys(validators)],
         (p) => _take(
-          lib.lookupFunction<_GenesisBuildC, _GenesisBuildD>(
-            'aviary_genesis_build',
-          )(
+          lib
+              .fn<_GenesisBuildC>('aviary_genesis_build')
+              .asFunction<_GenesisBuildD>()(
             chainId,
             timestamp,
             assuranceLevel,
@@ -49,7 +49,7 @@ extension AviaryGenesis on Aviary {
   Uint8List _bufOp(String fn, Uint8List a) => _scoped(
     [a],
     (p) => _take(
-      lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(fn)(p[0], a.length),
+      lib.fn<_BufOfBytesC>(fn).asFunction<_BufOfBytesD>()(p[0], a.length),
       fn,
     ),
   );
@@ -57,7 +57,7 @@ extension AviaryGenesis on Aviary {
   Uint8List _buf2Op(String fn, Uint8List a, Uint8List b) => _scoped(
     [a, b],
     (p) => _take(
-      lib.lookupFunction<_Buf2C, _Buf2D>(fn)(p[0], a.length, p[1], b.length),
+      lib.fn<_Buf2C>(fn).asFunction<_Buf2D>()(p[0], a.length, p[1], b.length),
       fn,
     ),
   );

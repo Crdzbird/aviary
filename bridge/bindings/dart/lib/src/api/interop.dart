@@ -3,9 +3,12 @@ part of '../../aviary.dart';
 /// Multi chain address derivation and EVM calldata helpers.
 /// {@category Interop}
 extension AviaryInterop on Aviary {
-  String _addr(String fn, Uint8List secret) => _scoped([
-    secret,
-  ], (p) => _takeStr(lib.lookupFunction<_BufOfPtrC, _BufOfPtrD>(fn)(p[0]), fn));
+  String _addr(String fn, Uint8List secret) => _scoped(
+    [
+      secret,
+    ],
+    (p) => _takeStr(lib.fn<_BufOfPtrC>(fn).asFunction<_BufOfPtrD>()(p[0]), fn),
+  );
 
   /// The Ethereum address of a 32 byte secp256k1 secret.
   String ethAddress(Uint8List secret32) =>
@@ -23,7 +26,7 @@ extension AviaryInterop on Aviary {
   Uint8List ethErc20TransferCalldata(Uint8List to20, int amount) => _scoped(
     [to20],
     (p) => _take(
-      lib.lookupFunction<_Erc20C, _Erc20D>('aviary_eth_erc20_transfer')(
+      lib.fn<_Erc20C>('aviary_eth_erc20_transfer').asFunction<_Erc20D>()(
         p[0],
         amount,
       ),
@@ -35,7 +38,7 @@ extension AviaryInterop on Aviary {
   Uint8List ethSelector(String signature) => _withUtf8(
     signature,
     (s) => _take(
-      lib.lookupFunction<_SelectorC, _SelectorD>('aviary_eth_selector')(s),
+      lib.fn<_SelectorC>('aviary_eth_selector').asFunction<_SelectorD>()(s),
       'ethSelector',
     ),
   );
@@ -56,9 +59,9 @@ extension AviaryInterop on Aviary {
     return _scoped(
       [to ?? Uint8List(0), data ?? Uint8List(0), secret32],
       (p) => _take(
-        lib.lookupFunction<_SignLegacyC, _SignLegacyD>(
-          'aviary_eth_sign_legacy',
-        )(
+        lib
+            .fn<_SignLegacyC>('aviary_eth_sign_legacy')
+            .asFunction<_SignLegacyD>()(
           nonce,
           gasPrice,
           gasLimit,

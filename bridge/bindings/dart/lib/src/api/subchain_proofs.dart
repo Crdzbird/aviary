@@ -21,7 +21,7 @@ extension AviarySubchainProofs on Aviary {
     return _scoped(
       [blob],
       (p) => _take(
-        lib.lookupFunction<_ScAnchorC, _ScAnchorD>('aviary_anchor_encode')(
+        lib.fn<_ScAnchorC>('aviary_anchor_encode').asFunction<_ScAnchorD>()(
           childChainId,
           p[0],
           blob.length,
@@ -42,9 +42,9 @@ extension AviarySubchainProofs on Aviary {
     return _scoped(
       [parentSubchainRoot, proof],
       (p) =>
-          lib.lookupFunction<_VerifyC, _VerifyD>(
-            'aviary_subchain_proof_verify',
-          )(p[0], p[1], proof.length) ==
+          lib
+              .fn<_VerifyC>('aviary_subchain_proof_verify')
+              .asFunction<_VerifyD>()(p[0], p[1], proof.length) ==
           1,
     );
   }
@@ -60,16 +60,16 @@ extension ChainSubchains on Chain {
     return _scoped(
       [blob],
       (p) => _bc._take(
-        _bc.lib.lookupFunction<_ScChainAnchoredC, _ScChainAnchoredD>(
-          'aviary_chain_propose_anchored',
-        )(_h, timestamp, p[0], blob.length),
+        _bc.lib
+            .fn<_ScChainAnchoredC>('aviary_chain_propose_anchored')
+            .asFunction<_ScChainAnchoredD>()(_h, timestamp, p[0], blob.length),
         'chain_propose_anchored',
       ),
     );
   }
 
   Uint8List _byChild(String fn, int childChainId) => _bc._take(
-    _bc.lib.lookupFunction<_ScChainIdC, _ScChainIdD>(fn)(_h, childChainId),
+    _bc.lib.fn<_ScChainIdC>(fn).asFunction<_ScChainIdD>()(_h, childChainId),
     fn,
   );
 
@@ -85,9 +85,9 @@ extension ChainSubchains on Chain {
   Uint8List proveAccount(Uint8List address) => _scoped(
     [address],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_ScChainAddrC, _ScChainAddrD>(
-        'aviary_chain_prove_account',
-      )(_h, p[0]),
+      _bc.lib
+          .fn<_ScChainAddrC>('aviary_chain_prove_account')
+          .asFunction<_ScChainAddrD>()(_h, p[0]),
       'chain_prove_account',
     ),
   );

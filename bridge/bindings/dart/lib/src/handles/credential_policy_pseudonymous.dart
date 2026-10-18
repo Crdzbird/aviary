@@ -8,7 +8,7 @@ extension CredentialPolicyPseudonymous on CredentialPolicy {
   Uint8List membershipCommit(Uint8List memberSecret) => _scoped(
     [encoded, memberSecret],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_Buf2C, _Buf2D>('aviary_membership_commit')(
+      _bc.lib.fn<_Buf2C>('aviary_membership_commit').asFunction<_Buf2D>()(
         p[0],
         encoded.length,
         p[1],
@@ -28,7 +28,7 @@ extension CredentialPolicyPseudonymous on CredentialPolicy {
   ) => _scoped(
     [encoded, issuerSecret, commitment],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_BlindIssueC, _BlindIssueD>('aviary_blind_issue')(
+      _bc.lib.fn<_BlindIssueC>('aviary_blind_issue').asFunction<_BlindIssueD>()(
         p[0],
         encoded.length,
         p[1],
@@ -54,9 +54,9 @@ extension CredentialPolicyPseudonymous on CredentialPolicy {
     (sp) => _scoped(
       [encoded, credential, challenge],
       (p) => _bc._take(
-        _bc.lib.lookupFunction<_CredPresentC, _CredPresentD>(
-          'aviary_credential_present_pseudonymous',
-        )(
+        _bc.lib
+            .fn<_CredPresentC>('aviary_credential_present_pseudonymous')
+            .asFunction<_CredPresentD>()(
           p[0],
           encoded.length,
           p[1],

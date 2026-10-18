@@ -18,9 +18,9 @@ extension AviaryTrees on Aviary {
         (pw) => _scoped(
           [bp, _concat(n.accounts.map((a) => a.address)), pks, secrets, kids],
           (p) => _take(
-            lib.lookupFunction<_TreeNodeC, _TreeNodeD>(
-              'aviary_chain_tree_node_encode',
-            )(
+            lib
+                .fn<_TreeNodeC>('aviary_chain_tree_node_encode')
+                .asFunction<_TreeNodeD>()(
               n.chainId,
               p[0],
               bp.length,
@@ -55,9 +55,9 @@ extension AviaryTrees on Aviary {
     final err = chainTreeSpecError(spec);
     if (err.isNotEmpty) throw StateError('chain tree: $err');
     return _scoped([spec], (p) {
-      final h = lib.lookupFunction<_TreeBuildC, _TreeBuildD>(
-        'aviary_chain_tree_build',
-      )(p[0], spec.length);
+      final h = lib
+          .fn<_TreeBuildC>('aviary_chain_tree_build')
+          .asFunction<_TreeBuildD>()(p[0], spec.length);
       if (h == nullptr) throw StateError('chain tree: build rejected');
       return ChainTree._(this, h);
     });

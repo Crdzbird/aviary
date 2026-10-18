@@ -10,9 +10,9 @@ extension ChainRecords on Chain {
   Uint8List addTx(Uint8List tx) => _blockOp('aviary_chain_add_tx', tx);
 
   /// Transactions waiting for the next proposal.
-  int get pendingCount => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(
-    'aviary_chain_pending_count',
-  )(_h);
+  int get pendingCount => _bc.lib
+      .fn<_U64OfHandleC>('aviary_chain_pending_count')
+      .asFunction<_U64OfHandleD>()(_h);
 
   /// Signs and queues a record write from a 64 byte Ed25519 [secret]; the
   /// nonce is taken from the chain, so several writes can be queued at once.
@@ -68,9 +68,9 @@ extension ChainRecords on Chain {
   /// The next nonce [address] must use, counting queued writes.
   int recordNonce(Uint8List address) => _scoped(
     [address],
-    (p) => _bc.lib.lookupFunction<_RecAddrU64C, _RecAddrU64D>(
-      'aviary_chain_record_nonce',
-    )(_h, p[0]),
+    (p) => _bc.lib
+        .fn<_RecAddrU64C>('aviary_chain_record_nonce')
+        .asFunction<_RecAddrU64D>()(_h, p[0]),
   );
 
   /// A state inclusion proof for the record at [key]; verify it with
@@ -81,7 +81,7 @@ extension ChainRecords on Chain {
   Uint8List _byKey(String fn, Uint8List key) => _scoped(
     [key],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_ScChainAddrC, _ScChainAddrD>(fn)(_h, p[0]),
+      _bc.lib.fn<_ScChainAddrC>(fn).asFunction<_ScChainAddrD>()(_h, p[0]),
       fn,
     ),
   );

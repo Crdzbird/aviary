@@ -8,7 +8,7 @@ extension AviaryCredentials on Aviary {
     [keyMaterial],
     (p) => _splitKeyBlob(
       _take(
-        lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_bbs_keygen')(
+        lib.fn<_BufOfBytesC>('aviary_bbs_keygen').asFunction<_BufOfBytesD>()(
           p[0],
           keyMaterial.length,
         ),
@@ -28,9 +28,9 @@ extension AviaryCredentials on Aviary {
     int mode = 0,
   }) => _scoped([issuerPublic, header], (p) {
     final enc = mode == 0
-        ? lib.lookupFunction<_CredPolicyEncodeC, _CredPolicyEncodeD>(
-            'aviary_credential_policy_encode',
-          )(
+        ? lib
+              .fn<_CredPolicyEncodeC>('aviary_credential_policy_encode')
+              .asFunction<_CredPolicyEncodeD>()(
             chainId,
             p[0],
             issuerPublic.length,
@@ -39,9 +39,9 @@ extension AviaryCredentials on Aviary {
             attributeCount,
             minTier,
           )
-        : lib.lookupFunction<_CredPolicyEncodeExC, _CredPolicyEncodeExD>(
-            'aviary_credential_policy_encode_ex',
-          )(
+        : lib
+              .fn<_CredPolicyEncodeExC>('aviary_credential_policy_encode_ex')
+              .asFunction<_CredPolicyEncodeExD>()(
             chainId,
             p[0],
             issuerPublic.length,
@@ -57,9 +57,9 @@ extension AviaryCredentials on Aviary {
   /// Opens a verifier's admission gate enforcing [policy].
   CredentialGate makeCredentialGate(CredentialPolicy policy) =>
       _scoped([policy.encoded], (p) {
-        final h = lib.lookupFunction<_CredGateNewC, _CredGateNewD>(
-          'aviary_credential_gate_new',
-        )(p[0], policy.encoded.length);
+        final h = lib
+            .fn<_CredGateNewC>('aviary_credential_gate_new')
+            .asFunction<_CredGateNewD>()(p[0], policy.encoded.length);
         return CredentialGate._(
           this,
           _requireHandle(h, 'credential gate creation'),
@@ -73,7 +73,7 @@ extension AviaryCredentials on Aviary {
   ) => _scoped(
     [membershipCommit, blindIssuance],
     (p) => _take(
-      lib.lookupFunction<_Buf2C, _Buf2D>('aviary_finalize_membership')(
+      lib.fn<_Buf2C>('aviary_finalize_membership').asFunction<_Buf2D>()(
         p[0],
         membershipCommit.length,
         p[1],

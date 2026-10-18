@@ -13,9 +13,17 @@ final class KeyStore extends _NativeHandle {
     final pa = calloc<Uint8>(32);
     try {
       _scoped([publicKey, secret], (p) {
-        final rc = _lib.lookupFunction<_KsAddC, _KsAddD>(
-          'aviary_keystore_add_account',
-        )(_h, p[0], publicKey.length, p[1], secret.length, pa);
+        final rc =
+            _lib
+                .fn<_KsAddC>('aviary_keystore_add_account')
+                .asFunction<_KsAddD>()(
+              _h,
+              p[0],
+              publicKey.length,
+              p[1],
+              secret.length,
+              pa,
+            );
         if (rc != 0) throw const AviaryException('keystore add failed');
       });
       return Uint8List.fromList(pa.asTypedList(32));
@@ -28,26 +36,26 @@ final class KeyStore extends _NativeHandle {
   Uint8List reveal(Uint8List address) => _scoped(
     [address],
     (p) => _bc._take(
-      _lib.lookupFunction<_BufNodeAddrC, _BufNodeAddrD>(
-        'aviary_keystore_reveal',
-      )(_h, p[0]),
+      _lib
+          .fn<_BufNodeAddrC>('aviary_keystore_reveal')
+          .asFunction<_BufNodeAddrD>()(_h, p[0]),
       'keystore_reveal',
     ),
   );
 
   /// The persistable encrypted blob.
   Uint8List serialise() => _bc._take(
-    _lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(
-      'aviary_keystore_serialise',
-    )(_h),
+    _lib
+        .fn<_BufOfHandleC>('aviary_keystore_serialise')
+        .asFunction<_BufOfHandleD>()(_h),
     'keystore_serialise',
   );
 
   /// Recovers the master key from [passphrase]. Throws when it is wrong.
   void unlock(String passphrase) => _withUtf8(passphrase, (cp) {
-    final rc = _lib.lookupFunction<_KsUnlockC, _KsUnlockD>(
-      'aviary_keystore_unlock',
-    )(_h, cp);
+    final rc = _lib
+        .fn<_KsUnlockC>('aviary_keystore_unlock')
+        .asFunction<_KsUnlockD>()(_h, cp);
     if (rc != 0) {
       throw const AviaryException('keystore unlock failed');
     }
@@ -55,9 +63,9 @@ final class KeyStore extends _NativeHandle {
 
   /// Whether secrets can currently be revealed.
   bool get unlocked =>
-      _lib.lookupFunction<_IntOfHandleC, _IntOfHandleD>(
-        'aviary_keystore_unlocked',
-      )(_h) ==
+      _lib
+          .fn<_IntOfHandleC>('aviary_keystore_unlocked')
+          .asFunction<_IntOfHandleD>()(_h) ==
       1;
 
   /// Releases the native store.

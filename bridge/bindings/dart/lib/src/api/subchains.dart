@@ -19,9 +19,9 @@ extension AviarySubchains on Aviary {
     (pw) => _scoped(
       [genesisHeader, _publicKeys(validators)],
       (p) => _take(
-        lib.lookupFunction<_ScChildRegC, _ScChildRegD>(
-          'aviary_child_registration_encode',
-        )(
+        lib
+            .fn<_ScChildRegC>('aviary_child_registration_encode')
+            .asFunction<_ScChildRegD>()(
           chainId,
           p[0],
           genesisHeader.length,
@@ -48,9 +48,9 @@ extension AviarySubchains on Aviary {
     return _scoped(
       [blob],
       (p) => _take(
-        lib.lookupFunction<_ScPolicyC, _ScPolicyD>(
-          'aviary_subchain_policy_encode',
-        )(
+        lib
+            .fn<_ScPolicyC>('aviary_subchain_policy_encode')
+            .asFunction<_ScPolicyD>()(
           maxChildren,
           maxDepth,
           maxAnchorsPerBlock,
@@ -75,9 +75,9 @@ extension AviarySubchains on Aviary {
   ) => _scoped(
     [genesis, parentGenesisHash],
     (p) => _take(
-      lib.lookupFunction<_ScBindingC, _ScBindingD>(
-        'aviary_genesis_commit_parent_binding',
-      )(p[0], genesis.length, parentChainId, p[1]),
+      lib
+          .fn<_ScBindingC>('aviary_genesis_commit_parent_binding')
+          .asFunction<_ScBindingD>()(p[0], genesis.length, parentChainId, p[1]),
       'genesis_commit_parent_binding',
     ),
   );

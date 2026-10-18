@@ -18,7 +18,7 @@ extension KeyStoreSigning on KeyStore {
   }) => _scoped(
     [from, to],
     (p) => _bc._take(
-      _lib.lookupFunction<_KsSignC, _KsSignD>('aviary_keystore_sign_transfer')(
+      _lib.fn<_KsSignC>('aviary_keystore_sign_transfer').asFunction<_KsSignD>()(
         _h,
         chainId,
         p[0],
@@ -42,9 +42,9 @@ extension KeyStoreSigning on KeyStore {
     required RecordOp op,
     required Uint8List value,
   }) => _scoped([from, key, value], (p) {
-    final f = _lib.lookupFunction<_KsSignRecC, _KsSignRecD>(
-      'aviary_keystore_sign_record',
-    );
+    final f = _lib
+        .fn<_KsSignRecC>('aviary_keystore_sign_record')
+        .asFunction<_KsSignRecD>();
     final r = f(_h, chainId, p[0], nonce, p[1], op.index, p[2], value.length);
     return _bc._take(r, 'keystore_sign_record');
   });
@@ -53,9 +53,9 @@ extension KeyStoreSigning on KeyStore {
   Uint8List publicKey(Uint8List address) => _scoped(
     [address],
     (p) => _bc._take(
-      _lib.lookupFunction<_BufNodeAddrC, _BufNodeAddrD>(
-        'aviary_keystore_public_key',
-      )(_h, p[0]),
+      _lib
+          .fn<_BufNodeAddrC>('aviary_keystore_public_key')
+          .asFunction<_BufNodeAddrD>()(_h, p[0]),
       'keystore_public_key',
     ),
   );
@@ -64,7 +64,7 @@ extension KeyStoreSigning on KeyStore {
   bool has(Uint8List address) => _scoped(
     [address],
     (p) =>
-        _lib.lookupFunction<_KsHasC, _KsHasD>('aviary_keystore_has')(
+        _lib.fn<_KsHasC>('aviary_keystore_has').asFunction<_KsHasD>()(
           _h,
           p[0],
         ) ==
@@ -74,15 +74,15 @@ extension KeyStoreSigning on KeyStore {
   /// Every stored address.
   List<Uint8List> addresses() => _splitBlobList(
     _bc._take(
-      _lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(
-        'aviary_keystore_addresses',
-      )(_h),
+      _lib
+          .fn<_BufOfHandleC>('aviary_keystore_addresses')
+          .asFunction<_BufOfHandleD>()(_h),
       'keystore_addresses',
     ),
   );
 
   /// Forgets the master key until the next [KeyStore.unlock].
-  void lock() => _lib.lookupFunction<_HandleFreeC, _HandleFreeD>(
-    'aviary_keystore_lock',
-  )(_h);
+  void lock() => _lib
+      .fn<_HandleFreeC>('aviary_keystore_lock')
+      .asFunction<_HandleFreeD>()(_h);
 }

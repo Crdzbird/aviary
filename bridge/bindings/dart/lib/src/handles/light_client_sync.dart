@@ -12,13 +12,14 @@ extension AviaryLightClients on Aviary {
   ) {
     final vs = _encodeValidatorSet(validators);
     return _scoped([vs, trustedHeader], (p) {
-      final h = lib.lookupFunction<_LcNewC, _LcNewD>('aviary_light_client_new')(
-        chainId,
-        p[0],
-        vs.length,
-        p[1],
-        trustedHeader.length,
-      );
+      final h =
+          lib.fn<_LcNewC>('aviary_light_client_new').asFunction<_LcNewD>()(
+            chainId,
+            p[0],
+            vs.length,
+            p[1],
+            trustedHeader.length,
+          );
       if (h == nullptr) return null;
       return LightClient._(this, h);
     });

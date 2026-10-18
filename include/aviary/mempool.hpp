@@ -3,9 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <optional>
 #include <vector>
 
+#include "aviary/signature_cache.hpp"
 #include "aviary/state.hpp"
 #include "aviary/types.hpp"
 
@@ -68,6 +70,11 @@ class Mempool {
   AddResult add(const Transaction& tx, std::uint64_t chain_id, std::uint32_t epoch,
                 crypto::ByteView challenge, crypto::ByteView presentation, std::uint64_t now);
 
+  /// Verify signatures through [cache] (normally the ledger's), so a
+  /// transaction admitted here is not verified again when its block is built
+  /// and applied. Null verifies every time.
+  void set_signature_cache(std::shared_ptr<SignatureCache> cache) { sig_cache_ = std::move(cache); }
+
   bool contains(const Hash& txid) const { return pool_.count(txid) != 0; }
   std::size_t size() const { return pool_.size(); }
 
@@ -99,6 +106,7 @@ class Mempool {
   // Pending-tx count per sender address (BLAKE3(author)), for the per-account
   // cap. Only tracks txs with a non-empty author.
   std::map<Hash, std::size_t> per_account_;
+  std::shared_ptr<SignatureCache> sig_cache_;
   observe::EventBus* bus_ = nullptr;
   const consensus::CredentialGate* gate_ = nullptr;
 };

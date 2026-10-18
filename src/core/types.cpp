@@ -245,13 +245,15 @@ Receipt Receipt::decode_all(codec::ByteView bytes) {
 
 // -- Free functions -----------------------------------------------------------
 
+Hash tx_leaf_hash(const Bytes& encoded) { return crypto::hash_tagged(crypto::Domain::kLeaf, encoded); }
+
+Hash tx_root_from_leaves(const std::vector<Hash>& leaves) { return merkle::compute_root(leaves); }
+
 Hash compute_tx_root(const std::vector<Transaction>& txs) {
   std::vector<Hash> leaves;
   leaves.reserve(txs.size());
-  for (const auto& tx : txs) {
-    leaves.push_back(crypto::hash_tagged(crypto::Domain::kLeaf, tx.encode()));
-  }
-  return merkle::compute_root(leaves);
+  for (const auto& tx : txs) leaves.push_back(tx_leaf_hash(tx.encode()));
+  return tx_root_from_leaves(leaves);
 }
 
 Hash compute_receipt_root(const std::vector<Receipt>& receipts) {

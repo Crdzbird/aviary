@@ -21,7 +21,7 @@ final class Aviary {
   /// Wraps an already resolved [lib] and runs the one time native init.
   static Aviary fromLibrary(DynamicLibrary lib, [String? path]) {
     final bc = Aviary._(lib, path);
-    final rc = lib.lookupFunction<_IntVoid, int Function()>('aviary_init');
+    final rc = lib.fn<_IntVoid>('aviary_init').asFunction<int Function()>();
     if (rc() != 0) throw const AviaryException('init failed');
     return bc;
   }

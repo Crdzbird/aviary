@@ -14,7 +14,7 @@ extension AviaryRecords on Aviary {
   }) => _scoped(
     [key, value, secret],
     (p) => _take(
-      lib.lookupFunction<_RecSignC, _RecSignD>('aviary_record_tx_sign')(
+      lib.fn<_RecSignC>('aviary_record_tx_sign').asFunction<_RecSignD>()(
         chainId,
         nonce,
         p[0],
@@ -39,9 +39,9 @@ extension AviaryRecords on Aviary {
     required Uint8List publicKey,
     required Uint8List secret,
   }) => _scoped([key, value, publicKey, secret], (p) {
-    final f = lib.lookupFunction<_RecSignHybC, _RecSignHybD>(
-      'aviary_record_tx_sign_hybrid',
-    );
+    final f = lib
+        .fn<_RecSignHybC>('aviary_record_tx_sign_hybrid')
+        .asFunction<_RecSignHybD>();
     final r = f(
       chainId,
       nonce,
@@ -61,7 +61,7 @@ extension AviaryRecords on Aviary {
   Uint8List addressOf(Uint8List publicKey) => _scoped(
     [publicKey],
     (p) => _take(
-      lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_address_of')(
+      lib.fn<_BufOfBytesC>('aviary_address_of').asFunction<_BufOfBytesD>()(
         p[0],
         publicKey.length,
       ),
@@ -75,9 +75,9 @@ extension AviaryRecords on Aviary {
     (p) =>
         _decodeRecord(
               _take(
-                lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-                  'aviary_record_from_proof',
-                )(p[0], proof.length),
+                lib
+                    .fn<_BufOfBytesC>('aviary_record_from_proof')
+                    .asFunction<_BufOfBytesD>()(p[0], proof.length),
                 'record_from_proof',
               ),
               withKey: true,

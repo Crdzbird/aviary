@@ -72,6 +72,8 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
   const bool with_receipts = spec_.produce_receipts || registry_.has_value();  // v3 implies v2's receipts
   auto working = state_->clone();
   std::vector<Receipt> receipts;
+  std::vector<Hash> leaves;
+  leaves.reserve(txs.size());
   for (const auto& tx : txs) {
     if (tx.chain_id != spec_.chain_id) {
       throw std::runtime_error("build_block: tx chain_id mismatch");
@@ -79,7 +81,8 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
     if (!spec_.accepts(tx.algo())) {
       throw std::runtime_error("build_block: signature scheme not accepted by chain");
     }
-    if (!verify_transaction_signature(tx)) {
+    leaves.push_back(tx_leaf_hash(tx.encode()));
+    if (!sig_cache_->verify(tx, leaves.back())) {
       throw std::runtime_error("build_block: bad signature");
     }
     const ValidationResult vr = working->validate(tx);
@@ -94,7 +97,7 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
   block.header.height = tip_.height + 1;
   block.header.parent_hash = tip_.hash();
   block.header.timestamp = timestamp;
-  block.header.tx_root = compute_tx_root(txs);
+  block.header.tx_root = tx_root_from_leaves(leaves);
   block.header.state_root = working->state_root();
   if (with_receipts) block.header.receipt_root = compute_receipt_root(receipts);
   if (reg) {
@@ -117,7 +120,10 @@ BlockError Ledger::run_block(const Block& block, Worked& out) const {
   }
 
   // 3. Recompute and compare the transaction root.
-  if (compute_tx_root(block.transactions) != block.header.tx_root) {
+  std::vector<Hash> leaves;
+  leaves.reserve(block.transactions.size());
+  for (const auto& tx : block.transactions) leaves.push_back(tx_leaf_hash(tx.encode()));
+  if (tx_root_from_leaves(leaves) != block.header.tx_root) {
     return BlockError::failure("tx_root mismatch");
   }
 
@@ -140,14 +146,15 @@ BlockError Ledger::run_block(const Block& block, Worked& out) const {
   out.state = state_->clone();
   const bool with_receipts = block.header.version >= 2;
   out.receipts.clear();
-  for (const auto& tx : block.transactions) {
+  for (std::size_t i = 0; i < block.transactions.size(); ++i) {
+    const Transaction& tx = block.transactions[i];
     if (tx.chain_id != spec_.chain_id) {
       return BlockError::failure("tx chain_id mismatch");
     }
     if (!spec_.accepts(tx.algo())) {
       return BlockError::failure("signature scheme not accepted by chain");
     }
-    if (!verify_transaction_signature(tx)) {
+    if (!sig_cache_->verify(tx, leaves[i])) {
       return BlockError::failure("invalid tx signature");
     }
     const ValidationResult vr = out.state->validate(tx);

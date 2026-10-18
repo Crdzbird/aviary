@@ -14,14 +14,14 @@ final class NoiseSession extends _NativeHandle {
     : super(bc, h, 'aviary_noise_free');
 
   Uint8List _buf(String fn) => _bc._take(
-    _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
+    _bc.lib.fn<_BufOfHandleC>(fn).asFunction<_BufOfHandleD>()(_h),
     fn,
   );
 
   Uint8List _op(String fn, Uint8List input) => _scoped(
     [input],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_ChainBlockC, _ChainBlockD>(fn)(
+      _bc.lib.fn<_ChainBlockC>(fn).asFunction<_ChainBlockD>()(
         _h,
         p[0],
         input.length,
@@ -33,7 +33,7 @@ final class NoiseSession extends _NativeHandle {
   void _check(String fn, Uint8List input, String what) {
     final rc = _scoped(
       [input],
-      (p) => _bc.lib.lookupFunction<_HandleBytesIntC, _HandleBytesIntD>(fn)(
+      (p) => _bc.lib.fn<_HandleBytesIntC>(fn).asFunction<_HandleBytesIntD>()(
         _h,
         p[0],
         input.length,
@@ -67,7 +67,7 @@ final class NoiseSession extends _NativeHandle {
 
   /// Whether the handshake is done and the peer's proof verified.
   bool get isOpen =>
-      _bc.lib.lookupFunction<_HandleFlagC, _HandleFlagD>('aviary_noise_open')(
+      _bc.lib.fn<_HandleFlagC>('aviary_noise_open').asFunction<_HandleFlagD>()(
         _h,
       ) ==
       1;

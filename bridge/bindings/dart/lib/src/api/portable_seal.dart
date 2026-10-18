@@ -7,9 +7,9 @@ extension AviaryPortableSeal on Aviary {
   PortableAccount hybridKemKeypair() {
     final kp = _splitKeyBlob(
       _take(
-        lib.lookupFunction<_KemKeygenC, _KemKeygenD>(
-          'aviary_hybrid_kem_keygen',
-        )(),
+        lib
+            .fn<_KemKeygenC>('aviary_hybrid_kem_keygen')
+            .asFunction<_KemKeygenD>()(),
         'hybrid_kem_keygen',
       ),
     );
@@ -29,9 +29,17 @@ extension AviaryPortableSeal on Aviary {
     (cp) => _scoped(
       [public, secret],
       (p) => _take(
-        lib.lookupFunction<_PSealPassC, _PSealPassD>(
-          'aviary_portable_seal_passphrase',
-        )(p[0], public.length, p[1], secret.length, cp, ops, mem),
+        lib
+            .fn<_PSealPassC>('aviary_portable_seal_passphrase')
+            .asFunction<_PSealPassD>()(
+          p[0],
+          public.length,
+          p[1],
+          secret.length,
+          cp,
+          ops,
+          mem,
+        ),
         'portable_seal_passphrase',
       ),
     ),
@@ -45,7 +53,7 @@ extension AviaryPortableSeal on Aviary {
   ) => _scoped(
     [public, secret, recipientKemPublic],
     (p) => _take(
-      lib.lookupFunction<_PSealToC, _PSealToD>('aviary_portable_seal_to')(
+      lib.fn<_PSealToC>('aviary_portable_seal_to').asFunction<_PSealToD>()(
         p[0],
         public.length,
         p[1],
@@ -67,9 +75,9 @@ extension AviaryPortableSeal on Aviary {
   ) => _scoped(
     [public, secret, recipientKemPublic, senderSigSecret],
     (p) => _take(
-      lib.lookupFunction<_PSealSignedC, _PSealSignedD>(
-        'aviary_portable_seal_signed_to',
-      )(
+      lib
+          .fn<_PSealSignedC>('aviary_portable_seal_signed_to')
+          .asFunction<_PSealSignedD>()(
         p[0],
         public.length,
         p[1],

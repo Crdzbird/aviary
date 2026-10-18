@@ -28,6 +28,11 @@ abstract class _NativeHandle implements Finalizable {
     if (_released) return;
     _released = true;
     _finalizerFor(_bc.lib, _freeSymbol).detach(this);
-    _bc.lib.lookupFunction<_HandleFreeC, _HandleFreeD>(_freeSymbol)(_h);
+    _bc.lib.fn<_HandleFreeC>(_freeSymbol).asFunction<_HandleFreeD>()(_h);
   }
+}
+
+Pointer<Void> _requireHandle(Pointer<Void> h, String what) {
+  if (h == nullptr) throw AviaryException('$what failed');
+  return h;
 }

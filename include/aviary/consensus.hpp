@@ -100,10 +100,13 @@ Vote sign_vote(std::uint64_t chain_id, std::uint64_t height, std::uint32_t round
 
 /// Build a commit certificate from collected votes for the same
 /// (height, round, block_id). Invalid or duplicate votes are dropped; returns
-/// nullopt if the valid signing power does not reach quorum.
+/// nullopt if the valid signing power does not reach quorum. [votes_verified]
+/// skips the per vote signature check for votes whose signatures the caller
+/// already verified against this exact (height, round, block_id).
 std::optional<CommitCertificate> aggregate_commit(
     std::uint64_t chain_id, const ValidatorSet& vset, std::uint64_t height,
-    std::uint32_t round, const Hash& block_id, const std::vector<Vote>& votes);
+    std::uint32_t round, const Hash& block_id, const std::vector<Vote>& votes,
+    bool votes_verified = false);
 
 /// Verify a commit certificate: well-formed signer list, quorum power, and a
 /// valid BLS aggregate signature. Never throws.

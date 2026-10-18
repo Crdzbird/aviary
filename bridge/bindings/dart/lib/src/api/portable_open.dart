@@ -18,9 +18,9 @@ extension AviaryPortableOpen on Aviary {
       [envelope],
       (p) => _account(
         _take(
-          lib.lookupFunction<_POpenPassC, _POpenPassD>(
-            'aviary_portable_open_passphrase',
-          )(p[0], envelope.length, cp),
+          lib
+              .fn<_POpenPassC>('aviary_portable_open_passphrase')
+              .asFunction<_POpenPassD>()(p[0], envelope.length, cp),
           'portable_open_passphrase',
         ),
       ),
@@ -35,7 +35,7 @@ extension AviaryPortableOpen on Aviary {
     [envelope, recipientKemSecret],
     (p) => _account(
       _take(
-        lib.lookupFunction<_Buf2C, _Buf2D>('aviary_portable_open_to')(
+        lib.fn<_Buf2C>('aviary_portable_open_to').asFunction<_Buf2D>()(
           p[0],
           envelope.length,
           p[1],
@@ -56,9 +56,9 @@ extension AviaryPortableOpen on Aviary {
     [envelope, recipientKemSecret, senderSigPublic],
     (p) => _account(
       _take(
-        lib.lookupFunction<_POpenSignedC, _POpenSignedD>(
-          'aviary_portable_open_signed_from',
-        )(
+        lib
+            .fn<_POpenSignedC>('aviary_portable_open_signed_from')
+            .asFunction<_POpenSignedD>()(
           p[0],
           envelope.length,
           p[1],

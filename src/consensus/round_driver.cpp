@@ -46,6 +46,13 @@ Hash RoundDriver::get_value() {
 }
 
 bool RoundDriver::applicable(const Hash& block_id) {
+  if (auto memo = applicable_memo_.find(block_id); memo != applicable_memo_.end()) return memo->second;
+  const bool ok = check_applicable(block_id);
+  applicable_memo_[block_id] = ok;
+  return ok;
+}
+
+bool RoundDriver::check_applicable(const Hash& block_id) {
   auto it = blocks_.find(block_id);
   if (it == blocks_.end()) return false;  // we don't hold the block
   const BlockHeader& h = it->second.header;
@@ -169,6 +176,7 @@ RoundDriver::Output RoundDriver::advance() {
   height_ = ledger_->tip().height + 1;
   sm_ = RoundStateMachine(make_config());
   blocks_.clear();
+  applicable_memo_.clear();
   precommit_sigs_.clear();
   committed_ = false;
   cert_.reset();
@@ -190,12 +198,13 @@ void RoundDriver::commit(std::uint32_t round, const Value& value) {
     }
   }
   std::optional<CommitCertificate> cert =
-      aggregate_commit(chain_id_, vset_, height_, round, id, votes);
+      aggregate_commit(chain_id_, vset_, height_, round, id, votes, true);
   if (!cert) return;  // not enough valid precommits (should not happen at decide)
 
   if (ledger_->process_block(bit->second).ok) {
     cert_ = std::move(cert);
     committed_ = true;
+    applicable_memo_.clear();
     txs_.clear();
     // A finalized rotation takes effect NOW for the next height: validators()
     // answers "in force next" immediately, and any late message for this

@@ -15,9 +15,9 @@ final class CredentialPolicy {
   Uint8List hash() => _scoped(
     [encoded],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-        'aviary_credential_policy_hash',
-      )(p[0], encoded.length),
+      _bc.lib
+          .fn<_BufOfBytesC>('aviary_credential_policy_hash')
+          .asFunction<_BufOfBytesD>()(p[0], encoded.length),
       'credential_policy_hash',
     ),
   );
@@ -32,9 +32,9 @@ final class CredentialPolicy {
   ) => _scoped(
     [encoded, issuerSecret, memberSecret],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_CredIssueC, _CredIssueD>(
-        'aviary_credential_issue',
-      )(
+      _bc.lib
+          .fn<_CredIssueC>('aviary_credential_issue')
+          .asFunction<_CredIssueD>()(
         p[0],
         encoded.length,
         p[1],
@@ -61,9 +61,9 @@ final class CredentialPolicy {
     (sp) => _scoped(
       [encoded, credential, challenge],
       (p) => _bc._take(
-        _bc.lib.lookupFunction<_CredPresentC, _CredPresentD>(
-          'aviary_credential_present',
-        )(
+        _bc.lib
+            .fn<_CredPresentC>('aviary_credential_present')
+            .asFunction<_CredPresentD>()(
           p[0],
           encoded.length,
           p[1],
@@ -83,9 +83,16 @@ final class CredentialPolicy {
   Uint8List admissionAnswer(Uint8List credential, Uint8List wire) => _scoped(
     [encoded, credential, wire],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_AdmAnswerC, _AdmAnswerD>(
-        'aviary_admission_answer',
-      )(p[0], encoded.length, p[1], credential.length, p[2], wire.length),
+      _bc.lib
+          .fn<_AdmAnswerC>('aviary_admission_answer')
+          .asFunction<_AdmAnswerD>()(
+        p[0],
+        encoded.length,
+        p[1],
+        credential.length,
+        p[2],
+        wire.length,
+      ),
       'admission_answer',
     ),
   );

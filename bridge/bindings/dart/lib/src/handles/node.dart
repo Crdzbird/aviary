@@ -8,7 +8,7 @@ final class Node extends _NativeHandle {
   DynamicLibrary get _lib => _bc.lib;
 
   Uint8List _bufOfNode(String fn, String op) =>
-      _bc._take(_lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h), op);
+      _bc._take(_lib.fn<_BufOfHandleC>(fn).asFunction<_BufOfHandleD>()(_h), op);
 
   /// A fresh Ed25519 account.
   Account newAccount() {
@@ -30,7 +30,9 @@ final class Node extends _NativeHandle {
   Uint8List accountAddress(Uint8List publicKey) => _scoped(
     [publicKey],
     (p) => _bc._take(
-      _lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_account_address')(
+      _lib
+          .fn<_BufOfBytesC>('aviary_account_address')
+          .asFunction<_BufOfBytesD>()(
         p[0],
         publicKey.length,
       ),
@@ -40,7 +42,7 @@ final class Node extends _NativeHandle {
 
   /// Credits an address at genesis. Throws once a block has been produced.
   void credit(Uint8List address, int amount) => _scoped([address], (p) {
-    final rc = _lib.lookupFunction<_CreditC, _CreditD>('aviary_node_credit')(
+    final rc = _lib.fn<_CreditC>('aviary_node_credit').asFunction<_CreditD>()(
       _h,
       p[0],
       amount,
@@ -57,9 +59,9 @@ final class Node extends _NativeHandle {
   int produceBlock(int timestamp) {
     final out = calloc<Uint64>();
     try {
-      final rc = _lib.lookupFunction<_ProduceC, _ProduceD>(
-        'aviary_node_produce_block',
-      )(_h, timestamp, out);
+      final rc = _lib
+          .fn<_ProduceC>('aviary_node_produce_block')
+          .asFunction<_ProduceD>()(_h, timestamp, out);
       if (rc != 0) throw const AviaryException('produce_block failed');
       return out.value;
     } finally {

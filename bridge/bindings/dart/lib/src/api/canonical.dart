@@ -7,7 +7,7 @@ extension AviaryCanonical on Aviary {
   Uint8List hash(Uint8List msg) => _scoped(
     [msg],
     (p) => _take(
-      lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_hash')(
+      lib.fn<_BufOfBytesC>('aviary_hash').asFunction<_BufOfBytesD>()(
         p[0],
         msg.length,
       ),
@@ -25,7 +25,7 @@ extension AviaryCanonical on Aviary {
   ) => _scoped(
     [body, author, signature],
     (p) => _take(
-      lib.lookupFunction<_TxidC, _TxidD>('aviary_txid')(
+      lib.fn<_TxidC>('aviary_txid').asFunction<_TxidD>()(
         version,
         chainId,
         p[0],
@@ -52,7 +52,7 @@ extension AviaryCanonical on Aviary {
   ) => _scoped(
     [parentHash, txRoot, stateRoot, consensus],
     (p) => _take(
-      lib.lookupFunction<_HeaderC, _HeaderD>('aviary_header_hash')(
+      lib.fn<_HeaderC>('aviary_header_hash').asFunction<_HeaderD>()(
         version,
         chainId,
         height,
@@ -74,7 +74,7 @@ extension AviaryProofs on Aviary {
   bool _verify(String fn, Uint8List root, Uint8List proof) => _scoped(
     [root, proof],
     (p) =>
-        lib.lookupFunction<_VerifyC, _VerifyD>(fn)(p[0], p[1], proof.length) ==
+        lib.fn<_VerifyC>(fn).asFunction<_VerifyD>()(p[0], p[1], proof.length) ==
         1,
   );
 
@@ -88,13 +88,12 @@ extension AviaryProofs on Aviary {
 
   /// Whether a commit certificate is valid under an encoded validator set.
   /// Malformed input yields false.
-  bool verifyCommit(int chainId, Uint8List validatorSet, Uint8List cert) =>
-      _scoped(
-        [validatorSet, cert],
-        (p) =>
-            lib.lookupFunction<_VerifyCommitC, _VerifyCommitD>(
-              'aviary_verify_commit',
-            )(chainId, p[0], validatorSet.length, p[1], cert.length) ==
-            1,
-      );
+  bool verifyCommit(int chainId, Uint8List validatorSet, Uint8List cert) {
+    final f = lib.fn<_VerifyCommitC>('aviary_verify_commit');
+    return _scoped([validatorSet, cert], (p) {
+      final n = [validatorSet.length, cert.length];
+      return f.asFunction<_VerifyCommitD>()(chainId, p[0], n[0], p[1], n[1]) ==
+          1;
+    });
+  }
 }

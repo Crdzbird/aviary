@@ -4,11 +4,11 @@ part of '../../aviary.dart';
 /// {@category Ledger}
 extension NodeQueries on Node {
   int _u64(String fn) =>
-      _lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(fn)(_h);
+      _lib.fn<_U64OfHandleC>(fn).asFunction<_U64OfHandleD>()(_h);
 
   int _u64Addr(String fn, Uint8List addr) => _scoped([
     addr,
-  ], (p) => _lib.lookupFunction<_U64NodeAddrC, _U64NodeAddrD>(fn)(_h, p[0]));
+  ], (p) => _lib.fn<_U64NodeAddrC>(fn).asFunction<_U64NodeAddrD>()(_h, p[0]));
 
   /// The chain height.
   int height() => _u64('aviary_node_height');
@@ -41,9 +41,9 @@ extension NodeQueries on Node {
   Uint8List proveAccount(Uint8List address) => _scoped(
     [address],
     (p) => _bc._take(
-      _lib.lookupFunction<_BufNodeAddrC, _BufNodeAddrD>(
-        'aviary_node_prove_account',
-      )(_h, p[0]),
+      _lib
+          .fn<_BufNodeAddrC>('aviary_node_prove_account')
+          .asFunction<_BufNodeAddrD>()(_h, p[0]),
       'prove_account',
     ),
   );

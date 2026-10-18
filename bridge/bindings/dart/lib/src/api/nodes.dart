@@ -5,7 +5,7 @@ part of '../../aviary.dart';
 extension AviaryNodes on Aviary {
   /// Creates an in memory single validator chain.
   Node createNode(int chainId) {
-    final h = lib.lookupFunction<_NodeNewC, _NodeNewD>('aviary_node_new')(
+    final h = lib.fn<_NodeNewC>('aviary_node_new').asFunction<_NodeNewD>()(
       chainId,
     );
     return Node._(this, _requireHandle(h, 'node creation'));
@@ -16,13 +16,13 @@ extension AviaryNodes on Aviary {
 
   /// Creates a custodial key store protected by [passphrase], unlocked.
   KeyStore createKeyStore(String passphrase) => _withUtf8(passphrase, (cp) {
-    final h = lib.lookupFunction<_KsNewC, _KsNewD>('aviary_keystore_new')(cp);
+    final h = lib.fn<_KsNewC>('aviary_keystore_new').asFunction<_KsNewD>()(cp);
     return KeyStore._(this, _requireHandle(h, 'keystore creation'));
   });
 
   /// Loads a serialised key store. It comes back locked.
   KeyStore loadKeyStore(Uint8List blob) => _scoped([blob], (p) {
-    final h = lib.lookupFunction<_KsLoadC, _KsLoadD>('aviary_keystore_load')(
+    final h = lib.fn<_KsLoadC>('aviary_keystore_load').asFunction<_KsLoadD>()(
       p[0],
       blob.length,
     );
@@ -39,7 +39,9 @@ extension NodeStorage on Node {
 
   /// The encoded finalized block at [height], 1 based. Throws when absent.
   Uint8List blockAt(int height) => _bc._take(
-    _lib.lookupFunction<_ChainProposeC, _ChainProposeD>('aviary_node_block_at')(
+    _lib
+        .fn<_ChainProposeC>('aviary_node_block_at')
+        .asFunction<_ChainProposeD>()(
       _h,
       height,
     ),
@@ -68,7 +70,7 @@ extension AviaryNodeStorage on Aviary {
         final symbol = replay
             ? 'aviary_node_restore_replay'
             : 'aviary_node_restore';
-        final h = lib.lookupFunction<_KsLoadC, _KsLoadD>(symbol)(
+        final h = lib.fn<_KsLoadC>(symbol).asFunction<_KsLoadD>()(
           p[0],
           snapshot.length,
         );

@@ -6,24 +6,24 @@ final class Chain extends _NativeHandle {
   Chain._(Aviary bc, Pointer<Void> h) : super(bc, h, 'aviary_chain_free');
 
   /// The chain height.
-  int get height => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(
-    'aviary_chain_height',
-  )(_h);
+  int get height => _bc.lib
+      .fn<_U64OfHandleC>('aviary_chain_height')
+      .asFunction<_U64OfHandleD>()(_h);
 
   /// The chain id this chain runs.
-  int get chainId => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(
-    'aviary_chain_chain_id',
-  )(_h);
+  int get chainId => _bc.lib
+      .fn<_U64OfHandleC>('aviary_chain_chain_id')
+      .asFunction<_U64OfHandleD>()(_h);
 
   Uint8List _buf(String fn) => _bc._take(
-    _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
+    _bc.lib.fn<_BufOfHandleC>(fn).asFunction<_BufOfHandleD>()(_h),
     fn,
   );
 
   Uint8List _blockOp(String fn, Uint8List block) => _scoped(
     [block],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_ChainBlockC, _ChainBlockD>(fn)(
+      _bc.lib.fn<_ChainBlockC>(fn).asFunction<_ChainBlockD>()(
         _h,
         p[0],
         block.length,
@@ -40,9 +40,9 @@ final class Chain extends _NativeHandle {
 
   /// Proposes the next block. Throws when this node may not propose now.
   Uint8List propose(int timestamp) => _bc._take(
-    _bc.lib.lookupFunction<_ChainProposeC, _ChainProposeD>(
-      'aviary_chain_propose',
-    )(_h, timestamp),
+    _bc.lib
+        .fn<_ChainProposeC>('aviary_chain_propose')
+        .asFunction<_ChainProposeD>()(_h, timestamp),
     'chain_propose',
   );
 
@@ -61,9 +61,15 @@ final class Chain extends _NativeHandle {
     return _scoped(
       [block, j],
       (p) =>
-          _bc.lib.lookupFunction<_ChainSubmitC, _ChainSubmitD>(
-            'aviary_chain_submit',
-          )(_h, p[0], block.length, p[1], j.length) ==
+          _bc.lib
+              .fn<_ChainSubmitC>('aviary_chain_submit')
+              .asFunction<_ChainSubmitD>()(
+            _h,
+            p[0],
+            block.length,
+            p[1],
+            j.length,
+          ) ==
           1,
     );
   }
@@ -77,9 +83,9 @@ final class Chain extends _NativeHandle {
   void scheduleValidators(List<ValidatorEntry> validators) => _withU64s(
     _powers(validators),
     (pw) => _scoped([_publicKeys(validators)], (p) {
-      final rc = _bc.lib.lookupFunction<_ScSchedC, _ScSchedD>(
-        'aviary_chain_schedule_validators',
-      )(_h, p[0], pw, validators.length);
+      final rc = _bc.lib
+          .fn<_ScSchedC>('aviary_chain_schedule_validators')
+          .asFunction<_ScSchedD>()(_h, p[0], pw, validators.length);
       if (rc != 1) throw StateError('chain: cannot schedule validators');
     }),
   );

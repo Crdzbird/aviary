@@ -9,20 +9,14 @@ extension NodeTransfers on Node {
     Uint8List to,
     int amount,
     int nonce,
-  ) => _scoped(
-    [secret, to],
-    (p) => _bc._take(
-      _lib.lookupFunction<_SubmitC, _SubmitD>('aviary_node_submit_transfer')(
-        _h,
-        p[0],
-        secret.length,
-        p[1],
-        amount,
-        nonce,
-      ),
-      'submit_transfer',
-    ),
-  );
+  ) {
+    final f = _lib.fn<_SubmitC>('aviary_node_submit_transfer');
+    final g = f.asFunction<_SubmitD>();
+    return _scoped([secret, to], (p) {
+      final r = g(_h, p[0], secret.length, p[1], amount, nonce);
+      return _bc._take(r, 'submit_transfer');
+    });
+  }
 
   /// Submits a transfer carrying a priority [fee].
   Uint8List submitTransferFee(
@@ -31,15 +25,14 @@ extension NodeTransfers on Node {
     int amount,
     int nonce,
     int fee,
-  ) => _scoped(
-    [secret, to],
-    (p) => _bc._take(
-      _lib.lookupFunction<_SubmitFeeC, _SubmitFeeD>(
-        'aviary_node_submit_transfer_fee',
-      )(_h, p[0], secret.length, p[1], amount, nonce, fee),
-      'submit_transfer_fee',
-    ),
-  );
+  ) {
+    final f = _lib.fn<_SubmitFeeC>('aviary_node_submit_transfer_fee');
+    final g = f.asFunction<_SubmitFeeD>();
+    return _scoped([secret, to], (p) {
+      final r = g(_h, p[0], secret.length, p[1], amount, nonce, fee);
+      return _bc._take(r, 'submit_transfer_fee');
+    });
+  }
 
   /// Submits a hybrid post quantum transfer with the blobs from
   /// [Node.newAccountHybrid].
@@ -49,29 +42,25 @@ extension NodeTransfers on Node {
     Uint8List to,
     int amount,
     int nonce,
-  ) => _scoped(
-    [secret, public, to],
-    (p) => _bc._take(
-      _lib.lookupFunction<_SubmitHybridC, _SubmitHybridD>(
-        'aviary_node_submit_transfer_hybrid',
-      )(_h, p[0], secret.length, p[1], public.length, p[2], amount, nonce),
-      'submit_transfer_hybrid',
-    ),
-  );
+  ) {
+    final f = _lib.fn<_SubmitHybridC>('aviary_node_submit_transfer_hybrid');
+    final g = f.asFunction<_SubmitHybridD>();
+    final s = secret.length, k = public.length;
+    return _scoped([secret, public, to], (p) {
+      final r = g(_h, p[0], s, p[1], k, p[2], amount, nonce);
+      return _bc._take(r, 'submit_transfer_hybrid');
+    });
+  }
 
   /// Admits an already signed, encoded transaction, for example from
   /// [KeyStoreSigning.signTransfer]. Returns its transaction id.
-  Uint8List submitTx(Uint8List encodedTx) => _scoped(
-    [encodedTx],
-    (p) => _bc._take(
-      _lib.lookupFunction<_ChainBlockC, _ChainBlockD>('aviary_node_submit_tx')(
-        _h,
-        p[0],
-        encodedTx.length,
-      ),
-      'submit_tx',
-    ),
-  );
+  Uint8List submitTx(Uint8List encodedTx) {
+    final f = _lib.fn<_ChainBlockC>('aviary_node_submit_tx');
+    final g = f.asFunction<_ChainBlockD>();
+    return _scoped([encodedTx], (p) {
+      return _bc._take(g(_h, p[0], encodedTx.length), 'submit_tx');
+    });
+  }
 
   /// Signs a transfer from the [store] account at [from] and admits it. The
   /// secret never leaves the engine. Returns the transaction id.
@@ -82,13 +71,12 @@ extension NodeTransfers on Node {
     int amount,
     int nonce, {
     int fee = 0,
-  }) => _scoped(
-    [from, to],
-    (p) => _bc._take(
-      _lib.lookupFunction<_SubmitKsC, _SubmitKsD>(
-        'aviary_node_submit_transfer_keystore',
-      )(_h, store._h, p[0], p[1], amount, nonce, fee),
-      'submit_transfer_keystore',
-    ),
-  );
+  }) {
+    final f = _lib.fn<_SubmitKsC>('aviary_node_submit_transfer_keystore');
+    final g = f.asFunction<_SubmitKsD>();
+    return _scoped([from, to], (p) {
+      final r = g(_h, store._h, p[0], p[1], amount, nonce, fee);
+      return _bc._take(r, 'submit_transfer_keystore');
+    });
+  }
 }

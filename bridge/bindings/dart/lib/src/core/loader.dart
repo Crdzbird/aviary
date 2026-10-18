@@ -55,3 +55,14 @@ DynamicLibrary _openAndroid() {
   }
   return DynamicLibrary.open('libaviary_c.so');
 }
+
+final _symbols = Expando<Map<String, Pointer<Void>>>();
+
+/// Native symbols resolved once per library. A symbol lookup costs far more
+/// than the call it serves, so each name is looked up on first use only.
+extension on DynamicLibrary {
+  Pointer<NativeFunction<T>> fn<T extends Function>(String name) {
+    final cache = _symbols[this] ??= <String, Pointer<Void>>{};
+    return (cache[name] ??= lookup<Void>(name)).cast<NativeFunction<T>>();
+  }
+}

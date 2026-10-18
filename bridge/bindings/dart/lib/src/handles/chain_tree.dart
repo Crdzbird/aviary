@@ -16,12 +16,12 @@ final class ChainTree extends _NativeHandle {
       exceptionalReturn: 0,
     )..keepIsolateAlive = false;
     final ctx = Pointer<Void>.fromAddress(_handle);
-    _bc.lib.lookupFunction<_TreeSetFinC, _TreeSetFinD>(
-      'aviary_chain_tree_set_finalized_hook',
-    )(_h, _fin.nativeFunction, ctx);
-    _bc.lib.lookupFunction<_TreeSetTxC, _TreeSetTxD>(
-      'aviary_chain_tree_set_tx_source',
-    )(_h, _tx.nativeFunction, ctx);
+    _bc.lib
+        .fn<_TreeSetFinC>('aviary_chain_tree_set_finalized_hook')
+        .asFunction<_TreeSetFinD>()(_h, _fin.nativeFunction, ctx);
+    _bc.lib
+        .fn<_TreeSetTxC>('aviary_chain_tree_set_tx_source')
+        .asFunction<_TreeSetTxD>()(_h, _tx.nativeFunction, ctx);
   }
 
   final int _handle;
@@ -36,9 +36,9 @@ final class ChainTree extends _NativeHandle {
 
   /// Produces and finalizes the next block on [chainId].
   Uint8List produce(int chainId, int timestamp) => _bc._take(
-    _bc.lib.lookupFunction<_TreeProduceC, _TreeProduceD>(
-      'aviary_chain_tree_produce',
-    )(_h, chainId, timestamp),
+    _bc.lib
+        .fn<_TreeProduceC>('aviary_chain_tree_produce')
+        .asFunction<_TreeProduceD>()(_h, chainId, timestamp),
     'chain_tree_produce',
   );
 
@@ -46,9 +46,9 @@ final class ChainTree extends _NativeHandle {
   bool verify(Uint8List proof) => _scoped(
     [proof],
     (p) =>
-        _bc.lib.lookupFunction<_TreeVerifyC, _TreeVerifyD>(
-          'aviary_chain_tree_verify',
-        )(_h, p[0], proof.length) ==
+        _bc.lib
+            .fn<_TreeVerifyC>('aviary_chain_tree_verify')
+            .asFunction<_TreeVerifyD>()(_h, p[0], proof.length) ==
         1,
   );
 

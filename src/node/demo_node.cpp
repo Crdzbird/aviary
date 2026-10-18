@@ -36,6 +36,7 @@ void DemoNode::start_engine(std::unique_ptr<Ledger> ledger) {
   engine_ = std::make_unique<consensus::BftEngine>(std::move(vset), std::move(ledger));
   engine_->set_observability(&bus_, &metrics_);
   mempool_.set_event_bus(&bus_);
+  mempool_.set_signature_cache(engine_->ledger().signature_cache());
 
 }
 

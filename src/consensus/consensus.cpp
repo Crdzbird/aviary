@@ -130,7 +130,8 @@ Vote sign_vote(std::uint64_t chain_id, std::uint64_t height, std::uint32_t round
 
 std::optional<CommitCertificate> aggregate_commit(
     std::uint64_t chain_id, const ValidatorSet& vset, std::uint64_t height,
-    std::uint32_t round, const Hash& block_id, const std::vector<Vote>& votes) {
+    std::uint32_t round, const Hash& block_id, const std::vector<Vote>& votes,
+    bool votes_verified) {
   std::set<std::uint32_t> included;
   std::vector<std::pair<std::uint32_t, Bytes>> collected;  // (index, signature)
   std::uint64_t power = 0;
@@ -138,10 +139,11 @@ std::optional<CommitCertificate> aggregate_commit(
   for (const auto& v : votes) {
     if (v.validator_index >= vset.size()) continue;
     if (!included.insert(v.validator_index).second) continue;  // dedupe
-    const Bytes msg =
-        vote_signing_bytes(chain_id, height, round, block_id, v.validator_index);
-    if (!crypto::bls_verify(view(msg), view(v.signature),
-                            view(vset.at(v.validator_index).bls_pubkey))) {
+    const bool valid =
+        votes_verified ||
+        crypto::bls_verify(view(vote_signing_bytes(chain_id, height, round, block_id, v.validator_index)),
+                           view(v.signature), view(vset.at(v.validator_index).bls_pubkey));
+    if (!valid) {
       included.erase(v.validator_index);
       continue;  // drop invalid vote
     }

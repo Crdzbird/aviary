@@ -8,7 +8,7 @@ extension AviaryMixtures on Aviary {
     [keyMaterial],
     (p) => _splitKeyBlob(
       _take(
-        lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_bls_keygen')(
+        lib.fn<_BufOfBytesC>('aviary_bls_keygen').asFunction<_BufOfBytesD>()(
           p[0],
           keyMaterial.length,
         ),
@@ -36,9 +36,9 @@ extension AviaryMixtures on Aviary {
             (p) => Blueprint._(
               this,
               _take(
-                lib.lookupFunction<_BpEncodeC, _BpEncodeD>(
-                  'aviary_blueprint_encode',
-                )(cc, cs, cp, p[0], pr.length),
+                lib
+                    .fn<_BpEncodeC>('aviary_blueprint_encode')
+                    .asFunction<_BpEncodeD>()(cc, cs, cp, p[0], pr.length),
                 'blueprint_encode',
               ),
             ),
@@ -50,7 +50,7 @@ extension AviaryMixtures on Aviary {
 
   List<String> _registryIds(int kind) {
     final b = _take(
-      lib.lookupFunction<_RegistryIdsC, _RegistryIdsD>('aviary_registry_ids')(
+      lib.fn<_RegistryIdsC>('aviary_registry_ids').asFunction<_RegistryIdsD>()(
         kind,
       ),
       'registry_ids',
@@ -74,9 +74,18 @@ extension AviaryMixtures on Aviary {
     Uint8List blsPub,
     Uint8List blsSec,
   ) => _scoped([genesis, blsPub, blsSec], (p) {
-    final h = lib.lookupFunction<_ChainAssembleC, _ChainAssembleD>(
-      'aviary_chain_assemble',
-    )(p[0], genesis.length, me, p[1], blsPub.length, p[2], blsSec.length);
+    final h =
+        lib
+            .fn<_ChainAssembleC>('aviary_chain_assemble')
+            .asFunction<_ChainAssembleD>()(
+          p[0],
+          genesis.length,
+          me,
+          p[1],
+          blsPub.length,
+          p[2],
+          blsSec.length,
+        );
     if (h == nullptr) return null;
     return Chain._(this, h);
   });

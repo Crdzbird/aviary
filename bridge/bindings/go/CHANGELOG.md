@@ -2,6 +2,9 @@
 
 ## 0.1.1
 
+- A faster engine: each transaction's signature is verified once on its
+  way into a block instead of three times, and consensus no longer repeats
+  vote and block checks within a height.
 - Built against CipherBird 1.1.1 (engine hardening, libsodium 1.0.22,
   OpenSSL 3.5.9); the CipherBird Go module pin moves to that commit.
 - Application records: `Chain.Write`, `Record`, `ProveRecord`,

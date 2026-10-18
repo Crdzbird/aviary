@@ -10,7 +10,7 @@ final class Ceremony extends _NativeHandle {
   Uint8List sign(Uint8List card, Uint8List nonces) => _scoped(
     [card, nonces],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_ThSignC, _ThSignD>('aviary_threshold_sign')(
+      _bc.lib.fn<_ThSignC>('aviary_threshold_sign').asFunction<_ThSignD>()(
         _h,
         p[0],
         card.length,
@@ -25,9 +25,9 @@ final class Ceremony extends _NativeHandle {
       _scoped(
         [publicShare, sigShare],
         (p) =>
-            _bc.lib.lookupFunction<_ThVerifyC, _ThVerifyD>(
-              'aviary_threshold_verify_share',
-            )(_h, id, p[0], p[1]) ==
+            _bc.lib
+                .fn<_ThVerifyC>('aviary_threshold_verify_share')
+                .asFunction<_ThVerifyD>()(_h, id, p[0], p[1]) ==
             1,
       );
 
@@ -41,9 +41,9 @@ final class Ceremony extends _NativeHandle {
       return _scoped(
         [_concat(sigShares)],
         (p) => _bc._take(
-          _bc.lib.lookupFunction<_ThAggC, _ThAggD>(
-            'aviary_threshold_aggregate',
-          )(_h, idP, p[0], ids.length),
+          _bc.lib
+              .fn<_ThAggC>('aviary_threshold_aggregate')
+              .asFunction<_ThAggD>()(_h, idP, p[0], ids.length),
           'threshold_aggregate',
         ),
       );
@@ -58,9 +58,9 @@ final class Ceremony extends _NativeHandle {
 
 ThresholdShare _shareInfo(Aviary bc, Uint8List card) => _scoped([card], (p) {
   final info = bc._take(
-    bc.lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-      'aviary_threshold_share_info',
-    )(p[0], card.length),
+    bc.lib
+        .fn<_BufOfBytesC>('aviary_threshold_share_info')
+        .asFunction<_BufOfBytesD>()(p[0], card.length),
     'threshold_share_info',
   );
   return ThresholdShare(

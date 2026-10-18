@@ -159,6 +159,10 @@ Hash compute_receipt_root(const std::vector<Receipt>& receipts);
 
 /// Merkle root over hash_tagged(kLeaf, tx.encode()) for each tx, in order.
 Hash compute_tx_root(const std::vector<Transaction>& txs);
+/// The tx root leaf of an encoded transaction: hash_tagged(kLeaf, encoded).
+Hash tx_leaf_hash(const Bytes& encoded);
+/// The tx root over leaves from tx_leaf_hash, in block order.
+Hash tx_root_from_leaves(const std::vector<Hash>& leaves);
 
 /// Signs [tx] in place: sets [author] from [kp] and [signature] over
 /// signing_bytes().

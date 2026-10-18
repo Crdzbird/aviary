@@ -4,9 +4,9 @@ part of '../../aviary.dart';
 /// {@category Networking}
 extension NetNodeQueries on NetNode {
   /// The committed chain height.
-  int get height => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(
-    'aviary_net_node_height',
-  )(_h);
+  int get height => _bc.lib
+      .fn<_U64OfHandleC>('aviary_net_node_height')
+      .asFunction<_U64OfHandleD>()(_h);
 
   /// The encoded tip header.
   Uint8List tip() => _buf('aviary_net_node_tip');
@@ -21,26 +21,26 @@ extension NetNodeQueries on NetNode {
 
   /// Whether [peer] has been banned for misbehaviour.
   bool peerBanned(int peer) =>
-      _bc.lib.lookupFunction<_NetPeerFlagC, _NetPeerFlagD>(
-        'aviary_net_node_peer_banned',
-      )(_h, peer) ==
+      _bc.lib
+          .fn<_NetPeerFlagC>('aviary_net_node_peer_banned')
+          .asFunction<_NetPeerFlagD>()(_h, peer) ==
       1;
 
   /// The balance of an address on this account model chain.
   int balance(Uint8List address) => _scoped(
     [address],
-    (p) => _bc.lib.lookupFunction<_U64NodeAddrC, _U64NodeAddrD>(
-      'aviary_net_node_balance',
-    )(_h, p[0]),
+    (p) => _bc.lib
+        .fn<_U64NodeAddrC>('aviary_net_node_balance')
+        .asFunction<_U64NodeAddrD>()(_h, p[0]),
   );
 
   /// A state inclusion proof for an address.
   Uint8List proveAccount(Uint8List address) => _scoped(
     [address],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_BufNodeAddrC, _BufNodeAddrD>(
-        'aviary_net_node_prove_account',
-      )(_h, p[0]),
+      _bc.lib
+          .fn<_BufNodeAddrC>('aviary_net_node_prove_account')
+          .asFunction<_BufNodeAddrD>()(_h, p[0]),
       'net_node_prove_account',
     ),
   );
@@ -62,9 +62,9 @@ extension NetNodeQueries on NetNode {
   /// Record model networks: the next nonce [address] must use.
   int recordNonce(Uint8List address) => _scoped(
     [address],
-    (p) => _bc.lib.lookupFunction<_RecAddrU64C, _RecAddrU64D>(
-      'aviary_net_node_record_nonce',
-    )(_h, p[0]),
+    (p) => _bc.lib
+        .fn<_RecAddrU64C>('aviary_net_node_record_nonce')
+        .asFunction<_RecAddrU64D>()(_h, p[0]),
   );
 
   /// Record model networks: a state inclusion proof for the record at [key].
@@ -74,7 +74,7 @@ extension NetNodeQueries on NetNode {
   Uint8List _byKey(String fn, Uint8List key) => _scoped(
     [key],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_BufNodeAddrC, _BufNodeAddrD>(fn)(_h, p[0]),
+      _bc.lib.fn<_BufNodeAddrC>(fn).asFunction<_BufNodeAddrD>()(_h, p[0]),
       fn,
     ),
   );

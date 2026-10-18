@@ -15,9 +15,9 @@ final class AddressBook extends _NativeHandle {
   void add(Uint8List record) {
     final rc = _scoped(
       [record],
-      (p) => _bc.lib.lookupFunction<_HandleBytesIntC, _HandleBytesIntD>(
-        'aviary_address_book_add',
-      )(_h, p[0], record.length),
+      (p) => _bc.lib
+          .fn<_HandleBytesIntC>('aviary_address_book_add')
+          .asFunction<_HandleBytesIntD>()(_h, p[0], record.length),
     );
     if (rc == 0) return;
     throw const AviaryException(
@@ -31,9 +31,9 @@ final class AddressBook extends _NativeHandle {
   int merge(Uint8List encodedBook) {
     final n = _scoped(
       [encodedBook],
-      (p) => _bc.lib.lookupFunction<_BookMergeC, _BookMergeD>(
-        'aviary_address_book_merge',
-      )(_h, p[0], encodedBook.length),
+      (p) => _bc.lib
+          .fn<_BookMergeC>('aviary_address_book_merge')
+          .asFunction<_BookMergeD>()(_h, p[0], encodedBook.length),
     );
     if (n >= 0) return n;
     throw const AviaryException(
@@ -46,24 +46,24 @@ final class AddressBook extends _NativeHandle {
   Uint8List? record(int id) {
     if (!contains(id)) return null;
     return _bc._take(
-      _bc.lib.lookupFunction<_BookIdBufC, _BookIdBufD>(
-        'aviary_address_book_get',
-      )(_h, id),
+      _bc.lib
+          .fn<_BookIdBufC>('aviary_address_book_get')
+          .asFunction<_BookIdBufD>()(_h, id),
       'address_book_get',
     );
   }
 
   /// Whether [id] is known.
   bool contains(int id) =>
-      _bc.lib.lookupFunction<_BookIdIntC, _BookIdIntD>(
-        'aviary_address_book_contains',
-      )(_h, id) ==
+      _bc.lib
+          .fn<_BookIdIntC>('aviary_address_book_contains')
+          .asFunction<_BookIdIntD>()(_h, id) ==
       1;
 
   /// How many peers are known.
-  int get length => _bc.lib.lookupFunction<_U64OfHandleC, _U64OfHandleD>(
-    'aviary_address_book_size',
-  )(_h);
+  int get length => _bc.lib
+      .fn<_U64OfHandleC>('aviary_address_book_size')
+      .asFunction<_U64OfHandleD>()(_h);
 
   /// Every encoded record in ascending id order.
   List<Uint8List> records() =>
@@ -73,7 +73,7 @@ final class AddressBook extends _NativeHandle {
   Uint8List encode() => _buf('aviary_address_book_encode');
 
   Uint8List _buf(String fn) => _bc._take(
-    _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
+    _bc.lib.fn<_BufOfHandleC>(fn).asFunction<_BufOfHandleD>()(_h),
     fn,
   );
 

@@ -12,14 +12,14 @@ final class SecureSession extends _NativeHandle {
     : super(bc, h, 'aviary_secure_free');
 
   Uint8List _buf(String fn) => _bc._take(
-    _bc.lib.lookupFunction<_BufOfHandleC, _BufOfHandleD>(fn)(_h),
+    _bc.lib.fn<_BufOfHandleC>(fn).asFunction<_BufOfHandleD>()(_h),
     fn,
   );
 
   Uint8List _crypt(String fn, Uint8List input) => _scoped(
     [input],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_ChainBlockC, _ChainBlockD>(fn)(
+      _bc.lib.fn<_ChainBlockC>(fn).asFunction<_ChainBlockD>()(
         _h,
         p[0],
         input.length,
@@ -37,9 +37,9 @@ final class SecureSession extends _NativeHandle {
   void complete(Uint8List reply) {
     final ok = _scoped(
       [reply],
-      (p) => _bc.lib.lookupFunction<_HandleBytesIntC, _HandleBytesIntD>(
-        'aviary_secure_complete',
-      )(_h, p[0], reply.length),
+      (p) => _bc.lib
+          .fn<_HandleBytesIntC>('aviary_secure_complete')
+          .asFunction<_HandleBytesIntD>()(_h, p[0], reply.length),
     );
     if (ok != 1) {
       throw const AviaryException(
@@ -51,7 +51,7 @@ final class SecureSession extends _NativeHandle {
 
   /// Whether both directions are ready.
   bool get isOpen =>
-      _bc.lib.lookupFunction<_HandleFlagC, _HandleFlagD>('aviary_secure_open')(
+      _bc.lib.fn<_HandleFlagC>('aviary_secure_open').asFunction<_HandleFlagD>()(
         _h,
       ) ==
       1;

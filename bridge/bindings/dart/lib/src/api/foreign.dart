@@ -43,9 +43,9 @@ extension AviaryForeign on Aviary {
     return _withUtf8(
       id,
       (cid) =>
-          lib.lookupFunction<_RegEngineC, _RegEngineD>(
-            'aviary_registry_add_engine',
-          )(
+          lib
+              .fn<_RegEngineC>('aviary_registry_add_engine')
+              .asFunction<_RegEngineD>()(
             cid,
             j.nativeFunction,
             v.nativeFunction,
@@ -68,9 +68,13 @@ extension AviaryForeign on Aviary {
     return _withUtf8(
       id,
       (cid) =>
-          lib.lookupFunction<_RegProposerC, _RegProposerD>(
-            'aviary_registry_add_proposer',
-          )(cid, p.nativeFunction, Pointer<Void>.fromAddress(h)) ==
+          lib
+              .fn<_RegProposerC>('aviary_registry_add_proposer')
+              .asFunction<_RegProposerD>()(
+            cid,
+            p.nativeFunction,
+            Pointer<Void>.fromAddress(h),
+          ) ==
           1,
     );
   }

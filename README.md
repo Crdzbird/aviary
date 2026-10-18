@@ -377,28 +377,55 @@ Console demos without Flutter: `dart run bin/node_demo.dart` in
 
 ## Performance
 
-Measured with `tools/bench_engine.cpp` on an Apple M3 Max (one core of 14,
-36 GB), Release build, Aviary 0.1.0 on CipherBird 1.1.1. Medians of three runs;
-runs vary by about 20 percent.
+On a Pixel 7 Pro (Tensor G2, one Cortex-X1 core at 2.85 GHz, Android 17),
+through the `aviary_lite` arm64 engine as it ships, on CipherBird 1.1.1.
+Medians of three runs, per transaction or per operation.
 
-| Work | Result |
-|---|---|
-| Ed25519 transfer, sign and admit to the mempool | 11,300 tx/s (88 us each) |
-| BFT block of 1,000 transfers: build, validate, apply, certify | 6,300 tx/s (160 ms per block) |
-| Admit and finalize, end to end | 4,000 tx/s |
-| Follower replay, every certificate and signature verified | 13,400 tx/s |
-| Restore a 5 block snapshot without replay | 22 ms |
-| Account state proof over 1,000 accounts | under 1 us to prove, 30 us to verify, 393 bytes |
-| Hybrid Ed25519 + ML-DSA-65 transfer, admit and finalize | 1,340 tx/s |
-| Record writes of 64 bytes, sign and finalize | 5,900 writes/s |
-| One height of a 4 validator BFT mesh, in process | 110 ms (81 gossip deliveries) |
+| Work | Plain | Encrypted |
+|---|---|---|
+| Sign and admit a transfer | 120 us, raw secret | 154 us, signed from the key store |
+| Admit and finalize a transfer | 194 us, plain mempool | 574 us, sealed mempool |
+| One height of a 4 validator BFT mesh | 64.1 ms, plaintext links | 65.0 ms over Noise, 65.4 ms over SecureSession |
+| Link setup, once per peer | none | 2.0 ms Noise XX with identity proofs, 1.7 ms SecureSession |
+| Encrypt and decrypt a 1 KiB frame | none | 16.6 us Noise, 16.8 us SecureSession |
+| Transfer on the wire | 173 bytes | 1,501 bytes sealed |
 
-Reproduce:
+The ledger itself: a BFT block of 1,000 transfers costs 99.8 us per
+transfer to build, validate, apply and certify, follower replay with every
+signature and certificate verified 114 us, and a hybrid Ed25519 + ML-DSA-65
+transfer 728 us to sign and admit.
+
+What encryption costs:
+
+- **Key store:** 34 us more per transfer to unseal the key inside the
+  engine, plus a one time Argon2id derivation: 283 ms to create a store,
+  140 ms to unlock a saved one.
+- **Sealed mempool:** three times the plain path. Each transaction carries
+  its own hybrid KEM encapsulation (X25519 + ML-KEM-768): 207 us to seal on
+  the client and 180 us to open at the proposer, and it grows 8.7 times on
+  the wire. Admitting a sealed transaction is 1 us, since the pool never
+  decrypts.
+- **Encrypted links:** 1 to 2 percent on a BFT height. Consensus time is BLS
+  pairings, not the AEAD.
+
+These figures include this release's engine work: each transaction's
+signature is verified once instead of three times, consensus no longer
+verifies the same votes and block twice per height, and the Dart binding
+resolves each native function once. On the same phone that took a block of
+1,000 from 223 to 99.8 us per transfer, admit and finalize from 311 to
+194 us, and a mesh height from 127 to 64 ms. CipherBird's plain digest
+output (CipherBird#6, not yet released) takes the block to 18.4 us, admit
+and finalize to 83.5 us and replay to 67.2 us. Full tables, the desktop
+numbers and the method are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+
+Reproduce on a connected Android device, or on the desktop:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target bench_engine
-./build/bench_engine
+bash scripts/android/bench_paths.sh
+```
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target bench_paths bench_engine
 ```
 
 What the numbers are and are not:
@@ -412,7 +439,7 @@ What the numbers are and are not:
   vote and the aggregated commit certificate. Empty blocks, so it is the floor
   of consensus latency rather than a throughput figure.
 - Every run checks its own results (proofs verify, replay reaches the same
-  height, the mesh reaches the target height) and exits non zero otherwise.
+  height, the mesh commits every height) and exits non zero otherwise.
 
 Against the pub.dev packages a Dart ledger would otherwise be built from
 (`crypto`, `hashlib`, `blake3_ffi`, `ed25519_edwards`, `pinenacl`,
@@ -485,6 +512,8 @@ docs/                    design, codec spec, threat model, mobile builds, backlo
   two largest feature designs.
 - [`docs/MOBILE.md`](docs/MOBILE.md): native artifacts, Flutter packaging,
   publishing.
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md): on device benchmarks of the
+  plain and encrypted paths, and what each engine change bought.
 - [`docs/CONSUMER_API_README.md`](docs/CONSUMER_API_README.md): a Go
   service skeleton over the binding.
 - [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md): the running backlog and

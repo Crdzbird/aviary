@@ -1,17 +1,28 @@
 part of '../../aviary.dart';
 
-Pointer<Uint8> _allocBytes(Uint8List d) {
-  final p = calloc<Uint8>(d.isEmpty ? 1 : d.length);
-  if (d.isNotEmpty) p.asTypedList(d.length).setAll(0, d);
-  return p;
-}
-
+/// Copies [inputs] into one native block for [body], then wipes and frees
+/// it: one allocation per call, and secret inputs such as keys do not linger
+/// in freed memory. An empty input still gets a valid, zeroed byte.
 R _scoped<R>(List<Uint8List> inputs, R Function(List<Pointer<Uint8>>) body) {
-  final ptrs = [for (final d in inputs) _allocBytes(d)];
+  var total = 0;
+  for (final d in inputs) {
+    total += d.isEmpty ? 1 : d.length;
+  }
+  final size = total == 0 ? 1 : total;
+  final block = malloc<Uint8>(size);
+  final view = block.asTypedList(size)..fillRange(0, size, 0);
+  final ptrs = <Pointer<Uint8>>[];
+  var at = 0;
+  for (final d in inputs) {
+    ptrs.add(block + at);
+    view.setAll(at, d);
+    at += d.isEmpty ? 1 : d.length;
+  }
   try {
     return body(ptrs);
   } finally {
-    ptrs.forEach(calloc.free);
+    view.fillRange(0, size, 0);
+    malloc.free(block);
   }
 }
 
@@ -34,11 +45,6 @@ R _withU64s<R>(List<int> values, R Function(Pointer<Uint64>) body) {
   } finally {
     calloc.free(p);
   }
-}
-
-Pointer<Void> _requireHandle(Pointer<Void> h, String what) {
-  if (h == nullptr) throw AviaryException('$what failed');
-  return h;
 }
 
 int _u32be(Uint8List b, int off) =>

@@ -25,9 +25,9 @@ extension AviaryPeering on Aviary {
   }) {
     final pre = prekey ?? Uint8List(0);
     final k = identity.kem.public, s = identity.sig;
-    final f = lib.lookupFunction<_PeerSignC, _PeerSignD>(
-      'aviary_peer_record_sign',
-    );
+    final f = lib
+        .fn<_PeerSignC>('aviary_peer_record_sign')
+        .asFunction<_PeerSignD>();
     final keys = [k, s.public, pre, s.secret];
     final n = keys.map((b) => b.length).toList();
     return _withUtf8(
@@ -55,7 +55,9 @@ extension AviaryPeering on Aviary {
   bool verifyPeerRecord(Uint8List record) => _scoped(
     [record],
     (p) =>
-        lib.lookupFunction<_BytesIntC, _BytesIntD>('aviary_peer_record_verify')(
+        lib
+            .fn<_BytesIntC>('aviary_peer_record_verify')
+            .asFunction<_BytesIntD>()(
           p[0],
           record.length,
         ) ==
@@ -68,9 +70,9 @@ extension AviaryPeering on Aviary {
       _scoped(
         [record],
         (p) => _take(
-          lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-            'aviary_peer_record_fields',
-          )(p[0], record.length),
+          lib
+              .fn<_BufOfBytesC>('aviary_peer_record_fields')
+              .asFunction<_BufOfBytesD>()(p[0], record.length),
           'peer_record_fields',
         ),
       ),
@@ -84,14 +86,14 @@ extension AviaryPeering on Aviary {
     if (encoded == null) {
       return AddressBook._(
         this,
-        lib.lookupFunction<_VNoArgC, _VNoArgC>('aviary_address_book_new')(),
+        lib.fn<_VNoArgC>('aviary_address_book_new').asFunction<_VNoArgC>()(),
       );
     }
     final h = _scoped(
       [encoded],
-      (p) => lib.lookupFunction<_VOfBytesC, _VOfBytesD>(
-        'aviary_address_book_decode',
-      )(p[0], encoded.length),
+      (p) => lib
+          .fn<_VOfBytesC>('aviary_address_book_decode')
+          .asFunction<_VOfBytesD>()(p[0], encoded.length),
     );
     return AddressBook._(this, _requireHandle(h, 'address book decode'));
   }

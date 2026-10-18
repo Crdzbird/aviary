@@ -12,10 +12,9 @@ final class CredentialGate extends _NativeHandle {
     : super(bc, h, 'aviary_credential_gate_free');
 
   /// Bulk revocation: refuses every credential issued in [epoch].
-  void revokeIssuerEpoch(int epoch) =>
-      _bc.lib.lookupFunction<_CredGateRevokeC, _CredGateRevokeD>(
-        'aviary_credential_gate_revoke_epoch',
-      )(_h, epoch);
+  void revokeIssuerEpoch(int epoch) => _bc.lib
+      .fn<_CredGateRevokeC>('aviary_credential_gate_revoke_epoch')
+      .asFunction<_CredGateRevokeD>()(_h, epoch);
 
   /// Runs the full admission checklist. A malformed presentation is false;
   /// this never throws.
@@ -30,9 +29,9 @@ final class CredentialGate extends _NativeHandle {
     (sp) => _scoped(
       [challenge, presentation],
       (p) =>
-          _bc.lib.lookupFunction<_CredGateAdmitC, _CredGateAdmitD>(
-            'aviary_credential_gate_admit',
-          )(
+          _bc.lib
+              .fn<_CredGateAdmitC>('aviary_credential_gate_admit')
+              .asFunction<_CredGateAdmitD>()(
             _h,
             epoch,
             sp,
@@ -49,9 +48,9 @@ final class CredentialGate extends _NativeHandle {
   /// A fresh admission challenge for [epoch]: keep the nonce, send the wire
   /// message to the connecting peer.
   AdmissionChallenge admissionChallenge(int epoch) {
-    final f = _bc.lib.lookupFunction<_AdmChalC, _AdmChalD>(
-      'aviary_admission_challenge',
-    );
+    final f = _bc.lib
+        .fn<_AdmChalC>('aviary_admission_challenge')
+        .asFunction<_AdmChalD>();
     final b = _bc._take(f(epoch), 'admission_challenge');
     return (nonce: b.sublist(0, 32), wire: b.sublist(32));
   }
@@ -65,9 +64,9 @@ final class CredentialGate extends _NativeHandle {
     Uint8List presentation,
     int now,
   ) => _scoped([nonce, presentation], (p) {
-    final f = _bc.lib.lookupFunction<_AdmGrantC, _AdmGrantD>(
-      'aviary_admission_granted',
-    );
+    final f = _bc.lib
+        .fn<_AdmGrantC>('aviary_admission_granted')
+        .asFunction<_AdmGrantD>();
     return f(_h, epoch, p[0], nonce.length, p[1], presentation.length, now) ==
         1;
   });

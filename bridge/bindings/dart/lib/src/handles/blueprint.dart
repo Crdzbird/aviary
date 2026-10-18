@@ -15,9 +15,9 @@ final class Blueprint {
   Uint8List hash() => _scoped(
     [encoded],
     (p) => _bc._take(
-      _bc.lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>(
-        'aviary_blueprint_hash',
-      )(p[0], encoded.length),
+      _bc.lib
+          .fn<_BufOfBytesC>('aviary_blueprint_hash')
+          .asFunction<_BufOfBytesD>()(p[0], encoded.length),
       'blueprint_hash',
     ),
   );

@@ -127,6 +127,7 @@ add_library(aviary_core STATIC
   src/state/record_state.cpp
   src/state/state_serialize.cpp
   src/core/ledger.cpp
+  src/core/signature_cache.cpp
   src/core/genesis.cpp
   src/core/assurance.cpp
   src/core/chain_blueprint.cpp
@@ -247,6 +248,12 @@ add_executable(bench_engine tools/bench_engine.cpp)
 target_link_libraries(bench_engine PRIVATE aviary_core)
 set_target_properties(bench_engine PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
 
+# Plain and encrypted paths through the C ABI only, so the same file runs
+# against any shipped libaviary_c (see scripts/android/bench_paths.sh).
+add_executable(bench_paths tools/bench_paths.cpp)
+target_link_libraries(bench_paths PRIVATE aviary_c)
+target_include_directories(bench_paths PRIVATE bridge)
+
 # -- Tests (zero-dependency runner, matching cryptolib's convention) ----------
 enable_testing()
 
@@ -263,6 +270,7 @@ aviary_add_test(test_smoke tests/test_smoke.cpp)
 aviary_add_test(test_registry_threads tests/test_registry_threads.cpp)
 aviary_add_test(test_codec tests/test_codec.cpp)
 aviary_add_test(test_merkle tests/test_merkle.cpp)
+aviary_add_test(test_signature_cache tests/test_signature_cache.cpp)
 aviary_add_test(test_types tests/test_types.cpp)
 aviary_add_test(test_ledger tests/test_ledger.cpp)
 aviary_add_test(test_utxo tests/test_utxo.cpp)

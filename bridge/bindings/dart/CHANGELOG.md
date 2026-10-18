@@ -69,6 +69,10 @@ CipherBird 1.1.1 crypto engine.
 
 **Packaging and ergonomics**
 
+- Native symbols are resolved once per library, and each call's inputs
+  share one native block that is wiped before it is freed, so secret keys
+  do not linger in freed memory.
+
 - The engine ships as one self contained library per platform (macOS arm64
   2.8 MB, Linux x64 and arm64); the build hook
   bundles the Linux library as a code asset, and `Aviary.loadedFrom`

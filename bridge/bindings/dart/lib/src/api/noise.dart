@@ -12,9 +12,9 @@ extension AviaryNoise on Aviary {
   NoiseIdentity generateNoiseIdentity() {
     final p = _splitBlobList(
       _take(
-        lib.lookupFunction<_BufNoArgC, _BufNoArgD>(
-          'aviary_noise_identity_generate',
-        )(),
+        lib
+            .fn<_BufNoArgC>('aviary_noise_identity_generate')
+            .asFunction<_BufNoArgD>()(),
         'noise_identity_generate',
       ),
     );
@@ -29,9 +29,9 @@ extension AviaryNoise on Aviary {
     final id = _noiseBlob(me), pro = prologue ?? Uint8List(0);
     final h = _scoped(
       [id, pro],
-      (p) => lib.lookupFunction<_NoiseInitC, _NoiseInitD>(
-        'aviary_noise_initiate',
-      )(p[0], id.length, p[1], pro.length),
+      (p) => lib
+          .fn<_NoiseInitC>('aviary_noise_initiate')
+          .asFunction<_NoiseInitD>()(p[0], id.length, p[1], pro.length),
     );
     return NoiseSession._(this, _requireHandle(h, 'noise initiate'));
   }
@@ -45,9 +45,17 @@ extension AviaryNoise on Aviary {
     final id = _noiseBlob(me), pro = prologue ?? Uint8List(0);
     final h = _scoped(
       [id, msg0, pro],
-      (p) => lib.lookupFunction<_NoiseAcceptC, _NoiseAcceptD>(
-        'aviary_noise_accept',
-      )(p[0], id.length, p[1], msg0.length, p[2], pro.length),
+      (p) =>
+          lib
+              .fn<_NoiseAcceptC>('aviary_noise_accept')
+              .asFunction<_NoiseAcceptD>()(
+            p[0],
+            id.length,
+            p[1],
+            msg0.length,
+            p[2],
+            pro.length,
+          ),
     );
     return NoiseSession._(this, _requireHandle(h, 'noise accept'));
   }

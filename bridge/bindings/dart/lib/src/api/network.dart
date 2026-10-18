@@ -12,9 +12,9 @@ extension AviaryNetwork on Aviary {
   SecureIdentity generateSecureIdentity() {
     final parts = _splitBlobList(
       _take(
-        lib.lookupFunction<_BufNoArgC, _BufNoArgD>(
-          'aviary_secure_identity_generate',
-        )(),
+        lib
+            .fn<_BufNoArgC>('aviary_secure_identity_generate')
+            .asFunction<_BufNoArgD>()(),
         'secure_identity_generate',
       ),
     );
@@ -32,7 +32,7 @@ extension AviaryNetwork on Aviary {
     KeyPairBytes sig,
   ) => _scoped([responderKemPublic, sig.public, sig.secret], (p) {
     final h =
-        lib.lookupFunction<_SecInitC, _SecInitD>('aviary_secure_initiate')(
+        lib.fn<_SecInitC>('aviary_secure_initiate').asFunction<_SecInitD>()(
           p[0],
           responderKemPublic.length,
           p[1],
@@ -49,9 +49,9 @@ extension AviaryNetwork on Aviary {
   SecureSession acceptSecureSession(SecureIdentity me, Uint8List firstMessage) {
     final k = me.kem;
     final g = me.sig;
-    final f = lib.lookupFunction<_SecAcceptC, _SecAcceptD>(
-      'aviary_secure_accept',
-    );
+    final f = lib
+        .fn<_SecAcceptC>('aviary_secure_accept')
+        .asFunction<_SecAcceptD>();
     final parts = [k.public, k.secret, g.public, g.secret, firstMessage];
     final n = parts.map((b) => b.length).toList();
     return _scoped(parts, (p) {
@@ -78,7 +78,7 @@ extension AviaryNetwork on Aviary {
     final pub = blsKey?.public ?? Uint8List(0);
     final sec = blsKey?.secret ?? Uint8List(0);
     final node = _scoped([genesis, pub, sec], (p) {
-      final h = lib.lookupFunction<_NetNewC, _NetNewD>('aviary_net_node_new')(
+      final h = lib.fn<_NetNewC>('aviary_net_node_new').asFunction<_NetNewD>()(
         p[0],
         genesis.length,
         me,

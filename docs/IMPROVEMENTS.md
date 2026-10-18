@@ -1802,3 +1802,33 @@ selectors - validated against real-world vectors). Deferred:
 - **[ ] [M] macOS engine for `dart build cli`.** The build hook bundles the
   engine as a code asset only on Linux and Windows; on macOS it is found
   through the package config, which a copied AOT binary does not have.
+
+## Speed and resource handling (Crdzbird/aviary#1) - IN PROGRESS (2026-10-18)
+- **[x] One signature check per transaction.** `SignatureCache` (bounded,
+  8,192 entries) owned by the `Ledger` and shared with the `Mempool`, keyed
+  by the tx root leaf; `build_block` and `run_block` hash each transaction
+  once for both the tx root and the cache. `test_signature_cache` covers
+  hits, eviction and a tampered copy of a cached transaction in a block.
+- **[x] Consensus.** `RoundDriver::applicable` is memoized per height and
+  cleared on commit; `aggregate_commit` takes `votes_verified` so the driver
+  does not verify its stored precommits again.
+- **[x] Dart binding.** Native symbols resolved once per library through a
+  cached lookup (about 0.6 to 2 us saved per call); one wiped native block
+  per call for inputs; a reused struct for freeing results.
+- **[x] On device benchmark.** `tools/bench_paths.cpp` and
+  `scripts/android/bench_paths.sh`: plain against encrypted paths (key
+  store, sealed mempool, Noise and SecureSession links) through the C ABI on
+  a connected device. Pixel 7 Pro results in `docs/PERFORMANCE.md`: BFT
+  block of 1,000 from 223 to 99.8 us per transfer, admit and finalize from
+  311 to 194 us, mesh height from 127 to 64 ms.
+- **[ ] CipherBird 1.1.2** with plain digest output (CipherBird#6, commit
+  3e757ec): measured on the Pixel at 18.4 us per transfer for a block of
+  1,000, 83.5 us to admit and finalize, 67.2 us to replay. Needs the release
+  and rebuilt engines.
+- **[ ] AEAD output in locked memory** in CipherBird (about 80 percent of a
+  1 KiB frame round trip; comment on CipherBird#6).
+- **[ ] BLS certificates.** Votes sign index bound messages, so verifying a
+  certificate costs one pairing per signer; a same message vote would allow
+  a two pairing aggregate check but changes the signed bytes, a consensus
+  format change.
+- **[ ] Desktop numbers** for the README, on an idle machine.

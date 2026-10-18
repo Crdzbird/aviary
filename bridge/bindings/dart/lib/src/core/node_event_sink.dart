@@ -60,9 +60,11 @@ final class _NodeEventSink {
     final callable = NativeCallable<_NodeEventC>.isolateLocal(
       _nodeEventTrampoline,
     )..keepIsolateAlive = false;
-    bc.lib.lookupFunction<_NodeSetEventC, _NodeSetEventD>(
-      symbol,
-    )(node, callable.nativeFunction, node);
+    bc.lib.fn<_NodeSetEventC>(symbol).asFunction<_NodeSetEventD>()(
+      node,
+      callable.nativeFunction,
+      node,
+    );
     final sink = _NodeEventSink._(
       bc.lib,
       node,
@@ -82,9 +84,11 @@ final class _NodeEventSink {
 
   /// Detaches the hook before the node is freed and closes the stream.
   void close() {
-    _lib.lookupFunction<_NodeSetEventC, _NodeSetEventD>(
-      _symbol,
-    )(_node, nullptr, nullptr);
+    _lib.fn<_NodeSetEventC>(_symbol).asFunction<_NodeSetEventD>()(
+      _node,
+      nullptr,
+      nullptr,
+    );
     _callable.close();
     _nodeSinks.remove(_node.address);
     unawaited(controller.close());

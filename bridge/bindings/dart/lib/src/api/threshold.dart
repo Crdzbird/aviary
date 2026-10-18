@@ -6,7 +6,7 @@ extension AviaryThreshold on Aviary {
   /// Deals a t of n account as [n] share cards. The group secret is erased.
   List<ThresholdShare> createThresholdAccount(int n, int t) {
     final blob = _take(
-      lib.lookupFunction<_ThCreateC, _ThCreateD>('aviary_threshold_create')(
+      lib.fn<_ThCreateC>('aviary_threshold_create').asFunction<_ThCreateD>()(
         n,
         t,
       ),
@@ -35,7 +35,7 @@ extension AviaryThreshold on Aviary {
     (pp) => _scoped(
       [card],
       (p) => _take(
-        lib.lookupFunction<_ThSealC, _ThSealD>('aviary_threshold_share_seal')(
+        lib.fn<_ThSealC>('aviary_threshold_share_seal').asFunction<_ThSealD>()(
           p[0],
           card.length,
           pp,
@@ -48,26 +48,21 @@ extension AviaryThreshold on Aviary {
   );
 
   /// Opens a sealed share card. Throws on a wrong passphrase or tamper.
-  Uint8List unsealShare(Uint8List envelope, String passphrase) => _withUtf8(
-    passphrase,
-    (pp) => _scoped(
-      [envelope],
-      (p) => _take(
-        lib.lookupFunction<_ThUnsealC, _ThUnsealD>(
-          'aviary_threshold_share_unseal',
-        )(p[0], envelope.length, pp),
-        'threshold_share_unseal',
-      ),
-    ),
-  );
+  Uint8List unsealShare(Uint8List envelope, String passphrase) {
+    final f = lib.fn<_ThUnsealC>('aviary_threshold_share_unseal');
+    final g = f.asFunction<_ThUnsealD>();
+    return _withUtf8(passphrase, (pp) {
+      return _scoped([envelope], (p) {
+        return _take(g(p[0], envelope.length, pp), 'threshold_share_unseal');
+      });
+    });
+  }
 
   /// Round one for a card. Keep the nonces secret, share the commitment.
   ThresholdCommit commit(Uint8List card) => _scoped([card], (p) {
+    final f = lib.fn<_BufOfBytesC>('aviary_threshold_commit');
     final b = _take(
-      lib.lookupFunction<_BufOfBytesC, _BufOfBytesD>('aviary_threshold_commit')(
-        p[0],
-        card.length,
-      ),
+      f.asFunction<_BufOfBytesD>()(p[0], card.length),
       'threshold_commit',
     );
     return (
@@ -84,9 +79,9 @@ extension AviaryThreshold on Aviary {
   ) {
     final roster = _concat(commitments);
     return _scoped([groupPublicKey, message, roster], (p) {
-      final h = lib.lookupFunction<_ThCerNewC, _ThCerNewD>(
-        'aviary_threshold_ceremony_new',
-      )(p[0], p[1], message.length, p[2], roster.length);
+      final f = lib.fn<_ThCerNewC>('aviary_threshold_ceremony_new');
+      final g = f.asFunction<_ThCerNewD>();
+      final h = g(p[0], p[1], message.length, p[2], roster.length);
       return Ceremony._(this, _requireHandle(h, 'threshold ceremony creation'));
     });
   }

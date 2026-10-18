@@ -90,7 +90,8 @@ class RoundDriver {
   Output run(const std::vector<Action>& actions);
   Hash get_value();                 // build a block extending the tip; store it
   bool valid(const Hash& block_id);        // applicable AND the governance rule (what we VOTE for)
-  bool applicable(const Hash& block_id);   // do we hold a block the ledger + consensus rules accept (what we FOLLOW)
+  bool applicable(const Hash& block_id);
+  bool check_applicable(const Hash& block_id);   // do we hold a block the ledger + consensus rules accept (what we FOLLOW)
   void commit(std::uint32_t round, const Value& value);
 
   std::uint64_t chain_id_;
@@ -107,6 +108,9 @@ class RoundDriver {
   // LastCommit. Absent for the first block after genesis.
   std::optional<CommitCertificate> last_commit_;
   std::map<Hash, Block> blocks_;  // block id -> block (self-produced or from a proposal)
+  /// applicable() per block id for this height: the block, the tip and the
+  /// validator set cannot change until a commit, which clears it.
+  std::map<Hash, bool> applicable_memo_;
   std::vector<Anchor> anchors_;   // subchain anchors to include in our next proposal (parent chains)
   ValidatorSet prev_vset_;        // the set that certified the tip
   std::optional<ValidatorSet> pending_;       // scheduled rotation
