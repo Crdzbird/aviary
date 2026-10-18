@@ -45,7 +45,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build git pkg-config build-essential ca-certificates libsodium-dev libssl-dev lld
+          sudo apt-get install -y clang cmake ninja-build git pkg-config build-essential ca-certificates libssl-dev lld
 
       # Ubuntu's OpenSSL 3.0 lacks AES-256-GCM-SIV, which the sealed mempool
       # needs, so the engine links CipherBird's from-source OpenSSL (3.6, static,
@@ -62,6 +62,26 @@ jobs:
             "$PWD/build/host-deps/openssl-nosock/lib" > "$PWD/build/pc/libcrypto.pc"
           echo "PKG_CONFIG_PATH=$PWD/build/pc" >> "$GITHUB_ENV"
           PKG_CONFIG_PATH="$PWD/build/pc" pkg-config --variable=libdir libcrypto
+
+      # CipherBird 1.1.1 ships libsodium 1.0.22 on every platform it builds;
+      # Ubuntu packages 1.0.18. Build the vendored 1.0.22 tarball from the
+      # CipherBird tag, position independent and static, into the directory
+      # the Linux archive script reads, and publish it through the same
+      # pkg-config directory as libcrypto so the script picks it up.
+      - name: Build libsodium for the engine
+        working-directory: cryptolib
+        run: |
+          DEPS="$PWD/build/linux-deps"
+          mkdir -p "$PWD/build/host-deps"
+          tar xzf third_party/android/src/libsodium-1.0.22.tar.gz -C "$PWD/build/host-deps"
+          SRC="$(find "$PWD/build/host-deps" -maxdepth 1 -type d -name 'libsodium-*' | head -1)"
+          ( cd "$SRC" && CFLAGS="-O2 -fPIC" ./configure --disable-shared --enable-static \
+              --disable-dependency-tracking --prefix="$DEPS" > /dev/null && make -j"$(nproc)" install > /dev/null )
+          printf 'prefix=%s\nlibdir=${prefix}/lib\nincludedir=${prefix}/include\nName: libsodium\nDescription: libsodium\nVersion: 1.0.22\nLibs: -L${libdir} -lsodium\nCflags: -I${includedir}\n' \
+            "$DEPS" > "$PWD/build/pc/libsodium.pc"
+          test "$(PKG_CONFIG_PATH="$PWD/build/pc" pkg-config --modversion libsodium)" = 1.0.22
+          grep -q '"1.0.22"' "$DEPS/include/sodium/version.h"
+          echo "libsodium $(PKG_CONFIG_PATH="$PWD/build/pc" pkg-config --modversion libsodium) at $DEPS/lib/libsodium.a"
 
       - name: Build the CipherBird static engine
         working-directory: cryptolib

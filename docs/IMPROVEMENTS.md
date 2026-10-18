@@ -1653,6 +1653,11 @@ selectors - validated against real-world vectors). Deferred:
   for 1.1.1 and were. All suites pass on 1.1.1: 70 C++, 30 Dart, both
   Flutter packages, Go, 18 npm on the bundled prebuilds, the JVM and Swift
   demos.
+- **[x] Linux engines on the released dependencies.** Native Linux checks
+  out CipherBird `v1.1.1` instead of `main`, so a rebuild reproduces the
+  shipped engine, and builds the libsodium 1.0.22 tarball that tag vendors
+  instead of linking Ubuntu's 1.0.18 package, matching every other
+  platform; the step asserts the version before the engine links.
 - **[x] Size note.** The self contained Android engine grows from 5.8 MB to
   6.3 MB on arm64 because OpenSSL 3.5 is larger than 3.3 under the same
   trim list (libcrypto text 1.8 MB to 2.1 MB); the 3.5 LTS line was
