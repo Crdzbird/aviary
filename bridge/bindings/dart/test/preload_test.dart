@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -45,10 +46,9 @@ void main() {
     print('aviary preload smoke: OK');
     final from = Aviary.loadedFrom;
     if (from == null) throw StateError('FAIL: loadedFrom unset');
-    if (Platform.isLinux && from != 'asset') {
-      throw StateError(
-        'FAIL: on Linux the build hook asset must win, got $from',
-      );
+    final hooked = Platform.isLinux || Abi.current() == Abi.macosArm64;
+    if (hooked && from != 'asset') {
+      throw StateError('FAIL: the build hook asset must win, got $from');
     }
     print('engine loaded from: $from');
   });

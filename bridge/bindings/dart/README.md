@@ -15,11 +15,16 @@ dependencies:
   aviary_dart: ^0.1.0
 ```
 
-The engine for macOS arm64 ships inside the package and is found through the
-package root. Linux binaries under `native/linux-x64` and `native/linux-arm64`
-are bundled by the package's build hook (`hook/build.dart`), so a Dart or
-Flutter application on Linux gets `libaviary_c.so` next to its executable
-with no setup. The hook also bundles `native/windows-x64/aviary_c.dll` when
+The engine ships inside the package under `native/darwin-arm64`,
+`native/linux-x64` and `native/linux-arm64`, and the package's build hook
+(`hook/build.dart`) bundles it as a code asset. `dart build cli` therefore
+produces a bundle that carries `libaviary_c` in `bundle/lib` and runs on any
+machine with no package config and no setup; `dart run` and `dart test` load
+the same asset. On macOS the hook skips the asset when the application
+depends on the `aviary` or `aviary_lite` plugin, because those link the
+engine into the app themselves and a second copy would be dead weight.
+`dart compile exe` does not run build hooks, so use `dart build cli` for
+executables. The hook also bundles `native/windows-x64/aviary_c.dll` when
 that file exists; no Windows binary ships yet because the CipherBird engine
 has no Windows build. Anywhere else, point `AVIARY_DYLIB` at a built
 `libaviary_c` library. `Aviary.loadedFrom` reports which path won.
