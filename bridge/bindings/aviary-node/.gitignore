@@ -1,3 +1,5 @@
+node_modules/
+
 # The bundled engines under prebuilds/<platform>-<arch>/ are part of the
 # package; the repository wide rules that ignore native libraries do not
 # apply here.

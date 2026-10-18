@@ -1729,3 +1729,22 @@ selectors - validated against real-world vectors). Deferred:
   `peering.test.js` (19 tests), the JVM and Swift demos.
 - **[ ] [L]** Windows: blocked until CipherBird has a Windows build.
 
+## Flutter examples, desktop Linux, repository hygiene - DONE (2026-10-18)
+- **[x] Example apps.** Both Flutter packages ship a four tab example
+  (ledger round trip with a balance proof, a live event stream with metrics,
+  an equipment record registered, serviced, handed over and proven, and four
+  validators reaching consensus over a `PeerMesh`), one class per file and
+  every file under 100 lines, with a widget test that drives every tab. The
+  previous example read a balance after disposing its node; fixed.
+- **[x] Flutter on desktop Linux** for `aviary_lite`: the plugin declares
+  Linux with a CMake file that bundles nothing, because `aviary_dart`'s build
+  hook already supplies the self contained Linux engine as a native asset.
+  The example has a Linux runner, and a new CI job runs the plugin and
+  example tests on Ubuntu and builds the example for Linux, checking that
+  `libaviary_c.so` lands in the bundle. `aviary` stays on Android, iOS and
+  macOS because the `cipherbird` package it shares its engine with has no
+  Linux build.
+- **[x] Hygiene workflow:** every tracked text file must be plain ASCII and
+  every copy of `aviary_c.h` must match the source header. The Flutter CI
+  job also formats, analyzes and tests each example app.
+

@@ -15,8 +15,9 @@ dependencies:
   aviary_lite: ^0.1.0
 ```
 
-Android, iOS and macOS are supported. The native library is bundled per
-platform and loaded automatically; call `Aviary.ensureInitialized()`
+Android, iOS, macOS and Linux desktop are supported. The native library is
+bundled per platform and loaded automatically (on Linux through
+`aviary_dart`'s build hook, so a Linux app needs no setup); call `Aviary.ensureInitialized()`
 once at start to warm it off the UI isolate.
 
 ## Use
@@ -46,3 +47,10 @@ final ok = node.verifyAccountProof(node.proveAccount(bob.address));
 API is re-exported, including its shortcut extensions (`fundAccount`,
 `sendTo`, `commit`, `hex`, `assembleSingleValidator`, `signWithShares`,
 `produceRound`). See that package for the full surface.
+
+## Example
+
+The example app has four tabs: a ledger round trip with a balance proof, a
+live event stream with metrics, an equipment record that is registered,
+serviced, handed over and proven, and four validators reaching consensus
+over a `PeerMesh`. Run it with `flutter run` from `example/`.

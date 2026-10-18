@@ -28,8 +28,8 @@ surface with the same names.
 | You are writing | Use | Install |
 |---|---|---|
 | A Dart CLI, server or test | `aviary_dart` | `dependencies: aviary_dart: ^0.1.0` |
-| A Flutter app that only needs the ledger | `aviary_lite` | `dependencies: aviary_lite: ^0.1.0` (one self-contained native binary) |
-| A Flutter app that also calls CipherBird directly | `aviary` | `dependencies: aviary: ^0.1.0` (shares the `cipherbird` package's engine) |
+| A Flutter app that only needs the ledger | `aviary_lite` | `dependencies: aviary_lite: ^0.1.0` (one self-contained native binary; Android, iOS, macOS, Linux) |
+| A Flutter app that also calls CipherBird directly | `aviary` | `dependencies: aviary: ^0.1.0` (shares the `cipherbird` package's engine; Android, iOS, macOS) |
 | Go | `bridge/bindings/go` | `go get github.com/Crdzbird/aviary/bridge/bindings/go@bridge/bindings/go/v0.1.1` |
 | Node.js | `aviary-ledger` | `npm install aviary-ledger` (bundles macOS arm64 and Linux engines) |
 | Swift (iOS, macOS) | Swift package at the repository root | `.package(url: "https://github.com/Crdzbird/aviary", from: "0.1.0")` |
@@ -366,6 +366,9 @@ cmake -S . -B build && cmake --build build
 `-d <device>` for an iOS simulator or an Android device (the READMEs
 explain the `adb reverse` step for Android). Sentinel and Interop also have a
 `probe` command under `server/cmd` that runs the scenario without Flutter.
+
+Each Flutter package also ships a four tab example app (ledger, events,
+records, network) under its `example/` folder, the one pub.dev shows.
 
 Console demos without Flutter: `dart run bin/node_demo.dart` in
 `bridge/bindings/dart`, `go run ./cmd/demo` in `bridge/bindings/go`, and

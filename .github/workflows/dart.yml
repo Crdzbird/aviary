@@ -47,3 +47,39 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze --fatal-infos
       - run: flutter test
+      - name: Example app
+        working-directory: bridge/bindings/${{ matrix.package }}/example
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze --fatal-infos
+          flutter test
+
+  # Flutter on desktop Linux: aviary_lite only, because the aviary package
+  # shares the cipherbird package's engine and cipherbird has no Linux build.
+  # aviary_dart's build hook supplies the self contained Linux engine.
+  aviary_lite_linux:
+    name: aviary_lite on Linux
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bridge/bindings/aviary_lite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install the Linux desktop toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - run: flutter pub get
+      - run: flutter analyze --fatal-infos
+      - run: flutter test
+      - name: Example app tests and a Linux build
+        working-directory: bridge/bindings/aviary_lite/example
+        run: |
+          flutter pub get
+          flutter test
+          flutter build linux --debug
+          test -f build/linux/x64/debug/bundle/lib/libaviary_c.so

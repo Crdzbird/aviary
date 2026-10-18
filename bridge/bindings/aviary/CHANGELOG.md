@@ -15,5 +15,6 @@ First release: the Aviary ledger for Flutter on Android, iOS and macOS.
   extensions of `aviary_dart`.
 - Requires Android API 24, iOS 15 and macOS 12, matching the CipherBird
   engine.
+- A four tab example app: ledger, events, records and network.
 - Ships an Apple privacy manifest: no tracking, no collected data, and the
   file timestamp and system boot time reasons declared.

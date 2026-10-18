@@ -2,7 +2,8 @@
 
 ## 0.1.0
 
-First release: the Aviary ledger for Flutter on Android, iOS and macOS.
+First release: the Aviary ledger for Flutter on Android, iOS, macOS and
+Linux desktop.
 
 - The whole `aviary_dart` API: the ledger with BFT finality, composable
   chains with application records, subchains, validator rotation, light
@@ -14,6 +15,7 @@ First release: the Aviary ledger for Flutter on Android, iOS and macOS.
 - `AviaryLite` entry point (`ensureInitialized`, `instance`) and the shortcut
   extensions of `aviary_dart`.
 - Requires Android API 24, iOS 15 and macOS 12, matching the CipherBird
-  engine.
+  engine. On Linux the engine comes from `aviary_dart`'s build hook.
+- A four tab example app: ledger, events, records and network.
 - Ships an Apple privacy manifest: no tracking, no collected data, and the
   file timestamp and system boot time reasons declared.
