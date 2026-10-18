@@ -36,7 +36,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Crdzbird/CipherBird
-          ref: main
+          # The shipped Linux engines are built from a released CipherBird, so a
+          # rebuild of the same Aviary commit yields the same engine. Move this
+          # tag together with the cipherbird constraint in bridge/bindings/aviary.
+          ref: v1.1.1
           path: cryptolib
 
       - name: Install build dependencies
