@@ -13,12 +13,14 @@ The package manifest is `Package.swift` at the repository root, so a
 dependency is one line:
 
 ```swift
-.package(url: "https://github.com/Crdzbird/aviary", from: "1.0.0"),
+.package(url: "https://github.com/Crdzbird/aviary", from: "1.0.1"),
 ```
 
 with the product `Aviary`. The two binary targets, `AviaryC.xcframework` and
 the merged `CipherBird.xcframework`, download from the GitHub release named in
 the manifest and are verified by checksum. Platforms: iOS 15 and macOS 12.
+Version 1.0.0's manifest asked for macOS 14 although its binaries run on
+macOS 12; 1.0.1 corrects that and ships the same binaries.
 
 ## Records, peering and admission
 

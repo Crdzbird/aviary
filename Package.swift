@@ -13,10 +13,10 @@
 // The crypto backend comes from the cryptolib Swift package (depended on, not
 // bundled). Local path until cryptolib is published.
 //
-// Slices: iOS 15+ device (arm64), iOS simulator (arm64), macOS 14+ (arm64).
+// Slices: iOS 15+ device (arm64), iOS simulator (arm64), macOS 12+ (arm64).
 //
 // Usage from another package:
-//     dependencies: [ .package(url: "https://github.com/Crdzbird/aviary", from: "1.0.0") ]
+//     dependencies: [ .package(url: "https://github.com/Crdzbird/aviary", from: "1.0.1") ]
 //     .product(name: "Aviary", package: "Aviary")
 // then `import Aviary`.
 import PackageDescription
@@ -43,7 +43,7 @@ let package = Package(
     name: "Aviary",
     platforms: [
         .iOS(.v15),
-        .macOS(.v14),
+        .macOS(.v12),
     ],
     products: [
         .library(name: "Aviary", targets: ["Aviary"]),

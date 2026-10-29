@@ -33,7 +33,7 @@ surface with the same names.
 | A Flutter app that also calls CipherBird directly | `aviary` | `dependencies: aviary: ^1.0.0` (shares the `cipherbird` package's engine; Android, iOS, macOS) |
 | Go | `bridge/bindings/go` | `go get github.com/Crdzbird/aviary/bridge/bindings/go@v1.0.0` |
 | Node.js | `aviary-ledger` | `npm install aviary-ledger` (bundles macOS arm64 and Linux engines) |
-| Swift (iOS, macOS) | Swift package at the repository root | `.package(url: "https://github.com/Crdzbird/aviary", from: "1.0.0")` |
+| Swift (iOS, macOS) | Swift package at the repository root | `.package(url: "https://github.com/Crdzbird/aviary", from: "1.0.1")` |
 | Java or Kotlin (JDK 22+) | `bridge/bindings/jvm` | jar from `scripts/jvm/build_jar.sh` |
 | Android without Flutter | `bridge/bindings/aviary-android` | AAR with the native pair and an off-thread preload |
 
