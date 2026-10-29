@@ -12,7 +12,7 @@ re-export this API.
 
 ```yaml
 dependencies:
-  aviary_dart: ^0.1.0
+  aviary_dart: ^1.0.0
 ```
 
 The engine for macOS arm64 ships inside the package and is found through the
@@ -278,9 +278,12 @@ The suites run one at a time (`dart_test.yaml`), because each drives the
 same native engine from its own isolate. The GitHub workflow `Dart packages`
 runs format, analysis, the suites and the pub.dev score on macOS and Linux
 for `aviary_dart`, and analysis plus tests for the two Flutter packages.
-Releases are published from tags (`aviary_dart-v0.1.0`, `aviary_lite-v0.1.0`,
-`aviary-v0.1.0`) by the `Publish to pub.dev` workflow through pub.dev's
+Releases are published from tags (`aviary_dart-v1.0.0`, `aviary_lite-v1.0.0`,
+`aviary-v1.0.0`) by the `Publish to pub.dev` workflow through pub.dev's
 GitHub Actions trust; see that workflow's header for the pub.dev settings.
+pub.dev enables that trust only for a package that already exists, so each
+package's first release (1.0.0) was published by hand; the workflow skips a
+version that is already on pub.dev.
 
 ## Determinism
 

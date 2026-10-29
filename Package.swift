@@ -16,7 +16,7 @@
 // Slices: iOS 15+ device (arm64), iOS simulator (arm64), macOS 14+ (arm64).
 //
 // Usage from another package:
-//     dependencies: [ .package(url: "https://github.com/Crdzbird/aviary", from: "0.1.0") ]
+//     dependencies: [ .package(url: "https://github.com/Crdzbird/aviary", from: "1.0.0") ]
 //     .product(name: "Aviary", package: "Aviary")
 // then `import Aviary`.
 import PackageDescription
@@ -27,7 +27,7 @@ import Foundation
 // checkout sets AVIARY_LOCAL_XCFRAMEWORKS=1 to use the trees in this repo,
 // which is what the demo and CI do. The manifest lives at the repository root
 // because SwiftPM resolves git URL dependencies from there.
-let releaseBase = "https://github.com/Crdzbird/aviary/releases/download/swift-v0.1.0"
+let releaseBase = "https://github.com/Crdzbird/aviary/releases/download/swift-v1.0.0"
 let aviaryChecksum = "effc9dceae1171c7776ba6c48ebb10a1c61a17a654b16cbea042d0590b8222c6"
 let cipherBirdChecksum = "bcedcc239dd65fae5848b0dade6dc808143dd4331bb054afa0b29ea1da067b92"
 let useLocal = ProcessInfo.processInfo.environment["AVIARY_LOCAL_XCFRAMEWORKS"] != nil

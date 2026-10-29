@@ -7,7 +7,7 @@
 // warm-up never blocks startup (the Android analog of the Flutter Isolate /
 // Node worker_thread preload).
 //
-//   dependencies { implementation("com.aviary:aviary-android:0.1.0") }
+//   dependencies { implementation("com.aviary:aviary-android:1.0.0") }
 //
 // Publish locally with:  ./gradlew :aviary-android:publishToMavenLocal
 plugins {
@@ -17,7 +17,7 @@ plugins {
 }
 
 group = "com.aviary"
-version = "0.1.0"
+version = "1.0.0"
 
 android {
     namespace = "com.aviary.android"

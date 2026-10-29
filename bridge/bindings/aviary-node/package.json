@@ -1,6 +1,6 @@
 {
   "name": "aviary-ledger",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Aviary for Node.js: a ledger with BFT consensus, composable chains, application records, light clients, custody, networking and EVM, Bitcoin and Solana interop over koffi FFI, with TypeScript types. Native libraries for macOS arm64 and Linux x64 and arm64 are bundled.",
   "main": "index.js",
   "types": "index.d.ts",

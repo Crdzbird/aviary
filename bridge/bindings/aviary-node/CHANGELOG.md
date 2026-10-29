@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.1.0
+## 1.0.0
 
-First release of aviary-ledger, the Aviary ledger for Node.js over koffi,
-built on the CipherBird 1.3.0 crypto engine.
+First stable release of aviary-ledger, the Aviary ledger for Node.js over
+koffi, built on the CipherBird 1.3.0 crypto engine. The public API follows semantic versioning
+from this release on.
 
 - The ledger: accounts (Ed25519 and hybrid post quantum), signed transfers,
   a mempool, BFT finality, state and inclusion proofs, snapshots and

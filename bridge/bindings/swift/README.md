@@ -13,7 +13,7 @@ The package manifest is `Package.swift` at the repository root, so a
 dependency is one line:
 
 ```swift
-.package(url: "https://github.com/Crdzbird/aviary", from: "0.1.0"),
+.package(url: "https://github.com/Crdzbird/aviary", from: "1.0.0"),
 ```
 
 with the product `Aviary`. The two binary targets, `AviaryC.xcframework` and

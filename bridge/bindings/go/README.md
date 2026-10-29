@@ -160,7 +160,7 @@ go run  ./cmd/demo           # cross-language golden-vector determinism check
 ## Install
 
 ```bash
-go get github.com/Crdzbird/aviary/bridge/bindings/go@bridge/bindings/go/v0.1.1
+go get github.com/Crdzbird/aviary/bridge/bindings/go@v1.0.0
 ```
 
 The module depends on CipherBird's Go module (`github.com/Crdzbird/CipherBird/

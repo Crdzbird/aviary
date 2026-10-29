@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.1.0
+## 1.0.0
 
-First release: the Aviary ledger for Flutter on Android, iOS, macOS and
-Linux desktop.
+First stable release: the Aviary ledger for Flutter on Android, iOS, macOS
+and Linux desktop. The public API follows semantic versioning
+from this release on.
 
 - The whole `aviary_dart` API: the ledger with BFT finality, composable
   chains with application records, subchains, validator rotation, light

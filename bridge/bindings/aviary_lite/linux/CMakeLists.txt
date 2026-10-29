@@ -3,5 +3,5 @@
 # loader finds it next to the application. The plugin therefore bundles no
 # library of its own.
 cmake_minimum_required(VERSION 3.13)
-project(aviary_lite_library VERSION 0.1.0 LANGUAGES CXX)
+project(aviary_lite_library VERSION 1.0.0 LANGUAGES CXX)
 set(aviary_lite_bundled_libraries "" PARENT_SCOPE)

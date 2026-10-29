@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.1.0
+## 1.0.0
 
-First release of the Dart API for the Aviary ledger, built on the
-CipherBird 1.3.0 crypto engine.
+First stable release of the Dart API for the Aviary ledger, built on the
+CipherBird 1.3.0 crypto engine. The public API follows semantic versioning
+from this release on.
 
 **Ledger**
 

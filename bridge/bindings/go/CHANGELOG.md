@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.1.1
+## 1.0.0
+
+First stable release. The public API follows semantic versioning from this
+release on.
 
 - A faster engine: each transaction's signature is verified once on its
   way into a block instead of three times, and consensus no longer repeats

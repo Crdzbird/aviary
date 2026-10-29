@@ -5,7 +5,7 @@
 # for the given release tag (the manifest is Package.swift at the repository
 # root). Upload the two zips as assets of a GitHub release
 # named after that tag; SwiftPM downloads them by URL and verifies the checksum.
-# Usage: bash scripts/apple/package_swift_release.sh swift-v0.1.0
+# Usage: bash scripts/apple/package_swift_release.sh swift-v1.0.0
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TAG="${1:?usage: package_swift_release.sh <release tag>}"

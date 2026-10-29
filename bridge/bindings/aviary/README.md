@@ -13,7 +13,7 @@ bundles the engine and has no extra dependency.
 
 ```yaml
 dependencies:
-  aviary: ^0.1.0
+  aviary: ^1.0.0
 ```
 
 Android, iOS and macOS are supported. Linux desktop is not, because the

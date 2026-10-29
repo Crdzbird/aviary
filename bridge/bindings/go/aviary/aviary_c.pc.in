@@ -5,7 +5,7 @@ includedir=${prefix}/include
 
 Name: aviary_c
 Description: Aviary C ABI (DLT core: ledger, BFT, mempool, interop)
-Version: 0.1.0
+Version: 1.0.0
 # aviary_c links cryptolib's C ABI at runtime.
 Requires.private: cryptolib_c
 Libs: -L${libdir} -laviary_c

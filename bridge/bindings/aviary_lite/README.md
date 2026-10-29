@@ -12,7 +12,7 @@ variant shares one engine with it instead of carrying a second copy.
 
 ```yaml
 dependencies:
-  aviary_lite: ^0.1.0
+  aviary_lite: ^1.0.0
 ```
 
 Android, iOS, macOS and Linux desktop are supported. The native library is

@@ -5,7 +5,7 @@
 # Usage: bash scripts/jvm/build_jar.sh [version]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-VERSION="${1:-0.1.0}"
+VERSION="${1:-1.0.0}"
 JVM="$ROOT/bridge/bindings/jvm"
 NATIVE="$ROOT/bridge/bindings/dart/native"
 OUT="$ROOT/dist/jvm"

@@ -103,8 +103,8 @@ platform.
 ## Self contained jar
 
 ```bash
-bash scripts/jvm/build_jar.sh 0.1.0
-java --enable-native-access=ALL-UNNAMED -jar dist/jvm/aviary-0.1.0.jar
+bash scripts/jvm/build_jar.sh 1.0.0
+java --enable-native-access=ALL-UNNAMED -jar dist/jvm/aviary-1.0.0.jar
 ```
 
 The jar carries the compiled binding and the native engine for macOS arm64
