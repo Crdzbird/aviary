@@ -8,6 +8,7 @@ on:
       - .github/workflows/native-linux.yml
       - scripts/linux/**
       - CMakeLists.txt
+      - VERSION
       - src/**
       - include/**
       - bridge/aviary_c.h
