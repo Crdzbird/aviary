@@ -28,8 +28,8 @@ import Foundation
 // which is what the demo and CI do. The manifest lives at the repository root
 // because SwiftPM resolves git URL dependencies from there.
 let releaseBase = "https://github.com/Crdzbird/aviary/releases/download/swift-v0.1.0"
-let aviaryChecksum = "c2650db68bc79ca1b5564f047e7a0f18eeb30a96407141910b618a64a822e437"
-let cipherBirdChecksum = "21f626c687696785419c3c4aea21ad008b08ac196f1ef9c513cf2c9513536a13"
+let aviaryChecksum = "effc9dceae1171c7776ba6c48ebb10a1c61a17a654b16cbea042d0590b8222c6"
+let cipherBirdChecksum = "bcedcc239dd65fae5848b0dade6dc808143dd4331bb054afa0b29ea1da067b92"
 let useLocal = ProcessInfo.processInfo.environment["AVIARY_LOCAL_XCFRAMEWORKS"] != nil
 
 let aviaryBinary: Target = useLocal
