@@ -11,7 +11,7 @@ Linux desktop.
   `PeerMesh`, custody, assurance postures, sealed mempools, anonymous
   membership credentials, typed event streams and metrics, and record
   queries on networked nodes.
-- Self contained: the CipherBird 1.1.1 engine is merged into the native
+- Self contained: the CipherBird 1.3.0 engine is merged into the native
   library, so the app carries one binary and no `cipherbird` dependency.
 - `AviaryLite` entry point (`ensureInitialized`, `instance`) and the shortcut
   extensions of `aviary_dart`.

@@ -3,7 +3,7 @@
 ## 0.1.0
 
 First release of the Dart API for the Aviary ledger, built on the
-CipherBird 1.1.1 crypto engine.
+CipherBird 1.3.0 crypto engine.
 
 **Ledger**
 

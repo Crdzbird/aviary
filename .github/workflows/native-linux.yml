@@ -39,7 +39,7 @@ jobs:
           # The shipped Linux engines are built from a released CipherBird, so a
           # rebuild of the same Aviary commit yields the same engine. Move this
           # tag together with the cipherbird constraint in bridge/bindings/aviary.
-          ref: v1.1.1
+          ref: v1.3.0
           path: cryptolib
 
       - name: Install build dependencies
@@ -63,7 +63,7 @@ jobs:
           echo "PKG_CONFIG_PATH=$PWD/build/pc" >> "$GITHUB_ENV"
           PKG_CONFIG_PATH="$PWD/build/pc" pkg-config --variable=libdir libcrypto
 
-      # CipherBird 1.1.1 ships libsodium 1.0.22 on every platform it builds;
+      # CipherBird 1.3.0 ships libsodium 1.0.22 on every platform it builds;
       # Ubuntu packages 1.0.18. Build the vendored 1.0.22 tarball from the
       # CipherBird tag, position independent and static, into the directory
       # the Linux archive script reads, and publish it through the same

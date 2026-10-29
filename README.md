@@ -378,45 +378,44 @@ Console demos without Flutter: `dart run bin/node_demo.dart` in
 ## Performance
 
 On a Pixel 7 Pro (Tensor G2, one Cortex-X1 core at 2.85 GHz, Android 17),
-through the `aviary_lite` arm64 engine as it ships, on CipherBird 1.1.1.
+through the `aviary_lite` arm64 engine as it ships, on CipherBird 1.3.0.
 Medians of three runs, per transaction or per operation.
 
 | Work | Plain | Encrypted |
 |---|---|---|
-| Sign and admit a transfer | 120 us, raw secret | 154 us, signed from the key store |
-| Admit and finalize a transfer | 194 us, plain mempool | 574 us, sealed mempool |
-| One height of a 4 validator BFT mesh | 64.1 ms, plaintext links | 65.0 ms over Noise, 65.4 ms over SecureSession |
-| Link setup, once per peer | none | 2.0 ms Noise XX with identity proofs, 1.7 ms SecureSession |
-| Encrypt and decrypt a 1 KiB frame | none | 16.6 us Noise, 16.8 us SecureSession |
+| Sign and admit a transfer | 86 us, raw secret | 130 us, signed from the key store |
+| Admit and finalize a transfer | 83 us, plain mempool | 442 us, sealed mempool |
+| One height of a 4 validator BFT mesh | 62.8 ms, plaintext links | 63.5 ms over Noise, 64.2 ms over SecureSession |
+| Link setup, once per peer | none | 1.9 ms Noise XX with identity proofs, 1.8 ms SecureSession |
+| Encrypt and decrypt a 1 KiB frame | none | 11.8 us Noise, 16.5 us SecureSession |
 | Transfer on the wire | 173 bytes | 1,501 bytes sealed |
 
-The ledger itself: a BFT block of 1,000 transfers costs 99.8 us per
+The ledger itself: a BFT block of 1,000 transfers costs 18.8 us per
 transfer to build, validate, apply and certify, follower replay with every
-signature and certificate verified 114 us, and a hybrid Ed25519 + ML-DSA-65
-transfer 728 us to sign and admit.
+signature and certificate verified 67 us, and a hybrid Ed25519 + ML-DSA-65
+transfer 735 us to sign and admit.
 
 What encryption costs:
 
-- **Key store:** 34 us more per transfer to unseal the key inside the
+- **Key store:** 44 us more per transfer to unseal the key inside the
   engine, plus a one time Argon2id derivation: 283 ms to create a store,
-  140 ms to unlock a saved one.
-- **Sealed mempool:** three times the plain path. Each transaction carries
-  its own hybrid KEM encapsulation (X25519 + ML-KEM-768): 207 us to seal on
-  the client and 180 us to open at the proposer, and it grows 8.7 times on
-  the wire. Admitting a sealed transaction is 1 us, since the pool never
-  decrypts.
+  146 ms to unlock a saved one.
+- **Sealed mempool:** about five times the plain path. Each transaction
+  carries its own hybrid KEM encapsulation (X25519 + ML-KEM-768): 174 us to
+  seal on the client and 181 us to open at the proposer, and it grows 8.7
+  times on the wire. Admitting a sealed transaction is 1 us, since the pool
+  never decrypts.
 - **Encrypted links:** 1 to 2 percent on a BFT height. Consensus time is BLS
   pairings, not the AEAD.
 
-These figures include this release's engine work: each transaction's
-signature is verified once instead of three times, consensus no longer
-verifies the same votes and block twice per height, and the Dart binding
-resolves each native function once. On the same phone that took a block of
-1,000 from 223 to 99.8 us per transfer, admit and finalize from 311 to
-194 us, and a mesh height from 127 to 64 ms. CipherBird's plain digest
-output (CipherBird#6, not yet released) takes the block to 18.4 us, admit
-and finalize to 83.5 us and replay to 67.2 us. Full tables, the desktop
-numbers and the method are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+On the same phone, from before the speed work to now: a block of 1,000
+went from 223 to 18.8 us per transfer, admit and finalize from 311 to
+83 us, follower replay from 112 to 67 us and a mesh height from 127 to
+63 ms. Two things did it: the engine verifies each signature once and no
+longer repeats consensus checks within a height, and CipherBird 1.1.2 and
+later stopped putting public outputs such as hashes and ciphertexts in
+page-locked memory. Full tables, the desktop numbers and the method are in
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 Reproduce on a connected Android device, or on the desktop:
 

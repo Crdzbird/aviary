@@ -42,8 +42,10 @@ Left out on purpose:
 Apple M3 Max, Dart 3.13.5, Aviary 0.1.0 on CipherBird 1.1.1, measured on
 the engine of commit 4f6ba2b. The engine and binding work recorded in
 `docs/PERFORMANCE.md` (one signature check per transaction, cached symbol
-lookups) has made the Aviary rows faster since; the pub.dev rows are
-unchanged. Each figure is
+lookups) has made the Aviary rows faster since, and CipherBird 1.1.2 and
+later return digests in plain memory, which removes the cost behind the
+hashing rows below (an engine hash of 32 bytes now takes about 0.2 us); the
+pub.dev rows are unchanged. Each figure is
 the best of five interleaved rounds per contender, so a burst of load
 elsewhere costs one round, not the result. Time per operation; lower is
 better. AOT is what a Flutter release build runs.

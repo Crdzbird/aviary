@@ -28,40 +28,40 @@ counterpart in the same process:
 ## Pixel 7 Pro, Android 17
 
 Tensor G2 pinned to a Cortex-X1 core at 2.85 GHz, thermal status 0 before
-every run. Three runs of each configuration, interleaved, medians shown.
-"1.1.1 before" is the engine as released in commit 4f6ba2b; "Aviary
-changes" is this release on the same CipherBird 1.1.1; the last column adds
-CipherBird's plain digest output (CipherBird commit 3e757ec, issue
-CipherBird#6), which is not released yet.
+every run, three runs of each configuration, medians shown. "1.1.1,
+before" is the engine of commit 4f6ba2b; "1.1.1, Aviary changes" is the
+engine of e00db9d on the same CipherBird; "1.3.0, as shipped" is that engine
+on CipherBird 1.3.0, whose public outputs (digests, ciphertexts, signatures)
+are no longer page-locked (CipherBird#6).
 
-| Path | Work | 1.1.1 before | Aviary changes | Plus CipherBird digest fix |
+| Path | Work | 1.1.1, before | 1.1.1, Aviary changes | 1.3.0, as shipped |
 |---|---|---|---|---|
-| plain | Ed25519 transfer, sign and admit | 110.0 us | 114.4 us | 90.2 us |
-| plain | BFT block of 1,000, validate, apply, certify | 223.0 us | 99.8 us | 18.4 us |
-| plain | Follower replay, all signatures and certificates | 111.7 us | 114.2 us | 67.2 us |
-| plain | Hybrid Ed25519 + ML-DSA-65 transfer, sign and admit | 768.1 us | 727.9 us | 733.3 us |
-| key store | Create the store (Argon2id key derivation) | 283.4 ms | 283.2 ms | 286.2 ms |
-| key store | Seal an account into the store | 58.9 us | 60.1 us | 57.2 us |
-| raw secret | Ed25519 transfer, sign and admit | 115.6 us | 120.2 us | 92.3 us |
-| key store | Ed25519 transfer, unseal, sign and admit | 152.2 us | 154.2 us | 133.4 us |
-| key store | Unlock a saved store (Argon2id) | 140.7 ms | 140.4 ms | 143.7 ms |
-| plain mempool | Admit a signed transaction | 89.3 us | 93.9 us | 65.8 us |
-| plain mempool | Admit and finalize | 310.5 us | 193.7 us | 83.5 us |
-| sealed mempool | Seal to the proposer (client side) | 205.9 us | 206.8 us | 209.8 us |
+| plain | Ed25519 transfer, sign and admit | 110.0 us | 114.4 us | 82.8 us |
+| plain | BFT block of 1,000, validate, apply, certify | 223.0 us | 99.8 us | 18.8 us |
+| plain | Follower replay, all signatures and certificates | 111.7 us | 114.2 us | 67.4 us |
+| plain | Hybrid Ed25519 + ML-DSA-65 transfer, sign and admit | 768.1 us | 727.9 us | 735.4 us |
+| key store | Create the store (Argon2id key derivation) | 283.4 ms | 283.2 ms | 283.4 ms |
+| key store | Seal an account into the store | 58.9 us | 60.1 us | 33.9 us |
+| raw secret | Ed25519 transfer, sign and admit | 115.6 us | 120.2 us | 85.9 us |
+| key store | Ed25519 transfer, unseal, sign and admit | 152.2 us | 154.2 us | 130.2 us |
+| key store | Unlock a saved store (Argon2id) | 140.7 ms | 140.4 ms | 146.0 ms |
+| plain mempool | Admit a signed transaction | 89.3 us | 93.9 us | 65.3 us |
+| plain mempool | Admit and finalize | 310.5 us | 193.7 us | 83.2 us |
+| sealed mempool | Seal to the proposer (client side) | 205.9 us | 206.8 us | 173.9 us |
 | sealed mempool | Admit sealed, no decryption | 1.0 us | 1.0 us | 1.0 us |
-| sealed mempool | Proposer opens the batch | 174.1 us | 179.9 us | 184.5 us |
-| sealed mempool | Seal, admit, open, admit and finalize | 684.9 us | 573.7 us | 478.7 us |
+| sealed mempool | Proposer opens the batch | 174.1 us | 179.9 us | 180.5 us |
+| sealed mempool | Seal, admit, open, admit and finalize | 684.9 us | 573.7 us | 442.3 us |
 | sealed mempool | Size of a sealed transfer | 1501 bytes against 173 plain | 1501 bytes against 173 plain | 1501 bytes against 173 plain |
-| plaintext links | 4 validator BFT height, full mesh | 127.3 ms | 64.1 ms | 63.0 ms |
+| plaintext links | 4 validator BFT height, full mesh | 127.3 ms | 64.1 ms | 62.8 ms |
 | plaintext links | Frames and wire bytes per height | 15568 bytes | 15568 bytes | 15568 bytes |
 | Noise links | Handshake per link, both sides | 2.0 ms | 2.0 ms | 1.9 ms |
-| Noise links | 4 validator BFT height, full mesh | 128.0 ms | 65.0 ms | 64.4 ms |
+| Noise links | 4 validator BFT height, full mesh | 128.0 ms | 65.0 ms | 63.5 ms |
 | Noise links | Frames and wire bytes per height | 16864 bytes | 16864 bytes | 16864 bytes |
-| SecureSession links | Handshake per link, both sides | 1.8 ms | 1.7 ms | 1.7 ms |
-| SecureSession links | 4 validator BFT height, full mesh | 128.4 ms | 65.4 ms | 64.5 ms |
+| SecureSession links | Handshake per link, both sides | 1.8 ms | 1.7 ms | 1.8 ms |
+| SecureSession links | 4 validator BFT height, full mesh | 128.4 ms | 65.4 ms | 64.2 ms |
 | SecureSession links | Frames and wire bytes per height | 16945 bytes | 16945 bytes | 16945 bytes |
-| Noise | Encrypt and decrypt a 1 KiB frame | 16.5 us | 16.6 us | 15.9 us |
-| SecureSession | Encrypt and decrypt a 1 KiB frame | 16.9 us | 16.8 us | 16.3 us |
+| Noise | Encrypt and decrypt a 1 KiB frame | 16.5 us | 16.6 us | 11.8 us |
+| SecureSession | Encrypt and decrypt a 1 KiB frame | 16.9 us | 16.8 us | 16.5 us |
 
 ## What changed in the engine
 
@@ -85,10 +85,10 @@ CipherBird#6), which is not released yet.
   not linger in freed memory. The struct used to free each result is reused
   instead of allocated per call.
 
-Still open: CipherBird returns AEAD output in locked memory, about 80
-percent of a 1 KiB frame round trip (CipherBird#6), and BFT votes are
-signed over index bound messages, so a certificate costs a pairing per
-signer instead of two.
+Still open: CipherBird's SecretStream (behind SecureSession) still builds
+its ciphertext in locked memory, so SecureSession frames did not get the
+Noise frames' gain (CipherBird#6), and BFT votes are signed over index
+bound messages, so a certificate costs a pairing per signer instead of two.
 
 ## Apple M3 Max, before these changes
 

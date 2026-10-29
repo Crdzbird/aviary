@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 # Merge CipherBird's per-platform xcframeworks (iOS and macOS are shipped as
 # two bundles by the cipherbird Flutter plugin) into one xcframework that the
-# Swift binding can reference as a single binary target.
+# Swift binding can reference as a single binary target. Since 1.3.0 both
+# bundles carry every slice, so each slice is taken once, from the first
+# bundle that has it.
 # Usage: bash scripts/apple/vendor_cipherbird.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CIPHERBIRD="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}/bridge/bindings/cipherbird"
 OUT="$ROOT/bridge/bindings/swift/Vendor/CipherBird.xcframework"
 ARGS=()
+SEEN=""
 for bundle in "$CIPHERBIRD/ios/cipherbird/CipherBird.xcframework" "$CIPHERBIRD/macos/cipherbird/CipherBird.xcframework"; do
   [[ -d "$bundle" ]] || { echo "missing $bundle; build the cipherbird plugin first"; exit 1; }
   for slice in "$bundle"/*/CipherBird.framework; do
+    id="$(basename "$(dirname "$slice")")"
+    case " $SEEN " in *" $id "*) continue ;; esac
+    SEEN="$SEEN $id"
     ARGS+=(-framework "$slice")
   done
 done

@@ -1803,7 +1803,7 @@ selectors - validated against real-world vectors). Deferred:
   engine as a code asset only on Linux and Windows; on macOS it is found
   through the package config, which a copied AOT binary does not have.
 
-## Speed and resource handling (Crdzbird/aviary#1) - IN PROGRESS (2026-10-18)
+## Speed and resource handling (Crdzbird/aviary#1) - IN PROGRESS (2026-10-18, updated 2026-10-29)
 - **[x] One signature check per transaction.** `SignatureCache` (bounded,
   8,192 entries) owned by the `Ledger` and shared with the `Mempool`, keyed
   by the tx root leaf; `build_block` and `run_block` hash each transaction
@@ -1821,12 +1821,16 @@ selectors - validated against real-world vectors). Deferred:
   a connected device. Pixel 7 Pro results in `docs/PERFORMANCE.md`: BFT
   block of 1,000 from 223 to 99.8 us per transfer, admit and finalize from
   311 to 194 us, mesh height from 127 to 64 ms.
-- **[ ] CipherBird 1.1.2** with plain digest output (CipherBird#6, commit
-  3e757ec): measured on the Pixel at 18.4 us per transfer for a block of
-  1,000, 83.5 us to admit and finalize, 67.2 us to replay. Needs the release
-  and rebuilt engines.
-- **[ ] AEAD output in locked memory** in CipherBird (about 80 percent of a
-  1 KiB frame round trip; comment on CipherBird#6).
+- **[x] CipherBird 1.3.0** (2026-10-29): public outputs (digests,
+  ciphertexts, signatures) in plain memory since 1.1.2 (CipherBird#6). Every
+  engine rebuilt on it, the Linux workflow pinned to v1.3.0, the `aviary`
+  package on `cipherbird: ^1.3.0`, the Go module on its commit. Pixel 7 Pro:
+  a block of 1,000 at 18.8 us per transfer, admit and finalize 83 us,
+  replay 67 us, Noise frames 16.6 to 11.8 us. Golden vectors unchanged.
+  `vendor_cipherbird.sh` takes each slice once, since both 1.3.0 bundles
+  carry all three.
+- **[ ] SecretStream ciphertext still locked** in CipherBird 1.3.0, so
+  SecureSession frames stay at 16.5 us (follow up on CipherBird#6).
 - **[ ] BLS certificates.** Votes sign index bound messages, so verifying a
   certificate costs one pairing per signer; a same message vote would allow
   a two pairing aggregate check but changes the signed bytes, a consensus
