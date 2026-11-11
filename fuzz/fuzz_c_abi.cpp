@@ -17,6 +17,7 @@ struct Fixture {
   AviarySecureSession open_session = nullptr;
   std::vector<std::uint8_t> kem_pub, kem_sec, sig_pub, sig_sec;
   std::vector<std::uint8_t> chain_genesis, chain_pub, chain_sec, tree_spec;
+  AviaryChain dynamic_parent = nullptr;
 
   static std::vector<std::uint8_t> take(AviaryBufferResult r) {
     std::vector<std::uint8_t> out;
@@ -55,6 +56,11 @@ struct Fixture {
     chain_sec = sec;
     std::vector<std::uint8_t> bft = take(aviary_blueprint_encode("bft", "account", "", nullptr, 0));
     chain_genesis = take(aviary_genesis_commit_blueprint(genesis.data(), genesis.size(), bft.data(), bft.size()));
+    std::vector<std::uint8_t> policy = take(aviary_dynamic_subchain_policy_encode(1, 0, 0, 0, 0, 0, nullptr, 0, nullptr, 0));
+    std::vector<std::uint8_t> parent_genesis =
+        take(aviary_genesis_commit_subchain_policy(chain_genesis.data(), chain_genesis.size(), policy.data(), policy.size()));
+    dynamic_parent = aviary_chain_assemble(parent_genesis.data(), parent_genesis.size(), 0, pub.data(), pub.size(),
+                                           sec.data(), sec.size());
     tree_spec = take(aviary_chain_tree_node_encode(79, bft.data(), bft.size(), 1, nullptr, nullptr, 0, pub.data(),
                                                    sec.data(), &power, 1, 0, 0, nullptr, 0));
     if (net) {
@@ -106,6 +112,17 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
   Fixture::take(aviary_portable_open_passphrase(data, size, "pw"));
   Fixture::take(aviary_threshold_share_unseal(data, size, "pw"));
   Fixture::take(aviary_subchain_policy_encode(4, 1, 0, 0, data, size));
+  std::uint8_t root[32] = {0};
+  Fixture::take(aviary_child_proof_verify(root, data, size));
+  aviary_subchain_proof_v2_verify(root, data, size);
+  Fixture::take(aviary_subchain_op_digest(data, size, 42, root));
+  Fixture::take(aviary_subchain_op_add_approval(data, size, 0, root, sizeof(root)));
+  Fixture::take(aviary_subchain_op_register(0, 0, data, size));
+  Fixture::take(aviary_subchain_op_set_registrars(0, 0, 1, data, size));
+  Fixture::take(aviary_dynamic_subchain_policy_encode(1, 0, 0, 0, 0, 1, data, size, data, size));
+  Fixture::take(aviary_subchain_proof_v2_encode(data, size, data, size));
+  Fixture::take(aviary_encoded_header_hash(data, size));
+  if (f.dynamic_parent) Fixture::take(aviary_chain_propose_subchain(f.dynamic_parent, 5, data, size, data, size));
   AviaryLightClient lc = aviary_light_client_new(42, data, size, data, size);
   if (lc) aviary_light_client_free(lc);
   return 0;

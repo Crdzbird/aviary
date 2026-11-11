@@ -28,6 +28,8 @@
 #include "aviary/peer_book.hpp"
 #include "aviary/bft_engine.hpp"
 #include "aviary/subchain.hpp"
+#include "aviary/dynamic_subchain.hpp"
+#include "aviary/subchain_relay.hpp"
 #include "aviary/light_client.hpp"
 #include "aviary/chain_tree.hpp"
 #include "aviary/chain_snapshot.hpp"
@@ -1690,6 +1692,12 @@ AviaryBufferResult aviary_genesis_commit_subchain_policy(const uint8_t* genesis,
                                                                      const uint8_t* policy, size_t policy_len) {
   try {
     aviary::GenesisSpec g = aviary::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    if (aviary::subchain_policy_format(cbv(policy, policy_len)) >= 2) {
+      aviary::DynamicSubchainPolicy d = aviary::DynamicSubchainPolicy::decode_all(cbv(policy, policy_len));
+      if (std::string e = d.validate(g.chain_id); !e.empty()) return error_result(e.c_str());
+      d.commit_to(g);
+      return bytes_result(g.encode());
+    }
     aviary::SubchainPolicy p = aviary::SubchainPolicy::decode_all(cbv(policy, policy_len));
     if (std::string e = p.validate(g.chain_id); !e.empty()) return error_result(e.c_str());
     p.commit_to(g);
@@ -1853,8 +1861,9 @@ AviaryBufferResult aviary_chain_validators(AviaryChain c) {
 AviaryBufferResult aviary_chain_child_tip(AviaryChain c, uint64_t child_chain_id) {
   if (!c) return error_result("null chain");
   const aviary::SubchainRegistry* reg = as_chain(c)->engine->ledger().subchains();
-  if (!reg) return error_result("chain: not a parent (no subchain policy)");
-  const aviary::BlockHeader* tip = reg->tip_of(child_chain_id);
+  const aviary::DynamicSubchainRegistry* dyn = as_chain(c)->engine->ledger().dynamic_subchains();
+  if (!reg && !dyn) return error_result("chain: not a parent (no subchain policy)");
+  const aviary::BlockHeader* tip = reg ? reg->tip_of(child_chain_id) : dyn->tip_of(child_chain_id);
   if (!tip) return error_result("chain: child not registered");
   return bytes_result(tip->encode());
 }
@@ -1863,6 +1872,8 @@ AviaryBufferResult aviary_chain_subchain_hop(AviaryChain c, uint64_t child_chain
   if (!c) return error_result("null chain");
   try {
     const aviary::SubchainRegistry* reg = as_chain(c)->engine->ledger().subchains();
+    if (!reg && as_chain(c)->engine->ledger().dynamic_subchains())
+      return error_result("chain: a dynamic parent proves a child with aviary_chain_child_proof");
     if (!reg) return error_result("chain: not a parent (no subchain policy)");
     return bytes_result(reg->hop(child_chain_id).encode());
   } catch (const std::exception& e) { return error_result(e.what()); }
@@ -2039,6 +2050,251 @@ void aviary_chain_tree_set_finalized_hook(AviaryChainTree t, AviaryFinalizedFn f
   if (t) { as_tree(t)->fin_fn = fn; as_tree(t)->fin_ctx = ctx; }
 }
 void aviary_chain_tree_free(AviaryChainTree t) { delete as_tree(t); }
+
+// -- Subchains version 2 -------------------------------------------------------
+
+namespace {
+std::vector<aviary::crypto::Bytes> optional_list(const uint8_t* p, size_t n) {
+  if (n == 0) return {};
+  if (!p) throw std::invalid_argument("null list");
+  return decode_blob_list(cbv(p, n));
+}
+
+aviary::RegistrarSet registrar_set(uint8_t threshold, const uint8_t* registrars, size_t registrars_len) {
+  aviary::RegistrarSet set;
+  set.threshold = threshold;
+  for (const auto& b : optional_list(registrars, registrars_len)) {
+    aviary::codec::CodecReader r(cbv(b.data(), b.size()));
+    aviary::Registrar one;
+    one.sig_algo = r.read_u8();
+    one.public_key = r.read_bytes();
+    r.assert_fully_consumed();
+    set.registrars.push_back(std::move(one));
+  }
+  return set;
+}
+
+aviary::ChildRegistration registration_of(const aviary::crypto::Bytes& b) {
+  aviary::codec::CodecReader r(cbv(b.data(), b.size()));
+  aviary::ChildRegistration c = aviary::ChildRegistration::decode(r);
+  r.assert_fully_consumed();
+  return c;
+}
+
+const aviary::DynamicSubchainRegistry* dynamic_registry(AviaryChain c) {
+  return as_chain(c)->engine->ledger().dynamic_subchains();
+}
+}  // namespace
+
+AviaryBufferResult aviary_encoded_header_hash(const uint8_t* header, size_t header_len) {
+  if (!header) return error_result("null header");
+  try {
+    const aviary::Hash h = aviary::BlockHeader::decode_all(cbv(header, header_len)).hash();
+    return bytes_result(h.data(), h.size());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_registrar_encode(uint8_t sig_algo, const uint8_t* public_key, size_t public_key_len) {
+  if (!public_key || public_key_len == 0) return error_result("registrar: empty public key");
+  try {
+    aviary::codec::CodecWriter w;
+    w.write_u8(sig_algo);
+    w.write_bytes(cbv(public_key, public_key_len));
+    return bytes_result(w.take());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_dynamic_subchain_policy_encode(
+    uint8_t max_depth, uint32_t max_children, uint16_t max_anchors_per_block, uint16_t max_headers_per_anchor,
+    uint16_t max_ops_per_block, uint8_t registrar_threshold, const uint8_t* registrars, size_t registrars_len,
+    const uint8_t* registrations, size_t registrations_len) {
+  try {
+    aviary::DynamicSubchainPolicy p;
+    p.max_depth = max_depth;
+    p.max_children = max_children;
+    p.max_anchors_per_block = max_anchors_per_block;
+    p.max_headers_per_anchor = max_headers_per_anchor;
+    p.max_ops_per_block = max_ops_per_block;
+    p.authority = registrar_set(registrar_threshold, registrars, registrars_len);
+    for (const auto& b : optional_list(registrations, registrations_len)) p.children.push_back(registration_of(b));
+    return bytes_result(p.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_subchain_op_register(uint32_t authority_epoch, uint64_t valid_until,
+                                               const uint8_t* registration, size_t registration_len) {
+  if (!registration) return error_result("operation: null registration");
+  try {
+    const aviary::crypto::Bytes b(registration, registration + registration_len);
+    return bytes_result(aviary::make_register_op(authority_epoch, valid_until, registration_of(b)).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_subchain_op_close(uint32_t authority_epoch, uint64_t valid_until, uint64_t chain_id,
+                                            uint64_t final_height, const uint8_t* final_tip_hash) {
+  if (!final_tip_hash) return error_result("operation: null final tip hash");
+  try {
+    return bytes_result(aviary::make_close_op(authority_epoch, valid_until,
+                                              aviary::CloseChild{chain_id, final_height, to_hash32(final_tip_hash)})
+                            .encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_subchain_op_set_registrars(uint32_t authority_epoch, uint64_t valid_until,
+                                                     uint8_t registrar_threshold, const uint8_t* registrars,
+                                                     size_t registrars_len) {
+  try {
+    return bytes_result(aviary::make_set_registrars_op(
+                            authority_epoch, valid_until, registrar_set(registrar_threshold, registrars, registrars_len))
+                            .encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_subchain_op_digest(const uint8_t* op, size_t op_len, uint64_t parent_chain_id,
+                                             const uint8_t* parent_genesis_hash) {
+  if (!op || !parent_genesis_hash) return error_result("operation: null argument");
+  try {
+    const aviary::Hash d = aviary::SubchainOp::decode_all(cbv(op, op_len))
+                               .auth_digest(parent_chain_id, to_hash32(parent_genesis_hash));
+    return bytes_result(d.data(), d.size());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_subchain_op_sign(const uint8_t* op, size_t op_len, uint64_t parent_chain_id,
+                                           const uint8_t* parent_genesis_hash, uint16_t registrar_index,
+                                           uint8_t sig_algo, const uint8_t* secret, size_t secret_len) {
+  if (!op || !parent_genesis_hash || !secret) return error_result("operation: null argument");
+  try {
+    const aviary::SigAlgo algo = static_cast<aviary::SigAlgo>(sig_algo);
+    if (algo == aviary::SigAlgo::kEd25519 && secret_len != 64)
+      return error_result("operation: ed25519 secret must be 64 bytes (seed || public)");
+    aviary::SubchainOp o = aviary::SubchainOp::decode_all(cbv(op, op_len));
+    aviary::approve_op(o, parent_chain_id, to_hash32(parent_genesis_hash), registrar_index, algo,
+                       cbv(secret, secret_len));
+    return bytes_result(o.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_subchain_op_add_approval(const uint8_t* op, size_t op_len, uint16_t registrar_index,
+                                                   const uint8_t* signature, size_t signature_len) {
+  if (!op || !signature) return error_result("operation: null argument");
+  try {
+    aviary::SubchainOp o = aviary::SubchainOp::decode_all(cbv(op, op_len));
+    aviary::add_op_approval(o, registrar_index, aviary::crypto::Bytes(signature, signature + signature_len));
+    return bytes_result(o.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_chain_propose_subchain(AviaryChain c, uint64_t timestamp, const uint8_t* anchors,
+                                                 size_t anchors_len, const uint8_t* ops, size_t ops_len) {
+  if (!c) return error_result("null chain");
+  try {
+    std::vector<aviary::Anchor> as;
+    for (const auto& b : optional_list(anchors, anchors_len)) as.push_back(aviary::Anchor::decode_all(cbv(b.data(), b.size())));
+    std::vector<aviary::SubchainOp> os;
+    for (const auto& b : optional_list(ops, ops_len)) os.push_back(aviary::SubchainOp::decode_all(cbv(b.data(), b.size())));
+    return bytes_result(as_chain(c)->engine->propose_subchain(as_box(c)->pending, timestamp, std::move(as), std::move(os)).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int aviary_chain_registry_counts(AviaryChain c, uint32_t* records, uint32_t* open, uint32_t* authority_epoch) {
+  if (!c) return 0;
+  const aviary::DynamicSubchainRegistry* reg = dynamic_registry(c);
+  if (!reg) return 0;
+  if (records) *records = reg->record_count();
+  if (open) *open = reg->open_count();
+  if (authority_epoch) *authority_epoch = reg->authority_epoch();
+  return 1;
+}
+
+AviaryBufferResult aviary_chain_child_record(AviaryChain c, uint64_t child_chain_id) {
+  if (!c) return error_result("null chain");
+  try {
+    const aviary::DynamicSubchainRegistry* reg = dynamic_registry(c);
+    if (!reg) return error_result("chain: no dynamic subchain policy");
+    const aviary::DynamicSubchainRegistry::Child* child = reg->child(child_chain_id);
+    if (!child) return error_result("chain: child not registered");
+    return bytes_result(child->record.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_chain_child_proof(AviaryChain c, uint64_t child_chain_id) {
+  if (!c) return error_result("null chain");
+  try {
+    const aviary::DynamicSubchainRegistry* reg = dynamic_registry(c);
+    if (!reg) return error_result("chain: no dynamic subchain policy");
+    return bytes_result(reg->prove(child_chain_id).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_child_proof_verify(const uint8_t* subchain_root, const uint8_t* proof, size_t proof_len) {
+  if (!subchain_root || !proof) return error_result("child proof: null argument");
+  try {
+    const std::optional<aviary::ChildRecord> rec = aviary::verify_child_proof(
+        to_hash32(subchain_root), aviary::ChildProof::decode_all(cbv(proof, proof_len)));
+    if (!rec) return error_result("child proof: not committed by this subchain_root");
+    return bytes_result(rec->encode());
+  } catch (const std::exception& e) { return error_result(std::string("child proof: ") + e.what()); }
+}
+
+AviaryBufferResult aviary_chain_pending_anchor(AviaryChain parent, AviaryChain child, uint16_t limit) {
+  if (!parent || !child) return error_result("null chain");
+  try {
+    const std::optional<aviary::BlockStore>& archive = as_box(child)->archive;
+    if (!archive) return error_result("chain: the child's archive is not enabled");
+    const aviary::Ledger& ledger = as_chain(parent)->engine->ledger();
+    const std::uint64_t id = as_chain(child)->engine->ledger().spec().chain_id;
+    std::optional<aviary::Anchor> anchor;
+    if (ledger.dynamic_subchains()) anchor = aviary::node::pending_anchor(*ledger.dynamic_subchains(), id, *archive, limit);
+    if (ledger.subchains()) anchor = aviary::node::pending_anchor(*ledger.subchains(), id, *archive, limit);
+    if (!ledger.dynamic_subchains() && !ledger.subchains()) return error_result("chain: not a parent (no subchain policy)");
+    const std::uint8_t none = 0;
+    if (!anchor) return bytes_result(&none, 0);
+    return bytes_result(anchor->encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_chain_subchain_hop_v2(AviaryChain c, uint64_t child_chain_id) {
+  if (!c) return error_result("null chain");
+  try {
+    const aviary::Ledger& ledger = as_chain(c)->engine->ledger();
+    std::vector<std::uint8_t> out;
+    if (ledger.dynamic_subchains()) {
+      out.push_back(aviary::SubchainProofV2::kRecordHop);
+      const aviary::crypto::Bytes body = ledger.dynamic_subchains()->prove(child_chain_id).encode();
+      out.insert(out.end(), body.begin(), body.end());
+      return bytes_result(out);
+    }
+    if (!ledger.subchains()) return error_result("chain: not a parent (no subchain policy)");
+    out.push_back(aviary::SubchainProofV2::kFlatHop);
+    const aviary::crypto::Bytes body = ledger.subchains()->hop(child_chain_id).encode();
+    out.insert(out.end(), body.begin(), body.end());
+    return bytes_result(out);
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_subchain_proof_v2_encode(const uint8_t* hops, size_t hops_len, const uint8_t* state_proof,
+                                                   size_t state_proof_len) {
+  if (!state_proof) return error_result("subchain proof: null state proof");
+  try {
+    aviary::SubchainProofV2 p;
+    for (const auto& b : optional_list(hops, hops_len)) {
+      if (b.empty()) return error_result("subchain proof: empty hop");
+      p.hops.push_back(aviary::SubchainProofV2::Hop{b[0], aviary::crypto::Bytes(b.begin() + 1, b.end())});
+    }
+    p.state_proof = aviary::StateProof::decode_all(cbv(state_proof, state_proof_len));
+    const aviary::crypto::Bytes encoded = p.encode();
+    return bytes_result(aviary::SubchainProofV2::decode_all(cbv(encoded.data(), encoded.size())).encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+int aviary_subchain_proof_v2_verify(const uint8_t* parent_subchain_root, const uint8_t* proof, size_t proof_len) {
+  if (!parent_subchain_root || !proof) return 0;
+  try {
+    return aviary::verify_subchain_proof_v2(to_hash32(parent_subchain_root),
+                                            aviary::SubchainProofV2::decode_all(cbv(proof, proof_len))) ? 1 : 0;
+  } catch (...) { return 0; }
+}
 
 // -- Persistence ---------------------------------------------------------------
 
