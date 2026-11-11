@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+Needs an engine built from the same source: the functions below are not in
+the 1.0.0 binaries bundled with the packages.
+
+**Subchains version 2**
+
+- A parent with a dynamic policy (`encodeDynamicSubchainPolicy`, registrars
+  as `RegistrarEntry`) registers children in any block: `opRegister`,
+  `opClose`, `opSetRegistrars`, `opDigest`, `signOp`, `addOpApproval` and
+  `Chain.proposeSubchain`.
+- A Merkle registry with one `ChildRecord` per child: `Chain.childRecord`,
+  `Chain.childProof`, `Chain.registryCounts`, `verifyChildProof`,
+  `pendingAnchor`, `Chain.subchainHopV2`, `encodeSubchainProofV2`,
+  `verifySubchainProofV2` and `encodedHeaderHash`.
+
+**Persistence**
+
+- `Chain.snapshot`, `restoreChain` and `chainSnapshotError`; an opt in block
+  archive (`Chain.enableArchive`, `archiveRange`, `archivedBlock`,
+  `archivedCertificate`, `pruneArchive`); `Chain.tip`.
+- `ChainTree.snapshot` and `restoreChainTree`.
+
 ## 1.0.0
 
 First stable release of the Dart API for the Aviary ledger, built on the

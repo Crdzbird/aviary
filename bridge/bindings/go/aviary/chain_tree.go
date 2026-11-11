@@ -134,6 +134,27 @@ func BuildChainTree(root ChainTreeNode) (*ChainTree, error) {
 	return t, nil
 }
 
+// Snapshot is the whole family as one blob: every node's chain snapshot. It
+// holds no secret key.
+func (t *ChainTree) Snapshot() ([]byte, error) { return takeBuf(C.aviary_chain_tree_snapshot(t.h)) }
+
+// RestoreChainTree rebuilds a family from the SAME root node it was built from
+// and a Snapshot. Hooks are not restored; set them again.
+func RestoreChainTree(root ChainTreeNode, snapshot []byte) (*ChainTree, error) {
+	spec, err := root.Encode()
+	if err != nil {
+		return nil, err
+	}
+	h := C.aviary_chain_tree_restore(bp(spec), C.size_t(len(spec)), bp(snapshot), C.size_t(len(snapshot)))
+	if h == nil {
+		return nil, errors.New("tree: restore refused (another family, or a malformed snapshot)")
+	}
+	t := &ChainTree{h: h}
+	t.handle = cgo.NewHandle(t)
+	C.bc_tree_hooks(unsafe.Pointer(h), unsafe.Pointer(t.handle))
+	return t, nil
+}
+
 func (t *ChainTree) Free() {
 	if t.h != nil {
 		C.aviary_chain_tree_free(t.h)

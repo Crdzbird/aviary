@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+Needs libaviary_c built from the same source.
+
+- Subchains version 2: `DynamicSubchainPolicy`, `Registrar`, `OpRegister`,
+  `OpClose`, `OpSetRegistrars`, `OpDigest`, `SignOp`, `AddOpApproval`,
+  `Chain.ProposeSubchain`, `Chain.RegistryCounts`, `Chain.ChildRecord`,
+  `Chain.ChildProof`, `VerifyChildProof`, `PendingAnchor`,
+  `Chain.SubchainHopV2`, `EncodeSubchainProofV2`, `VerifySubchainProofV2`
+  and `EncodedHeaderHash`.
+- Persistence: `Chain.Snapshot`, `RestoreChain`, `ChainSnapshotError`,
+  `Chain.Tip`, the opt in archive (`Chain.EnableArchive`, `ArchiveRange`,
+  `ArchivedBlock`, `ArchivedCertificate`, `PruneArchive`),
+  `ChainTree.Snapshot` and `RestoreChainTree`.
+
 ## 1.0.0
 
 First stable release. The public API follows semantic versioning from this
