@@ -872,6 +872,59 @@ AVIARY_API void aviary_chain_tree_set_tx_source(AviaryChainTree t, AviaryTxSourc
 AVIARY_API void aviary_chain_tree_set_finalized_hook(AviaryChainTree t, AviaryFinalizedFn fn, void* ctx);
 AVIARY_API void aviary_chain_tree_free(AviaryChainTree t);
 
+/* -- Persistence: save an assembled chain or a chain tree and bring it back ---
+ *  A snapshot is one canonical, versioned blob (docs/CODEC_SPEC.md "Chain
+ *  snapshot"): the ledger (tip, state, subchain registry), the receipts of the
+ *  tip block, the engine's consensus state and, when the chain keeps one, its
+ *  block archive. It is bound to the genesis hash and holds NO secret key:
+ *  restore takes the genesis and the validator key again. A restored chain
+ *  produces byte for byte what the original would for every later call.
+ *  Not captured: transactions queued with aviary_chain_add_tx, buffered
+ *  events, metrics and hooks. Restore is strict: a blob with trailing bytes,
+ *  a non canonical field, another genesis, or a section that disagrees with
+ *  its own tip is refused and nothing is built. Snapshots are ordinary
+ *  buffers (free with aviary_buffer_free); handles stay single threaded. */
+
+/** This chain's current tip header (the genesis header before any block). */
+AVIARY_API AviaryBufferResult aviary_chain_tip(AviaryChain c);
+/** The snapshot of this chain as it stands now. */
+AVIARY_API AviaryBufferResult aviary_chain_snapshot(AviaryChain c);
+/** Rebuild a chain from the genesis it was assembled from and a blob from
+ *  aviary_chain_snapshot, as validator [me]. NULL on ANY reject; ask
+ *  aviary_chain_snapshot_error for the reason. Built in state models only. */
+AVIARY_API AviaryChain aviary_chain_restore(
+    const uint8_t* genesis, size_t genesis_len, uint32_t me,
+    const uint8_t* bls_pub, size_t pub_len, const uint8_t* bls_sec, size_t sec_len,
+    const uint8_t* snapshot, size_t snapshot_len);
+/** Why aviary_chain_restore would refuse [snapshot] under [genesis], as text
+ *  (an EMPTY buffer = it would be accepted). Needs no key. */
+AVIARY_API AviaryBufferResult aviary_chain_snapshot_error(
+    const uint8_t* genesis, size_t genesis_len, const uint8_t* snapshot, size_t snapshot_len);
+
+/** Start keeping every block this handle commits from now on, with its commit
+ *  certificate, inside the handle (and so inside its snapshots). Off by
+ *  default: a chain that never calls this keeps no blocks. BFT chains only
+ *  (the engines whose blocks carry certificates and can be anchored).
+ *  Returns 1 (also when already on), 0 if the engine is not BFT. */
+AVIARY_API int aviary_chain_archive_enable(AviaryChain c);
+/** The archived height range. Returns 1 and writes *first / *last when the
+ *  archive holds at least one block, else 0. */
+AVIARY_API int aviary_chain_archive_range(AviaryChain c, uint64_t* first, uint64_t* last);
+/** The archived encoded block at [height]; an error when absent. */
+AVIARY_API AviaryBufferResult aviary_chain_archived_block(AviaryChain c, uint64_t height);
+/** The commit certificate that finalized the archived block at [height]. */
+AVIARY_API AviaryBufferResult aviary_chain_archived_certificate(AviaryChain c, uint64_t height);
+/** Drop archived blocks below [height] (for example once a parent anchored
+ *  them and they are stored elsewhere). Returns how many were dropped. */
+AVIARY_API uint64_t aviary_chain_archive_prune(AviaryChain c, uint64_t height);
+
+/** The snapshot of a whole chain tree: every node's chain snapshot. */
+AVIARY_API AviaryBufferResult aviary_chain_tree_snapshot(AviaryChainTree t);
+/** Rebuild a tree from the SAME encoded spec it was built from and a blob from
+ *  aviary_chain_tree_snapshot. NULL on any reject. Hooks are not restored. */
+AVIARY_API AviaryChainTree aviary_chain_tree_restore(
+    const uint8_t* spec, size_t spec_len, const uint8_t* snapshot, size_t snapshot_len);
+
 /* -- Networking: consensus over gossip without a socket or a clock ----------
  *  A NetNode is a validator (or an observer) that runs BFT consensus over a
  *  gossip mesh but owns no socket and no timer. Every input returns an

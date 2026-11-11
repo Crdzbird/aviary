@@ -30,6 +30,8 @@
 #include "aviary/subchain.hpp"
 #include "aviary/light_client.hpp"
 #include "aviary/chain_tree.hpp"
+#include "aviary/chain_snapshot.hpp"
+#include "aviary/block_store.hpp"
 #if defined(_WIN32)
 #include <windows.h>
 #else
@@ -226,8 +228,11 @@ struct ChainBox {
   std::unique_ptr<aviary::observe::JsonEventLog> log;
   std::vector<aviary::Transaction> pending;
   std::unique_ptr<aviary::StateMachine> staged;
-  ChainBox(aviary::node::AssembledChain c, std::uint32_t m, aviary::crypto::KeyPair k)
-      : chain(std::move(c)), me(m), key(std::move(k)), log(std::make_unique<aviary::observe::JsonEventLog>(bus)) {}
+  aviary::crypto::Hash genesis_hash{};
+  std::optional<aviary::BlockStore> archive;
+  ChainBox(aviary::node::AssembledChain c, std::uint32_t m, aviary::crypto::KeyPair k, aviary::crypto::Hash g)
+      : chain(std::move(c)), me(m), key(std::move(k)), log(std::make_unique<aviary::observe::JsonEventLog>(bus)),
+        genesis_hash(g) {}
   aviary::StateMachine& staged_state() {
     if (!staged) staged = chain.engine->ledger().state().clone();
     return *staged;
@@ -1396,7 +1401,7 @@ AviaryChain aviary_chain_assemble(const uint8_t* genesis, size_t genesis_len, ui
     aviary::crypto::KeyPair key{aviary::crypto::Bytes(bls_pub, bls_pub + pub_len),
                                       aviary::crypto::Bytes(bls_sec, bls_sec + sec_len)};
     auto chain = aviary::node::ChainAssembler::assemble(g, me, key);
-    return new ChainBox(std::move(chain), me, std::move(key));
+    return new ChainBox(std::move(chain), me, std::move(key), g.hash());
   } catch (...) {
     return nullptr;  // fail-closed: unknown id / forbidden mix / bad genesis
   }
@@ -1457,6 +1462,8 @@ int aviary_chain_submit(AviaryChain c, const uint8_t* block, size_t block_len,
   try {
     aviary::Block b = aviary::Block::decode_all(cbv(block, block_len));
     const bool ok = as_chain(c)->engine->submit(b, cbv(justification, justification_len)).ok;
+    if (ok && as_box(c)->archive)
+      as_box(c)->archive->put(b, aviary::consensus::CommitCertificate::decode_all(cbv(justification, justification_len)));
     as_box(c)->report(b, ok);
     return ok ? 1 : 0;
   } catch (...) {
@@ -1901,6 +1908,13 @@ class CallbackTree : public aviary::node::ChainTree {
     static_cast<aviary::node::ChainTree&>(*t) = std::move(*base);
     return t;
   }
+  static std::unique_ptr<CallbackTree> restore(const aviary::node::ChainTreeSpec& spec,
+                                               aviary::crypto::ByteView snapshot) {
+    auto base = aviary::node::ChainTree::restore(spec, snapshot);
+    auto t = std::unique_ptr<CallbackTree>(new CallbackTree());
+    static_cast<aviary::node::ChainTree&>(*t) = std::move(*base);
+    return t;
+  }
   AviaryTxSourceFn tx_fn = nullptr; void* tx_ctx = nullptr;
   AviaryFinalizedFn fin_fn = nullptr; void* fin_ctx = nullptr;
 
@@ -2025,6 +2039,107 @@ void aviary_chain_tree_set_finalized_hook(AviaryChainTree t, AviaryFinalizedFn f
   if (t) { as_tree(t)->fin_fn = fn; as_tree(t)->fin_ctx = ctx; }
 }
 void aviary_chain_tree_free(AviaryChainTree t) { delete as_tree(t); }
+
+// -- Persistence ---------------------------------------------------------------
+
+AviaryBufferResult aviary_chain_tip(AviaryChain c) {
+  if (!c) return error_result("null chain");
+  try { return bytes_result(as_chain(c)->engine->tip().encode()); } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_chain_snapshot(AviaryChain c) {
+  if (!c) return error_result("null chain");
+  try {
+    ChainBox* box = as_box(c);
+    return bytes_result(aviary::node::snapshot_chain(box->genesis_hash, box->chain, box->archive ? &*box->archive : nullptr));
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryChain aviary_chain_restore(const uint8_t* genesis, size_t genesis_len, uint32_t me,
+                                 const uint8_t* bls_pub, size_t pub_len, const uint8_t* bls_sec, size_t sec_len,
+                                 const uint8_t* snapshot, size_t snapshot_len) {
+  if (!genesis || !snapshot) return nullptr;
+  try {
+    aviary::GenesisSpec g = aviary::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    aviary::crypto::KeyPair key{aviary::crypto::Bytes(bls_pub, bls_pub + pub_len),
+                                aviary::crypto::Bytes(bls_sec, bls_sec + sec_len)};
+    aviary::node::RestoredChain restored = aviary::node::restore_chain(g, me, key, cbv(snapshot, snapshot_len));
+    auto box = std::make_unique<ChainBox>(std::move(restored.chain), me, std::move(key), g.hash());
+    box->archive = std::move(restored.archive);
+    return box.release();
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+AviaryBufferResult aviary_chain_snapshot_error(const uint8_t* genesis, size_t genesis_len,
+                                               const uint8_t* snapshot, size_t snapshot_len) {
+  std::string reason;
+  try {
+    if (!genesis || !snapshot) throw std::invalid_argument("null genesis or snapshot");
+    aviary::GenesisSpec g = aviary::GenesisSpec::decode_all(cbv(genesis, genesis_len));
+    (void)aviary::node::restore_chain(g, 0, aviary::crypto::KeyPair{}, cbv(snapshot, snapshot_len));
+  } catch (const std::exception& e) {
+    reason = e.what();
+    if (reason.empty()) reason = "rejected";
+  } catch (...) {
+    reason = "rejected";
+  }
+  return bytes_result(reinterpret_cast<const std::uint8_t*>(reason.data()), reason.size());
+}
+
+int aviary_chain_archive_enable(AviaryChain c) {
+  if (!c) return 0;
+  if (!dynamic_cast<aviary::consensus::BftEngine*>(as_chain(c)->engine.get())) return 0;
+  if (!as_box(c)->archive) as_box(c)->archive.emplace();
+  return 1;
+}
+
+int aviary_chain_archive_range(AviaryChain c, uint64_t* first, uint64_t* last) {
+  if (!c || !first || !last) return 0;
+  const std::optional<aviary::BlockStore>& archive = as_box(c)->archive;
+  if (!archive || archive->empty()) return 0;
+  *first = archive->first_height();
+  *last = archive->tip_height();
+  return 1;
+}
+
+AviaryBufferResult aviary_chain_archived_block(AviaryChain c, uint64_t height) {
+  if (!c) return error_result("null chain");
+  try {
+    const std::optional<aviary::BlockStore>& archive = as_box(c)->archive;
+    if (!archive) return error_result("chain: the archive is not enabled");
+    return bytes_result(archive->by_height(height).block.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryBufferResult aviary_chain_archived_certificate(AviaryChain c, uint64_t height) {
+  if (!c) return error_result("null chain");
+  try {
+    const std::optional<aviary::BlockStore>& archive = as_box(c)->archive;
+    if (!archive) return error_result("chain: the archive is not enabled");
+    return bytes_result(archive->by_height(height).commit.encode());
+  } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+uint64_t aviary_chain_archive_prune(AviaryChain c, uint64_t height) {
+  if (!c || !as_box(c)->archive) return 0;
+  try { return static_cast<uint64_t>(as_box(c)->archive->prune_below(height)); } catch (...) { return 0; }
+}
+
+AviaryBufferResult aviary_chain_tree_snapshot(AviaryChainTree t) {
+  if (!t) return error_result("null tree");
+  try { return bytes_result(as_tree(t)->snapshot()); } catch (const std::exception& e) { return error_result(e.what()); }
+}
+
+AviaryChainTree aviary_chain_tree_restore(const uint8_t* spec, size_t spec_len,
+                                          const uint8_t* snapshot, size_t snapshot_len) {
+  if (!spec || !snapshot) return nullptr;
+  try {
+    return CallbackTree::restore(aviary::node::ChainTreeSpec::decode_all(cbv(spec, spec_len)),
+                                 cbv(snapshot, snapshot_len)).release();
+  } catch (...) { return nullptr; }
+}
 
 // -- Networking: NetworkedNode and SecureSession over the C ABI ---------------
 

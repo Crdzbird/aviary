@@ -16,6 +16,7 @@ struct Fixture {
   AviaryNetNode net = nullptr;
   AviarySecureSession open_session = nullptr;
   std::vector<std::uint8_t> kem_pub, kem_sec, sig_pub, sig_sec;
+  std::vector<std::uint8_t> chain_genesis, chain_pub, chain_sec, tree_spec;
 
   static std::vector<std::uint8_t> take(AviaryBufferResult r) {
     std::vector<std::uint8_t> out;
@@ -50,6 +51,12 @@ struct Fixture {
     std::uint64_t power = 1;
     std::vector<std::uint8_t> genesis = take(aviary_genesis_build(42, 1, 1, 0, nullptr, nullptr, 0, pub.data(), &power, 1));
     net = aviary_net_node_new(genesis.data(), genesis.size(), 0, pub.data(), pub.size(), sec.data(), sec.size(), 1);
+    chain_pub = pub;
+    chain_sec = sec;
+    std::vector<std::uint8_t> bft = take(aviary_blueprint_encode("bft", "account", "", nullptr, 0));
+    chain_genesis = take(aviary_genesis_commit_blueprint(genesis.data(), genesis.size(), bft.data(), bft.size()));
+    tree_spec = take(aviary_chain_tree_node_encode(79, bft.data(), bft.size(), 1, nullptr, nullptr, 0, pub.data(),
+                                                   sec.data(), &power, 1, 0, 0, nullptr, 0));
     if (net) {
       aviary_net_node_add_peer(net, 1);
       take(aviary_net_node_start(net));
@@ -90,6 +97,12 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
   AviaryChainTree tree = aviary_chain_tree_build(data, size);
   if (tree) aviary_chain_tree_free(tree);
   Fixture::take(aviary_chain_tree_spec_error(data, size));
+  AviaryChain chain = aviary_chain_restore(f.chain_genesis.data(), f.chain_genesis.size(), 0, f.chain_pub.data(),
+                                           f.chain_pub.size(), f.chain_sec.data(), f.chain_sec.size(), data, size);
+  if (chain) aviary_chain_free(chain);
+  Fixture::take(aviary_chain_snapshot_error(f.chain_genesis.data(), f.chain_genesis.size(), data, size));
+  AviaryChainTree restored_tree = aviary_chain_tree_restore(f.tree_spec.data(), f.tree_spec.size(), data, size);
+  if (restored_tree) aviary_chain_tree_free(restored_tree);
   Fixture::take(aviary_portable_open_passphrase(data, size, "pw"));
   Fixture::take(aviary_threshold_share_unseal(data, size, "pw"));
   Fixture::take(aviary_subchain_policy_encode(4, 1, 0, 0, data, size));
