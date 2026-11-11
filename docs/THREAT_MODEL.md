@@ -107,6 +107,32 @@ quorum (>=1/3 power) of colluding validators; physical key extraction.
 | Child validator supermajority anchors a false state root | **Undetectable by the parent** (it never executes children) - the same limit as any light client. Documented, not mitigated. | *(accepted)* |
 | Child rotates validators | Followed: the child's rotation header is anchored like any other, the registry tracks the set in force next + the set that certified the tip, and `subchain_root` commits both hashes (a snapshot cannot smuggle a set). | [x] |
 
+### 4.4c Subchains version 2 (dynamic registration - docs/design/SUBCHAINS.md Part 2)
+| Threat | Mitigation | Status |
+|---|---|---|
+| Unauthorised registration, close or registrar change | Every registry operation needs `threshold` signatures from registrar keys the parent genesis commits; every validator verifies them in `Ledger::run_block` before the block can be certified; a registry with no registrars is sealed. | [x] |
+| A hostile registrant (a registered child is malicious) | The parent commits only the child's genesis header and validator set and never executes it; a registrant cannot touch another child's record. The harm is bounded to those who trust that child's validators. | *(accepted, as in 4.4b)* |
+| Compromised registrar quorum | It can register up to the policy bounds, close children and replace the registrars; it cannot forge a child tip (only a child certificate moves one). Rotation by the current quorum bumps the authority epoch and voids outstanding signatures. If the attacker rotates first, recovery is a new parent chain. | [x] (rotation); *(accepted)* (capture) |
+| Registration spam | Only registrars create records; `max_ops_per_block` bounds per block work and growth; `max_children` bounds open children; a closed record keeps hashes only. No open, fee priced registration is offered. | [x] |
+| Replay of an operation on another parent | The signed digest binds the parent's chain id AND genesis hash; a ledger with a dynamic policy refuses to boot without its genesis hash. | [x] |
+| Replay on the same parent, or a stale operation included late | A register is consumed by the id (unique forever), a close by the status, a rotation by the epoch; every operation names its epoch and an optional expiry height. | [x] |
+| Registrar key reused as an account or peer key | Operations are signed as a 32 byte digest under its own domain tag (0x13); no transaction or peer record signing input has that shape. | [x] |
+| Forged or reinterpreted child proof | Record count, open count, authority epoch and registrar set hash are bound into `subchain_root`; the leaf carries its own index; the sibling count must match the tree shape exactly. | [x] |
+| Proposer slips an invalid operation into a certified block | Same dry run as anchors; structural checks precede signature work; all or nothing. Work per proposal is bounded by `max_ops_per_block` times the registrar count. | [x] |
+| Child supermajority anchors a false root | Unchanged and undetectable by the parent. With one chain per user and one validator per chain, an anchor is an ordered, timestamped witness of what that validator signed, not independent validation. | *(accepted)* |
+| Version confusion (v3 against v4 roots, proofs, headers) | Distinct domain tags per root format; the version fence is exact per policy format (v1 policy: 3, dynamic: 4). Note: 1.0.0 accepted any version of 3 or more on a v1 parent; such a header is now refused (SUBCHAINS.md section 19.2). | [x] |
+
+### 4.4d Chain snapshots (persistence through the C ABI)
+| Threat | Mitigation | Status |
+|---|---|---|
+| Secret keys at rest in a snapshot | A snapshot never contains a validator secret; restore takes the key again. | [x] |
+| A snapshot restored under the wrong chain | Bound to the genesis hash; refused under any other genesis. | [x] |
+| Malformed or non canonical snapshot | Strict decode; every section must re-encode byte for byte; trailing bytes refused; fuzzed. | [x] |
+| Tampered ledger section | The state must hash to the tip's `state_root`; the fee must be the genesis fee; receipts must hash to `receipt_root`; a registry must recompute `subchain_root`; a height 0 ledger must equal the genesis ledger. For BFT the tip must carry a valid quorum certificate under the certifying set its header commits. | [x] |
+| Tampered archive | Blocks must be contiguous, belong to the chain, hash-link up to the certified tip, and match their `tx_root`, `anchor_root` and `ops_root`; the archived tip certificate must be the engine's. | [x] |
+| Tampered archived certificate below the tip | Checked for shape and target only, not re-verified: a damaged one is caught by whoever consumes it (a parent refuses the anchor). | *(accepted)* |
+| An attacker who can rewrite the whole snapshot of a non BFT chain | Nothing inside such a snapshot authenticates its tip (those engines keep no certificate). A snapshot is trusted local storage; protect it like the database it lives in. | *(accepted)* |
+
 ### 4.5 Interop & bridge (highest-loss-history component)
 | Threat | Mitigation | Status |
 |---|---|---|
@@ -158,9 +184,11 @@ X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
 - The bridge is **federated** (trusts a >2/3 attestor set), not trustless.
 - P2P lacks **peer-identity authentication**, discovery, and a gossip overlay
   with anti-eclipse/DoS controls.
-- No **persistence/storage** layer yet (in-memory state).
+- No **storage engine** yet: state is in memory. Chains and chain trees are
+  saved and restored as whole snapshots (section 4.4d), which the operator stores.
 - **Subchains** trust each child's registered validator set for the child's
-  state (section 4.4b); only BFT children can be anchored in v1.
+  state (section 4.4b); only BFT children can be anchored. Dynamic registration
+  (section 4.4c) trusts the registrar quorum to choose which children exist.
 - No external **security audit** or FIPS validation of the original
   constructions; the primitives come from cryptolib's vetted upstreams.
 

@@ -127,6 +127,46 @@ state on any registered child (`encodeChildRegistration`,
 `commitSubchainPolicy`, `commitParentBinding`, `proposeAnchored`,
 `encodeSubchainProof`, `verifySubchainProof`).
 
+Children can also be registered after the parent is running. A parent
+whose genesis commits a dynamic policy accepts signed registry operations in
+any block: register a child, close one, or replace the registrar keys. Its
+registry is a Merkle tree with one record per child, so proving one child
+takes its record and about log2(n) hashes however many children there are
+(634 bytes at 2000 children). This is in the source tree and in the C ABI,
+Go and Dart bindings; it is not in the 1.0.0 packages. The design, the
+decisions still to confirm and the threat analysis are in
+[`docs/design/SUBCHAINS.md`](docs/design/SUBCHAINS.md), Part 2.
+
+```dart
+final policy = bc.encodeDynamicSubchainPolicy(
+  threshold: 1,
+  registrars: [(scheme: SignatureScheme.ed25519, publicKey: registrarPublic)],
+);
+final mainGenesis = bc.commitSubchainPolicy(genesis, policy);
+final mainHash = bc.genesisHash(mainGenesis);
+final main = bc.assembleChain(mainGenesis, 0, key.public, key.secret)!;
+
+final op = bc.signOp(
+  bc.opRegister(registration),
+  parentChainId: 1,
+  parentGenesisHash: mainHash,
+  registrarIndex: 0,
+  secret: registrarSecret,
+);
+final registering = main.proposeSubchain(now, ops: [op]);
+main.submit(registering, main.certify(registering));
+
+final anchor = bc.pendingAnchor(main, userChain);
+final anchoring = main.proposeSubchain(later, anchors: [anchor!]);
+main.submit(anchoring, main.certify(anchoring));
+
+final record = bc.verifyChildProof(
+  bc.headerSubchainRoot(main.tip()),
+  main.childProof(userChainId),
+);
+print(record.tipHeight);
+```
+
 A chain tree declares a whole family at once and drives it together:
 
 ```dart
@@ -333,6 +373,17 @@ node.fundAccount(1000);
 node.commit();
 await node.saveTo(path);
 ```
+
+An assembled chain and a chain tree are saved the same way (in the source
+tree, not in the 1.0.0 packages). `chain.snapshot()` holds the ledger, the
+subchain registry, the engine's consensus state and, after
+`chain.enableArchive()`, the finalized blocks with their certificates. It
+holds no secret key and is bound to the genesis: `bc.restoreChain(genesis,
+me, blsPublic, blsSecret, bytes)` brings the chain back, and from then on it
+produces byte for byte what the original would. A snapshot that is damaged,
+not canonical or from another chain is refused with the reason
+(`bc.chainSnapshotError`). `tree.snapshot()` and `bc.restoreChainTree` do the
+same for a whole family.
 
 ### Interop with other chains
 

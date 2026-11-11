@@ -407,6 +407,45 @@
   `aviary_light_client_*` handle + five-binding parity, each proving a
   no-overlap jump is "thin" (never a refusal), bisection through the rotation
   header, and continuation under the new set. 67 suites, ASan-clean.
+- **[~] Subchains version 2 + chain persistence - BUILT ON A BRANCH, not
+  released** (2026-11-11, branch `claude/dynamic-subchains-c93c8b`; design
+  `docs/design/SUBCHAINS.md` Part 2, decisions D1 to D11 await the owner).
+  Dynamic registration: a parent with a `DynamicSubchainPolicy` produces
+  header version 4 blocks carrying signed registry operations (register,
+  close, set registrars; k of n registrar keys committed at genesis; digest
+  bound to parent chain id + genesis hash, authority epoch and expiry).
+  Registry commitment is an append only Merkle tree of fixed 230 byte
+  `ChildRecord`s with the counts, epoch and registrar set hash bound into
+  `subchain_root`; `ChildProof` is one record and its path (634 bytes at 2000
+  children against 534 KB for the version 1 flat hop); `SubchainProofV2`
+  mixes version 3 and version 4 parents. The registry applies a block as an
+  overlay on a shared base (`merkle::AppendTree`), so validation copies
+  nothing proportional to the child count. Versions 1 to 3 and every existing
+  vector are byte identical; the fence is exact per policy format.
+  Persistence: `node::ChainSnapshot` (ledger, tip receipts, engine consensus
+  state, optional archive; bound to the genesis hash; no secret; canonical and
+  strictly decoded), `ChainTree::snapshot/restore`, engines expose
+  `consensus_state`. C ABI: `aviary_chain_snapshot/_restore/_snapshot_error`,
+  the opt in archive, `aviary_chain_tree_snapshot/_restore`, the
+  `aviary_subchain_op_*` family, `aviary_chain_propose_subchain`,
+  `aviary_chain_child_record/_child_proof`, `aviary_child_proof_verify`,
+  `aviary_chain_pending_anchor`, `aviary_subchain_proof_v2_*`. Go and Dart
+  bindings expose all of it and replay `vectors/subchain_v2_vectors.txt`.
+  Tests: `test_dynamic_subchains`, `test_subchain_scale`,
+  `test_chain_snapshot`, `test_c_abi_persistence`, `test_c_abi_dynamic`,
+  `test_subchain_vectors`, AppendTree properties in `test_merkle`, the
+  fuzz-lite sweep and the three libFuzzer harnesses. 78 suites, ASan/UBSan
+  clean.
+  **Not built:** operations and anchors proposed through
+  `RoundDriver`/`NetworkedNode` (they validate such blocks, they cannot yet
+  propose them); a dynamic `ChainTree`; absence proofs; operation inclusion
+  proofs; child initiated close; npm, JVM, Swift and Flutter bindings.
+  **A release needs:** the owner's answer to D1 to D11; a version bump of the
+  engine and every package (new C ABI symbols and header version 4); rebuilt
+  native binaries for the Dart `native/` slots, the Flutter plugins
+  (xcframeworks, jniLibs), the npm prebuilds and the Linux engines; the
+  remaining bindings; the Swift checksums; a note to operators of multi
+  validator version 1 parents about the exact version fence (section 19.2).
 - **[x] ChainTree - declare a FAMILY of chains and build / drive it together - 
   DONE** (commits 30c7c4e core, ff35221 C ABI + Go, + bindings). The capstone
   over composable chains + subchains: `ChainTreeSpec` is a recursive node spec

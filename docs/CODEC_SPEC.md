@@ -52,6 +52,11 @@ with an internal node or a header:
 | `0x0D` | Subchain registry commitment (`subchain_root`) |
 | `0x0E` | Subchain policy (parent genesis) |
 | `0x0F` | Parent binding (child genesis) |
+| `0x10` | Dynamic registry leaf: `H(0x10 || canonical(ChildRecord))` |
+| `0x11` | Dynamic registry commitment (`subchain_root` of a version 4 header) |
+| `0x12` | Registry operation leaf under `ops_root`: `H(0x12 || canonical(SubchainOp))` |
+| `0x13` | Registry operation authorisation digest (what a registrar signs) |
+| `0x14` | Registrar set commitment (`authority_hash`) |
 
 ### Subchain layouts (header version 3; docs/design/SUBCHAINS.md)
 
@@ -71,6 +76,66 @@ with an internal node or a header:
 - `GenesisSpec` gains `bytes(subchain_policy) || bytes(parent_binding)` appended last
   (empty when unused).
 
+### Subchain layouts, version 2 (header version 4; docs/design/SUBCHAINS.md Part 2)
+
+A parent whose genesis `subchain_policy` is a dynamic policy produces version 4
+headers. Versions 1 to 3 are unchanged: `ops_root` and the operation list are
+written and read only from version 4 on.
+
+- `BlockHeader` v4 = v3 layout || `ops_root[32]`, before `consensus_data`.
+- `Block` v4 = `bytes(header) || list(bytes(tx)) || list(bytes(anchor)) || list(bytes(op))`.
+- `ops_root` = Merkle root over `H(0x12 || canonical(op))` in block order; the
+  zero hash for no operations.
+- `DynamicSubchainPolicy` = `00 00 00 || u8 format(=2) || u8 max_depth ||
+  u32 max_children || u16 max_anchors_per_block || u16 max_headers_per_anchor ||
+  u16 max_ops_per_block || RegistrarSet || list(bytes(ChildRegistration))`.
+  It occupies the same genesis field as the version 1 `SubchainPolicy`. The
+  three zero bytes can never begin a valid version 1 policy (they would read as
+  `max_depth = 0`, which is rejected), so the two formats cannot be confused.
+- `RegistrarSet` = `u8 threshold || list(u8 sig_algo || bytes(public_key))`;
+  `sig_algo` is 1 (Ed25519), 2 (hybrid Ed25519 + ML-DSA-65) or 4 (SLH-DSA).
+  `authority_hash` = `H(0x14 || canonical(RegistrarSet))`.
+- `SubchainOp` = `u8 kind || u32 authority_epoch || u64 valid_until ||
+  bytes(payload) || list(u16 registrar_index || bytes(signature))`, approvals
+  ascending and unique by index. `kind` 1 register (payload = `ChildRegistration`),
+  2 close (payload = `u64 chain_id || u64 final_height || final_tip_hash[32]`),
+  3 set registrars (payload = `RegistrarSet`).
+- Authorisation digest = `H(0x13 || u64 parent_chain_id || parent_genesis_hash[32] ||
+  u8 kind || u32 authority_epoch || u64 valid_until || bytes(payload))`. Each
+  approval signs these 32 bytes with its registrar's scheme.
+- `ChildRecord` (230 bytes, fixed) = `u32 index || u64 chain_id || u8 status ||
+  u8 child_max_depth || genesis_header_hash[32] || u64 registered_height ||
+  u64 closed_height || u64 tip_height || tip_hash[32] || tip_state_root[32] ||
+  tip_subchain_root[32] || vset_hash[32] || tip_vset_hash[32]`. `status` is 1
+  (open) or 2 (closed); `closed_height` is zero exactly when the record is open.
+
+  | Offset | Field | Offset | Field |
+  |---|---|---|---|
+  | 0 | index u32 | 62 | tip_height u64 |
+  | 4 | chain_id u64 | 70 | tip_hash |
+  | 12 | status u8 | 102 | tip_state_root |
+  | 13 | child_max_depth u8 | 134 | tip_subchain_root |
+  | 14 | genesis_header_hash | 166 | vset_hash |
+  | 46 | registered_height u64 | 198 | tip_vset_hash |
+  | 54 | closed_height u64 | 230 | end |
+
+- `subchain_root` (v4) = `H(0x11 || u32 record_count || u32 open_count ||
+  u32 authority_epoch || authority_hash[32] || children_root[32])`, where
+  `children_root` is the Merkle root (the tree below) over
+  `H(0x10 || canonical(ChildRecord_i))` in index order.
+- `ChildProof` = `bytes(ChildRecord) || u32 record_count || u32 open_count ||
+  u32 authority_epoch || authority_hash[32] || list(sibling[32])`, siblings
+  bottom up. The record's own `index` is the leaf position.
+- `SubchainProofV2` = `list(u8 kind || bytes(hop)) || bytes(StateProof)`; hop
+  kind 1 is the version 1 hop above, kind 2 is a `ChildProof`.
+- Ledger snapshot of a dynamic parent appends
+  `bytes(u32 authority_epoch || RegistrarSet || list(u64 chain_id || u8 status ||
+  u8 child_max_depth || genesis_header_hash[32] || u64 registered_height ||
+  u64 closed_height || bytes(tip_header) || sets))`, where `sets` is
+  `bytes(vset) || bytes(tip_vset)` for an open child and
+  `vset_hash[32] || tip_vset_hash[32]` for a closed one. Records are in index
+  order.
+
 (Tags are provisional; finalized when the block/tx model lands in M1.)
 
 ## Merkle commitment
@@ -85,6 +150,32 @@ with an internal node or a header:
 1. `u128` vs arbitrary-precision for value fields (ARCHITECTURE section 17.1).
 2. State-trie key/proof format (section 17.2).
 3. Final domain-tag table and any additional roots (receipts).
+
+## Chain snapshot
+
+What `aviary_chain_snapshot` writes and `aviary_chain_restore` reads. Strict:
+a wrong magic, an unknown version, a trailing byte, or any section that is not
+byte for byte what the restored chain would write again, is refused.
+
+- `ChainSnapshot` = `"AVCS" || u8 version(=1) || genesis_hash[32] ||
+  bytes(ledger) || list(bytes(Receipt)) || bytes(engine) || bool has_archive ||
+  [bytes(archive)]`.
+- `ledger` = the ledger snapshot: `bytes(tip_header) || bytes(state)`, then
+  for a version 1 parent `bytes(child tips)` and for a dynamic parent the
+  registry section above.
+- The receipts are those of the tip block; they must hash to its
+  `receipt_root`.
+- `engine`, by consensus engine: BFT = `bytes(vset) || bytes(certifying_vset) ||
+  bool has_cert || [bytes(CommitCertificate)] || bool has_scheduled ||
+  [bytes(scheduled_vset)] || list(u32 equivocator)` (ascending, unique); proof
+  of work = the 32 byte current target; every other built in engine = empty.
+- `archive` = the block archive: `u32 count || (u64 height || bytes(Block) ||
+  bytes(CommitCertificate))*`, heights ascending and contiguous, ending at the
+  tip.
+- A snapshot holds no secret key.
+
+Chain tree snapshot = `"AVTS" || u8 version(=1) || list(u64 chain_id ||
+bytes(ChainSnapshot))` in pre-order (parents before children).
 
 ## Record model (state model 2)
 

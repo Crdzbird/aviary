@@ -402,8 +402,10 @@ the registry commitment. Those are exactly the invariants section 10 pins down f
 
 # Part 2 - Version 2: dynamic registration, a Merkle registry, closing
 
-Status: **DESIGNED 2026-11-11, built on the branch `claude/dynamic-subchains-c93c8b`
-to the recommendations below, NOT released.** Every rule in this part sits
+Status: **DESIGNED AND BUILT 2026-11-11 on the branch
+`claude/dynamic-subchains-c93c8b`, to the recommendations below, NOT released
+and NOT yet confirmed by the owner (section 24).** Core, C ABI, Go and Dart
+are built and tested; section 25 lists what is not. Every rule in this part sits
 behind a new genesis policy format and header version 4, which no existing
 chain uses, so each decision in section 24 can still be changed before a
 release at the cost of regenerating only the new vectors. Part 1 (sections 0
@@ -1031,3 +1033,9 @@ snapshot restore in `fuzz_restore`.
 
 Vectors: `vectors/subchain_v2_vectors.txt`, replayed by the C++ suite, Go and
 Dart; the existing three vector files unchanged.
+
+All of the above is built and green: 78 C++ suites (plain and under ASan and
+UBSan), the Go binding tests and the Dart binding tests. Measured in
+`test_subchain_scale`: 2000 children registered after genesis and anchored;
+a child proof is 538 bytes at 250 children and 634 bytes at 2000, where the
+version 1 flat hop for the same registry would be 534 012 bytes.
