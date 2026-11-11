@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "aviary/block_store.hpp"
+#include "aviary/dynamic_subchain.hpp"
 #include "aviary/subchain.hpp"
 
 /// The in-process relay (docs/design/SUBCHAINS.md section 9 Q6): what a parent
@@ -19,6 +20,11 @@ namespace aviary::node {
 /// child is not registered, its archive holds nothing newer, or the archive has
 /// a gap right after the recorded tip (nothing consecutive to anchor).
 std::optional<Anchor> pending_anchor(const SubchainRegistry& parent, std::uint64_t child_chain_id,
+                                     const BlockStore& child_archive, std::uint16_t limit = 0);
+
+/// The same for a parent with a dynamic registry. Also nullopt when the child
+/// is closed.
+std::optional<Anchor> pending_anchor(const DynamicSubchainRegistry& parent, std::uint64_t child_chain_id,
                                      const BlockStore& child_archive, std::uint16_t limit = 0);
 
 /// All pending anchors for the given (child id, archive) pairs, in canonical

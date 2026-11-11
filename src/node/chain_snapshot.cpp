@@ -46,6 +46,8 @@ void check_archive(const BlockStore& archive, const Bytes& encoded, const BlockH
       throw std::invalid_argument("chain snapshot: archived transactions do not match their header");
     if (header.version >= 3 && compute_anchor_root(sb.block.anchors) != header.anchor_root)
       throw std::invalid_argument("chain snapshot: archived anchors do not match their header");
+    if (header.version >= 4 && compute_ops_root(sb.block.ops) != header.ops_root)
+      throw std::invalid_argument("chain snapshot: archived registry operations do not match their header");
     expected_parent = header.hash();
     if (sb.commit.height != h || sb.commit.block_id != expected_parent)
       throw std::invalid_argument("chain snapshot: archived certificate is for another block");

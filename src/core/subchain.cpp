@@ -291,21 +291,27 @@ SubchainProof SubchainProof::decode_all(crypto::ByteView bytes) {
   return p;
 }
 
+const BlockHeader* verify_subchain_hop(const Hash& root, const SubchainProof::Hop& h) {
+  // The list must be canonical (ascending, unique) - otherwise two lists
+  // could not be told apart from the root alone.
+  for (std::size_t i = 1; i < h.summaries.size(); ++i)
+    if (!(h.summaries[i - 1].chain_id < h.summaries[i].chain_id)) return nullptr;
+  if (registry_root(h.summaries) != root) return nullptr;
+  const BlockHeader* tip = nullptr;
+  for (const ChildSummary& s : h.summaries)
+    if (s.chain_id == h.child_chain_id) tip = &s.tip;
+  if (tip == nullptr) return nullptr;
+  if (tip->chain_id != h.child_chain_id) return nullptr;
+  return tip;
+}
+
 bool verify_subchain_proof(const Hash& parent_subchain_root, const SubchainProof& p) {
   if (p.hops.empty()) return false;
   Hash root = parent_subchain_root;
   const BlockHeader* tip = nullptr;
   for (const SubchainProof::Hop& h : p.hops) {
-    // The list must be canonical (ascending, unique) - otherwise two lists
-    // could not be told apart from the root alone.
-    for (std::size_t i = 1; i < h.summaries.size(); ++i)
-      if (!(h.summaries[i - 1].chain_id < h.summaries[i].chain_id)) return false;
-    if (registry_root(h.summaries) != root) return false;
-    tip = nullptr;
-    for (const ChildSummary& s : h.summaries)
-      if (s.chain_id == h.child_chain_id) tip = &s.tip;
+    tip = verify_subchain_hop(root, h);
     if (tip == nullptr) return false;
-    if (tip->chain_id != h.child_chain_id) return false;
     root = tip->subchain_root;  // descend (zero unless that child is itself a parent)
   }
   return verify_state_proof(tip->state_root, p.state_proof);

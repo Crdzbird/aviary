@@ -99,5 +99,97 @@ int main() {
   }
   CHECK_THROWS(MerkleIndex{}.proof(0));
 
+  std::printf("== root_from_proof agrees with verify_proof ==\n");
+  {
+    bool agree = true;
+    for (std::uint32_t n = 1; n <= 33; ++n) {
+      auto ls = leaves(n);
+      const Hash root = compute_root(ls);
+      for (std::uint32_t i = 0; i < n; ++i) {
+        const Proof pr = make_proof(ls, i);
+        const std::optional<Hash> got = root_from_proof(ls[i], pr, n);
+        agree &= got.has_value() && *got == root;
+        Proof longer = pr;
+        longer.siblings.push_back(leaf(200));
+        agree &= !root_from_proof(ls[i], longer, n).has_value();
+        if (pr.siblings.empty()) continue;
+        Proof shorter = pr;
+        shorter.siblings.pop_back();
+        agree &= !root_from_proof(ls[i], shorter, n).has_value();
+      }
+      agree &= !root_from_proof(ls[0], make_proof(ls, 0), 0).has_value();
+      Proof out_of_range = make_proof(ls, 0);
+      out_of_range.index = n;
+      agree &= !root_from_proof(ls[0], out_of_range, n).has_value();
+    }
+    CHECK_MSG(agree, "root_from_proof returns the root exactly when the proof has the shape the tree needs");
+  }
+
+  std::printf("== AppendTree equals compute_root and make_proof under appends and rewrites ==\n");
+  {
+    AppendTree empty;
+    CHECK(empty.leaf_count() == 0 && empty.root() == compute_root({}));
+    CHECK_THROWS(empty.leaf(0));
+    CHECK_THROWS(empty.proof_with({}, 0));
+    AppendTree::Batch bad;
+    bad.changes[0] = leaf(1);
+    CHECK_THROWS(empty.root_with(bad));
+
+    std::uint64_t state = 0x9E3779B97F4A7C15ull;
+    auto rnd = [&](std::uint64_t n) {
+      state ^= state << 13;
+      state ^= state >> 7;
+      state ^= state << 17;
+      return n == 0 ? 0 : state % n;
+    };
+    bool roots = true, proofs = true, pure = true;
+    for (std::uint32_t start = 0; start <= 20; ++start) {
+      std::vector<Hash> model = leaves(start);
+      AppendTree tree;
+      tree.reset(model);
+      roots &= tree.root() == compute_root(model);
+      std::uint8_t next_tag = 100;
+      for (int step = 0; step < 30; ++step) {
+        AppendTree::Batch batch;
+        std::vector<Hash> after = model;
+        const std::uint64_t rewrites = model.empty() ? 0 : rnd(4);
+        for (std::uint64_t k = 0; k < rewrites; ++k) {
+          const std::size_t at = static_cast<std::size_t>(rnd(model.size()));
+          batch.changes[at] = leaf(next_tag);
+          after[at] = leaf(next_tag++);
+        }
+        const std::uint64_t appends = rnd(5);
+        for (std::uint64_t k = 0; k < appends; ++k) {
+          batch.appended.push_back(leaf(next_tag));
+          after.push_back(leaf(next_tag++));
+        }
+        const Hash before = tree.root();
+        roots &= tree.root_with(batch) == compute_root(after);
+        pure &= tree.root() == before && tree.leaf_count() == model.size();
+        for (std::uint32_t i = 0; i < after.size(); ++i) {
+          const Proof want = make_proof(after, i);
+          const Proof got = tree.proof_with(batch, i);
+          proofs &= got.index == want.index && got.siblings == want.siblings;
+        }
+        if (!after.empty()) {
+          bool threw = false;
+          try {
+            (void)tree.proof_with(batch, static_cast<std::uint32_t>(after.size()));
+          } catch (const std::out_of_range&) {
+            threw = true;
+          }
+          proofs &= threw;
+        }
+        tree.apply(batch);
+        model = after;
+        roots &= tree.root() == compute_root(model) && tree.leaf_count() == model.size();
+        for (std::size_t i = 0; i < model.size(); ++i) roots &= tree.leaf(i) == model[i];
+      }
+    }
+    CHECK_MSG(roots, "AppendTree roots match compute_root before and after every batch");
+    CHECK_MSG(proofs, "AppendTree proofs match make_proof for every leaf of the batched tree");
+    CHECK_MSG(pure, "root_with and proof_with leave the tree untouched");
+  }
+
   return bctest::summary();
 }

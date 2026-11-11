@@ -99,7 +99,11 @@ Block PowEngine::propose(std::vector<Transaction> txs, std::uint64_t timestamp) 
 }
 Block PowEngine::propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                                   std::vector<Anchor> anchors) {
-  Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
+  return propose_subchain(std::move(txs), timestamp, std::move(anchors), {});
+}
+Block PowEngine::propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                  std::vector<Anchor> anchors, std::vector<SubchainOp> ops) {
+  Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors), std::move(ops));
   b.header.consensus_data = PowData{target_, 0}.encode();  // unsolved candidate
   return b;
 }

@@ -110,6 +110,7 @@ ChainSpec GenesisSpec::chain_spec() const {
   s.max_block_txs = max_block_txs;
   s.max_block_bytes = max_block_bytes;
   s.subchain_policy = subchain_policy;
+  s.genesis_hash = hash();
   return s;
 }
 

@@ -71,8 +71,9 @@ class BftEngine : public ConsensusEngine {
   }
   /// A parent chain's proposal: the same block, also anchoring [anchors]
   /// (docs/design/SUBCHAINS.md). Throws if an anchor is invalid.
-  Block propose(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors) {
-    Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
+  Block propose(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors,
+                std::vector<SubchainOp> ops = {}) {
+    Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors), std::move(ops));
     ConsensusData cd{vset_.hash(), last_commit_};
     if (pending_) cd.next_validators = pending_->validators();
     b.header.consensus_data = cd.encode();
@@ -81,6 +82,10 @@ class BftEngine : public ConsensusEngine {
   Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                          std::vector<Anchor> anchors) override {
     return propose(std::move(txs), timestamp, std::move(anchors));
+  }
+  Block propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors,
+                         std::vector<SubchainOp> ops) override {
+    return propose(std::move(txs), timestamp, std::move(anchors), std::move(ops));
   }
 
   /// ConsensusEngine seam: the justification is an encoded CommitCertificate.

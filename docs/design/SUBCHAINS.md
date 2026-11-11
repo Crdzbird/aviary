@@ -840,11 +840,10 @@ Every top level decode rejects trailing bytes.
 - Registry snapshot section: section 22.
 
 Non canonical forms rejected on decode, beyond the generic codec rules:
-approvals not ascending or not unique; `status` outside {1, 2}; a `closed_height`
-that is non zero on an open record or zero on a closed one where the context
-can tell (registry restore); an unknown hop kind; an unknown operation kind is
-decodable (so a block carrying one can be hashed and refused with a reason)
-but never valid.
+approvals not ascending or not unique; `status` outside {1, 2}; a
+`closed_height` that is non zero on an open record or zero on a closed one; an
+unknown hop kind. An unknown operation kind is decodable (so a block carrying
+one can be hashed and refused with a reason) but never valid.
 
 ### 20.2 Domain tags
 
@@ -915,14 +914,20 @@ where it lives. `Ledger::snapshot()` of a dynamic parent appends one section
 registry section = u32 authority_epoch || u8 registrar_threshold || list(Registrar) ||
                    list( u64 chain_id || u8 status || u8 child_max_depth ||
                          genesis_header_hash[32] || u64 registered_height || u64 closed_height ||
-                         bytes(tip_header) || bytes(vset) || bytes(tip_vset) )
+                         bytes(tip_header) || sets )
+sets, open child   = bytes(vset) || bytes(tip_vset)
+sets, closed child = vset_hash[32] || tip_vset_hash[32]
 ```
 
-Records are in index order (the index is the position). `vset` and `tip_vset`
-are the canonical `ValidatorSet` encodings for an open child and empty for a
-closed one. Restore decodes strictly, refuses duplicate chain ids and
-inconsistent status fields, rebuilds the tree, and requires the recomputed
-root to equal the restored tip header's `subchain_root`.
+Records are in index order (the index is the position). An open child stores
+its two canonical `ValidatorSet` encodings, from which the two hashes of its
+record are recomputed; a closed child no longer needs the sets and stores only
+the two hashes its record commits. Restore decodes strictly, refuses duplicate
+chain ids, a status that does not fit `closed_height`, an unanchored child
+whose tip is not its genesis header, and a registrar set that fails the policy
+rules; it rebuilds the tree and requires the recomputed root to equal the
+restored tip header's `subchain_root`. Flipping any single bit of the section
+is refused (tested).
 
 What a whole chain needs beyond the ledger (the chain snapshot of the C ABI,
 format in docs/CODEC_SPEC.md):
@@ -931,8 +936,9 @@ format in docs/CODEC_SPEC.md):
 - the ledger snapshot (tip, state, registry) and the receipts of the tip block;
 - the engine's consensus state. For BFT: the validator set in force, the set
   that certified the tip, the tip's commit certificate (it is embedded in the
-  next proposal), a scheduled rotation, and the recorded equivocators. The
-  other built in engines keep nothing beyond the ledger;
+  next proposal), a scheduled rotation, and the recorded equivocators. For
+  proof of work: the current target. The other built in engines keep nothing
+  beyond the ledger;
 - optionally the archive of finalized blocks with their certificates.
 
 Not captured, by design: validator secret keys (the caller supplies them

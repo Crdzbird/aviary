@@ -93,10 +93,14 @@ Block VrfPosEngine::propose(std::vector<Transaction> txs, std::uint64_t timestam
 }
 Block VrfPosEngine::propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                                      std::vector<Anchor> anchors) {
+  return propose_subchain(std::move(txs), timestamp, std::move(anchors), {});
+}
+Block VrfPosEngine::propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                     std::vector<Anchor> anchors, std::vector<SubchainOp> ops) {
   for (std::uint32_t attempt = 0; attempt < kMaxAttempts; ++attempt) {
     std::optional<Bytes> proof = eligible(attempt);
     if (!proof) continue;
-    Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
+    Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors), std::move(ops));
     b.header.consensus_data = VrfPosData{me_, attempt, std::move(*proof)}.encode();
     return b;
   }

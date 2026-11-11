@@ -44,6 +44,16 @@ class ConsensusEngine {
     return propose(std::move(txs), timestamp);
   }
 
+  /// The same, on a parent with a DYNAMIC subchain policy also carrying
+  /// registry operations [ops] (register, close, set registrars). Every
+  /// built-in engine implements it; an engine that does not can only propose
+  /// operation-free blocks (throws on non-empty ops, never drops them).
+  virtual Block propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                 std::vector<Anchor> anchors, std::vector<SubchainOp> ops) {
+    if (!ops.empty()) throw std::runtime_error("this consensus engine does not carry registry operations");
+    return propose_anchored(std::move(txs), timestamp, std::move(anchors));
+  }
+
   /// Verify [block]'s [justification] and, if valid, apply it atomically - 
   /// advancing the chain on success, leaving it unchanged on failure. The
   /// justification encoding is engine-specific.

@@ -132,6 +132,7 @@ add_library(aviary_core STATIC
   src/core/assurance.cpp
   src/core/chain_blueprint.cpp
   src/core/subchain.cpp
+  src/core/dynamic_subchain.cpp
   src/core/block_store.cpp
   src/core/fork_choice.cpp
   src/storage/file_store.cpp
@@ -348,6 +349,8 @@ aviary_add_test(test_validator_rotation tests/test_validator_rotation.cpp)
 aviary_add_test(test_light_client_skip tests/test_light_client_skip.cpp)
 aviary_add_test(test_chain_tree tests/test_chain_tree.cpp)
 aviary_add_test(test_chain_snapshot tests/test_chain_snapshot.cpp)
+aviary_add_test(test_dynamic_subchains tests/test_dynamic_subchains.cpp)
+aviary_add_test(test_subchain_scale tests/test_subchain_scale.cpp)
 aviary_add_test(test_remote_guard tests/test_remote_guard.cpp)
 aviary_add_test(test_bbs tests/test_bbs.cpp)
 aviary_add_test(test_bbs_pseudonym tests/test_bbs_pseudonym.cpp)

@@ -37,6 +37,11 @@ enum class Domain : std::uint8_t {
   kSubchainRegistry = 0x0D,        ///< commitment to a parent's registry of child tips
   kSubchainPolicy = 0x0E,          ///< commitment to a parent's subchain policy (genesis)
   kParentBinding = 0x0F,           ///< a child's genesis binding to its parent chain
+  kSubchainLeaf = 0x10,            ///< a dynamic registry leaf (one child record)
+  kDynamicRegistry = 0x11,         ///< subchain_root of a version-4 header (Merkle registry)
+  kSubchainOp = 0x12,              ///< a registry operation, the leaf under ops_root
+  kSubchainOpAuth = 0x13,          ///< the digest a registrar signs to authorise an operation
+  kRegistrarSet = 0x14,            ///< commitment to a parent's registrar keys and threshold
 };
 
 /// BLAKE3-256 over [data, data+len). The chain's primary hash primitive.

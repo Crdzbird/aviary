@@ -88,6 +88,7 @@ Bytes BlockHeader::encode() const {
     w.write_fixed_bytes(view(anchor_root), 32);    // this block's subchain anchors
     w.write_fixed_bytes(view(subchain_root), 32);  // post-block child-tip registry
   }
+  if (version >= 4) w.write_fixed_bytes(view(ops_root), 32);
   w.write_bytes(view(consensus_data));
   return w.take();
 }
@@ -106,6 +107,7 @@ BlockHeader BlockHeader::decode(codec::CodecReader& r) {
     h.anchor_root = to_hash(r.read_fixed_bytes(32));
     h.subchain_root = to_hash(r.read_fixed_bytes(32));
   }
+  if (h.version >= 4) h.ops_root = to_hash(r.read_fixed_bytes(32));
   h.consensus_data = r.read_bytes();
   return h;
 }
@@ -172,6 +174,65 @@ Hash compute_anchor_root(const std::vector<Anchor>& anchors) {
   return merkle::compute_root(leaves);
 }
 
+Bytes SubchainOp::encode() const {
+  codec::CodecWriter w;
+  w.write_u8(kind);
+  w.write_u32(authority_epoch);
+  w.write_u64(valid_until);
+  w.write_bytes(view(payload));
+  w.write_list(approvals, [](codec::CodecWriter& ww, const OpApproval& a) {
+    ww.write_u16(a.registrar_index);
+    ww.write_bytes(codec::ByteView(a.signature.data(), a.signature.size()));
+  });
+  return w.take();
+}
+
+SubchainOp SubchainOp::decode(codec::CodecReader& r) {
+  SubchainOp op;
+  op.kind = r.read_u8();
+  op.authority_epoch = r.read_u32();
+  op.valid_until = r.read_u64();
+  op.payload = r.read_bytes();
+  op.approvals = r.read_list<OpApproval>([](codec::CodecReader& rr) {
+    OpApproval a;
+    a.registrar_index = rr.read_u16();
+    a.signature = rr.read_bytes();
+    return a;
+  });
+  for (std::size_t i = 1; i < op.approvals.size(); ++i)
+    if (!(op.approvals[i - 1].registrar_index < op.approvals[i].registrar_index))
+      throw codec::CodecError("registry operation: approvals must be ascending and unique");
+  return op;
+}
+
+SubchainOp SubchainOp::decode_all(codec::ByteView bytes) {
+  codec::CodecReader r(bytes);
+  SubchainOp op = decode(r);
+  r.assert_fully_consumed();
+  return op;
+}
+
+Hash SubchainOp::hash() const { return crypto::hash_tagged(crypto::Domain::kSubchainOp, encode()); }
+
+Hash SubchainOp::auth_digest(std::uint64_t parent_chain_id, const Hash& parent_genesis_hash) const {
+  codec::CodecWriter w;
+  w.write_u64(parent_chain_id);
+  w.write_fixed_bytes(view(parent_genesis_hash), 32);
+  w.write_u8(kind);
+  w.write_u32(authority_epoch);
+  w.write_u64(valid_until);
+  w.write_bytes(view(payload));
+  return crypto::hash_tagged(crypto::Domain::kSubchainOpAuth, w.take());
+}
+
+Hash compute_ops_root(const std::vector<SubchainOp>& ops) {
+  if (ops.empty()) return crypto::zero_hash();
+  std::vector<Hash> leaves;
+  leaves.reserve(ops.size());
+  for (const auto& op : ops) leaves.push_back(op.hash());
+  return merkle::compute_root(leaves);
+}
+
 BlockHeader BlockHeader::decode_all(codec::ByteView bytes) {
   codec::CodecReader r(bytes);
   BlockHeader h = decode(r);
@@ -189,6 +250,9 @@ Bytes Block::encode() const {
   if (header.version < 3 && !anchors.empty()) {
     throw std::invalid_argument("Block::encode: anchors require a version-3 header");
   }
+  if (header.version < 4 && !ops.empty()) {
+    throw std::invalid_argument("Block::encode: registry operations require a version-4 header");
+  }
   codec::CodecWriter w;
   Bytes hdr = header.encode();
   w.write_bytes(view(hdr));
@@ -200,6 +264,12 @@ Bytes Block::encode() const {
   if (header.version >= 3) {
     w.write_list(anchors, [](codec::CodecWriter& w, const Anchor& a) {
       Bytes e = a.encode();
+      w.write_bytes(codec::ByteView(e.data(), e.size()));
+    });
+  }
+  if (header.version >= 4) {
+    w.write_list(ops, [](codec::CodecWriter& w, const SubchainOp& op) {
+      Bytes e = op.encode();
       w.write_bytes(codec::ByteView(e.data(), e.size()));
     });
   }
@@ -219,6 +289,12 @@ Block Block::decode_all(codec::ByteView bytes) {
     b.anchors = r.read_list<Anchor>([](codec::CodecReader& r) {
       Bytes e = r.read_bytes();
       return Anchor::decode_all(codec::ByteView(e.data(), e.size()));
+    });
+  }
+  if (b.header.version >= 4) {
+    b.ops = r.read_list<SubchainOp>([](codec::CodecReader& r) {
+      Bytes e = r.read_bytes();
+      return SubchainOp::decode_all(codec::ByteView(e.data(), e.size()));
     });
   }
   r.assert_fully_consumed();
@@ -279,28 +355,53 @@ void sign_transaction(Transaction& tx, const crypto::KeyPair& kp) {
   }
 }
 
+bool verify_signature(SigAlgo algo, codec::ByteView msg, codec::ByteView signature,
+                      codec::ByteView public_key) {
+  switch (algo) {
+    case SigAlgo::kEd25519:
+      // Fixed sizes: reject malformed before touching the backend.
+      if (public_key.size() != 32 || signature.size() != 64) return false;
+      return crypto::ed25519_verify(msg, signature, public_key);
+    case SigAlgo::kHybridEd25519MlDsa:
+      // hybrid_sig_verify checks both the Ed25519 and ML-DSA parts; a truncated
+      // (downgraded) signature or mismatched key fails.
+      return crypto::hybrid_sig_verify(msg, signature, public_key);
+    case SigAlgo::kSlhDsa:
+      // Fixed SLH-DSA-SHA2-128s shapes: pk 32 B, signature 7856 B. Reject
+      // malformed sizes before touching the backend.
+      if (public_key.size() != 32 || signature.size() != 7856) return false;
+      return crypto::slh_dsa_verify(msg, signature, public_key);
+    default:
+      return false;
+  }
+}
+
+Bytes sign_message(SigAlgo algo, codec::ByteView msg, codec::ByteView secret_key) {
+  switch (algo) {
+    case SigAlgo::kEd25519:
+      return crypto::ed25519_sign(msg, secret_key);
+    case SigAlgo::kHybridEd25519MlDsa:
+      return crypto::hybrid_sig_sign(msg, secret_key);
+    case SigAlgo::kSlhDsa:
+      return crypto::slh_dsa_sign(msg, secret_key);
+    default:
+      throw std::invalid_argument("sign_message: not a key scheme");
+  }
+}
+
 bool verify_transaction_signature(const Transaction& tx) {
   const Bytes msg = tx.signing_bytes();
   switch (tx.algo()) {
     case SigAlgo::kEd25519:
-      // Fixed sizes: reject malformed before touching the backend.
-      if (tx.author.size() != 32 || tx.signature.size() != 64) return false;
-      return crypto::ed25519_verify(view(msg), view(tx.signature), view(tx.author));
     case SigAlgo::kHybridEd25519MlDsa:
-      // hybrid_sig_verify checks both the Ed25519 and ML-DSA parts; a truncated
-      // (downgraded) signature or mismatched key fails.
-      return crypto::hybrid_sig_verify(view(msg), view(tx.signature), view(tx.author));
+    case SigAlgo::kSlhDsa:
+      return verify_signature(tx.algo(), view(msg), view(tx.signature), view(tx.author));
     case SigAlgo::kUtxoWitness:
       // Per-input witnesses are verified by the UTXO state machine's validate()
       // (which knows each input's owner). The account model rejects this scheme
       // (empty author), so it is only ever honoured on a UTXO chain. Envelope
       // verification is therefore a pass-through here.
       return true;
-    case SigAlgo::kSlhDsa:
-      // Fixed SLH-DSA-SHA2-128s shapes: pk 32 B, signature 7856 B. Reject
-      // malformed sizes before touching the backend.
-      if (tx.author.size() != 32 || tx.signature.size() != 7856) return false;
-      return crypto::slh_dsa_verify(view(msg), view(tx.signature), view(tx.author));
     default:
       return false;  // unknown scheme - never accept
   }

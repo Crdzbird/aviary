@@ -72,6 +72,8 @@ class VrfPosEngine : public ConsensusEngine {
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override;
   Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                          std::vector<Anchor> anchors) override;
+  Block propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors,
+                         std::vector<SubchainOp> ops) override;
 
   /// The leader's BLS signature over the block id - the block's justification
   /// (same sealing rule as the reference PoS engine).
