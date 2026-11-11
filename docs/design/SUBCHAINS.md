@@ -1,6 +1,6 @@
 # Subchains - a block that anchors a whole blockchain - Design Doc
 
-Status: **v1 BUILT (all six stages, 2026-09-19). Version 2 (dynamic registration, Merkle registry, closing) is designed in Part 2 below, sections 13 to 26.** Recommendations approved as proposed; two findings changed the design while building - registration by genesis header (section 4.4 note) and BFT-only children (section 8). This document exists because the feature
+Status: **v1 BUILT (all six stages, 2026-09-19). Version 2 (dynamic registration, Merkle registry, closing) is designed and built in Part 2 below, sections 13 to 26, its decisions confirmed 2026-11-11, not yet released.** Recommendations approved as proposed; two findings changed the design while building - registration by genesis header (section 4.4 note) and BFT-only children (section 8). This document exists because the feature
 is delicate: it changes what a block commits to, adds a second trust level, and
 touches consensus-critical code. Every question in section 9 must be answered before a
 line of implementation is written; every invariant in section 5 must have a test in
@@ -403,12 +403,12 @@ the registry commitment. Those are exactly the invariants section 10 pins down f
 # Part 2 - Version 2: dynamic registration, a Merkle registry, closing
 
 Status: **DESIGNED AND BUILT 2026-11-11 on the branch
-`claude/dynamic-subchains-c93c8b`, to the recommendations below, NOT released
-and NOT yet confirmed by the owner (section 24).** Core, C ABI, Go and Dart
-are built and tested; section 25 lists what is not. Every rule in this part sits
-behind a new genesis policy format and header version 4, which no existing
-chain uses, so each decision in section 24 can still be changed before a
-release at the cost of regenerating only the new vectors. Part 1 (sections 0
+`claude/dynamic-subchains-c93c8b`. Decisions D1 to D11 (section 24) were
+CONFIRMED AS BUILT by the owner on 2026-11-11. NOT released.** Core, C ABI,
+Go and Dart are built and tested; section 25 lists what is not. Every rule in
+this part sits behind a new genesis policy format and header version 4, which
+no existing chain uses; once a release ships them they are consensus rules
+and change only under a new version. Part 1 (sections 0
 to 12) stays exactly as built: a chain whose genesis carries a version 1
 policy behaves and encodes as in aviary 1.0.0.
 
@@ -968,10 +968,11 @@ next proposal, buffered events and metrics.
 
 ---
 
-## 24. Decisions for the owner to confirm
+## 24. Decisions (confirmed by the owner, 2026-11-11)
 
-Each is implemented as recommended. None affects any chain that exists today
-except the note under D7.
+Each is implemented as recommended and was confirmed as built. None affects
+any chain that exists today except the note under D7. The alternatives are
+kept as the record of what was weighed.
 
 | # | Decision | Recommendation | Alternative |
 |---|---|---|---|

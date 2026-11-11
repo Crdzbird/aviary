@@ -409,7 +409,8 @@
   header, and continuation under the new set. 67 suites, ASan-clean.
 - **[~] Subchains version 2 + chain persistence - BUILT ON A BRANCH, not
   released** (2026-11-11, branch `claude/dynamic-subchains-c93c8b`; design
-  `docs/design/SUBCHAINS.md` Part 2, decisions D1 to D11 await the owner).
+  `docs/design/SUBCHAINS.md` Part 2; decisions D1 to D11 confirmed as built by
+  the owner on 2026-11-11).
   Dynamic registration: a parent with a `DynamicSubchainPolicy` produces
   header version 4 blocks carrying signed registry operations (register,
   close, set registrars; k of n registrar keys committed at genesis; digest
@@ -440,7 +441,7 @@
   `RoundDriver`/`NetworkedNode` (they validate such blocks, they cannot yet
   propose them); a dynamic `ChainTree`; absence proofs; operation inclusion
   proofs; child initiated close; npm, JVM, Swift and Flutter bindings.
-  **A release needs:** the owner's answer to D1 to D11; a version bump of the
+  **A release needs:** a version bump of the
   engine and every package (new C ABI symbols and header version 4); rebuilt
   native binaries for the Dart `native/` slots, the Flutter plugins
   (xcframeworks, jniLibs), the npm prebuilds and the Linux engines; the
