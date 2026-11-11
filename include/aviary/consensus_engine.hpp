@@ -48,6 +48,18 @@ class ConsensusEngine {
   /// advancing the chain on success, leaving it unchanged on failure. The
   /// justification encoding is engine-specific.
   virtual BlockError submit(const Block& block, codec::ByteView justification) = 0;
+
+  /// The engine's own state beyond the ledger, as canonical bytes, for a chain
+  /// snapshot (docs/design/SUBCHAINS.md section 22). Empty for an engine that
+  /// keeps none. Never contains a secret key.
+  virtual Bytes consensus_state() const { return {}; }
+
+  /// Resume from [state] (what consensus_state() returned) over a ledger that
+  /// was restored to the same tip. Throws on bytes that are malformed or do
+  /// not fit the ledger's tip; the default accepts only the empty state.
+  virtual void restore_consensus_state(codec::ByteView state) {
+    if (!state.empty()) throw std::invalid_argument("this consensus engine keeps no consensus state");
+  }
 };
 
 }  // namespace aviary::consensus

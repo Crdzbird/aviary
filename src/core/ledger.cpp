@@ -232,4 +232,17 @@ std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot
   return ledger;
 }
 
+std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot,
+                                        std::vector<Receipt> tip_receipts) {
+  std::unique_ptr<Ledger> ledger = restore(std::move(spec), snapshot);
+  const BlockHeader& tip = ledger->tip_;
+  const bool commits_receipts = tip.version >= 2 && tip.height > 0;
+  if (!commits_receipts && !tip_receipts.empty())
+    throw std::invalid_argument("snapshot: receipts for a tip that commits none");
+  if (commits_receipts && compute_receipt_root(tip_receipts) != tip.receipt_root)
+    throw std::invalid_argument("snapshot: receipt_root mismatch");
+  ledger->last_receipts_ = std::move(tip_receipts);
+  return ledger;
+}
+
 }  // namespace aviary

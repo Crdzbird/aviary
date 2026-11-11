@@ -50,6 +50,13 @@ class BlockStore {
   /// Locate a transaction by id, or nullopt if unknown.
   std::optional<TxLocation> find_tx(const Hash& txid) const;
 
+  /// Lowest stored height (0 if empty).
+  std::uint64_t first_height() const { return by_height_.empty() ? 0 : by_height_.begin()->first; }
+
+  /// Drop every stored block below [height] and its index entries; returns
+  /// how many were removed. What remains is still contiguous.
+  std::size_t prune_below(std::uint64_t height);
+
   /// Serialize the whole archive (blocks + certs) to bytes; the indexes are
   /// rebuilt on load.
   Bytes serialize() const;

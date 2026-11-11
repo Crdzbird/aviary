@@ -175,6 +175,7 @@ add_library(aviary_core STATIC
   src/node/chain_assembler.cpp
   src/node/foreign_engine.cpp
   src/node/subchain_relay.cpp
+  src/node/chain_snapshot.cpp
   src/node/chain_tree.cpp
   src/node/remote_guard.cpp
   src/node/demo_node.cpp)
@@ -338,6 +339,7 @@ aviary_add_test(test_subchains tests/test_subchains.cpp)
 aviary_add_test(test_validator_rotation tests/test_validator_rotation.cpp)
 aviary_add_test(test_light_client_skip tests/test_light_client_skip.cpp)
 aviary_add_test(test_chain_tree tests/test_chain_tree.cpp)
+aviary_add_test(test_chain_snapshot tests/test_chain_snapshot.cpp)
 aviary_add_test(test_remote_guard tests/test_remote_guard.cpp)
 aviary_add_test(test_bbs tests/test_bbs.cpp)
 aviary_add_test(test_bbs_pseudonym tests/test_bbs_pseudonym.cpp)

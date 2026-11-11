@@ -113,6 +113,12 @@ class Ledger {
   /// the snapshotted height and accepts the next block. Throws on a bad blob.
   static std::unique_ptr<Ledger> restore(ChainSpec spec, codec::ByteView snapshot);
 
+  /// The same, also restoring last_receipts(): [tip_receipts] are the receipts
+  /// of the snapshotted tip block. Throws unless they hash to the tip's
+  /// receipt_root (a tip that commits none, or a genesis tip, takes none).
+  static std::unique_ptr<Ledger> restore(ChainSpec spec, codec::ByteView snapshot,
+                                         std::vector<Receipt> tip_receipts);
+
  private:
   BlockError check_header(const BlockHeader& h) const;
   // Shared body of validate_block / process_block: runs the full pipeline on a

@@ -12,6 +12,9 @@
 #include "aviary/chain_blueprint.hpp"
 #include "aviary/subchain.hpp"
 #include "aviary/chain_tree.hpp"
+#include "aviary/chain_snapshot.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/assurance.hpp"
 #include "aviary/consensus.hpp"
 #include "aviary/credential_gate.hpp"
 #include "aviary/genesis.hpp"
@@ -104,6 +107,7 @@ int main() {
     totality_ok &= total([&] { (void)ParentBinding::decode_all(v); });
     totality_ok &= total([&] { (void)SubchainProof::decode_all(v); });
     totality_ok &= total([&] { (void)node::ChainTreeSpec::decode_all(v); });
+    totality_ok &= total([&] { (void)node::ChainSnapshot::decode_all(v); });
     totality_ok &= total([&] { (void)p2p::AddressBook::decode(v); });
     totality_ok &= total([&] { (void)custody::ShareCard::decode(v); });
     totality_ok &= total([&] { (void)consensus::CredentialPolicy::decode_all(v); });
@@ -120,6 +124,59 @@ int main() {
   }
   CHECK_MSG(totality_ok,
             "all decoders are total (success or CodecError only) on random input");
+
+  std::printf("== chain snapshot: mutated blobs never crash and are accepted only when canonical ==\n");
+  {
+    GenesisSpec g;
+    g.chain_id = 77;
+    g.timestamp = 1;
+    std::vector<crypto::KeyPair> keys;
+    for (std::uint8_t i = 0; i < 2; ++i) {
+      keys.push_back(crypto::bls_keygen_from_ikm(view(Bytes(32, static_cast<std::uint8_t>(0x51 + i)))));
+      g.validators.push_back(consensus::Validator{keys.back().public_key, 1});
+    }
+    AssuranceProfile::standard().apply_to(g);
+    ChainBlueprint{"bft", "account", "", {}}.commit_to(g);
+    node::AssembledChain chain = node::ChainAssembler::assemble(g, 0, keys[0]);
+    auto& bft = dynamic_cast<consensus::BftEngine&>(*chain.engine);
+    BlockStore archive;
+    for (std::uint64_t ts = 10; ts < 13; ++ts) {
+      Block b = bft.propose({}, ts);
+      auto cert = bft.try_commit(b, {bft.precommit(b, 0, keys[0]), bft.precommit(b, 1, keys[1])});
+      CHECK(cert.has_value() && bft.finalize(b, *cert).ok && archive.put(b, *cert));
+    }
+    const Bytes good = node::snapshot_chain(g.hash(), chain, &archive);
+    CHECK(node::snapshot_chain(g.hash(), node::restore_chain(g, 0, keys[0], view(good)).chain, &archive) == good);
+    bool survived = true, canonical = true;
+    int accepted = 0;
+    for (int i = 0; i < 4000; ++i) {
+      Bytes m = good;
+      const std::uint32_t mode = rng.below(4);
+      if (mode == 0) m[rng.below(static_cast<std::uint32_t>(m.size()))] ^= static_cast<std::uint8_t>(1u << rng.below(8));
+      if (mode == 1) m.resize(rng.below(static_cast<std::uint32_t>(m.size())));
+      if (mode == 2) {
+        const Bytes extra = random_bytes(rng, 1 + rng.below(8));
+        m.insert(m.end(), extra.begin(), extra.end());
+      }
+      if (mode == 3) {
+        const std::uint32_t at = rng.below(static_cast<std::uint32_t>(m.size()));
+        const Bytes noise = random_bytes(rng, 1 + rng.below(6));
+        for (std::size_t k = 0; k < noise.size() && at + k < m.size(); ++k) m[at + k] = noise[k];
+      }
+      try {
+        node::RestoredChain r = node::restore_chain(g, 0, keys[0], view(m));
+        ++accepted;
+        const Bytes again = node::snapshot_chain(g.hash(), r.chain, r.archive ? &*r.archive : nullptr);
+        if (again != m) canonical = false;
+      } catch (const std::exception&) {
+      } catch (...) {
+        survived = false;
+      }
+    }
+    CHECK_MSG(survived, "restore_chain throws only std::exception on mutated snapshots");
+    CHECK_MSG(canonical, "a mutated snapshot is accepted only when it re-encodes to itself");
+    std::printf("  (%d of 4000 mutations left the snapshot acceptable)\n", accepted);
+  }
 
   std::printf("== interop decoders survive arbitrary input (20k iterations) ==\n");
   {

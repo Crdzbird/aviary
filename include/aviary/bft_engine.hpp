@@ -44,6 +44,8 @@ class BftEngine : public ConsensusEngine {
   const ValidatorSet& validators() const { return vset_; }
   /// The set that certified the current tip.
   const ValidatorSet& tip_validators() const { return prev_vset_; }
+  /// The certificate that finalized the current tip (absent at genesis).
+  const std::optional<CommitCertificate>& last_commit() const { return last_commit_; }
 
   // -- Validator-set changes (coordinated rotation) ---------------------------
   // Operators agree a new set out of band and each SCHEDULES it; the next block
@@ -84,6 +86,15 @@ class BftEngine : public ConsensusEngine {
   /// ConsensusEngine seam: the justification is an encoded CommitCertificate.
   /// Decodes it and finalizes the block (verify certificate -> apply).
   BlockError submit(const Block& b, codec::ByteView justification) override;
+
+  /// The set in force, the set that certified the tip, the tip's certificate,
+  /// a scheduled rotation and the recorded equivocators, canonically encoded.
+  Bytes consensus_state() const override;
+  /// Throws unless [state] is canonical and consistent with the ledger's tip:
+  /// the certifying set matches the hash the tip header commits, the set in
+  /// force is the one that header announces (or the same set), and the
+  /// certificate is a valid quorum for exactly that tip.
+  void restore_consensus_state(codec::ByteView state) override;
 
   /// A validator precommits a proposed block.
   Vote precommit(const Block& b, std::uint32_t validator_index,

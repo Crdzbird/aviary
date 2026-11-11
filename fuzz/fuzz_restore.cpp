@@ -8,6 +8,10 @@
 #include <memory>
 
 #include "aviary/account_state.hpp"
+#include "aviary/assurance.hpp"
+#include "aviary/chain_blueprint.hpp"
+#include "aviary/chain_snapshot.hpp"
+#include "aviary/chain_tree.hpp"
 #include "aviary/genesis.hpp"
 #include "aviary/networked_node.hpp"
 #include "aviary/node/demo_node.hpp"
@@ -21,9 +25,20 @@ codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()
 struct Fixture {
   node::DemoNode node{77};
   std::unique_ptr<p2p::NetworkedNode> net;
+  GenesisSpec chain_genesis;
+  crypto::KeyPair chain_key;
+  node::ChainTreeSpec tree_spec;
   Fixture() {
     init();
     auto key = crypto::bls_keygen_from_ikm(view(Bytes(32, 0x61)));
+    chain_key = key;
+    chain_genesis.chain_id = 78;
+    chain_genesis.timestamp = 1;
+    chain_genesis.validators = {consensus::Validator{key.public_key, 1}};
+    AssuranceProfile::standard().apply_to(chain_genesis);
+    ChainBlueprint{"bft", "account", "", {}}.commit_to(chain_genesis);
+    tree_spec.root.chain_id = 79;
+    tree_spec.root.validators = {node::ChainTreeSpec::Validator{key.public_key, key.secret_key, 1}};
     consensus::ValidatorSet vset(std::vector<consensus::Validator>{{key.public_key, 1}});
     auto genesis = std::make_unique<AccountStateMachine>();
     auto ledger = std::make_unique<Ledger>(ChainSpec{42, StateModel::kAccount}, std::move(genesis));
@@ -50,6 +65,9 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
   Fixture& f = fixture();
   codec::ByteView v(data, size);
   attempt([&] { (void)node::DemoNode::restore(v); });
+  attempt([&] { (void)node::ChainSnapshot::decode_all(v); });
+  attempt([&] { (void)node::restore_chain(f.chain_genesis, 0, f.chain_key, v); });
+  attempt([&] { (void)node::ChainTree::restore(f.tree_spec, v); });
   attempt([&] { (void)f.node.submit_encoded(v); });
   attempt([&] { (void)f.net->on_gossip(1, Bytes(data, data + size)); });
   return 0;

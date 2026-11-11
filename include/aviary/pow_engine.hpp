@@ -55,6 +55,13 @@ class PowEngine : public ConsensusEngine {
   /// argument is unused (the proof is intrinsic to the block).
   BlockError submit(const Block& block, codec::ByteView justification) override;
 
+  /// The current target (32 bytes): it can move after assembly (set_target).
+  Bytes consensus_state() const override { return Bytes(target_.begin(), target_.end()); }
+  void restore_consensus_state(codec::ByteView state) override {
+    if (state.size() != target_.size()) throw std::invalid_argument("pow: consensus state must be a 32 byte target");
+    for (std::size_t i = 0; i < target_.size(); ++i) target_[i] = state[i];
+  }
+
   /// Search nonces (in-place, in [block].header.consensus_data) until the block
   /// hash meets the target, up to [max_iters]. Returns true if solved.
   bool mine(Block& block, std::uint64_t max_iters = 1u << 24) const;

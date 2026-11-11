@@ -171,21 +171,10 @@ ChainBlueprint ChainAssembler::default_blueprint(const GenesisSpec& genesis) {
   return b;
 }
 
-AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_t me,
-                                        crypto::KeyPair bls_key, Bytes vrf_secret,
-                                        std::vector<Bytes> vrf_pubkeys) {
-  // 1. The posture check every boot already runs (unknown id / inconsistent sigs -> throw).
-  const AssuranceProfile profile = AssuranceProfile::from_genesis(genesis);
-
-  // 2. The mixture: committed in genesis, else the posture-driven default.
-  ChainBlueprint bp = ChainBlueprint::from_genesis(genesis).value_or(default_blueprint(genesis));
-
-  // 3. State model -> genesis state -> ledger (the id must match the seeding).
-  const StateFactory* sf = ComponentRegistry::find_state(bp.state_model_id);
-  if (!sf) throw std::runtime_error("chain-assembler: unknown state model id '" + bp.state_model_id + "'");
-  auto ledger = std::make_unique<Ledger>(genesis.chain_spec(), (*sf)(genesis), genesis.timestamp);
-
-  // 4. Proposer policy (optional).
+namespace {
+AssembledChain assemble_over(const GenesisSpec& genesis, const AssuranceProfile& profile, ChainBlueprint bp,
+                             std::unique_ptr<Ledger> ledger, std::uint32_t me, crypto::KeyPair bls_key,
+                             Bytes vrf_secret, std::vector<Bytes> vrf_pubkeys) {
   consensus::ProposerPolicy proposer;
   if (!bp.proposer_id.empty()) {
     const ProposerFactory* pf = ComponentRegistry::find_proposer(bp.proposer_id);
@@ -193,8 +182,6 @@ AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_
     proposer = (*pf)();
   }
 
-  // 5. Engine - and the posture must permit it: a grind-proof posture cannot
-  //    run a predictable-leader engine.
   const EngineEntry* ee = ComponentRegistry::find_engine(bp.consensus_id);
   if (!ee) throw std::runtime_error("chain-assembler: unknown consensus id '" + bp.consensus_id + "'");
   if (profile.consensus() == AssuranceProfile::Consensus::kVrf && !ee->grind_proof) {
@@ -202,8 +189,6 @@ AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_
                              "election, but engine '" + bp.consensus_id + "' is not grind-proof");
   }
 
-  // Aggregate-initialised in member order (ValidatorSet validates at
-  // construction, so BootContext has no default constructor).
   BootContext ctx{&genesis,
                   &bp,
                   std::move(ledger),
@@ -216,6 +201,39 @@ AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_
   std::unique_ptr<consensus::ConsensusEngine> engine = ee->make(ctx);
   if (!engine) throw std::runtime_error("chain-assembler: factory for '" + bp.consensus_id + "' returned no engine");
   return AssembledChain{std::move(bp), profile, std::move(engine)};
+}
+}  // namespace
+
+AssembledChain ChainAssembler::assemble(const GenesisSpec& genesis, std::uint32_t me,
+                                        crypto::KeyPair bls_key, Bytes vrf_secret,
+                                        std::vector<Bytes> vrf_pubkeys) {
+  const AssuranceProfile profile = AssuranceProfile::from_genesis(genesis);
+  ChainBlueprint bp = ChainBlueprint::from_genesis(genesis).value_or(default_blueprint(genesis));
+
+  const StateFactory* sf = ComponentRegistry::find_state(bp.state_model_id);
+  if (!sf) throw std::runtime_error("chain-assembler: unknown state model id '" + bp.state_model_id + "'");
+  auto ledger = std::make_unique<Ledger>(genesis.chain_spec(), (*sf)(genesis), genesis.timestamp);
+  return assemble_over(genesis, profile, std::move(bp), std::move(ledger), me, std::move(bls_key),
+                       std::move(vrf_secret), std::move(vrf_pubkeys));
+}
+
+AssembledChain ChainAssembler::assemble_restored(const GenesisSpec& genesis, std::uint32_t me,
+                                                 crypto::KeyPair bls_key, codec::ByteView ledger_snapshot,
+                                                 std::vector<Receipt> tip_receipts, Bytes vrf_secret,
+                                                 std::vector<Bytes> vrf_pubkeys) {
+  const AssuranceProfile profile = AssuranceProfile::from_genesis(genesis);
+  ChainBlueprint bp = ChainBlueprint::from_genesis(genesis).value_or(default_blueprint(genesis));
+
+  if (!ComponentRegistry::find_state(bp.state_model_id))
+    throw std::runtime_error("chain-assembler: unknown state model id '" + bp.state_model_id + "'");
+  const char* expected = genesis.state_model == StateModel::kAccount ? "account"
+                         : genesis.state_model == StateModel::kUtxo ? "utxo" : "record";
+  if (bp.state_model_id != expected)
+    throw std::runtime_error("chain-assembler: state model '" + bp.state_model_id +
+                             "' cannot be restored from a snapshot (built in models only)");
+  auto ledger = Ledger::restore(genesis.chain_spec(), ledger_snapshot, std::move(tip_receipts));
+  return assemble_over(genesis, profile, std::move(bp), std::move(ledger), me, std::move(bls_key),
+                       std::move(vrf_secret), std::move(vrf_pubkeys));
 }
 
 }  // namespace aviary::node
