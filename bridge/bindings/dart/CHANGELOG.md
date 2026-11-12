@@ -100,8 +100,10 @@ from this release on.
   do not linger in freed memory.
 
 - The engine ships as one self contained library per platform (macOS arm64
-  2.8 MB, Linux x64 and arm64); the build hook
-  bundles the Linux library as a code asset, and `Aviary.loadedFrom`
+  2.8 MB, Linux x64 and arm64); the build hook bundles it as a code asset,
+  so a `dart build cli` bundle runs anywhere with no setup. On macOS the
+  hook leaves the engine to the `aviary` and `aviary_lite` plugins when the
+  app depends on one of them, so an app never carries two. `Aviary.loadedFrom`
   reports which library was loaded. `AVIARY_DYLIB` points at any other
   build.
 - Native handles are released by a finalizer; releasing twice is a no-op.
