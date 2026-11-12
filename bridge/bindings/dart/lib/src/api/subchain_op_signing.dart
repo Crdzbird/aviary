@@ -35,7 +35,7 @@ extension AviarySubchainOpSigning on Aviary {
     required Uint8List parentGenesisHash,
     required int registrarIndex,
     required Uint8List secret,
-    SignatureScheme scheme = SignatureScheme.ed25519,
+    RegistrarScheme scheme = RegistrarScheme.ed25519,
   }) {
     _requireHash(parentGenesisHash, 'parent genesis hash');
     return _scoped(

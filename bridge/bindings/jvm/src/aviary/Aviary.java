@@ -50,6 +50,13 @@ public final class Aviary implements AutoCloseable {
             netNew, netAddPeer, netSetTxs, netStart, netOnGossip, netOnTimeout, netAdvance, netCommitted, netHeight,
             netPeerBanned, netReplayLog, netTip, netStateRoot, netBalance, netProve, netRecordH, netRecordNonceH, netProveRecordH, netFree, netDrainEvents, netSetEventHook, netMetrics,
             secIdentity, secInitiate, secAccept, secHandshake, secComplete, secOpen, secPeer, secEncrypt, secDecrypt, secFree;
+    private final MethodHandle hashH, encodedHeaderHashH, registrarEncode, dynPolicyEncode,
+            opRegisterH, opCloseH, opSetRegistrarsH, opDigestH, opSignH, opAddApprovalH,
+            chainProposeSubchain, chainRegistryCounts, chainChildRecord, chainChildProof, childProofVerify,
+            chainPendingAnchor, chainSubchainHopV2, subchainProofV2Encode, subchainProofV2Verify,
+            chainTipH, chainSnapshotH, chainRestoreH, chainSnapshotErrorH,
+            chainArchiveEnable, chainArchiveRange, chainArchivedBlock, chainArchivedCert, chainArchivePrune,
+            treeSnapshot, treeRestore;
 
     public Aviary() {
         lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
@@ -279,6 +286,36 @@ public final class Aviary implements AutoCloseable {
         secEncrypt = h("aviary_secure_encrypt", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
         secDecrypt = h("aviary_secure_decrypt", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
         secFree = h("aviary_secure_free", FunctionDescriptor.ofVoid(ADDRESS));
+        hashH = h("aviary_hash", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        encodedHeaderHashH = h("aviary_encoded_header_hash", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        registrarEncode = h("aviary_registrar_encode", FunctionDescriptor.of(RES, JAVA_BYTE, ADDRESS, JAVA_LONG));
+        dynPolicyEncode = h("aviary_dynamic_subchain_policy_encode", FunctionDescriptor.of(RES, JAVA_BYTE, JAVA_INT, JAVA_SHORT, JAVA_SHORT, JAVA_SHORT, JAVA_BYTE, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        opRegisterH = h("aviary_subchain_op_register", FunctionDescriptor.of(RES, JAVA_INT, JAVA_LONG, ADDRESS, JAVA_LONG));
+        opCloseH = h("aviary_subchain_op_close", FunctionDescriptor.of(RES, JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, ADDRESS));
+        opSetRegistrarsH = h("aviary_subchain_op_set_registrars", FunctionDescriptor.of(RES, JAVA_INT, JAVA_LONG, JAVA_BYTE, ADDRESS, JAVA_LONG));
+        opDigestH = h("aviary_subchain_op_digest", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, JAVA_LONG, ADDRESS));
+        opSignH = h("aviary_subchain_op_sign", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, JAVA_LONG, ADDRESS, JAVA_SHORT, JAVA_BYTE, ADDRESS, JAVA_LONG));
+        opAddApprovalH = h("aviary_subchain_op_add_approval", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, JAVA_SHORT, ADDRESS, JAVA_LONG));
+        chainProposeSubchain = h("aviary_chain_propose_subchain", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        chainRegistryCounts = h("aviary_chain_registry_counts", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+        chainChildRecord = h("aviary_chain_child_record", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        chainChildProof = h("aviary_chain_child_proof", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        childProofVerify = h("aviary_child_proof_verify", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_LONG));
+        chainPendingAnchor = h("aviary_chain_pending_anchor", FunctionDescriptor.of(RES, ADDRESS, ADDRESS, JAVA_SHORT));
+        chainSubchainHopV2 = h("aviary_chain_subchain_hop_v2", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        subchainProofV2Encode = h("aviary_subchain_proof_v2_encode", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        subchainProofV2Verify = h("aviary_subchain_proof_v2_verify", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_LONG));
+        chainTipH = h("aviary_chain_tip", FunctionDescriptor.of(RES, ADDRESS));
+        chainSnapshotH = h("aviary_chain_snapshot", FunctionDescriptor.of(RES, ADDRESS));
+        chainRestoreH = h("aviary_chain_restore", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        chainSnapshotErrorH = h("aviary_chain_snapshot_error", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
+        chainArchiveEnable = h("aviary_chain_archive_enable", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+        chainArchiveRange = h("aviary_chain_archive_range", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS));
+        chainArchivedBlock = h("aviary_chain_archived_block", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        chainArchivedCert = h("aviary_chain_archived_certificate", FunctionDescriptor.of(RES, ADDRESS, JAVA_LONG));
+        chainArchivePrune = h("aviary_chain_archive_prune", FunctionDescriptor.of(JAVA_LONG, ADDRESS, JAVA_LONG));
+        treeSnapshot = h("aviary_chain_tree_snapshot", FunctionDescriptor.of(RES, ADDRESS));
+        treeRestore = h("aviary_chain_tree_restore", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
         try { if ((int) init.invoke() != 0) throw new IllegalStateException("init failed"); }
         catch (Throwable t) { throw new RuntimeException(t); }
     }
@@ -762,6 +799,43 @@ public final class Aviary implements AutoCloseable {
         public long recordNonce(byte[] address) { try { return (long) chainRecordNonce.invoke(h, seg(address)); } catch (Throwable e) { throw new RuntimeException(e); } }
         /** A state inclusion proof for the record at key; verify with verifyStateProof(stateRoot(), proof). */
         public byte[] proveRecord(byte[] key) { return call(chainProveRecord, h, seg(key)); }
+
+        /** Propose the next block on a parent with a dynamic policy: anchors (ascending child id) and signed registry operations, applied operations first. Throws with the reason on an invalid anchor or operation. */
+        public byte[] proposeSubchain(long timestamp, byte[][] anchors, byte[][] ops) {
+            byte[] a = optionalList(anchors), o = optionalList(ops);
+            return call(chainProposeSubchain, h, timestamp, seg(a), (long) a.length, seg(o), (long) o.length);
+        }
+        /** The dynamic registry's record count, open count and authority epoch, or null when this chain has no dynamic policy. */
+        public RegistryCounts registryCounts() {
+            MemorySegment c = arena.allocate(JAVA_INT, 3);
+            try { if ((int) chainRegistryCounts.invoke(h, c, c.asSlice(4), c.asSlice(8)) != 1) return null; } catch (Throwable e) { throw new RuntimeException(e); }
+            return new RegistryCounts(Integer.toUnsignedLong(c.getAtIndex(JAVA_INT, 0)), Integer.toUnsignedLong(c.getAtIndex(JAVA_INT, 1)), Integer.toUnsignedLong(c.getAtIndex(JAVA_INT, 2)));
+        }
+        /** The current record of a child; throws when this chain has no dynamic policy or the child was never registered. */
+        public ChildRecord childRecord(long childChainId) { return decodeChildRecord(call(chainChildRecord, h, childChainId)); }
+        /** A proof that a child's record is committed by this parent's current subchain root. */
+        public byte[] childProof(long childChainId) { return call(chainChildProof, h, childChainId); }
+        /** A proof hop into a child tagged with its kind (HOP_FLAT or HOP_RECORD) in its first byte. */
+        public byte[] subchainHopV2(long childChainId) { return call(chainSubchainHopV2, h, childChainId); }
+
+        /** The current tip header (the genesis header before any block). */
+        public byte[] tip() { return call(chainTipH, h); }
+        /** Everything this chain needs to resume: ledger, tip receipts, consensus state and the archive when enabled. Holds no secret key; queued transactions are not included. */
+        public byte[] snapshot() { return call(chainSnapshotH, h); }
+        /** Keep every block committed from now on with its certificate (and so in snapshots). False when the engine is not BFT. */
+        public boolean enableArchive() { try { return (int) chainArchiveEnable.invoke(h) == 1; } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** The archived height range, or null when the archive holds no block. */
+        public ArchiveRange archiveRange() {
+            MemorySegment r = arena.allocate(JAVA_LONG, 2);
+            try { if ((int) chainArchiveRange.invoke(h, r, r.asSlice(8)) != 1) return null; } catch (Throwable e) { throw new RuntimeException(e); }
+            return new ArchiveRange(r.getAtIndex(JAVA_LONG, 0), r.getAtIndex(JAVA_LONG, 1));
+        }
+        /** The archived encoded block at a height; throws when absent. */
+        public byte[] archivedBlock(long height) { return call(chainArchivedBlock, h, height); }
+        /** The commit certificate that finalized the archived block at a height. */
+        public byte[] archivedCertificate(long height) { return call(chainArchivedCert, h, height); }
+        /** Drop archived blocks below a height; returns how many were dropped. */
+        public long pruneArchive(long height) { try { return (long) chainArchivePrune.invoke(h, height); } catch (Throwable e) { throw new RuntimeException(e); } }
     }
 
     /** The canonical ValidatorSet encoding: [count]([len][pk][power u64])x. */
@@ -875,12 +949,22 @@ public final class Aviary implements AutoCloseable {
             if (!err.isEmpty()) throw new IllegalArgumentException("chain tree: " + err);
             try { h = (MemorySegment) treeBuild.invoke(seg(spec), (long) spec.length); } catch (Throwable e) { throw new RuntimeException(e); }
             if (h.address() == 0) throw new IllegalArgumentException("chain tree: build rejected (unknown mixture or posture-forbidden engine)");
-            handle = NEXT_HANDLE.getAndIncrement(); TREES.put(handle, this);
+            handle = attachHooks();
+        }
+        ChainTree(TreeNode root, byte[] snapshot) {
+            byte[] spec = encodeTreeNode(root);
+            try { h = (MemorySegment) treeRestore.invoke(seg(spec), (long) spec.length, seg(snapshot), (long) snapshot.length); } catch (Throwable e) { throw new RuntimeException(e); }
+            if (h.address() == 0) throw new IllegalArgumentException("chain tree: restore refused (another family, or a malformed snapshot)");
+            handle = attachHooks();
+        }
+        private long attachHooks() {
+            long handle = NEXT_HANDLE.getAndIncrement(); TREES.put(handle, this);
             MemorySegment fin = upcall("treeFinalizedUpcall", java.lang.invoke.MethodType.methodType(void.class, MemorySegment.class, long.class, MemorySegment.class, long.class),
                     FunctionDescriptor.ofVoid(ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG));
             MemorySegment tx = upcall("treeTxSourceUpcall", java.lang.invoke.MethodType.methodType(int.class, MemorySegment.class, long.class, long.class, MemorySegment.class, long.class, MemorySegment.class),
                     FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS));
             try { treeSetFinalized.invoke(h, fin, MemorySegment.ofAddress(handle)); treeSetTxSource.invoke(h, tx, MemorySegment.ofAddress(handle)); } catch (Throwable e) { throw new RuntimeException(e); }
+            return handle;
         }
         public long[] chainIds() { byte[] b = call(treeChainIds, h); java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b); int n = bb.getInt(); long[] out = new long[n]; for (int i = 0; i < n; i++) out[i] = bb.getLong(); return out; }
         public long height(long chainId) { try { return (long) treeHeight.invoke(h, chainId); } catch (Throwable e) { throw new RuntimeException(e); } }
@@ -890,9 +974,13 @@ public final class Aviary implements AutoCloseable {
         public byte[] produce(long chainId, long timestamp) { return call(treeProduce, h, chainId, timestamp); }
         public byte[] proveAccount(long chainId, byte[] address) { return call(treeProve, h, chainId, seg(address)); }
         public boolean verify(byte[] proof) { try { return (int) treeVerify.invoke(h, seg(proof), (long) proof.length) == 1; } catch (Throwable e) { throw new RuntimeException(e); } }
+        /** The whole family as one blob: every node's chain snapshot. Holds no secret key. */
+        public byte[] snapshot() { return call(treeSnapshot, h); }
         @Override public void close() { try { treeFree.invoke(h); } catch (Throwable ignored) {} TREES.remove(handle); }
     }
     public ChainTree buildChainTree(TreeNode root) { return new ChainTree(root); }
+    /** Rebuild a family from the SAME root node it was built from and a ChainTree snapshot. Hooks are not restored; set them again. */
+    public ChainTree restoreChainTree(TreeNode root, byte[] snapshot) { return new ChainTree(root, snapshot); }
 
     // -- Subchains: a parent block anchors a child chain's finalized headers ----
     // (docs/design/SUBCHAINS.md). Register a child at the parent's genesis by its
@@ -941,6 +1029,123 @@ public final class Aviary implements AutoCloseable {
         if (parentSubchainRoot.length != 32) return false;
         try { return (int) subchainProofVerify.invoke(seg(parentSubchainRoot), seg(proof), (long) proof.length) == 1; } catch (Throwable e) { throw new RuntimeException(e); }
     }
+    /** BLAKE3-256 of a message (32 bytes). */
+    public byte[] hash(byte[] message) { return call(hashH, seg(message), (long) message.length); }
+
+    /** Signature schemes a registrar key may use (the transaction schemes). */
+    public static final int SIG_ED25519 = 1, SIG_HYBRID = 2, SIG_SLH_DSA = 4;
+    /** Child record statuses. */
+    public static final int CHILD_OPEN = 1, CHILD_CLOSED = 2;
+    /** Proof hop kinds of a version 2 cross-chain proof. */
+    public static final int HOP_FLAT = 1, HOP_RECORD = 2;
+
+    /** A key allowed to authorise registry operations: a signature scheme and its public key. */
+    public record Registrar(int sigAlgo, byte[] publicKey) {}
+    /** The sizes and authority epoch of a dynamic registry. */
+    public record RegistryCounts(long records, long open, long authorityEpoch) {}
+    /** The archived height range of a chain. */
+    public record ArchiveRange(long first, long last) {}
+    /** One child's entry in a dynamic registry: what the parent commits about it and what a proof carries. */
+    public record ChildRecord(long index, long chainId, int status, int maxDepth, byte[] genesisHeaderHash,
+                              long registeredHeight, long closedHeight, long tipHeight, byte[] tipHash,
+                              byte[] tipStateRoot, byte[] tipSubchainRoot, byte[] vsetHash, byte[] tipVsetHash, byte[] encoded) {
+        public boolean isOpen() { return status == CHILD_OPEN; }
+    }
+    static final int CHILD_RECORD_SIZE = 230;
+    /** Parse the fixed 230 byte record layout. */
+    public static ChildRecord decodeChildRecord(byte[] b) {
+        if (b.length != CHILD_RECORD_SIZE) throw new IllegalArgumentException("child record: must be 230 bytes");
+        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(b);
+        java.util.function.IntFunction<byte[]> cut = from -> java.util.Arrays.copyOfRange(b, from, from + 32);
+        return new ChildRecord(Integer.toUnsignedLong(bb.getInt(0)), bb.getLong(4), b[12] & 0xFF, b[13] & 0xFF, cut.apply(14),
+                bb.getLong(46), bb.getLong(54), bb.getLong(62), cut.apply(70), cut.apply(102), cut.apply(134), cut.apply(166), cut.apply(198), b.clone());
+    }
+
+    /** A parent's version 2 policy. maxChildren bounds OPEN children; 0 is unlimited for every bound. No registrars with threshold 0 is a registry sealed at genesis. registrations are encoded child registrations, ascending and unique by chain id. */
+    public static final class DynamicSubchainPolicy {
+        public int maxDepth; public long maxChildren; public int maxAnchorsPerBlock, maxHeadersPerAnchor, maxOpsPerBlock, threshold;
+        public java.util.List<Registrar> registrars = new java.util.ArrayList<>();
+        public byte[][] registrations = new byte[0][];
+    }
+    static byte[] optionalList(byte[][] items) { return items == null || items.length == 0 ? new byte[0] : blobList(items); }
+    /** Canonically encode one registrar. */
+    public byte[] encodeRegistrar(Registrar r) { return call(registrarEncode, (byte) r.sigAlgo(), seg(r.publicKey()), (long) r.publicKey().length); }
+    private byte[] encodeRegistrars(java.util.List<Registrar> registrars) {
+        byte[][] items = new byte[registrars.size()][];
+        for (int i = 0; i < items.length; i++) items[i] = encodeRegistrar(registrars.get(i));
+        return optionalList(items);
+    }
+    /** Encode a dynamic policy; commit it with commitSubchainPolicy. */
+    public byte[] encodeDynamicSubchainPolicy(DynamicSubchainPolicy p) {
+        byte[] regs = encodeRegistrars(p.registrars), kids = optionalList(p.registrations);
+        return call(dynPolicyEncode, (byte) p.maxDepth, (int) p.maxChildren, (short) p.maxAnchorsPerBlock, (short) p.maxHeadersPerAnchor,
+                (short) p.maxOpsPerBlock, (byte) p.threshold, seg(regs), (long) regs.length, seg(kids), (long) kids.length);
+    }
+    /** The canonical 32 byte hash of an encoded header of any version (what a record's tipHash and genesisHeaderHash hold). */
+    public byte[] encodedHeaderHash(byte[] header) { return call(encodedHeaderHashH, seg(header), (long) header.length); }
+    /** An UNSIGNED operation registering a child (an encoded child registration), valid in authorityEpoch up to parent height validUntil (0 = no expiry). */
+    public byte[] opRegister(long authorityEpoch, long validUntil, byte[] registration) {
+        return call(opRegisterH, (int) authorityEpoch, validUntil, seg(registration), (long) registration.length);
+    }
+    /** An UNSIGNED operation closing a child at its recorded tip (height and 32 byte header hash, as childRecord reports them). */
+    public byte[] opClose(long authorityEpoch, long validUntil, long chainId, long finalHeight, byte[] finalTipHash) {
+        if (finalTipHash.length != 32) throw new IllegalArgumentException("operation: final tip hash must be 32 bytes");
+        return call(opCloseH, (int) authorityEpoch, validUntil, chainId, finalHeight, seg(finalTipHash));
+    }
+    /** An UNSIGNED operation replacing the registrar set; applying it increments the authority epoch, voiding every operation signed for the old one. */
+    public byte[] opSetRegistrars(long authorityEpoch, long validUntil, int threshold, java.util.List<Registrar> registrars) {
+        byte[] regs = encodeRegistrars(registrars);
+        return call(opSetRegistrarsH, (int) authorityEpoch, validUntil, (byte) threshold, seg(regs), (long) regs.length);
+    }
+    /** The 32 byte digest registrars sign for an operation on the parent identified by its chain id and genesis hash. */
+    public byte[] opDigest(byte[] op, long parentChainId, byte[] parentGenesisHash) {
+        if (parentGenesisHash.length != 32) throw new IllegalArgumentException("operation: parent genesis hash must be 32 bytes");
+        return call(opDigestH, seg(op), (long) op.length, parentChainId, seg(parentGenesisHash));
+    }
+    /** Sign an operation as registrar registrarIndex and return it with that approval added; throws if that registrar already approved. */
+    public byte[] signOp(byte[] op, long parentChainId, byte[] parentGenesisHash, int registrarIndex, int sigAlgo, byte[] secret) {
+        if (parentGenesisHash.length != 32) throw new IllegalArgumentException("operation: parent genesis hash must be 32 bytes");
+        return call(opSignH, seg(op), (long) op.length, parentChainId, seg(parentGenesisHash), (short) registrarIndex, (byte) sigAlgo, seg(secret), (long) secret.length);
+    }
+    /** Add an approval whose signature over opDigest was made elsewhere. */
+    public byte[] addOpApproval(byte[] op, int registrarIndex, byte[] signature) {
+        return call(opAddApprovalH, seg(op), (long) op.length, (short) registrarIndex, seg(signature), (long) signature.length);
+    }
+    /** Verify a child proof against a 32 byte version 4 subchain root from a trusted parent header and return the proven record; throws on a bad proof. */
+    public ChildRecord verifyChildProof(byte[] subchainRoot, byte[] proof) {
+        if (subchainRoot.length != 32) throw new IllegalArgumentException("child proof: subchain root must be 32 bytes");
+        return decodeChildRecord(call(childProofVerify, seg(subchainRoot), seg(proof), (long) proof.length));
+    }
+    /** The next anchor parent can take for child, from the child's archive (enableArchive) and the parent's recorded tip, at most limit headers (0 = the policy bound); null when nothing is pending. */
+    public byte[] pendingAnchor(Chain parent, Chain child, int limit) {
+        byte[] b = call(chainPendingAnchor, parent.h, child.h, (short) limit);
+        return b.length == 0 ? null : b;
+    }
+    /** A cross-chain proof through any mixture of parents: tagged hops (top parent first) and the last chain's state proof. */
+    public byte[] encodeSubchainProofV2(byte[][] hops, byte[] stateProof) {
+        byte[] blob = optionalList(hops);
+        return call(subchainProofV2Encode, seg(blob), (long) blob.length, seg(stateProof), (long) stateProof.length);
+    }
+    /** Whether a version 2 proof is committed under the parent's 32 byte subchain root all the way down and its state proof holds. */
+    public boolean verifySubchainProofV2(byte[] parentSubchainRoot, byte[] proof) {
+        if (parentSubchainRoot.length != 32) return false;
+        try { return (int) subchainProofV2Verify.invoke(seg(parentSubchainRoot), seg(proof), (long) proof.length) == 1; } catch (Throwable e) { throw new RuntimeException(e); }
+    }
+
+    /** Rebuild a chain from the genesis it was assembled from and a Chain snapshot, as validator me. Throws IllegalArgumentException with the reason on a refused snapshot. */
+    public Chain restoreChain(byte[] genesis, int me, byte[] blsPub, byte[] blsSec, byte[] snapshot) {
+        MemorySegment h;
+        try { h = (MemorySegment) chainRestoreH.invoke(seg(genesis), (long) genesis.length, me, seg(blsPub), (long) blsPub.length, seg(blsSec), (long) blsSec.length, seg(snapshot), (long) snapshot.length); }
+        catch (Throwable e) { throw new RuntimeException(e); }
+        if (h.address() != 0) return new Chain(h);
+        String reason = chainSnapshotError(genesis, snapshot);
+        throw new IllegalArgumentException(reason.isEmpty() ? "chain restore refused" : "chain restore refused: " + reason);
+    }
+    /** Why restoreChain would refuse a snapshot under a genesis; the empty string means it would be accepted. */
+    public String chainSnapshotError(byte[] genesis, byte[] snapshot) {
+        return new String(call(chainSnapshotErrorH, seg(genesis), (long) genesis.length, seg(snapshot), (long) snapshot.length), StandardCharsets.UTF_8);
+    }
+
     // -- Foreign components (engines / proposers implemented in Java) ------------
 
     /** A consensus engine implemented in Java, plugged into a mixture by id. The

@@ -234,6 +234,37 @@ function ensureLoaded() {
     addressOf: f('AviaryBufferResult aviary_address_of(uint8_t*, size_t)'),
     subchainProofEncode: f('AviaryBufferResult aviary_subchain_proof_encode(uint8_t*, size_t, uint8_t*, size_t)'),
     subchainProofVerify: f('int aviary_subchain_proof_verify(uint8_t*, uint8_t*, size_t)'),
+    // Subchains version 2 (dynamic registration, Merkle registry, closing)
+    encodedHeaderHash: f('AviaryBufferResult aviary_encoded_header_hash(uint8_t*, size_t)'),
+    registrarEncode: f('AviaryBufferResult aviary_registrar_encode(uint8_t, uint8_t*, size_t)'),
+    dynPolicyEncode: f('AviaryBufferResult aviary_dynamic_subchain_policy_encode(uint8_t, uint32_t, uint16_t, uint16_t, uint16_t, uint8_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    opRegister: f('AviaryBufferResult aviary_subchain_op_register(uint32_t, uint64_t, uint8_t*, size_t)'),
+    opClose: f('AviaryBufferResult aviary_subchain_op_close(uint32_t, uint64_t, uint64_t, uint64_t, uint8_t*)'),
+    opSetRegistrars: f('AviaryBufferResult aviary_subchain_op_set_registrars(uint32_t, uint64_t, uint8_t, uint8_t*, size_t)'),
+    opDigest: f('AviaryBufferResult aviary_subchain_op_digest(uint8_t*, size_t, uint64_t, uint8_t*)'),
+    opSign: f('AviaryBufferResult aviary_subchain_op_sign(uint8_t*, size_t, uint64_t, uint8_t*, uint16_t, uint8_t, uint8_t*, size_t)'),
+    opAddApproval: f('AviaryBufferResult aviary_subchain_op_add_approval(uint8_t*, size_t, uint16_t, uint8_t*, size_t)'),
+    chainProposeSubchain: f('AviaryBufferResult aviary_chain_propose_subchain(void*, uint64_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    chainRegistryCounts: f('int aviary_chain_registry_counts(void*, _Out_ uint32_t *, _Out_ uint32_t *, _Out_ uint32_t *)'),
+    chainChildRecord: f('AviaryBufferResult aviary_chain_child_record(void*, uint64_t)'),
+    chainChildProof: f('AviaryBufferResult aviary_chain_child_proof(void*, uint64_t)'),
+    childProofVerify: f('AviaryBufferResult aviary_child_proof_verify(uint8_t*, uint8_t*, size_t)'),
+    chainPendingAnchor: f('AviaryBufferResult aviary_chain_pending_anchor(void*, void*, uint16_t)'),
+    chainSubchainHopV2: f('AviaryBufferResult aviary_chain_subchain_hop_v2(void*, uint64_t)'),
+    subchainProofV2Encode: f('AviaryBufferResult aviary_subchain_proof_v2_encode(uint8_t*, size_t, uint8_t*, size_t)'),
+    subchainProofV2Verify: f('int aviary_subchain_proof_v2_verify(uint8_t*, uint8_t*, size_t)'),
+    // Chain persistence (snapshots, block archive) and chain tree snapshots
+    chainTip: f('AviaryBufferResult aviary_chain_tip(void*)'),
+    chainSnapshot: f('AviaryBufferResult aviary_chain_snapshot(void*)'),
+    chainRestore: f('void *aviary_chain_restore(uint8_t*, size_t, uint32_t, uint8_t*, size_t, uint8_t*, size_t, uint8_t*, size_t)'),
+    chainSnapshotError: f('AviaryBufferResult aviary_chain_snapshot_error(uint8_t*, size_t, uint8_t*, size_t)'),
+    chainArchiveEnable: f('int aviary_chain_archive_enable(void*)'),
+    chainArchiveRange: f('int aviary_chain_archive_range(void*, _Out_ uint64_t *, _Out_ uint64_t *)'),
+    chainArchivedBlock: f('AviaryBufferResult aviary_chain_archived_block(void*, uint64_t)'),
+    chainArchivedCert: f('AviaryBufferResult aviary_chain_archived_certificate(void*, uint64_t)'),
+    chainArchivePrune: f('uint64_t aviary_chain_archive_prune(void*, uint64_t)'),
+    treeSnapshot: f('AviaryBufferResult aviary_chain_tree_snapshot(void*)'),
+    treeRestore: f('void *aviary_chain_tree_restore(uint8_t*, size_t, uint8_t*, size_t)'),
     // Foreign components (engines / proposers implemented in JavaScript)
     regAddEngine: f('int aviary_registry_add_engine(const char*, AviaryJustifyFn*, AviaryVerifyFn*, void*, int)'),
     regAddProposer: f('int aviary_registry_add_proposer(const char*, AviaryProposerFn*, void*)'),
@@ -735,6 +766,43 @@ class Chain {
   recordNonce(address) { return Number(fn.chainRecordNonce(this._h, u8(address))); }
   /** A state inclusion proof for the record at key; verify with verifyStateProof(stateRoot(), proof). */
   proveRecord(key) { return consume(fn.chainProveRecord(this._h, u8(key)), 'chain_prove_record'); }
+
+  // -- Subchains version 2 --
+  /** Dynamic parents: the next block carrying anchors (ascending child id) and signed operations, operations applied first. Throws with the reason on an invalid one. */
+  proposeSubchain(timestamp, anchors = [], ops = []) {
+    const a = anchors.length ? blobList(anchors) : null, o = ops.length ? blobList(ops) : null;
+    return consume(fn.chainProposeSubchain(this._h, BigInt(timestamp), a, a ? a.length : 0, o, o ? o.length : 0), 'chain_propose_subchain');
+  }
+  /** Dynamic parents: { records, open, authorityEpoch }, or null when this chain has no dynamic policy. */
+  registryCounts() {
+    const records = [0], open = [0], epoch = [0];
+    if (fn.chainRegistryCounts(this._h, records, open, epoch) !== 1) return null;
+    return { records: records[0], open: open[0], authorityEpoch: epoch[0] };
+  }
+  /** Dynamic parents: the current record of a child. Throws when the child was never registered. */
+  childRecord(childChainId) { return decodeChildRecord(consume(fn.chainChildRecord(this._h, BigInt(childChainId)), 'chain_child_record')); }
+  /** Dynamic parents: a proof that a child's record is committed by the CURRENT subchain root. */
+  childProof(childChainId) { return consume(fn.chainChildProof(this._h, BigInt(childChainId)), 'chain_child_proof'); }
+  /** A proof hop into a child tagged with its kind in the first byte (HopFlat or HopRecord). */
+  subchainHopV2(childChainId) { return consume(fn.chainSubchainHopV2(this._h, BigInt(childChainId)), 'chain_subchain_hop_v2'); }
+
+  // -- Persistence --
+  /** The current tip header (the genesis header before any block). */
+  tip() { return consume(fn.chainTip(this._h), 'chain_tip'); }
+  /** One blob to resume from: ledger, tip receipts, consensus state and the archive when enabled. No secret key; queued transactions are not included. */
+  snapshot() { return consume(fn.chainSnapshot(this._h), 'chain_snapshot'); }
+  /** BFT chains: keep every block committed from now on, with its certificate, in the handle and its snapshots. */
+  enableArchive() { if (fn.chainArchiveEnable(this._h) !== 1) throw new Error('chain: the archive needs a BFT engine'); }
+  /** The archived height range { first, last }, or null while it is empty. */
+  archiveRange() {
+    const first = [0n], last = [0n];
+    if (fn.chainArchiveRange(this._h, first, last) !== 1) return null;
+    return { first: Number(first[0]), last: Number(last[0]) };
+  }
+  archivedBlock(height) { return consume(fn.chainArchivedBlock(this._h, BigInt(height)), 'chain_archived_block'); }
+  archivedCertificate(height) { return consume(fn.chainArchivedCert(this._h, BigInt(height)), 'chain_archived_certificate'); }
+  /** Drops archived blocks below height; returns how many. */
+  pruneArchive(height) { return Number(fn.chainArchivePrune(this._h, BigInt(height))); }
 }
 // The canonical ValidatorSet encoding: [count]([len][pk][power u64])x.
 function decodeValidatorSet(b) {
@@ -837,7 +905,16 @@ class ChainTree {
     }, koffi.pointer('AviaryTxSourceFn'));
     treeKeep.push(reg); fn.treeSetTxSource(this._h, reg, null);
   }
+  /** The whole family as one blob: every node's chain snapshot. No secret key. */
+  snapshot() { return consume(fn.treeSnapshot(this._h), 'chain_tree_snapshot'); }
   free() { if (this._h) { fn.treeFree(this._h); this._h = null; } }
+  /** Rebuild a family from the SAME root node it was built from and a snapshot(). Hooks are not restored. */
+  static restore(rootNode, snapshot) {
+    const spec = encodeTreeNode(rootNode), s = u8(snapshot);
+    const h = fn.treeRestore(spec, spec.length, s, s.length);
+    if (!h) throw new Error('chain tree: restore refused (another family, or a malformed snapshot)');
+    const t = Object.create(ChainTree.prototype); t._h = h; return t;
+  }
 }
 
 // [count u32]([len u32][bytes]) repeated, decoded back into Buffers.
@@ -880,6 +957,91 @@ function encodeSubchainProof(hops, stateProof) {
   return consume(fn.subchainProofEncode(blob, blob.length, u8(stateProof), u8(stateProof).length), 'subchain_proof_encode');
 }
 const verifySubchainProof = (parentSubchainRoot, proof) => u8(parentSubchainRoot).length === 32 && fn.subchainProofVerify(u8(parentSubchainRoot), u8(proof), u8(proof).length) === 1;
+
+// -- Subchains version 2 (docs/design/SUBCHAINS.md Part 2) ----------------------
+// A parent whose genesis commits a DYNAMIC policy registers children in any
+// block through registry operations signed by k of n registrars, commits its
+// registry as a Merkle tree of fixed 230 byte records, and can close a child.
+/** Signature schemes a registrar key may use (the transaction schemes). */
+const SigAlgo = Object.freeze({ ED25519: 1, HYBRID: 2, SLH_DSA: 4 });
+/** Child record statuses. */
+const ChildStatus = Object.freeze({ OPEN: 1, CLOSED: 2 });
+/** Proof hop kinds of a version 2 cross-chain proof. */
+const HopFlat = 1, HopRecord = 2;
+const CHILD_RECORD_SIZE = 230;
+const hash32 = (b, m) => { if (u8(b).length !== 32) throw new Error(m + ' must be 32 bytes'); return u8(b); };
+/** Encode one registrar { sigAlgo, publicKey }. */
+const encodeRegistrar = ({ sigAlgo, publicKey }) => consume(fn.registrarEncode(sigAlgo, u8(publicKey), u8(publicKey).length), 'registrar_encode');
+const registrarList = (rs) => rs.length ? blobList(rs.map((r) => Buffer.isBuffer(r) ? r : encodeRegistrar(r))) : null;
+/** Encode a dynamic policy; commit it with commitSubchainPolicy. maxChildren bounds OPEN children; 0 is unlimited for every bound. */
+function encodeDynamicSubchainPolicy({ maxDepth = 1, maxChildren = 0, maxAnchorsPerBlock = 0, maxHeadersPerAnchor = 0, maxOpsPerBlock = 0, threshold = 0, registrars = [], children = [] }) {
+  const r = registrarList(registrars);
+  const c = children.length ? blobList(children.map((x) => Buffer.isBuffer(x) ? x : encodeChildRegistration(x))) : null;
+  return consume(fn.dynPolicyEncode(maxDepth, maxChildren, maxAnchorsPerBlock, maxHeadersPerAnchor, maxOpsPerBlock, threshold,
+    r, r ? r.length : 0, c, c ? c.length : 0), 'dynamic_subchain_policy_encode');
+}
+/** The canonical 32 byte hash of an encoded header of any version. */
+const encodedHeaderHash = (header) => consume(fn.encodedHeaderHash(u8(header), u8(header).length), 'encoded_header_hash');
+/** An UNSIGNED operation registering a child (an encoded child registration); validUntil 0 = no expiry. */
+const opRegister = (authorityEpoch, validUntil, registration) =>
+  consume(fn.opRegister(authorityEpoch, BigInt(validUntil), u8(registration), u8(registration).length), 'subchain_op_register');
+/** An UNSIGNED operation closing a child at its recorded tip (height and 32 byte header hash). */
+const opClose = (authorityEpoch, validUntil, chainId, finalHeight, finalTipHash) =>
+  consume(fn.opClose(authorityEpoch, BigInt(validUntil), BigInt(chainId), BigInt(finalHeight), hash32(finalTipHash, 'operation: final tip hash')), 'subchain_op_close');
+/** An UNSIGNED operation replacing the registrar set; applying it increments the authority epoch. */
+function opSetRegistrars(authorityEpoch, validUntil, threshold, registrars) {
+  const r = registrarList(registrars);
+  return consume(fn.opSetRegistrars(authorityEpoch, BigInt(validUntil), threshold, r, r ? r.length : 0), 'subchain_op_set_registrars');
+}
+/** The 32 byte digest registrars sign for op on the parent (chain id, 32 byte genesis hash). */
+const opDigest = (op, parentChainId, parentGenesisHash) =>
+  consume(fn.opDigest(u8(op), u8(op).length, BigInt(parentChainId), hash32(parentGenesisHash, 'operation: parent genesis hash')), 'subchain_op_digest');
+/** Sign op as registrar index with secret under sigAlgo; returns the op with that approval added. */
+const signOp = (op, parentChainId, parentGenesisHash, registrarIndex, sigAlgo, secret) =>
+  consume(fn.opSign(u8(op), u8(op).length, BigInt(parentChainId), hash32(parentGenesisHash, 'operation: parent genesis hash'),
+    registrarIndex, sigAlgo, u8(secret), u8(secret).length), 'subchain_op_sign');
+/** Add an approval whose signature over opDigest was made elsewhere. */
+const addOpApproval = (op, registrarIndex, signature) =>
+  consume(fn.opAddApproval(u8(op), u8(op).length, registrarIndex, u8(signature), u8(signature).length), 'subchain_op_add_approval');
+/** Parse the fixed 230 byte child record. */
+function decodeChildRecord(b) {
+  b = u8(b);
+  if (b.length !== CHILD_RECORD_SIZE) throw new Error('child record: must be 230 bytes');
+  const cut = (o) => Buffer.from(b.subarray(o, o + 32));
+  return {
+    index: b.readUInt32BE(0), chainId: Number(b.readBigUInt64BE(4)), status: b[12], maxDepth: b[13],
+    genesisHeaderHash: cut(14), registeredHeight: Number(b.readBigUInt64BE(46)), closedHeight: Number(b.readBigUInt64BE(54)),
+    tipHeight: Number(b.readBigUInt64BE(62)), tipHash: cut(70), tipStateRoot: cut(102), tipSubchainRoot: cut(134),
+    vsetHash: cut(166), tipVsetHash: cut(198), encoded: Buffer.from(b),
+  };
+}
+/** Verify a child proof against a trusted 32 byte version 4 subchain root; returns the proven record. Throws on failure. */
+const verifyChildProof = (subchainRoot, proof) =>
+  decodeChildRecord(consume(fn.childProofVerify(hash32(subchainRoot, 'child proof: subchain root'), u8(proof), u8(proof).length), 'child_proof_verify'));
+/** The next anchor parent can take for child (from the child's archive), at most limit headers (0 = the policy bound); null when nothing is pending. */
+function pendingAnchor(parent, child, limit = 0) {
+  const b = consume(fn.chainPendingAnchor(parent._h, child._h, limit), 'chain_pending_anchor');
+  return b.length ? b : null;
+}
+/** A cross-chain proof through any mixture of parents: tagged hops (top parent first) and the last chain's state proof. */
+function encodeSubchainProofV2(hops, stateProof) {
+  const h = hops.length ? blobList(hops) : null;
+  return consume(fn.subchainProofV2Encode(h, h ? h.length : 0, u8(stateProof), u8(stateProof).length), 'subchain_proof_v2_encode');
+}
+const verifySubchainProofV2 = (parentSubchainRoot, proof) => u8(parentSubchainRoot).length === 32 && fn.subchainProofV2Verify(u8(parentSubchainRoot), u8(proof), u8(proof).length) === 1;
+
+// -- Chain persistence ---------------------------------------------------------
+/** Why restoreChain would refuse snapshot under genesis; '' = it would be accepted. */
+const chainSnapshotError = (genesis, snapshot) =>
+  consume(fn.chainSnapshotError(u8(genesis), u8(genesis).length, u8(snapshot), u8(snapshot).length), 'chain_snapshot_error').toString('utf8');
+/** Rebuild a chain from its genesis and Chain#snapshot() as validator me; it continues byte for byte. Throws with the reason on a refused snapshot. */
+function restoreChain(genesis, me, blsPublic, blsSecret, snapshot) {
+  const g = u8(genesis), s = u8(snapshot);
+  const h = fn.chainRestore(g, g.length, me, u8(blsPublic), u8(blsPublic).length, u8(blsSecret), u8(blsSecret).length, s, s.length);
+  if (h) return new Chain(h);
+  const reason = chainSnapshotError(g, s);
+  throw new Error(reason ? 'chain restore refused: ' + reason : 'chain restore refused');
+}
 
 function buildGenesis({ chainId, timestamp = 1, assuranceLevel = 1, stateModel = 0, accounts = [], validators = [] }) {
   const addrs = Buffer.concat(accounts.map((a) => u8(a.address)));
@@ -1251,6 +1413,12 @@ module.exports = {
   // Subchains.
   genesisHeader, encodeChildRegistration, encodeSubchainPolicy, commitSubchainPolicy, commitParentBinding,
   blockHeader, headerSubchainRoot, certifiedHeader, encodeAnchor, encodeSubchainProof, verifySubchainProof,
+  // Subchains version 2.
+  SigAlgo, ChildStatus, HopFlat, HopRecord, encodeRegistrar, encodeDynamicSubchainPolicy, encodedHeaderHash,
+  opRegister, opClose, opSetRegistrars, opDigest, signOp, addOpApproval, decodeChildRecord, verifyChildProof,
+  pendingAnchor, encodeSubchainProofV2, verifySubchainProofV2,
+  // Chain persistence.
+  restoreChain, chainSnapshotError,
 
   commit(card) {
     const b = consume(fn.thCommit(u8(card), u8(card).length), 'threshold_commit');

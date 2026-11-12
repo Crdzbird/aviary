@@ -22,7 +22,7 @@ final class DynamicFixture {
   final KeyPairBytes user;
 
   RegistrarEntry get registrar =>
-      (scheme: SignatureScheme.ed25519, publicKey: secret.sublist(32));
+      (scheme: RegistrarScheme.ed25519, publicKey: secret.sublist(32));
 
   Uint8List get policy =>
       bc.encodeDynamicSubchainPolicy(threshold: 1, registrars: [registrar]);

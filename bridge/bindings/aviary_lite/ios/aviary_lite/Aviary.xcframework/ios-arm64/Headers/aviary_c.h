@@ -652,7 +652,10 @@ AVIARY_API AviaryBufferResult aviary_child_registration_encode(
 AVIARY_API AviaryBufferResult aviary_subchain_policy_encode(
     uint16_t max_children, uint8_t max_depth, uint16_t max_anchors_per_block,
     uint16_t max_headers_per_anchor, const uint8_t* registrations, size_t registrations_len);
-/** Commit a subchain policy into a genesis -> the parent's genesis blob (hash changes). */
+/** Commit a subchain policy into a genesis -> the parent's genesis blob (hash
+ *  changes). Takes either format: the version 1 policy above or a dynamic
+ *  policy from aviary_dynamic_subchain_policy_encode. An invalid policy is an
+ *  error. */
 AVIARY_API AviaryBufferResult aviary_genesis_commit_subchain_policy(
     const uint8_t* genesis, size_t genesis_len, const uint8_t* policy, size_t policy_len);
 /** Bind a child genesis to its parent (id + 32-byte parent genesis hash) ->
@@ -734,7 +737,8 @@ AVIARY_API int aviary_chain_schedule_validators(
 AVIARY_API AviaryBufferResult aviary_chain_validators(AviaryChain c);
 
 /** A parent's last anchored header for [child_chain_id] (errors if this chain
- *  is not a parent or the child is not registered). */
+ *  is not a parent or the child is not registered). Works for both policy
+ *  formats; a closed child reports its final tip. */
 AVIARY_API AviaryBufferResult aviary_chain_child_tip(
     AviaryChain c, uint64_t child_chain_id);
 /** A proof hop from this parent's CURRENT registry into [child_chain_id]. */
@@ -871,6 +875,173 @@ typedef void (*AviaryFinalizedFn)(void* ctx, uint64_t chain_id, const uint8_t* b
 AVIARY_API void aviary_chain_tree_set_tx_source(AviaryChainTree t, AviaryTxSourceFn fn, void* ctx);
 AVIARY_API void aviary_chain_tree_set_finalized_hook(AviaryChainTree t, AviaryFinalizedFn fn, void* ctx);
 AVIARY_API void aviary_chain_tree_free(AviaryChainTree t);
+
+/* -- Subchains version 2: register children in any block, Merkle registry -----
+ *  (docs/design/SUBCHAINS.md Part 2). A parent whose genesis commits a DYNAMIC
+ *  policy produces version 4 blocks that may carry registry OPERATIONS: register
+ *  a child, close a child, replace the registrar set. An operation is valid
+ *  when registrars (keys the policy commits; k of n) signed its 32 byte digest,
+ *  which binds the parent's chain id and genesis hash, the registry's authority
+ *  epoch and an expiry height. The registry is a Merkle tree with one fixed
+ *  230 byte RECORD per child, so a proof for one child is its record and about
+ *  log2(n) hashes however many children the parent holds.
+ *
+ *  Record layout (big-endian, see docs/CODEC_SPEC.md): index u32, chain_id u64,
+ *  status u8 (1 open, 2 closed), child_max_depth u8, genesis_header_hash 32,
+ *  registered_height u64, closed_height u64, tip_height u64, tip_hash 32,
+ *  tip_state_root 32, tip_subchain_root 32, vset_hash 32, tip_vset_hash 32.
+ *  Signature schemes are the transaction ones: 1 Ed25519 (64 byte secret, seed
+ *  || public), 2 hybrid Ed25519 + ML-DSA-65, 4 SLH-DSA. A LIST argument of
+ *  length 0 is the empty list. */
+
+/** The canonical 32 byte hash of an ENCODED header of any version (what a
+ *  record's tip_hash and genesis_header_hash hold, and what a certificate
+ *  signs). */
+AVIARY_API AviaryBufferResult aviary_encoded_header_hash(const uint8_t* header, size_t header_len);
+/** One registrar: a signature scheme and its public key. */
+AVIARY_API AviaryBufferResult aviary_registrar_encode(
+    uint8_t sig_algo, const uint8_t* public_key, size_t public_key_len);
+/** Encode a dynamic policy. registrars = a LIST from aviary_registrar_encode
+ *  (index significant; empty with threshold 0 = a registry sealed at genesis);
+ *  registrations = a LIST of children registered at genesis (ascending, unique
+ *  chain ids; may be empty). max_children bounds OPEN children; 0 for an
+ *  unlimited bound anywhere. Commit it with
+ *  aviary_genesis_commit_subchain_policy. */
+AVIARY_API AviaryBufferResult aviary_dynamic_subchain_policy_encode(
+    uint8_t max_depth, uint32_t max_children, uint16_t max_anchors_per_block,
+    uint16_t max_headers_per_anchor, uint16_t max_ops_per_block, uint8_t registrar_threshold,
+    const uint8_t* registrars, size_t registrars_len,
+    const uint8_t* registrations, size_t registrations_len);
+
+/** An UNSIGNED operation registering a child (an encoded child registration),
+ *  valid in [authority_epoch] up to parent height [valid_until] (0 = no expiry). */
+AVIARY_API AviaryBufferResult aviary_subchain_op_register(
+    uint32_t authority_epoch, uint64_t valid_until, const uint8_t* registration, size_t registration_len);
+/** An UNSIGNED operation closing [chain_id] at its recorded tip (height and
+ *  32 byte header hash, as aviary_chain_child_record reports them). */
+AVIARY_API AviaryBufferResult aviary_subchain_op_close(
+    uint32_t authority_epoch, uint64_t valid_until, uint64_t chain_id, uint64_t final_height,
+    const uint8_t* final_tip_hash);
+/** An UNSIGNED operation replacing the registrar set (a LIST from
+ *  aviary_registrar_encode and its threshold). Applying it increments the
+ *  authority epoch, which voids every operation signed for the old one. */
+AVIARY_API AviaryBufferResult aviary_subchain_op_set_registrars(
+    uint32_t authority_epoch, uint64_t valid_until, uint8_t registrar_threshold,
+    const uint8_t* registrars, size_t registrars_len);
+/** The 32 byte digest registrars sign for [op] on the parent identified by
+ *  its chain id and 32 byte genesis hash (for a signer outside this library). */
+AVIARY_API AviaryBufferResult aviary_subchain_op_digest(
+    const uint8_t* op, size_t op_len, uint64_t parent_chain_id, const uint8_t* parent_genesis_hash);
+/** Sign [op] as registrar [registrar_index] with [secret] under [sig_algo] and
+ *  return the operation with that approval added. An error if that registrar
+ *  already approved. The secret is used and not retained. */
+AVIARY_API AviaryBufferResult aviary_subchain_op_sign(
+    const uint8_t* op, size_t op_len, uint64_t parent_chain_id, const uint8_t* parent_genesis_hash,
+    uint16_t registrar_index, uint8_t sig_algo, const uint8_t* secret, size_t secret_len);
+/** Add an approval whose signature over aviary_subchain_op_digest was made
+ *  elsewhere. */
+AVIARY_API AviaryBufferResult aviary_subchain_op_add_approval(
+    const uint8_t* op, size_t op_len, uint16_t registrar_index,
+    const uint8_t* signature, size_t signature_len);
+
+/** Propose the next block on a parent with a dynamic policy: a LIST of anchors
+ *  (ascending child id) and a LIST of signed operations, applied operations
+ *  first. Queued transactions are included as in aviary_chain_propose. Errors
+ *  with the reason if any anchor or operation is invalid - never proposes it. */
+AVIARY_API AviaryBufferResult aviary_chain_propose_subchain(
+    AviaryChain c, uint64_t timestamp, const uint8_t* anchors, size_t anchors_len,
+    const uint8_t* ops, size_t ops_len);
+/** The registry's record count, open count and authority epoch. Returns 1 and
+ *  writes them (NULL pointers are skipped), or 0 when this chain has no
+ *  dynamic policy. */
+AVIARY_API int aviary_chain_registry_counts(
+    AviaryChain c, uint32_t* records, uint32_t* open, uint32_t* authority_epoch);
+/** The current 230 byte record of [child_chain_id]; an error when this chain
+ *  has no dynamic policy or the child was never registered. */
+AVIARY_API AviaryBufferResult aviary_chain_child_record(AviaryChain c, uint64_t child_chain_id);
+/** A proof that [child_chain_id]'s record is committed by this parent's
+ *  CURRENT subchain_root. */
+AVIARY_API AviaryBufferResult aviary_chain_child_proof(AviaryChain c, uint64_t child_chain_id);
+/** Verify a child proof against a 32 byte version 4 subchain_root taken from
+ *  a parent header the caller trusts. On success the buffer is the proven
+ *  230 byte record: READ it (tip, status); on failure an error. Never throws. */
+AVIARY_API AviaryBufferResult aviary_child_proof_verify(
+    const uint8_t* subchain_root, const uint8_t* proof, size_t proof_len);
+/** The next anchor [parent] can take for [child], built from the child's
+ *  archive (aviary_chain_archive_enable) and the parent's recorded tip, at
+ *  most [limit] headers (0 = the policy bound). An EMPTY buffer when nothing
+ *  is pending, the child is unregistered or closed, or its archive no longer
+ *  holds the next height. An error when the child keeps no archive or
+ *  [parent] has no subchain policy. Works for both policy formats. Touches
+ *  both handles: neither may be in use by another thread. */
+AVIARY_API AviaryBufferResult aviary_chain_pending_anchor(
+    AviaryChain parent, AviaryChain child, uint16_t limit);
+/** A proof hop from this parent's CURRENT registry into [child_chain_id],
+ *  tagged with its kind: [u8 kind][hop], kind 1 for a version 1 policy (the
+ *  flat list of aviary_chain_subchain_hop), kind 2 for a dynamic policy (a
+ *  child proof). */
+AVIARY_API AviaryBufferResult aviary_chain_subchain_hop_v2(AviaryChain c, uint64_t child_chain_id);
+/** A cross-chain proof through any mixture of parents: a LIST of tagged hops
+ *  (top parent first) + the state proof of the last chain. */
+AVIARY_API AviaryBufferResult aviary_subchain_proof_v2_encode(
+    const uint8_t* hops, size_t hops_len, const uint8_t* state_proof, size_t state_proof_len);
+/** 1 iff [proof] is committed under the 32 byte [parent_subchain_root] all the
+ *  way down and its state proof holds; 0 otherwise. Never throws. */
+AVIARY_API int aviary_subchain_proof_v2_verify(
+    const uint8_t* parent_subchain_root, const uint8_t* proof, size_t proof_len);
+
+/* -- Persistence: save an assembled chain or a chain tree and bring it back ---
+ *  A snapshot is one canonical, versioned blob (docs/CODEC_SPEC.md "Chain
+ *  snapshot"): the ledger (tip, state, subchain registry), the receipts of the
+ *  tip block, the engine's consensus state and, when the chain keeps one, its
+ *  block archive. It is bound to the genesis hash and holds NO secret key:
+ *  restore takes the genesis and the validator key again. A restored chain
+ *  produces byte for byte what the original would for every later call.
+ *  Not captured: transactions queued with aviary_chain_add_tx, buffered
+ *  events, metrics and hooks. Restore is strict: a blob with trailing bytes,
+ *  a non canonical field, another genesis, or a section that disagrees with
+ *  its own tip is refused and nothing is built. Snapshots are ordinary
+ *  buffers (free with aviary_buffer_free); handles stay single threaded. */
+
+/** This chain's current tip header (the genesis header before any block). */
+AVIARY_API AviaryBufferResult aviary_chain_tip(AviaryChain c);
+/** The snapshot of this chain as it stands now. */
+AVIARY_API AviaryBufferResult aviary_chain_snapshot(AviaryChain c);
+/** Rebuild a chain from the genesis it was assembled from and a blob from
+ *  aviary_chain_snapshot, as validator [me]. NULL on ANY reject; ask
+ *  aviary_chain_snapshot_error for the reason. Built in state models only. */
+AVIARY_API AviaryChain aviary_chain_restore(
+    const uint8_t* genesis, size_t genesis_len, uint32_t me,
+    const uint8_t* bls_pub, size_t pub_len, const uint8_t* bls_sec, size_t sec_len,
+    const uint8_t* snapshot, size_t snapshot_len);
+/** Why aviary_chain_restore would refuse [snapshot] under [genesis], as text
+ *  (an EMPTY buffer = it would be accepted). Needs no key. */
+AVIARY_API AviaryBufferResult aviary_chain_snapshot_error(
+    const uint8_t* genesis, size_t genesis_len, const uint8_t* snapshot, size_t snapshot_len);
+
+/** Start keeping every block this handle commits from now on, with its commit
+ *  certificate, inside the handle (and so inside its snapshots). Off by
+ *  default: a chain that never calls this keeps no blocks. BFT chains only
+ *  (the engines whose blocks carry certificates and can be anchored).
+ *  Returns 1 (also when already on), 0 if the engine is not BFT. */
+AVIARY_API int aviary_chain_archive_enable(AviaryChain c);
+/** The archived height range. Returns 1 and writes *first / *last when the
+ *  archive holds at least one block, else 0. */
+AVIARY_API int aviary_chain_archive_range(AviaryChain c, uint64_t* first, uint64_t* last);
+/** The archived encoded block at [height]; an error when absent. */
+AVIARY_API AviaryBufferResult aviary_chain_archived_block(AviaryChain c, uint64_t height);
+/** The commit certificate that finalized the archived block at [height]. */
+AVIARY_API AviaryBufferResult aviary_chain_archived_certificate(AviaryChain c, uint64_t height);
+/** Drop archived blocks below [height] (for example once a parent anchored
+ *  them and they are stored elsewhere). Returns how many were dropped. */
+AVIARY_API uint64_t aviary_chain_archive_prune(AviaryChain c, uint64_t height);
+
+/** The snapshot of a whole chain tree: every node's chain snapshot. */
+AVIARY_API AviaryBufferResult aviary_chain_tree_snapshot(AviaryChainTree t);
+/** Rebuild a tree from the SAME encoded spec it was built from and a blob from
+ *  aviary_chain_tree_snapshot. NULL on any reject. Hooks are not restored. */
+AVIARY_API AviaryChainTree aviary_chain_tree_restore(
+    const uint8_t* spec, size_t spec_len, const uint8_t* snapshot, size_t snapshot_len);
 
 /* -- Networking: consensus over gossip without a socket or a clock ----------
  *  A NetNode is a validator (or an observer) that runs BFT consensus over a

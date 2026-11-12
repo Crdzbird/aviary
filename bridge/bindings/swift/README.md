@@ -64,6 +64,38 @@ macOS 12; 1.0.1 corrects that and ships the same binaries.
   `gate.admissionGranted(epoch:nonce:presentation:now:)`, so only credential
   holders get past the handshake.
 
+## Dynamic subchains and chain snapshots
+
+Unreleased: these calls need an `AviaryC` built from this branch, not the
+`swift-v1.0.0` binaries.
+
+- Dynamic policy: `Aviary.DynamicSubchainPolicy(threshold:registrars:)` with
+  `Aviary.Registrar(scheme:publicKey:)`, committed with
+  `Aviary.commitSubchainPolicy`. A parent then registers, closes and rotates
+  registrars in any block through signed operations:
+  `Aviary.opRegister`, `opClose` and `opSetRegistrars` build them,
+  `Aviary.signOp` (or `opDigest` plus `addOpApproval` for a signer elsewhere)
+  approves them, and `chain.proposeSubchain(timestamp:anchors:ops:)` includes
+  them. Replacing the registrars bumps `chain.registryCounts()?.authorityEpoch`
+  and voids operations signed for the old epoch.
+- Anchoring: `Aviary.pendingAnchor(parent:child:)` builds the next anchor from
+  the child's archive (`chain.enableArchive()`), nil when nothing is pending.
+- Child proofs: `chain.childRecord(_:)` reads the 230 byte
+  `Aviary.ChildRecord`, `chain.childProof(_:)` proves it against the parent's
+  subchain root, and `Aviary.verifyChildProof(subchainRoot:proof:)` returns the
+  proven record. `chain.subchainHopV2(_:)`, `Aviary.encodeSubchainProofV2` and
+  `Aviary.verifySubchainProofV2` prove state on a child from a parent header
+  through either policy format.
+- Persistence: `chain.snapshot()` and `Aviary.restoreChain(genesis:me:blsPub:blsSec:snapshot:)`
+  resume a chain that continues byte for byte; `Aviary.chainSnapshotError`
+  says why a snapshot would be refused. `chain.tip()`, `archiveRange()`,
+  `archivedBlock(_:)`, `archivedCertificate(_:)` and `pruneArchive(below:)`
+  read and trim the block archive. `chainTree.snapshot()` and
+  `Aviary.restoreChainTree(_:snapshot:)` do the same for a whole tree.
+
+The demo replays `vectors/subchain_v2_vectors.txt`, the bytes the Go and Dart
+bindings pin.
+
 ## Develop
 
 Inside this repository the manifest uses the xcframework trees in the tree

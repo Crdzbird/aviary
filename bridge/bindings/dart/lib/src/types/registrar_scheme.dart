@@ -2,7 +2,7 @@ part of '../../aviary.dart';
 
 /// The signature scheme of a registrar key: the transaction schemes.
 /// {@category Subchains and trees}
-enum SignatureScheme {
+enum RegistrarScheme {
   /// Ed25519: a 32 byte public key and a 64 byte secret (seed, then public).
   ed25519(1),
 
@@ -12,7 +12,7 @@ enum SignatureScheme {
   /// SLH-DSA, the stateless hash based scheme.
   slhDsa(4);
 
-  const SignatureScheme(this.code);
+  const RegistrarScheme(this.code);
 
   /// The ABI value.
   final int code;

@@ -26,6 +26,21 @@ fun main() {
         println("ETH: ${bc.ethAddress(ethKey)}")
         println("SOL: ${bc.solAddress(alice.secret)}")
 
+        val validator = bc.newBLSValidator(ByteArray(32) { 0x05 })
+        val genesis = bc.commitBlueprint(
+            bc.buildGenesis(9, 1, 1, 0, arrayOf(alice.address), longArrayOf(1000), arrayOf(validator.publicKey), longArrayOf(1)),
+            bc.Blueprint("bft", "account", "", null),
+        )
+        val snapshot = bc.assembleChain(genesis, 0, validator.publicKey, validator.secret).use { chain ->
+            chain.enableArchive()
+            val block = chain.propose(2)
+            chain.submit(block, chain.certify(block))
+            chain.snapshot()
+        }
+        bc.restoreChain(genesis, 0, validator.publicKey, validator.secret, snapshot).use { chain ->
+            println("restored chain at height ${chain.height()}, archive ${chain.archiveRange()}")
+        }
+
         node.close()
         println("\nALL GOOD (Kotlin)")
     }

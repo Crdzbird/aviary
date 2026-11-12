@@ -100,6 +100,40 @@ platform.
   and the verifier checks it with `gate.admissionGranted(epoch, nonce, answer,
   now)`, so only credential holders get past the handshake.
 
+## Subchains version 2 and chain persistence
+
+- Dynamic registration: a parent whose genesis commits
+  `aviary.encodeDynamicSubchainPolicy(policy)` (an `Aviary.DynamicSubchainPolicy`
+  with its bounds, `Aviary.Registrar` keys and threshold) registers children
+  in any block. `opRegister`, `opClose` and `opSetRegistrars` build unsigned
+  registry operations; `signOp` (or `opDigest` plus `addOpApproval` for a
+  signer outside the library) adds a registrar approval, and
+  `chain.proposeSubchain(timestamp, anchors, ops)` proposes a block carrying
+  them. Replacing the registrars increments the authority epoch, which voids
+  every operation signed for the old one.
+- Merkle registry: `chain.registryCounts()` (null without a dynamic policy),
+  `chain.childRecord(id)` (an `Aviary.ChildRecord` with the child's status
+  and recorded tip), `chain.childProof(id)` and
+  `aviary.verifyChildProof(subchainRoot, proof)`, which returns the proven
+  record. `aviary.pendingAnchor(parent, child, limit)` builds the next anchor
+  from the child's archive, or returns null when nothing is pending.
+  `chain.subchainHopV2`, `encodeSubchainProofV2` and `verifySubchainProofV2`
+  prove state on a descendant through any mixture of parent formats.
+- Chain persistence: `chain.snapshot()` and `aviary.restoreChain(genesis, me,
+  blsPub, blsSec, snapshot)` resume an assembled chain that then produces byte
+  for byte what the original would; `chainSnapshotError` says why a blob would
+  be refused. A snapshot holds no secret key. `chain.enableArchive()` keeps
+  every committed block with its certificate (`archiveRange`, `archivedBlock`,
+  `archivedCertificate`, `pruneArchive`), and `chain.tip()` returns the tip
+  header. `tree.snapshot()` and `aviary.restoreChainTree(root, snapshot)` do
+  the same for a whole chain tree; hooks are not restored.
+- `aviary.hash(bytes)` is BLAKE3-256 and `aviary.encodedHeaderHash(header)` the
+  canonical hash of an encoded header.
+
+`aviary.Main` replays `vectors/subchain_v2_vectors.txt` when it runs inside
+the repository (or from `-Daviary.vectors=<file>`), so the JVM binding is held
+to the same golden bytes as C++, Go and Dart.
+
 ## Self contained jar
 
 ```bash

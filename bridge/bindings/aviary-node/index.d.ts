@@ -242,6 +242,28 @@ export class Chain {
   proposeAnchored(timestamp: Int, anchors: Bytes[]): Buffer;
   childTip(childChainId: Int): Buffer;
   subchainHop(childChainId: Int): Buffer;
+  /** Dynamic parents: the next block carrying anchors (ascending child id) and signed operations, operations applied first. Throws with the reason on an invalid one. */
+  proposeSubchain(timestamp: Int, anchors?: Bytes[], ops?: Bytes[]): Buffer;
+  /** Dynamic parents: the registry's counts and authority epoch; null when this chain has no dynamic policy. */
+  registryCounts(): RegistryCounts | null;
+  /** Dynamic parents: the current record of a child; throws when it was never registered. */
+  childRecord(childChainId: Int): ChildRecord;
+  /** Dynamic parents: a proof that a child's record is committed by the current subchain root. */
+  childProof(childChainId: Int): Buffer;
+  /** A proof hop into a child, its kind (HopFlat or HopRecord) in the first byte. */
+  subchainHopV2(childChainId: Int): Buffer;
+  /** The current tip header (the genesis header before any block). */
+  tip(): Buffer;
+  /** Everything needed to resume: ledger, tip receipts, consensus state and the archive when enabled. No secret key; queued transactions are not included. */
+  snapshot(): Buffer;
+  /** BFT chains: keep every block committed from now on, with its certificate. */
+  enableArchive(): void;
+  /** The archived height range; null while it is empty. */
+  archiveRange(): { first: number; last: number } | null;
+  archivedBlock(height: Int): Buffer;
+  archivedCertificate(height: Int): Buffer;
+  /** Drops archived blocks below height; returns how many. */
+  pruneArchive(height: Int): number;
   /** Account model chains: a state inclusion proof for an address. */
   proveAccount(address: Bytes): Buffer;
   /** Record model chains: signs a write with a 64 byte Ed25519 secret, nonce from the chain, and queues it. */
@@ -308,6 +330,76 @@ export function encodeAnchor(childChainId: Int, certifiedHeaders: Bytes[]): Buff
 export function encodeSubchainProof(hops: Bytes[], stateProof: Bytes): Buffer;
 export function verifySubchainProof(parentSubchainRoot: Bytes, proof: Bytes): boolean;
 
+// -- Subchains version 2: dynamic registration, Merkle registry, closing ------
+
+/** Signature schemes a registrar key may use. */
+export const SigAlgo: { readonly ED25519: 1; readonly HYBRID: 2; readonly SLH_DSA: 4 };
+/** Child record statuses. */
+export const ChildStatus: { readonly OPEN: 1; readonly CLOSED: 2 };
+/** Proof hop kinds of a version 2 cross-chain proof. */
+export const HopFlat: 1;
+export const HopRecord: 2;
+export interface Registrar { sigAlgo: number; publicKey: Bytes }
+export interface RegistryCounts { records: number; open: number; authorityEpoch: number }
+/** One child's entry in a dynamic registry, decoded from its fixed 230 byte record. */
+export interface ChildRecord {
+  index: number;
+  chainId: number;
+  status: number;
+  maxDepth: number;
+  genesisHeaderHash: Buffer;
+  registeredHeight: number;
+  closedHeight: number;
+  tipHeight: number;
+  tipHash: Buffer;
+  tipStateRoot: Buffer;
+  tipSubchainRoot: Buffer;
+  vsetHash: Buffer;
+  tipVsetHash: Buffer;
+  encoded: Buffer;
+}
+export function encodeRegistrar(registrar: Registrar): Buffer;
+/** A dynamic policy; commit it with commitSubchainPolicy. maxChildren bounds open children; 0 is unlimited for every bound. No registrars with threshold 0 seals the registry at genesis. */
+export function encodeDynamicSubchainPolicy(opts: {
+  maxDepth?: number;
+  maxChildren?: number;
+  maxAnchorsPerBlock?: number;
+  maxHeadersPerAnchor?: number;
+  maxOpsPerBlock?: number;
+  threshold?: number;
+  registrars?: (Registrar | Buffer)[];
+  children?: (Bytes | { chainId: Int; genesisHeader: Bytes; validators: ValidatorEntry[]; maxDepth?: number })[];
+}): Buffer;
+/** The canonical 32 byte hash of an encoded header of any version. */
+export function encodedHeaderHash(header: Bytes): Buffer;
+/** An unsigned operation registering a child; validUntil 0 = no expiry. */
+export function opRegister(authorityEpoch: number, validUntil: Int, registration: Bytes): Buffer;
+/** An unsigned operation closing a child at its recorded tip. */
+export function opClose(authorityEpoch: number, validUntil: Int, chainId: Int, finalHeight: Int, finalTipHash: Bytes): Buffer;
+/** An unsigned operation replacing the registrar set; applying it increments the authority epoch. */
+export function opSetRegistrars(authorityEpoch: number, validUntil: Int, threshold: number, registrars: (Registrar | Buffer)[]): Buffer;
+/** The 32 byte digest registrars sign for an operation on the parent. */
+export function opDigest(op: Bytes, parentChainId: Int, parentGenesisHash: Bytes): Buffer;
+/** Signs an operation as one registrar; returns it with that approval added. */
+export function signOp(op: Bytes, parentChainId: Int, parentGenesisHash: Bytes, registrarIndex: number, sigAlgo: number, secret: Bytes): Buffer;
+/** Adds an approval whose signature over opDigest was made elsewhere. */
+export function addOpApproval(op: Bytes, registrarIndex: number, signature: Bytes): Buffer;
+export function decodeChildRecord(record: Bytes): ChildRecord;
+/** Verifies a child proof against a trusted 32 byte subchain root and returns the proven record; throws on failure. */
+export function verifyChildProof(subchainRoot: Bytes, proof: Bytes): ChildRecord;
+/** The next anchor the parent can take for the child, from the child's archive; null when nothing is pending. */
+export function pendingAnchor(parent: Chain, child: Chain, limit?: number): Buffer | null;
+/** A cross-chain proof through any mixture of parents: tagged hops, top parent first, and the last chain's state proof. */
+export function encodeSubchainProofV2(hops: Bytes[], stateProof: Bytes): Buffer;
+export function verifySubchainProofV2(parentSubchainRoot: Bytes, proof: Bytes): boolean;
+
+// -- Chain persistence ---------------------------------------------------------
+
+/** Rebuilds a chain from its genesis and Chain#snapshot() as validator me; throws with the reason when refused. */
+export function restoreChain(genesis: Bytes, me: number, blsPublic: Bytes, blsSecret: Bytes, snapshot: Bytes): Chain;
+/** Why restoreChain would refuse a snapshot; empty when it would be accepted. */
+export function chainSnapshotError(genesis: Bytes, snapshot: Bytes): string;
+
 export interface TreeValidator { publicKey: Bytes; secret?: Bytes | null; power: Int }
 export interface TreeNode {
   chainId: Int;
@@ -335,7 +427,11 @@ export class ChainTree {
   verify(proof: Bytes): boolean;
   onFinalized(cb: (chainId: number, block: Buffer) => void): void;
   txSource(cb: (chainId: number, timestamp: number) => Bytes[]): void;
+  /** The whole family as one blob: every node's chain snapshot. No secret key. */
+  snapshot(): Buffer;
   free(): void;
+  /** Rebuilds a family from the same root node it was built from and a snapshot; hooks are not restored. */
+  static restore(root: TreeNode, snapshot: Bytes): ChainTree;
 }
 
 // -- Custody: threshold and portable accounts --------------------------------

@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-Needs an engine built from the same source: the functions below are not in
-the 1.0.0 binaries bundled with the packages.
+The bundled macOS engine is rebuilt with the functions below. The Linux
+engines are rebuilt by the Native Linux workflow once this source is pushed;
+until then a Linux build needs `AVIARY_DYLIB` pointing at an engine built
+from the same source.
 
 **Subchains version 2**
 

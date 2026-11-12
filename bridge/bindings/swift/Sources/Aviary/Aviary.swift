@@ -546,13 +546,14 @@ public enum Aviary {
 
     /// An assembled node behind the uniform propose -> (seal | mine) -> submit flow.
     public final class Chain {
-        private let h: OpaquePointer
+        let h: OpaquePointer
         init?(genesis: Data, me: UInt32, blsPub: Data, blsSec: Data) {
             let raw = genesis.withC { gp, gl in blsPub.withC { pp, pl in blsSec.withC { sp, sl in
                 aviary_chain_assemble(gp, gl, me, pp, pl, sp, sl) } } }
             guard let r = raw else { return nil }
             h = OpaquePointer(r)
         }
+        init(raw: UnsafeMutableRawPointer) { h = OpaquePointer(raw) }
         deinit {
             if nodeEventHooks[UnsafeMutableRawPointer(h)] != nil {
                 aviary_chain_set_event_hook(UnsafeMutableRawPointer(h), nil, nil)
@@ -764,15 +765,18 @@ public enum Aviary {
     }
     /// A built family driven in-process: produce() anchors children upward; proveAccount() proves any descendant from the root.
     public final class ChainTree {
-        private let h: OpaquePointer
+        let h: OpaquePointer
         public var onFinalized: ((UInt64, Data) -> Void)?
         public var txSource: ((UInt64, UInt64) -> [Data])?
-        init(root: TreeNode) throws {
+        convenience init(root: TreeNode) throws {
             let spec = try root.encode()
             let err = try Aviary.chainTreeSpecError(spec)
             if !err.isEmpty { throw AviaryError(message: "chain tree: " + err) }
             guard let raw = spec.withC({ sp, sl in aviary_chain_tree_build(sp, sl) }) else {
                 throw AviaryError(message: "chain tree: build rejected (unknown mixture or posture-forbidden engine)") }
+            self.init(raw: raw)
+        }
+        init(raw: UnsafeMutableRawPointer) {
             h = OpaquePointer(raw)
             let ctx = Unmanaged.passUnretained(self).toOpaque()
             let fin: AviaryFinalizedFn = { ctx, id, block, len in

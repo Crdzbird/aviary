@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Subchains version 2 and persistence from `aviary_dart`, re-exported:
+  dynamic child registration signed by registrars, a Merkle registry with
+  one provable `ChildRecord` per child, closing and registrar rotation,
+  version 2 cross chain proofs, chain snapshots with an opt in block
+  archive, and chain tree snapshots. The bundled native libraries are
+  rebuilt with these functions.
+
 ## 1.0.0
 
 First stable release: the Aviary ledger for Flutter on Android, iOS and

@@ -971,8 +971,9 @@ AVIARY_API AviaryBufferResult aviary_child_proof_verify(
  *  archive (aviary_chain_archive_enable) and the parent's recorded tip, at
  *  most [limit] headers (0 = the policy bound). An EMPTY buffer when nothing
  *  is pending, the child is unregistered or closed, or its archive no longer
- *  holds the next height. Works for both policy formats. Touches both
- *  handles: neither may be in use by another thread. */
+ *  holds the next height. An error when the child keeps no archive or
+ *  [parent] has no subchain policy. Works for both policy formats. Touches
+ *  both handles: neither may be in use by another thread. */
 AVIARY_API AviaryBufferResult aviary_chain_pending_anchor(
     AviaryChain parent, AviaryChain child, uint16_t limit);
 /** A proof hop from this parent's CURRENT registry into [child_chain_id],

@@ -39,7 +39,7 @@ part 'src/types/child_status.dart';
 part 'src/types/portable_account.dart';
 part 'src/types/portable_account_impl.dart';
 part 'src/types/records.dart';
-part 'src/types/signature_scheme.dart';
+part 'src/types/registrar_scheme.dart';
 part 'src/types/subchain_types.dart';
 part 'src/types/threshold_share.dart';
 part 'src/types/threshold_share_impl.dart';
