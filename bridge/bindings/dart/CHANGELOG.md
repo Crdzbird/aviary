@@ -7,6 +7,14 @@ engines are rebuilt by the Native Linux workflow once this source is pushed;
 until then a Linux build needs `AVIARY_DYLIB` pointing at an engine built
 from the same source.
 
+**Packaging**
+
+- The build hook now bundles the macOS engine as a code asset too, so a
+  `dart build cli` bundle carries `libaviary_c` in `bundle/lib` and runs
+  with no package config and no `AVIARY_DYLIB`. On macOS the hook leaves the
+  engine to the `aviary` and `aviary_lite` plugins when the app depends on
+  one of them, so an app never carries two.
+
 **Subchains version 2**
 
 - A parent with a dynamic policy (`encodeDynamicSubchainPolicy`, registrars
@@ -100,10 +108,8 @@ from this release on.
   do not linger in freed memory.
 
 - The engine ships as one self contained library per platform (macOS arm64
-  2.8 MB, Linux x64 and arm64); the build hook bundles it as a code asset,
-  so a `dart build cli` bundle runs anywhere with no setup. On macOS the
-  hook leaves the engine to the `aviary` and `aviary_lite` plugins when the
-  app depends on one of them, so an app never carries two. `Aviary.loadedFrom`
+  2.8 MB, Linux x64 and arm64); the build hook
+  bundles the Linux library as a code asset, and `Aviary.loadedFrom`
   reports which library was loaded. `AVIARY_DYLIB` points at any other
   build.
 - Native handles are released by a finalizer; releasing twice is a no-op.
