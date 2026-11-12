@@ -44,10 +44,32 @@ class ConsensusEngine {
     return propose(std::move(txs), timestamp);
   }
 
+  /// The same, on a parent with a DYNAMIC subchain policy also carrying
+  /// registry operations [ops] (register, close, set registrars). Every
+  /// built-in engine implements it; an engine that does not can only propose
+  /// operation-free blocks (throws on non-empty ops, never drops them).
+  virtual Block propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                 std::vector<Anchor> anchors, std::vector<SubchainOp> ops) {
+    if (!ops.empty()) throw std::runtime_error("this consensus engine does not carry registry operations");
+    return propose_anchored(std::move(txs), timestamp, std::move(anchors));
+  }
+
   /// Verify [block]'s [justification] and, if valid, apply it atomically - 
   /// advancing the chain on success, leaving it unchanged on failure. The
   /// justification encoding is engine-specific.
   virtual BlockError submit(const Block& block, codec::ByteView justification) = 0;
+
+  /// The engine's own state beyond the ledger, as canonical bytes, for a chain
+  /// snapshot (docs/design/SUBCHAINS.md section 22). Empty for an engine that
+  /// keeps none. Never contains a secret key.
+  virtual Bytes consensus_state() const { return {}; }
+
+  /// Resume from [state] (what consensus_state() returned) over a ledger that
+  /// was restored to the same tip. Throws on bytes that are malformed or do
+  /// not fit the ledger's tip; the default accepts only the empty state.
+  virtual void restore_consensus_state(codec::ByteView state) {
+    if (!state.empty()) throw std::invalid_argument("this consensus engine keeps no consensus state");
+  }
 };
 
 }  // namespace aviary::consensus

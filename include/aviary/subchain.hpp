@@ -100,6 +100,10 @@ struct SubchainProof {
 /// True iff every hop is committed under [parent_subchain_root] and the state
 /// proof holds under the final child tip. Never throws.
 bool verify_subchain_proof(const Hash& parent_subchain_root, const SubchainProof& p);
+/// One hop of that check: the tip of the child [hop] descends into when the
+/// hop's canonical list recomputes [root], else nullptr. The pointer refers
+/// into [hop]. Never throws.
+const BlockHeader* verify_subchain_hop(const Hash& root, const SubchainProof::Hop& hop);
 
 /// The child-side binding, committed into the child's genesis hash.
 struct ParentBinding {

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "aviary/dynamic_subchain.hpp"
 #include "aviary/signature_cache.hpp"
 #include "aviary/state.hpp"
 #include "aviary/subchain.hpp"
@@ -43,8 +44,18 @@ struct ChainSpec {
   /// Canonical `SubchainPolicy` bytes (docs/design/SUBCHAINS.md) when this
   /// chain is a PARENT. Empty = anchors nothing; every version-3 header is then
   /// refused. Non-empty = every produced block is version 3 and commits the
-  /// child-tip registry; a lower-version header is refused.
+  /// child-tip registry; a lower-version header is refused. The same field
+  /// carries a `DynamicSubchainPolicy` instead (Part 2 of that document, told
+  /// apart by its format prefix): every block is then version 4, may carry
+  /// registry operations, and commits the Merkle registry.
   Bytes subchain_policy{};
+
+  /// The genesis hash of this chain (GenesisSpec::chain_spec fills it). Only a
+  /// chain with a DYNAMIC subchain policy reads it: registry operations are
+  /// signed for one parent, identified by chain id and genesis hash, and such
+  /// a ledger refuses to boot while this is all zero. Every other chain
+  /// ignores the field.
+  Hash genesis_hash{};
 
   /// Whether [algo] is permitted on this chain.
   bool accepts(SigAlgo algo) const {
@@ -90,10 +101,14 @@ class Ledger {
   /// block commits the resulting tx/state (and anchor/subchain) roots. Throws
   /// std::runtime_error (with the reason) if any tx or anchor is invalid.
   Block build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
-                    std::vector<Anchor> anchors = {});
+                    std::vector<Anchor> anchors = {}, std::vector<SubchainOp> ops = {});
 
-  /// The subchain registry (child tips) when this chain is a parent, else null.
+  /// The subchain registry (child tips) when this chain is a parent under a
+  /// version 1 policy, else null.
   const SubchainRegistry* subchains() const { return registry_ ? &*registry_ : nullptr; }
+  /// The Merkle registry when this chain is a parent under a dynamic policy,
+  /// else null.
+  const DynamicSubchainRegistry* dynamic_subchains() const { return dynamic_ ? &*dynamic_ : nullptr; }
 
   /// Validate + apply [block] atomically. On success the ledger advances; on
   /// failure it is left completely unchanged.
@@ -113,6 +128,12 @@ class Ledger {
   /// the snapshotted height and accepts the next block. Throws on a bad blob.
   static std::unique_ptr<Ledger> restore(ChainSpec spec, codec::ByteView snapshot);
 
+  /// The same, also restoring last_receipts(): [tip_receipts] are the receipts
+  /// of the snapshotted tip block. Throws unless they hash to the tip's
+  /// receipt_root (a tip that commits none, or a genesis tip, takes none).
+  static std::unique_ptr<Ledger> restore(ChainSpec spec, codec::ByteView snapshot,
+                                         std::vector<Receipt> tip_receipts);
+
  private:
   BlockError check_header(const BlockHeader& h) const;
   // Shared body of validate_block / process_block: runs the full pipeline on a
@@ -121,6 +142,7 @@ class Ledger {
     std::unique_ptr<StateMachine> state;
     std::vector<Receipt> receipts;
     std::optional<SubchainRegistry> registry;
+    std::optional<DynamicSubchainRegistry> dynamic;
   };
   BlockError run_block(const Block& block, Worked& out) const;
 
@@ -129,6 +151,7 @@ class Ledger {
   BlockHeader tip_;
   std::vector<Receipt> last_receipts_;
   std::optional<SubchainRegistry> registry_;  // parent chains only
+  std::optional<DynamicSubchainRegistry> dynamic_;
   std::shared_ptr<SignatureCache> sig_cache_ = std::make_shared<SignatureCache>();
 };
 

@@ -47,6 +47,18 @@ std::optional<BlockStore::TxLocation> BlockStore::find_tx(const Hash& txid) cons
   return it->second;
 }
 
+std::size_t BlockStore::prune_below(std::uint64_t height) {
+  std::size_t removed = 0;
+  while (!by_height_.empty() && by_height_.begin()->first < height) {
+    const Block& block = by_height_.begin()->second.block;
+    hash_to_height_.erase(block.header.hash());
+    for (const Transaction& tx : block.transactions) tx_index_.erase(tx.txid());
+    by_height_.erase(by_height_.begin());
+    ++removed;
+  }
+  return removed;
+}
+
 Bytes BlockStore::serialize() const {
   codec::CodecWriter w;
   w.write_u32(static_cast<std::uint32_t>(by_height_.size()));

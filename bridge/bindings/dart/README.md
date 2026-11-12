@@ -89,6 +89,10 @@ final signature = bc.signWithShares([shares[0], shares[2]], 'pay'.utf8Bytes);
 - Mixtures: `makeBlueprint`, `buildGenesis`, `assembleChain`, `Chain`.
 - Foreign components: `registerEngine`, `registerProposer`.
 - Subchains: registrations, policies, anchors, `verifySubchainProof`.
+- Unreleased, needs an engine built from source: children registered after
+  genesis (`encodeDynamicSubchainPolicy`, `signOp`, `proposeSubchain`), child
+  proofs (`childProof`, `verifyChildProof`) and chain snapshots
+  (`Chain.snapshot`, `restoreChain`).
 - Validator rotation: `Chain.scheduleValidators`, `Chain.validators`.
 - Light clients: `newLightClient`, `acceptSkipping`, `syncTo`.
 - Networking: `newNetNode`, `NetNode`, `PeerMesh`, `SecureSession`,

@@ -132,6 +132,7 @@ add_library(aviary_core STATIC
   src/core/assurance.cpp
   src/core/chain_blueprint.cpp
   src/core/subchain.cpp
+  src/core/dynamic_subchain.cpp
   src/core/block_store.cpp
   src/core/fork_choice.cpp
   src/storage/file_store.cpp
@@ -175,6 +176,7 @@ add_library(aviary_core STATIC
   src/node/chain_assembler.cpp
   src/node/foreign_engine.cpp
   src/node/subchain_relay.cpp
+  src/node/chain_snapshot.cpp
   src/node/chain_tree.cpp
   src/node/remote_guard.cpp
   src/node/demo_node.cpp)
@@ -254,6 +256,14 @@ add_executable(bench_paths tools/bench_paths.cpp)
 target_link_libraries(bench_paths PRIVATE aviary_c)
 target_include_directories(bench_paths PRIVATE bridge)
 
+# Generator for vectors/subchain_v2_vectors.txt, through the C ABI only.
+if(NOT AVIARY_STATIC)
+  add_executable(print_subchain_vectors tools/print_subchain_vectors.cpp)
+  target_link_libraries(print_subchain_vectors PRIVATE aviary_c)
+  target_include_directories(print_subchain_vectors PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+  set_target_properties(print_subchain_vectors PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
 # -- Tests (zero-dependency runner, matching cryptolib's convention) ----------
 enable_testing()
 
@@ -282,6 +292,17 @@ if(NOT AVIARY_STATIC)
   target_include_directories(test_c_abi_extras PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
   set_target_properties(test_c_abi_extras PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
   add_test(NAME test_c_abi_extras COMMAND test_c_abi_extras)
+  function(aviary_add_c_abi_test name source)
+    add_executable(${name} ${source})
+    target_link_libraries(${name} PRIVATE aviary_c)
+    target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+    set_target_properties(${name} PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
+    add_test(NAME ${name} COMMAND ${name})
+  endfunction()
+  aviary_add_c_abi_test(test_c_abi_persistence tests/test_c_abi_persistence.cpp)
+  aviary_add_c_abi_test(test_c_abi_dynamic tests/test_c_abi_dynamic.cpp)
+  aviary_add_c_abi_test(test_subchain_vectors tests/test_subchain_vectors.cpp)
+  target_compile_definitions(test_subchain_vectors PRIVATE AVIARY_VECTORS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/vectors")
 endif()
 aviary_add_test(test_codec_fuzz tests/test_codec_fuzz.cpp)
 aviary_add_test(test_bls tests/test_bls.cpp)
@@ -338,6 +359,9 @@ aviary_add_test(test_subchains tests/test_subchains.cpp)
 aviary_add_test(test_validator_rotation tests/test_validator_rotation.cpp)
 aviary_add_test(test_light_client_skip tests/test_light_client_skip.cpp)
 aviary_add_test(test_chain_tree tests/test_chain_tree.cpp)
+aviary_add_test(test_chain_snapshot tests/test_chain_snapshot.cpp)
+aviary_add_test(test_dynamic_subchains tests/test_dynamic_subchains.cpp)
+aviary_add_test(test_subchain_scale tests/test_subchain_scale.cpp)
 aviary_add_test(test_remote_guard tests/test_remote_guard.cpp)
 aviary_add_test(test_bbs tests/test_bbs.cpp)
 aviary_add_test(test_bbs_pseudonym tests/test_bbs_pseudonym.cpp)

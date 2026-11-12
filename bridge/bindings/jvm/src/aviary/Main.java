@@ -580,6 +580,8 @@ public final class Main {
             }
             System.out.println("networked records OK");
 
+            DynamicSubchainChecks.run(bc);
+
             System.out.println("\nALL GOOD");
         }
     }

@@ -81,6 +81,18 @@ class ChainAssembler {
                                  crypto::KeyPair bls_key, Bytes vrf_secret = {},
                                  std::vector<Bytes> vrf_pubkeys = {});
 
+  /// Assemble the same chain over a RESTORED ledger: [ledger_snapshot] is a
+  /// Ledger::snapshot() of this chain and [tip_receipts] the receipts of its
+  /// tip block. The engine comes back with only its genesis consensus state;
+  /// resume it with ConsensusEngine::restore_consensus_state. Throws on every
+  /// reject assemble() throws on, on a snapshot that does not decode, and on a
+  /// state model that is not one of the built in three (a custom state
+  /// machine has no registered deserializer).
+  static AssembledChain assemble_restored(const GenesisSpec& genesis, std::uint32_t me,
+                                          crypto::KeyPair bls_key, codec::ByteView ledger_snapshot,
+                                          std::vector<Receipt> tip_receipts, Bytes vrf_secret = {},
+                                          std::vector<Bytes> vrf_pubkeys = {});
+
   /// The mixture a genesis WITHOUT a blueprint assembles as - derived from its
   /// posture and state model, so every legacy genesis is still assemblable.
   static ChainBlueprint default_blueprint(const GenesisSpec& genesis);

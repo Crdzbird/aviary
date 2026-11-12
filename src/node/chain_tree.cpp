@@ -10,6 +10,7 @@
 #include "aviary/account_state.hpp"
 #include "aviary/assurance.hpp"
 #include "aviary/bft_engine.hpp"
+#include "aviary/chain_snapshot.hpp"
 #include "aviary/codec.hpp"
 #include "aviary/pos_engine.hpp"
 #include "aviary/pow_engine.hpp"
@@ -128,6 +129,21 @@ struct Draft {
   std::uint8_t depth = 0;
 };
 
+struct LocalKey {
+  std::uint32_t me = 0;
+  crypto::KeyPair key;
+};
+
+LocalKey local_key(const std::vector<ChainTreeSpec::Validator>& validators) {
+  for (std::uint32_t i = 0; i < validators.size(); ++i)
+    if (!validators[i].bls_secret.empty())
+      return LocalKey{i, crypto::KeyPair{validators[i].bls_public, validators[i].bls_secret}};
+  return LocalKey{0, crypto::KeyPair{validators[0].bls_public, {}}};
+}
+
+constexpr std::uint8_t kTreeMagic[4] = {'A', 'V', 'T', 'S'};
+constexpr std::uint8_t kTreeVersion = 1;
+
 GenesisSpec base_genesis(const ChainTreeSpec::Node& n) {
   GenesisSpec g;
   g.chain_id = n.chain_id;
@@ -190,13 +206,8 @@ std::unique_ptr<ChainTree> ChainTree::build(const ChainTreeSpec& spec) {
       [&](const ChainTreeSpec::Node& n, std::uint64_t parent, const Hash* parent_hash) {
         Draft& d = drafts.at(n.chain_id);
         if (parent_hash) ParentBinding{parent, *parent_hash}.commit_to(d.genesis);
-        // Assemble as the first validator this process holds a secret for.
-        std::uint32_t me = 0;
-        crypto::KeyPair key;
-        for (std::uint32_t i = 0; i < n.validators.size(); ++i)
-          if (!n.validators[i].bls_secret.empty()) { me = i; key = crypto::KeyPair{n.validators[i].bls_public, n.validators[i].bls_secret}; break; }
-        if (key.public_key.empty()) key = crypto::KeyPair{n.validators[0].bls_public, {}};
-        AssembledChain chain = ChainAssembler::assemble(d.genesis, me, key);  // throws -> fail-closed
+        const LocalKey local = local_key(n.validators);
+        AssembledChain chain = ChainAssembler::assemble(d.genesis, local.me, local.key);  // throws -> fail-closed
         std::vector<std::uint64_t> kids;
         for (const auto& c : n.children) kids.push_back(c.chain_id);
         Built b{n.chain_id, parent, d.depth, d.genesis, n.validators, std::move(chain), BlockStore{}, std::move(kids)};
@@ -206,6 +217,59 @@ std::unique_ptr<ChainTree> ChainTree::build(const ChainTreeSpec& spec) {
         for (const ChainTreeSpec::Node& c : n.children) pass2(c, n.chain_id, &my_hash);
       };
   pass2(spec.root, 0, nullptr);
+  return t;
+}
+
+Bytes ChainTree::snapshot() const {
+  codec::CodecWriter w;
+  for (std::uint8_t b : kTreeMagic) w.write_u8(b);
+  w.write_u8(kTreeVersion);
+  w.write_list(order_, [this](codec::CodecWriter& ww, std::uint64_t id) {
+    const Built& n = node(id);
+    const bool bft = dynamic_cast<const consensus::BftEngine*>(n.chain.engine.get()) != nullptr;
+    const Bytes chain = snapshot_chain(n.genesis.hash(), n.chain, bft ? &n.archive : nullptr);
+    ww.write_u64(id);
+    ww.write_bytes(bv(chain));
+  });
+  return w.take();
+}
+
+std::unique_ptr<ChainTree> ChainTree::restore(const ChainTreeSpec& spec, crypto::ByteView snapshot) {
+  std::unique_ptr<ChainTree> t = build(spec);
+  codec::CodecReader r(snapshot);
+  for (std::uint8_t b : kTreeMagic)
+    if (r.read_u8() != b) throw codec::CodecError("chain tree snapshot: bad magic");
+  if (r.read_u8() != kTreeVersion) throw codec::CodecError("chain tree snapshot: unknown version");
+  if (r.read_u32() != t->order_.size()) throw std::invalid_argument("chain tree snapshot: taken from another family");
+  for (std::uint64_t id : t->order_) {
+    if (r.read_u64() != id) throw std::invalid_argument("chain tree snapshot: taken from another family");
+    const Bytes chain = r.read_bytes();
+    Built& n = t->mut(id);
+    const LocalKey local = local_key(n.validators);
+    RestoredChain restored = restore_chain(n.genesis, local.me, local.key, bv(chain));
+    const bool bft = dynamic_cast<const consensus::BftEngine*>(restored.chain.engine.get()) != nullptr;
+    if (bft != restored.archive.has_value())
+      throw std::invalid_argument("chain tree snapshot: archive presence does not match the engine");
+    n.chain = std::move(restored.chain);
+    n.archive = restored.archive ? std::move(*restored.archive) : BlockStore{};
+  }
+  r.assert_fully_consumed();
+
+  for (std::uint64_t id : t->order_) {
+    const Built& parent = t->node(id);
+    const SubchainRegistry* reg = parent.chain.engine->ledger().subchains();
+    if (reg == nullptr) continue;
+    for (std::uint64_t child_id : parent.children) {
+      const Built& child = t->node(child_id);
+      const BlockHeader* recorded = reg->tip_of(child_id);
+      if (recorded == nullptr || recorded->height == 0) continue;
+      if (!child.archive.has_height(recorded->height) ||
+          child.archive.by_height(recorded->height).block.header.hash() != recorded->hash())
+        throw std::invalid_argument("chain tree snapshot: chain " + std::to_string(id) +
+                                    " records a tip of child " + std::to_string(child_id) +
+                                    " that the child's snapshot does not hold");
+    }
+  }
   return t;
 }
 

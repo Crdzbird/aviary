@@ -64,12 +64,16 @@ Block PosEngine::propose(std::vector<Transaction> txs, std::uint64_t timestamp) 
 }
 Block PosEngine::propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                                   std::vector<Anchor> anchors) {
+  return propose_subchain(std::move(txs), timestamp, std::move(anchors), {});
+}
+Block PosEngine::propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                  std::vector<Anchor> anchors, std::vector<SubchainOp> ops) {
   const std::uint64_t next = ledger_->tip().height + 1;
   if (proposer_for(next) != me_) {
     throw std::runtime_error("pos: this validator is not the leader for height " +
                              std::to_string(next));
   }
-  Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
+  Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors), std::move(ops));
   b.header.consensus_data = PosData{me_}.encode();
   return b;
 }

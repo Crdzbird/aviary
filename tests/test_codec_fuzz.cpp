@@ -11,7 +11,11 @@
 #include "aviary/block_store.hpp"
 #include "aviary/chain_blueprint.hpp"
 #include "aviary/subchain.hpp"
+#include "aviary/dynamic_subchain.hpp"
 #include "aviary/chain_tree.hpp"
+#include "aviary/chain_snapshot.hpp"
+#include "aviary/bft_engine.hpp"
+#include "aviary/assurance.hpp"
 #include "aviary/consensus.hpp"
 #include "aviary/credential_gate.hpp"
 #include "aviary/genesis.hpp"
@@ -104,6 +108,15 @@ int main() {
     totality_ok &= total([&] { (void)ParentBinding::decode_all(v); });
     totality_ok &= total([&] { (void)SubchainProof::decode_all(v); });
     totality_ok &= total([&] { (void)node::ChainTreeSpec::decode_all(v); });
+    totality_ok &= total([&] { (void)node::ChainSnapshot::decode_all(v); });
+    totality_ok &= total([&] { (void)SubchainOp::decode_all(v); });
+    totality_ok &= total([&] { (void)RegistrarSet::decode_all(v); });
+    totality_ok &= total([&] { (void)DynamicSubchainPolicy::decode_all(v); });
+    totality_ok &= total([&] { (void)CloseChild::decode_all(v); });
+    totality_ok &= total([&] { (void)ChildRecord::decode_all(v); });
+    totality_ok &= total([&] { (void)ChildProof::decode_all(v); });
+    totality_ok &= total([&] { (void)SubchainProofV2::decode_all(v); });
+    totality_ok &= total([&] { (void)subchain_policy_format(v); });
     totality_ok &= total([&] { (void)p2p::AddressBook::decode(v); });
     totality_ok &= total([&] { (void)custody::ShareCard::decode(v); });
     totality_ok &= total([&] { (void)consensus::CredentialPolicy::decode_all(v); });
@@ -120,6 +133,161 @@ int main() {
   }
   CHECK_MSG(totality_ok,
             "all decoders are total (success or CodecError only) on random input");
+
+  std::printf("== chain snapshot: mutated blobs never crash and are accepted only when canonical ==\n");
+  {
+    GenesisSpec g;
+    g.chain_id = 77;
+    g.timestamp = 1;
+    std::vector<crypto::KeyPair> keys;
+    for (std::uint8_t i = 0; i < 2; ++i) {
+      keys.push_back(crypto::bls_keygen_from_ikm(view(Bytes(32, static_cast<std::uint8_t>(0x51 + i)))));
+      g.validators.push_back(consensus::Validator{keys.back().public_key, 1});
+    }
+    AssuranceProfile::standard().apply_to(g);
+    ChainBlueprint{"bft", "account", "", {}}.commit_to(g);
+    node::AssembledChain chain = node::ChainAssembler::assemble(g, 0, keys[0]);
+    auto& bft = dynamic_cast<consensus::BftEngine&>(*chain.engine);
+    BlockStore archive;
+    for (std::uint64_t ts = 10; ts < 13; ++ts) {
+      Block b = bft.propose({}, ts);
+      auto cert = bft.try_commit(b, {bft.precommit(b, 0, keys[0]), bft.precommit(b, 1, keys[1])});
+      CHECK(cert.has_value() && bft.finalize(b, *cert).ok && archive.put(b, *cert));
+    }
+    const Bytes good = node::snapshot_chain(g.hash(), chain, &archive);
+    CHECK(node::snapshot_chain(g.hash(), node::restore_chain(g, 0, keys[0], view(good)).chain, &archive) == good);
+    bool survived = true, canonical = true;
+    int accepted = 0;
+    for (int i = 0; i < 4000; ++i) {
+      Bytes m = good;
+      const std::uint32_t mode = rng.below(4);
+      if (mode == 0) m[rng.below(static_cast<std::uint32_t>(m.size()))] ^= static_cast<std::uint8_t>(1u << rng.below(8));
+      if (mode == 1) m.resize(rng.below(static_cast<std::uint32_t>(m.size())));
+      if (mode == 2) {
+        const Bytes extra = random_bytes(rng, 1 + rng.below(8));
+        m.insert(m.end(), extra.begin(), extra.end());
+      }
+      if (mode == 3) {
+        const std::uint32_t at = rng.below(static_cast<std::uint32_t>(m.size()));
+        const Bytes noise = random_bytes(rng, 1 + rng.below(6));
+        for (std::size_t k = 0; k < noise.size() && at + k < m.size(); ++k) m[at + k] = noise[k];
+      }
+      try {
+        node::RestoredChain r = node::restore_chain(g, 0, keys[0], view(m));
+        ++accepted;
+        const Bytes again = node::snapshot_chain(g.hash(), r.chain, r.archive ? &*r.archive : nullptr);
+        if (again != m) canonical = false;
+      } catch (const std::exception&) {
+      } catch (...) {
+        survived = false;
+      }
+    }
+    CHECK_MSG(survived, "restore_chain throws only std::exception on mutated snapshots");
+    CHECK_MSG(canonical, "a mutated snapshot is accepted only when it re-encodes to itself");
+    std::printf("  (%d of 4000 mutations left the snapshot acceptable)\n", accepted);
+  }
+
+  std::printf("== subchains version 2: round trips, and verifiers that never throw ==\n");
+  {
+    auto random_hash = [&] {
+      Hash h;
+      for (auto& x : h) x = static_cast<std::uint8_t>(rng.next());
+      return h;
+    };
+    bool op_ok = true, record_ok = true, proof_ok = true, policy_ok = true, quiet = true;
+    for (int i = 0; i < 3000; ++i) {
+      SubchainOp op;
+      op.kind = static_cast<std::uint8_t>(rng.next());
+      op.authority_epoch = static_cast<std::uint32_t>(rng.next());
+      op.valid_until = rng.next() >> 1;
+      op.payload = random_bytes(rng, rng.below(60));
+      std::uint16_t index = 0;
+      for (std::uint32_t k = rng.below(5); k > 0; --k) {
+        index = static_cast<std::uint16_t>(index + 1 + rng.below(9));
+        op.approvals.push_back(OpApproval{index, random_bytes(rng, rng.below(70))});
+      }
+      const Bytes enc = op.encode();
+      op_ok &= SubchainOp::decode_all(view(enc)) == op && SubchainOp::decode_all(view(enc)).encode() == enc;
+
+      ChildRecord rec;
+      rec.index = static_cast<std::uint32_t>(rng.next());
+      rec.chain_id = rng.next() >> 1;
+      rec.status = rng.below(2) == 0 ? ChildRecord::kOpen : ChildRecord::kClosed;
+      rec.child_max_depth = static_cast<std::uint8_t>(rng.next());
+      rec.genesis_header_hash = random_hash();
+      rec.registered_height = rng.next() >> 1;
+      rec.closed_height = rec.status == ChildRecord::kClosed ? 1 + (rng.next() >> 2) : 0;
+      rec.tip_height = rng.next() >> 1;
+      rec.tip_hash = random_hash();
+      rec.tip_state_root = random_hash();
+      rec.tip_subchain_root = random_hash();
+      rec.vset_hash = random_hash();
+      rec.tip_vset_hash = random_hash();
+      const Bytes rec_enc = rec.encode();
+      record_ok &= rec_enc.size() == ChildRecord::kEncodedSize && ChildRecord::decode_all(view(rec_enc)) == rec;
+
+      ChildProof proof;
+      proof.record = rec;
+      proof.record_count = static_cast<std::uint32_t>(rng.next());
+      proof.open_count = static_cast<std::uint32_t>(rng.next());
+      proof.authority_epoch = static_cast<std::uint32_t>(rng.next());
+      proof.authority_hash = random_hash();
+      for (std::uint32_t k = rng.below(34); k > 0; --k) proof.siblings.push_back(random_hash());
+      const Bytes proof_enc = proof.encode();
+      proof_ok &= ChildProof::decode_all(view(proof_enc)) == proof;
+      try {
+        quiet &= !verify_child_proof(random_hash(), proof).has_value();
+        SubchainProofV2 path;
+        path.hops.push_back({static_cast<std::uint8_t>(1 + rng.below(2)), random_bytes(rng, rng.below(300))});
+        path.hops.push_back({SubchainProofV2::kRecordHop, proof_enc});
+        quiet &= !verify_subchain_proof_v2(random_hash(), path);
+        quiet &= SubchainProofV2::decode_all(view(path.encode())).encode() == path.encode();
+      } catch (...) {
+        quiet = false;
+      }
+
+      DynamicSubchainPolicy policy;
+      policy.max_depth = static_cast<std::uint8_t>(rng.next());
+      policy.max_children = static_cast<std::uint32_t>(rng.next());
+      policy.max_anchors_per_block = static_cast<std::uint16_t>(rng.next());
+      policy.max_headers_per_anchor = static_cast<std::uint16_t>(rng.next());
+      policy.max_ops_per_block = static_cast<std::uint16_t>(rng.next());
+      policy.authority.threshold = static_cast<std::uint8_t>(rng.next());
+      for (std::uint32_t k = rng.below(4); k > 0; --k)
+        policy.authority.registrars.push_back(
+            Registrar{static_cast<std::uint8_t>(rng.next()), random_bytes(rng, rng.below(40))});
+      const Bytes policy_enc = policy.encode();
+      policy_ok &= DynamicSubchainPolicy::decode_all(view(policy_enc)) == policy &&
+                   subchain_policy_format(view(policy_enc)) == 2;
+      try {
+        (void)policy.validate(rng.next() >> 1);
+      } catch (...) {
+        quiet = false;
+      }
+    }
+    CHECK_MSG(op_ok, "decode(encode(operation)) is the identity");
+    CHECK_MSG(record_ok, "decode(encode(record)) is the identity at 230 bytes");
+    CHECK_MSG(proof_ok, "decode(encode(child proof)) is the identity");
+    CHECK_MSG(policy_ok, "decode(encode(dynamic policy)) is the identity and reads as format 2");
+    CHECK_MSG(quiet, "verifiers and validators return false on random input and never throw");
+
+    DynamicSubchainPolicy sealed;
+    sealed.max_depth = 1;
+    DynamicSubchainRegistry registry = DynamicSubchainRegistry::from_policy(5, random_hash(), sealed);
+    bool restore_survives = true;
+    for (int i = 0; i < 20000; ++i) {
+      const Bytes b = random_bytes(rng, rng.below(200));
+      try {
+        DynamicSubchainRegistry copy = registry;
+        copy.restore(view(b));
+        if (copy.serialize() != b) restore_survives = false;
+      } catch (const std::exception&) {
+      } catch (...) {
+        restore_survives = false;
+      }
+    }
+    CHECK_MSG(restore_survives, "registry restore throws std::exception or accepts only canonical bytes");
+  }
 
   std::printf("== interop decoders survive arbitrary input (20k iterations) ==\n");
   {

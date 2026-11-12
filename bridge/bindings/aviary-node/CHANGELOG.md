@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- Subchains version 2 (docs/design/SUBCHAINS.md Part 2): a parent whose
+  genesis commits a dynamic policy (`encodeDynamicSubchainPolicy`,
+  `encodeRegistrar`) registers, closes and re-keys children in any block
+  through registrar signed operations (`opRegister`, `opClose`,
+  `opSetRegistrars`, `opDigest`, `signOp`, `addOpApproval`,
+  `Chain.proposeSubchain`). The registry is a Merkle tree of fixed 230 byte
+  records: `Chain.registryCounts`, `childRecord`, `childProof`,
+  `verifyChildProof`, `decodeChildRecord`, `pendingAnchor`,
+  `Chain.subchainHopV2`, `encodeSubchainProofV2`, `verifySubchainProofV2`,
+  `encodedHeaderHash`, and the `SigAlgo`, `ChildStatus`, `HopFlat` and
+  `HopRecord` constants.
+- Chain persistence: `Chain.tip`, `Chain.snapshot`, `restoreChain` and
+  `chainSnapshotError`; a restored chain continues byte for byte. The block
+  archive: `Chain.enableArchive`, `archiveRange`, `archivedBlock`,
+  `archivedCertificate`, `pruneArchive`. Chain trees: `ChainTree.snapshot`
+  and `ChainTree.restore`.
+- `test/dynamic_subchain.test.js` replays `vectors/subchain_v2_vectors.txt`
+  call for call.
+
 ## 1.0.0
 
 First stable release of aviary-ledger, the Aviary ledger for Node.js over

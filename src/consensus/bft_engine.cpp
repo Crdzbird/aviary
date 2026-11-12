@@ -37,6 +37,86 @@ BlockError BftEngine::submit(const Block& b, codec::ByteView justification) {
   return finalize(b, cert);
 }
 
+Bytes BftEngine::consensus_state() const {
+  codec::CodecWriter w;
+  const Bytes current = vset_.encode();
+  const Bytes certifying = prev_vset_.encode();
+  w.write_bytes(codec::ByteView(current.data(), current.size()));
+  w.write_bytes(codec::ByteView(certifying.data(), certifying.size()));
+  w.write_bool(last_commit_.has_value());
+  if (last_commit_) {
+    const Bytes cert = last_commit_->encode();
+    w.write_bytes(codec::ByteView(cert.data(), cert.size()));
+  }
+  w.write_bool(pending_.has_value());
+  if (pending_) {
+    const Bytes next = pending_->encode();
+    w.write_bytes(codec::ByteView(next.data(), next.size()));
+  }
+  const std::vector<std::uint32_t> offenders(equivocators_.begin(), equivocators_.end());
+  w.write_list(offenders, [](codec::CodecWriter& ww, std::uint32_t i) { ww.write_u32(i); });
+  return w.take();
+}
+
+void BftEngine::restore_consensus_state(codec::ByteView state) {
+  codec::CodecReader r(state);
+  const Bytes current_bytes = r.read_bytes();
+  const Bytes certifying_bytes = r.read_bytes();
+  std::optional<CommitCertificate> cert;
+  if (r.read_bool()) {
+    const Bytes c = r.read_bytes();
+    cert = CommitCertificate::decode_all(codec::ByteView(c.data(), c.size()));
+  }
+  std::optional<ValidatorSet> pending;
+  if (r.read_bool()) {
+    const Bytes p = r.read_bytes();
+    pending = ValidatorSet::decode_all(codec::ByteView(p.data(), p.size()));
+  }
+  const std::vector<std::uint32_t> offenders =
+      r.read_list<std::uint32_t>([](codec::CodecReader& rr) { return rr.read_u32(); });
+  r.assert_fully_consumed();
+
+  ValidatorSet current = ValidatorSet::decode_all(codec::ByteView(current_bytes.data(), current_bytes.size()));
+  ValidatorSet certifying =
+      ValidatorSet::decode_all(codec::ByteView(certifying_bytes.data(), certifying_bytes.size()));
+  for (std::size_t i = 0; i < offenders.size(); ++i) {
+    if (i > 0 && !(offenders[i - 1] < offenders[i]))
+      throw std::invalid_argument("bft: equivocators must be ascending and unique");
+    if (offenders[i] >= current.size()) throw std::invalid_argument("bft: equivocator index out of range");
+  }
+
+  const BlockHeader& tip = ledger_->tip();
+  if (tip.height == 0) {
+    if (cert) throw std::invalid_argument("bft: a genesis tip has no commit certificate");
+    if (current.hash() != vset_.hash() || certifying.hash() != vset_.hash())
+      throw std::invalid_argument("bft: validator set does not match the genesis set");
+  } else {
+    if (!cert) throw std::invalid_argument("bft: missing the tip's commit certificate");
+    if (cert->height != tip.height || cert->block_id != tip.hash())
+      throw std::invalid_argument("bft: commit certificate is not for the restored tip");
+    ConsensusData cd;
+    try {
+      cd = ConsensusData::decode_all(codec::ByteView(tip.consensus_data.data(), tip.consensus_data.size()));
+    } catch (const codec::CodecError&) {
+      throw std::invalid_argument("bft: the restored tip carries no BFT consensus data");
+    }
+    if (cd.validator_set_hash != certifying.hash())
+      throw std::invalid_argument("bft: certifying set does not match the tip header");
+    const std::optional<ValidatorSet> announced = announced_validator_set(tip);
+    const Hash expected = announced ? announced->hash() : certifying.hash();
+    if (current.hash() != expected)
+      throw std::invalid_argument("bft: set in force does not follow from the tip header");
+    if (CommitError ce = verify_commit(ledger_->spec().chain_id, certifying, *cert); !ce.ok)
+      throw std::invalid_argument("bft: tip certificate rejected: " + ce.error);
+  }
+
+  vset_ = std::move(current);
+  prev_vset_ = std::move(certifying);
+  last_commit_ = std::move(cert);
+  pending_ = std::move(pending);
+  equivocators_ = std::set<std::uint32_t>(offenders.begin(), offenders.end());
+}
+
 Vote BftEngine::precommit(const Block& b, std::uint32_t validator_index,
                           const crypto::KeyPair& bls_key,
                           std::uint32_t round) const {

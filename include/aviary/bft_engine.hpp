@@ -44,6 +44,8 @@ class BftEngine : public ConsensusEngine {
   const ValidatorSet& validators() const { return vset_; }
   /// The set that certified the current tip.
   const ValidatorSet& tip_validators() const { return prev_vset_; }
+  /// The certificate that finalized the current tip (absent at genesis).
+  const std::optional<CommitCertificate>& last_commit() const { return last_commit_; }
 
   // -- Validator-set changes (coordinated rotation) ---------------------------
   // Operators agree a new set out of band and each SCHEDULES it; the next block
@@ -69,8 +71,9 @@ class BftEngine : public ConsensusEngine {
   }
   /// A parent chain's proposal: the same block, also anchoring [anchors]
   /// (docs/design/SUBCHAINS.md). Throws if an anchor is invalid.
-  Block propose(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors) {
-    Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
+  Block propose(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors,
+                std::vector<SubchainOp> ops = {}) {
+    Block b = ledger_->build_block(std::move(txs), timestamp, std::move(anchors), std::move(ops));
     ConsensusData cd{vset_.hash(), last_commit_};
     if (pending_) cd.next_validators = pending_->validators();
     b.header.consensus_data = cd.encode();
@@ -80,10 +83,23 @@ class BftEngine : public ConsensusEngine {
                          std::vector<Anchor> anchors) override {
     return propose(std::move(txs), timestamp, std::move(anchors));
   }
+  Block propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors,
+                         std::vector<SubchainOp> ops) override {
+    return propose(std::move(txs), timestamp, std::move(anchors), std::move(ops));
+  }
 
   /// ConsensusEngine seam: the justification is an encoded CommitCertificate.
   /// Decodes it and finalizes the block (verify certificate -> apply).
   BlockError submit(const Block& b, codec::ByteView justification) override;
+
+  /// The set in force, the set that certified the tip, the tip's certificate,
+  /// a scheduled rotation and the recorded equivocators, canonically encoded.
+  Bytes consensus_state() const override;
+  /// Throws unless [state] is canonical and consistent with the ledger's tip:
+  /// the certifying set matches the hash the tip header commits, the set in
+  /// force is the one that header announces (or the same set), and the
+  /// certificate is a valid quorum for exactly that tip.
+  void restore_consensus_state(codec::ByteView state) override;
 
   /// A validator precommits a proposed block.
   Vote precommit(const Block& b, std::uint32_t validator_index,

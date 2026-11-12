@@ -32,6 +32,16 @@ extension ChainTreeQueries on ChainTree {
   /// The current tip header of a chain.
   Uint8List tip(int chainId) => _byChain('aviary_chain_tree_tip', chainId);
 
+  /// The whole family as one snapshot: every chain's ledger, consensus state
+  /// and archive. It holds no secret key; restore it with
+  /// [AviaryPersistence.restoreChainTree] and the same root node.
+  Uint8List snapshot() => _bc._take(
+    _bc.lib
+        .fn<_BufOfHandleC>('aviary_chain_tree_snapshot')
+        .asFunction<_BufOfHandleD>()(_h),
+    'chain_tree_snapshot',
+  );
+
   /// How many anchors the next block on a chain would carry.
   int pendingAnchors(int chainId) => _bc.lib
       .fn<_TreeU32IdC>('aviary_chain_tree_pending_anchors')

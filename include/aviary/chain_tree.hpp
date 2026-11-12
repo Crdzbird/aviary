@@ -82,6 +82,16 @@ class ChainTree {
   /// Build the whole family. Throws std::invalid_argument on an invalid spec
   /// or a mixture the registry / posture rejects (fail-closed, nothing built).
   static std::unique_ptr<ChainTree> build(const ChainTreeSpec& spec);
+  /// The whole family as one canonical blob: every node's chain snapshot
+  /// (ledger, engine state and, for BFT nodes, the archive) in pre-order. It
+  /// holds no secret key; restore takes the spec again.
+  Bytes snapshot() const;
+  /// Rebuild the family from the SAME spec it was built from and a blob from
+  /// snapshot(). Throws and builds nothing on a blob that does not decode, was
+  /// taken from another family, fails any per chain check (see
+  /// node::restore_chain), or in which a parent records a child tip the
+  /// child's own snapshot does not hold.
+  static std::unique_ptr<ChainTree> restore(const ChainTreeSpec& spec, crypto::ByteView snapshot);
   virtual ~ChainTree() = default;
   ChainTree(ChainTree&&) = default;             // move-only (owns engines)
   ChainTree& operator=(ChainTree&&) = default;

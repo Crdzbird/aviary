@@ -29,14 +29,19 @@ std::string block_limit_error(const ChainSpec& spec, const std::vector<Transacti
 Ledger::Ledger(ChainSpec spec, std::unique_ptr<StateMachine> genesis_state,
                std::uint64_t genesis_timestamp)
     : spec_(spec), state_(std::move(genesis_state)) {
-  if (!spec_.subchain_policy.empty()) {
+  const crypto::ByteView policy(spec_.subchain_policy.data(), spec_.subchain_policy.size());
+  const std::uint8_t format = subchain_policy_format(policy);
+  if (format == 1) {
     // A parent chain: an invalid policy is a boot failure, never a silent
     // "anchors nothing" (std::invalid_argument propagates).
-    registry_ = SubchainRegistry::from_policy(
-        spec_.chain_id, SubchainPolicy::decode_all(
-                            crypto::ByteView(spec_.subchain_policy.data(), spec_.subchain_policy.size())));
+    registry_ = SubchainRegistry::from_policy(spec_.chain_id, SubchainPolicy::decode_all(policy));
   }
-  tip_.version = registry_ ? 3 : 1;
+  if (format == 2) {
+    dynamic_ = DynamicSubchainRegistry::from_policy(spec_.chain_id, spec_.genesis_hash,
+                                                    DynamicSubchainPolicy::decode_all(policy));
+  }
+  if (format > 2) throw std::invalid_argument("subchain policy: unknown format");
+  tip_.version = dynamic_ ? 4 : registry_ ? 3 : 1;
   tip_.chain_id = spec_.chain_id;
   tip_.height = 0;
   tip_.parent_hash = crypto::zero_hash();
@@ -44,6 +49,7 @@ Ledger::Ledger(ChainSpec spec, std::unique_ptr<StateMachine> genesis_state,
   tip_.tx_root = compute_tx_root({});
   tip_.state_root = state_->state_root();
   if (registry_) tip_.subchain_root = registry_->root();  // anchor_root = zero (no anchors)
+  if (dynamic_) tip_.subchain_root = dynamic_->root();
 }
 
 BlockError Ledger::check_header(const BlockHeader& h) const {
@@ -51,8 +57,13 @@ BlockError Ledger::check_header(const BlockHeader& h) const {
   // Version fence (docs/design/SUBCHAINS.md I2): anchor-carrying headers only
   // on a parent chain, and a parent chain only accepts anchor-carrying headers
   // (a lower version would skip the subchain_root commitment).
-  if (h.version >= 3 && !registry_) return BlockError::failure("version-3 header on a chain with no subchain policy");
+  if (h.version >= 3 && !registry_ && !dynamic_)
+    return BlockError::failure("version-3 header on a chain with no subchain policy");
   if (h.version < 3 && registry_) return BlockError::failure("parent chain requires version-3 headers");
+  if (h.version > 3 && registry_)
+    return BlockError::failure("a version 1 subchain policy takes exactly version-3 headers");
+  if (h.version != 4 && dynamic_)
+    return BlockError::failure("a dynamic subchain policy takes exactly version-4 headers");
   if (h.height != tip_.height + 1) return BlockError::failure("non-sequential height");
   if (h.parent_hash != tip_.hash()) return BlockError::failure("parent hash mismatch");
   if (h.timestamp < tip_.timestamp) return BlockError::failure("non-monotonic timestamp");
@@ -60,16 +71,25 @@ BlockError Ledger::check_header(const BlockHeader& h) const {
 }
 
 Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
-                          std::vector<Anchor> anchors) {
+                          std::vector<Anchor> anchors, std::vector<SubchainOp> ops) {
   if (std::string e = block_limit_error(spec_, txs); !e.empty()) {
     throw std::runtime_error("build_block: " + e);
   }
-  if (!anchors.empty() && !registry_) throw std::runtime_error("build_block: anchors on a non-parent chain");
+  if (!anchors.empty() && !registry_ && !dynamic_)
+    throw std::runtime_error("build_block: anchors on a non-parent chain");
+  if (!ops.empty() && !dynamic_)
+    throw std::runtime_error("build_block: registry operations on a chain with no dynamic subchain policy");
   std::optional<SubchainRegistry> reg = registry_;  // working copy
   if (reg) {
     if (std::string e = reg->apply_anchors(anchors); !e.empty()) throw std::runtime_error("build_block: invalid anchor: " + e);
   }
-  const bool with_receipts = spec_.produce_receipts || registry_.has_value();  // v3 implies v2's receipts
+  std::optional<DynamicSubchainRegistry> dyn = dynamic_;
+  if (dyn) {
+    if (std::string e = dyn->apply(tip_.height + 1, ops, anchors); !e.empty())
+      throw std::runtime_error("build_block: " + e);
+  }
+  const bool with_receipts =
+      spec_.produce_receipts || registry_.has_value() || dynamic_.has_value();  // v3 implies v2's receipts
   auto working = state_->clone();
   std::vector<Receipt> receipts;
   std::vector<Hash> leaves;
@@ -92,7 +112,7 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
   }
 
   Block block;
-  block.header.version = registry_ ? 3 : (spec_.produce_receipts ? 2 : 1);
+  block.header.version = dynamic_ ? 4 : registry_ ? 3 : (spec_.produce_receipts ? 2 : 1);
   block.header.chain_id = spec_.chain_id;
   block.header.height = tip_.height + 1;
   block.header.parent_hash = tip_.hash();
@@ -104,6 +124,13 @@ Block Ledger::build_block(std::vector<Transaction> txs, std::uint64_t timestamp,
     block.header.anchor_root = compute_anchor_root(anchors);
     block.header.subchain_root = reg->root();
     block.anchors = std::move(anchors);
+  }
+  if (dyn) {
+    block.header.anchor_root = compute_anchor_root(anchors);
+    block.header.ops_root = compute_ops_root(ops);
+    block.header.subchain_root = dyn->root();
+    block.anchors = std::move(anchors);
+    block.ops = std::move(ops);
   }
   block.transactions = std::move(txs);
   return block;
@@ -130,7 +157,22 @@ BlockError Ledger::run_block(const Block& block, Worked& out) const {
   // 3b/3c. Subchain anchors (docs/design/SUBCHAINS.md section 6): structural root +
   // order first, then the per-header light-client verification - all on a
   // working copy of the registry, BEFORE any transaction work.
-  if (!block.anchors.empty() && !registry_) return BlockError::failure("anchors on a chain with no subchain policy");
+  if (!block.anchors.empty() && !registry_ && !dynamic_)
+    return BlockError::failure("anchors on a chain with no subchain policy");
+  if (!block.ops.empty() && !dynamic_)
+    return BlockError::failure("registry operations on a chain with no dynamic subchain policy");
+  out.dynamic = dynamic_;
+  if (out.dynamic) {
+    if (compute_anchor_root(block.anchors) != block.header.anchor_root) {
+      return BlockError::failure("anchor_root mismatch");
+    }
+    if (compute_ops_root(block.ops) != block.header.ops_root) {
+      return BlockError::failure("ops_root mismatch");
+    }
+    if (std::string e = out.dynamic->apply(block.header.height, block.ops, block.anchors); !e.empty()) {
+      return BlockError::failure("invalid subchain content: " + e);
+    }
+  }
   out.registry = registry_;
   if (out.registry) {
     if (compute_anchor_root(block.anchors) != block.header.anchor_root) {
@@ -177,6 +219,9 @@ BlockError Ledger::run_block(const Block& block, Worked& out) const {
   if (out.registry && out.registry->root() != block.header.subchain_root) {
     return BlockError::failure("subchain_root mismatch");
   }
+  if (out.dynamic && out.dynamic->root() != block.header.subchain_root) {
+    return BlockError::failure("subchain_root mismatch");
+  }
   return BlockError::success();
 }
 
@@ -193,6 +238,10 @@ BlockError Ledger::process_block(const Block& block) {
   state_ = std::move(w.state);
   last_receipts_ = std::move(w.receipts);
   if (w.registry) registry_ = std::move(w.registry);
+  if (w.dynamic) {
+    dynamic_ = std::move(w.dynamic);
+    dynamic_->compact();
+  }
   tip_ = block.header;
   return BlockError::success();
 }
@@ -205,6 +254,10 @@ Bytes Ledger::snapshot() const {
   w.write_bytes(codec::ByteView(state_bytes.data(), state_bytes.size()));
   if (registry_) {  // parent chains append their child tips; others are byte-identical to before
     const Bytes reg_bytes = registry_->serialize_tips();
+    w.write_bytes(codec::ByteView(reg_bytes.data(), reg_bytes.size()));
+  }
+  if (dynamic_) {
+    const Bytes reg_bytes = dynamic_->serialize();
     w.write_bytes(codec::ByteView(reg_bytes.data(), reg_bytes.size()));
   }
   return w.take();
@@ -229,6 +282,23 @@ std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot
     ledger->registry_->restore_tips(codec::ByteView(reg_bytes.data(), reg_bytes.size()));
     if (ledger->registry_->root() != tip.subchain_root) throw std::invalid_argument("snapshot: subchain_root mismatch");
   }
+  if (ledger->dynamic_) {
+    ledger->dynamic_->restore(codec::ByteView(reg_bytes.data(), reg_bytes.size()));
+    if (ledger->dynamic_->root() != tip.subchain_root) throw std::invalid_argument("snapshot: subchain_root mismatch");
+  }
+  return ledger;
+}
+
+std::unique_ptr<Ledger> Ledger::restore(ChainSpec spec, codec::ByteView snapshot,
+                                        std::vector<Receipt> tip_receipts) {
+  std::unique_ptr<Ledger> ledger = restore(std::move(spec), snapshot);
+  const BlockHeader& tip = ledger->tip_;
+  const bool commits_receipts = tip.version >= 2 && tip.height > 0;
+  if (!commits_receipts && !tip_receipts.empty())
+    throw std::invalid_argument("snapshot: receipts for a tip that commits none");
+  if (commits_receipts && compute_receipt_root(tip_receipts) != tip.receipt_root)
+    throw std::invalid_argument("snapshot: receipt_root mismatch");
+  ledger->last_receipts_ = std::move(tip_receipts);
   return ledger;
 }
 

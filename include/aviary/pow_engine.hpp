@@ -50,10 +50,19 @@ class PowEngine : public ConsensusEngine {
   Block propose(std::vector<Transaction> txs, std::uint64_t timestamp) override;
   Block propose_anchored(std::vector<Transaction> txs, std::uint64_t timestamp,
                          std::vector<Anchor> anchors) override;
+  Block propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp, std::vector<Anchor> anchors,
+                         std::vector<SubchainOp> ops) override;
 
   /// Verify the block's embedded proof of work, then apply it. The justification
   /// argument is unused (the proof is intrinsic to the block).
   BlockError submit(const Block& block, codec::ByteView justification) override;
+
+  /// The current target (32 bytes): it can move after assembly (set_target).
+  Bytes consensus_state() const override { return Bytes(target_.begin(), target_.end()); }
+  void restore_consensus_state(codec::ByteView state) override {
+    if (state.size() != target_.size()) throw std::invalid_argument("pow: consensus state must be a 32 byte target");
+    for (std::size_t i = 0; i < target_.size(); ++i) target_[i] = state[i];
+  }
 
   /// Search nonces (in-place, in [block].header.consensus_data) until the block
   /// hash meets the target, up to [max_iters]. Returns true if solved.

@@ -66,6 +66,32 @@ point at any build with `AVIARY_DYLIB` / `CRYPTOLIB_DYLIB`.
   `InitiateSecureSession`, `AcceptSecureSession`, `Encrypt`, `Decrypt`).
   Names follow each language's casing.
 
+## Dynamic subchains and chain snapshots
+
+A parent whose genesis commits a dynamic policy registers children in any
+block. Registrars named in the policy sign each operation, and the parent
+commits one fixed size record per child in a Merkle tree, so a light reader
+proves a child's tip from the parent's header alone.
+
+```js
+const policy = bc.encodeDynamicSubchainPolicy({ maxDepth: 1, threshold: 1,
+  registrars: [{ sigAlgo: bc.SigAlgo.ED25519, publicKey: registrarSecret.subarray(32) }] });
+const op = bc.signOp(bc.opRegister(0, 0, registration), 1, parentHash, 0, bc.SigAlgo.ED25519, registrarSecret);
+parent.proposeSubchain(10, [], [op]);
+child.enableArchive();
+parent.proposeSubchain(11, [bc.pendingAnchor(parent, child)], []);
+const record = bc.verifyChildProof(subchainRoot, parent.childProof(1001));
+```
+
+`Chain.snapshot()` and `restoreChain(genesis, me, blsPublic, blsSecret,
+snapshot)` save and resume an assembled chain, its subchain registry and its
+block archive; `ChainTree.snapshot()` and `ChainTree.restore(root, snapshot)`
+do the same for a whole family. Snapshots hold no secret key and a restored
+chain produces exactly the blocks the original would. Each block returned
+by `proposeSubchain` is certified and submitted as usual; a child keeps
+its archive on so `pendingAnchor` can build anchors from it, and
+`verifyChildProof` returns the proven record with its tip and status.
+
 ## Records, peering and admission
 
 - Records: a chain built from a genesis with state model 2 stores 32 byte

@@ -74,9 +74,11 @@ struct Transaction {
 
 struct BlockHeader {
   /// 1 = base header; 2 = also commits [receipt_root]; 3 = also commits
-  /// [anchor_root] + [subchain_root] (docs/design/SUBCHAINS.md). Bumping the
-  /// version - not adding an unconditional field - keeps every version-1/2
-  /// encoding (and its golden vectors) byte-identical.
+  /// [anchor_root] + [subchain_root] (docs/design/SUBCHAINS.md); 4 = also
+  /// commits [ops_root] and its subchain_root is the Merkle registry of Part 2
+  /// of that document. Bumping the version - not adding an unconditional
+  /// field - keeps every lower version's encoding (and its golden vectors)
+  /// byte-identical.
   std::uint8_t version = 1;
   std::uint64_t chain_id = 0;
   std::uint64_t height = 0;
@@ -87,6 +89,7 @@ struct BlockHeader {
   Hash receipt_root{};   ///< only serialized when version >= 2
   Hash anchor_root{};    ///< version >= 3: Merkle root of this block's subchain anchors
   Hash subchain_root{};  ///< version >= 3: commitment to the post-block subchain registry
+  Hash ops_root{};       ///< version >= 4: Merkle root of this block's registry operations
   Bytes consensus_data;  ///< opaque to the ledger; owned by the consensus engine
 
   Bytes encode() const;
@@ -130,19 +133,63 @@ struct Anchor {
   bool operator==(const Anchor&) const = default;
 };
 
+/// One registrar's approval of a registry operation: which registrar (its
+/// index in the parent's current registrar set) and its signature over the
+/// operation's authorisation digest.
+struct OpApproval {
+  std::uint16_t registrar_index = 0;
+  Bytes signature;
+  bool operator==(const OpApproval&) const = default;
+};
+
+/// A registry operation carried in a version-4 parent block
+/// (docs/design/SUBCHAINS.md section 15): register a child, close a child, or
+/// replace the registrar set. The payload is the canonical bytes of the
+/// operation's body, kept opaque here so types.hpp stays free of the registry;
+/// the dynamic registry decodes and validates it.
+struct SubchainOp {
+  static constexpr std::uint8_t kRegister = 1;
+  static constexpr std::uint8_t kClose = 2;
+  static constexpr std::uint8_t kSetRegistrars = 3;
+
+  std::uint8_t kind = 0;
+  std::uint32_t authority_epoch = 0;  ///< the registry epoch this operation is valid in
+  std::uint64_t valid_until = 0;      ///< last parent height it may be applied at; 0 = no expiry
+  Bytes payload;
+  std::vector<OpApproval> approvals;  ///< ascending, unique registrar_index
+
+  Bytes encode() const;
+  /// Rejects approvals that are not ascending and unique by registrar index.
+  static SubchainOp decode(codec::CodecReader& r);
+  static SubchainOp decode_all(codec::ByteView bytes);
+  /// BLAKE3-256( kSubchainOp || encode() ) - the Merkle leaf under ops_root.
+  Hash hash() const;
+  /// The 32 bytes a registrar signs: BLAKE3-256( kSubchainOpAuth ||
+  /// parent_chain_id || parent_genesis_hash || kind || authority_epoch ||
+  /// valid_until || bytes(payload) ). Approvals are not part of it.
+  Hash auth_digest(std::uint64_t parent_chain_id, const Hash& parent_genesis_hash) const;
+  bool operator==(const SubchainOp&) const = default;
+};
+
 struct Block {
   BlockHeader header;
   std::vector<Transaction> transactions;
   std::vector<Anchor> anchors;  ///< only serialized when header.version >= 3
+  std::vector<SubchainOp> ops;  ///< only serialized when header.version >= 4
 
-  /// Throws std::invalid_argument if [anchors] is non-empty on a header whose
-  /// version cannot carry them - never silently drops a commitment.
+  /// Throws std::invalid_argument if [anchors] or [ops] is non-empty on a
+  /// header whose version cannot carry them - never silently drops a
+  /// commitment.
   Bytes encode() const;
   static Block decode_all(codec::ByteView bytes);
 };
 
 /// Merkle root over anchors (leaf = anchor.hash()); zero_hash for none.
 Hash compute_anchor_root(const std::vector<Anchor>& anchors);
+
+/// Merkle root over registry operations in block order (leaf = op.hash());
+/// zero_hash for none.
+Hash compute_ops_root(const std::vector<SubchainOp>& ops);
 
 /// A transaction's execution result, committed via a block's receipt_root
 /// (version-2 headers). `status` is 1 for success; `fee` is what the tx paid.
@@ -170,5 +217,15 @@ void sign_transaction(Transaction& tx, const crypto::KeyPair& kp);
 
 /// Verifies [tx]'s signature against its embedded [author]. Never throws.
 bool verify_transaction_signature(const Transaction& tx);
+
+/// Verifies [signature] over [msg] under [public_key] with a key scheme
+/// (kEd25519, kHybridEd25519MlDsa or kSlhDsa), applying the fixed size checks
+/// of that scheme first. False for any other scheme. Never throws.
+bool verify_signature(SigAlgo algo, codec::ByteView msg, codec::ByteView signature,
+                      codec::ByteView public_key);
+
+/// Signs [msg] with a key scheme (kEd25519, kHybridEd25519MlDsa or kSlhDsa).
+/// Throws std::invalid_argument for any other scheme.
+Bytes sign_message(SigAlgo algo, codec::ByteView msg, codec::ByteView secret_key);
 
 }  // namespace aviary

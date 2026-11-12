@@ -20,6 +20,10 @@ Block ForeignEngine::propose_anchored(std::vector<Transaction> txs, std::uint64_
                                       std::vector<Anchor> anchors) {
   return ledger_->build_block(std::move(txs), timestamp, std::move(anchors));
 }
+Block ForeignEngine::propose_subchain(std::vector<Transaction> txs, std::uint64_t timestamp,
+                                      std::vector<Anchor> anchors, std::vector<SubchainOp> ops) {
+  return ledger_->build_block(std::move(txs), timestamp, std::move(anchors), std::move(ops));
+}
 
 BlockError ForeignEngine::submit(const Block& block, codec::ByteView justification) {
   bool ok = false;

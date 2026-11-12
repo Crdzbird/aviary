@@ -9,6 +9,8 @@
 
 #include "aviary/account_state.hpp"
 #include "aviary/consensus.hpp"
+#include "aviary/dynamic_subchain.hpp"
+#include "aviary/chain_snapshot.hpp"
 #include "aviary/types.hpp"
 #include "aviary/utxo_state.hpp"
 #include "aviary/wire.hpp"
@@ -39,5 +41,21 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
   try_decode([&] { (void)consensus::ConsensusData::decode_all(v); });
   try_decode([&] { (void)consensus::Evidence::decode_all(v); });
   try_decode([&] { (void)wire::Message::decode_all(v); });
+  try_decode([&] { (void)SubchainOp::decode_all(v); });
+  try_decode([&] { (void)RegistrarSet::decode_all(v); });
+  try_decode([&] { (void)DynamicSubchainPolicy::decode_all(v); });
+  try_decode([&] { (void)CloseChild::decode_all(v); });
+  try_decode([&] { (void)ChildRecord::decode_all(v); });
+  try_decode([&] { (void)node::ChainSnapshot::decode_all(v); });
+  try_decode([&] {
+    const ChildProof proof = ChildProof::decode_all(v);
+    Hash root{};
+    (void)verify_child_proof(root, proof);
+  });
+  try_decode([&] {
+    const SubchainProofV2 proof = SubchainProofV2::decode_all(v);
+    Hash root{};
+    (void)verify_subchain_proof_v2(root, proof);
+  });
   return 0;
 }

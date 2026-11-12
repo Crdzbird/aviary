@@ -584,5 +584,11 @@ do {
 }
 print("networked records OK")
 
+print(try runSubchainVectors() ? "subchain v2 vectors OK" : "subchain v2 vectors skipped (no repository checkout)")
+try runDynamicSubchainRestart()
+print("dynamic subchains + chain restore OK")
+try runChainTreeSnapshot()
+print("chain tree snapshot OK")
+
 _ = warmed.wait(timeout: .now() + 2) // demo only; real apps never wait on preload
 print("OK")
