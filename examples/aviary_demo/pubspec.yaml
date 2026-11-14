@@ -37,6 +37,7 @@ dependencies:
   # (iOS/macOS xcframework, Android jniLibs) and re-exports the high-level API.
   aviary:
     path: ../../bridge/bindings/aviary
+  material_ui: ^1.11.0
 
 dev_dependencies:
   flutter_test:

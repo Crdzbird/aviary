@@ -39,6 +39,7 @@ dependencies:
   fixnum: ^1.1.0
   aviary:
     path: ../../../bridge/bindings/aviary
+  material_ui: ^1.11.0
 
 dev_dependencies:
   flutter_test:

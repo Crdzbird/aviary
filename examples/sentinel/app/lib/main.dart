@@ -10,7 +10,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:grpc/grpc.dart';
 
 import 'gen/sentinel.pbgrpc.dart' as pb;

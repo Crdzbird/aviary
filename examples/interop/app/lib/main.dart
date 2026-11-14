@@ -10,7 +10,7 @@ import 'dart:typed_data';
 
 import 'package:aviary/aviary.dart';
 import 'package:fixnum/fixnum.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:grpc/grpc.dart';
 
 import 'gen/interop.pbgrpc.dart' as pb;
