@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 /// An event kind this version of the binding does not model. [json] holds
 /// the fields as the engine sent them.

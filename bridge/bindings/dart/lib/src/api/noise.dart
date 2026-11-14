@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A Noise identity: the X25519 static pair and the hybrid signature pair.
 /// {@category Networking}

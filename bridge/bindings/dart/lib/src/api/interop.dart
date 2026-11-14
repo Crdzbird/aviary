@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Multi chain address derivation and EVM calldata helpers.
 /// {@category Interop}

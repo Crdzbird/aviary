@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Events and metrics of an assembled chain: every [Chain.submit] reports a
 /// [BlockFinalized] or a [BlockRejected], and the metrics count them.

@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 extension _AviaryBuffers on Aviary {
   String _cString(String symbol) =>

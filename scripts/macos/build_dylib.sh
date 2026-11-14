@@ -8,7 +8,9 @@
 # ciphers the engine uses, liboqs limited to the exposed algorithms, the small
 # secp256k1 table), the same archive aviary_lite's macOS slice merges. Only the
 # aviary_* functions are exported, so the result has no sibling library and no
-# CipherBird symbols leak into the process.
+# CipherBird symbols leak into the process. The configure step refuses an
+# archive older than the CipherBird checkout's last commit, and the script ends
+# by naming the CipherBird revision the dylib bundles.
 # Usage: bash scripts/macos/build_dylib.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -24,6 +26,7 @@ cmake -S "$ROOT" -B "$BUILD" -G Ninja \
   -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
   -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" \
   -DCRYPTOLIB_C_LIBRARY="$ENGINE" \
+  -DAVIARY_REQUIRE_FRESH_CRYPTOLIB=ON \
   -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-dead_strip -Wl,-exported_symbol,_aviary_* -framework Security -framework CoreFoundation" >/dev/null
 cmake --build "$BUILD" --target aviary_c >/dev/null
 LIB="$BUILD/libaviary_c.dylib"
@@ -38,4 +41,5 @@ OUT="$ROOT/bridge/bindings/dart/native/darwin-arm64"
 mkdir -p "$OUT"
 rm -f "$OUT/libcipherbird.dylib"
 cp "$LIB" "$OUT/libaviary_c.dylib"
-echo "ok: $OUT/libaviary_c.dylib ($(du -h "$OUT/libaviary_c.dylib" | cut -f1), $(nm -gU "$LIB" | grep -c ' _aviary_') exported functions)"
+REVISION="$(sed -n 's/^revision //p' "$BUILD/cryptolib_revision.txt")"
+echo "ok: $OUT/libaviary_c.dylib bundles CipherBird $REVISION ($(du -h "$OUT/libaviary_c.dylib" | cut -f1), $(nm -gU "$LIB" | grep -c ' _aviary_') exported functions)"

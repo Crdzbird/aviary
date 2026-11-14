@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 typedef _U8 = Pointer<Uint8>;
 typedef _V = Pointer<Void>;

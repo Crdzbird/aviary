@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Portable account import: opening a sealed account.
 /// {@category Custody}

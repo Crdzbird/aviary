@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// An admission challenge: keep [nonce], send [wire] to the peer.
 /// {@category Networking}

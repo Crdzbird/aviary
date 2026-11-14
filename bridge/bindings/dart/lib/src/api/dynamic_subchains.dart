@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Subchains version 2: a parent with a dynamic policy registers children in
 /// any block and commits its registry as a Merkle tree.

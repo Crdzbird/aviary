@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A registrar: the scheme and public key allowed to authorise registry
 /// operations on a parent with a dynamic policy.

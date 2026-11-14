@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Subchains: registering children and binding them to a parent.
 /// {@category Subchains and trees}

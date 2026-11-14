@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A built family of chains driven in process. [produce] anchors children
 /// upward automatically; [ChainTreeQueries.proveAccount] proves any

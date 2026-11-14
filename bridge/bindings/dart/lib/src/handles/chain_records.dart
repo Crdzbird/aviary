@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Application records on a chain assembled with the `record` state model,
 /// and the transaction queue every assembled chain proposes from.

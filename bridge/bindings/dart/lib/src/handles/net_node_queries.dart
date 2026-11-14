@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Read only views of a networked node's chain and mesh.
 /// {@category Networking}

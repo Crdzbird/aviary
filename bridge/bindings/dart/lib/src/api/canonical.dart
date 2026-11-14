@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Canonical bytes that are identical across every binding.
 /// {@category Ledger}

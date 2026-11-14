@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../common.dart';
 
 /// One child's entry in a dynamic registry: what the parent commits about it
 /// and what a child proof carries.

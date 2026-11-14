@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 final class _AssuranceProfile implements AssuranceProfile {
   const _AssuranceProfile({

@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The Argon2 bound custody operations on a worker isolate, so the calling
 /// isolate stays responsive. The worker loads the engine the way this

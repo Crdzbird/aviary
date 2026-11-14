@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The pseudonymous admission flow of a gate.
 /// {@category Assurance and credentials}

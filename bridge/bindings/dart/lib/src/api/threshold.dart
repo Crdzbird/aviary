@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Threshold accounts: any t of n share holders can sign.
 /// {@category Custody}

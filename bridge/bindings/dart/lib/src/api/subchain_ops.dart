@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Registry operations: the unsigned bodies a registrar then signs.
 /// {@category Subchains and trees}

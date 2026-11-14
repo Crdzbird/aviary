@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Assurance postures and the sealed mempool.
 /// {@category Assurance and credentials}

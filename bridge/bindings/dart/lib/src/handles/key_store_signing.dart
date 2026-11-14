@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Signing and inventory on a key store. The sealed secret is used inside
 /// the engine and wiped; it never reaches Dart.

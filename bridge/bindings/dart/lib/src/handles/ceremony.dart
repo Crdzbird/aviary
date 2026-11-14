@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A two round threshold signing ceremony over one message and roster.
 /// {@category Custody}

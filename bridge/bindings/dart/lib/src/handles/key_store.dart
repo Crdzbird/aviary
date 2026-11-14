@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A custodial store that seals signing secrets at rest. Create one with
 /// [AviaryNodes.createKeyStore] or [AviaryNodes.loadKeyStore].

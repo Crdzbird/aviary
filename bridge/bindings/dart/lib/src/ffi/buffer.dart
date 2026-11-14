@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 final class _Buffer extends Struct {
   external Pointer<Uint8> data;

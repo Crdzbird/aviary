@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Portable account export: sealing an account for transport.
 /// {@category Custody}

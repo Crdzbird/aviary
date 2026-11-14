@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The peers a node knows: self signed records saying where each validator
 /// is reached and which keys authenticate it. [add] is the trusted local

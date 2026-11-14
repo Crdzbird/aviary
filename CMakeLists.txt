@@ -111,6 +111,7 @@ if(NOT AVIARY_STATIC)
   get_filename_component(CRYPTOLIB_C_LIBDIR "${_cryptolib_first}" DIRECTORY)
   message(STATUS "aviary: cryptolib_c library = ${CRYPTOLIB_C_LIBRARY}")
 endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/cryptolib_revision.cmake")
 
 # -- Core static library ------------------------------------------------------
 add_library(aviary_core STATIC
@@ -180,7 +181,8 @@ add_library(aviary_core STATIC
   src/node/chain_tree.cpp
   src/node/remote_guard.cpp
   src/node/demo_node.cpp)
-target_compile_definitions(aviary_core PRIVATE AVIARY_VERSION_STRING="${PROJECT_VERSION}")
+target_compile_definitions(aviary_core PRIVATE AVIARY_VERSION_STRING="${PROJECT_VERSION}"
+  AVIARY_CRYPTOLIB_REVISION="${AVIARY_CRYPTOLIB_REVISION}")
 target_include_directories(aviary_core
   PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/include"
   PRIVATE "${CRYPTOLIB_C_INCLUDE_DIR}")

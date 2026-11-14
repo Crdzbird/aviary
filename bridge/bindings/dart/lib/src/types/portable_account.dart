@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Key material as returned by the portable account open methods, or a
 /// hybrid KEM device key pair from [AviaryPortableSeal.hybridKemKeypair].

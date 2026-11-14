@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 typedef _BpEncodeC =
     _BR Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, _U8, Size);

@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Shortcuts for the common single validator setups.
 /// {@category Ledger}

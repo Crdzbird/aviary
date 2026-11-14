@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Bringing chains and chain trees back from a snapshot.
 /// {@category Chains}

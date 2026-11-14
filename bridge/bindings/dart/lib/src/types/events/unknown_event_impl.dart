@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 final class _UnknownEvent extends ChainEvent implements UnknownEvent {
   const _UnknownEvent(this.type, this.json);

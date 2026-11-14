@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// One participant's share of a threshold account. Persist [bytes] sealed.
 /// {@category Custody}

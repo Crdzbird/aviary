@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Subchain anchors and cross chain proofs.
 /// {@category Subchains and trees}

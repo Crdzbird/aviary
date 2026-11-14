@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Signed transfers admitted to a node's mempool.
 /// {@category Ledger}

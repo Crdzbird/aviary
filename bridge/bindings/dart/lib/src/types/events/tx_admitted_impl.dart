@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 final class _TxAdmitted extends ChainEvent implements TxAdmitted {
   const _TxAdmitted({required this.txid, required this.mempoolSize});

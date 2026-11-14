@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 const _bundledPackages = ['aviary_dart', 'aviary', 'aviary_lite'];
 

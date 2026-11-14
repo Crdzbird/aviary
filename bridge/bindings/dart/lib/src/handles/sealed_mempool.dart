@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A mempool of sealed transactions only the block proposer can open.
 /// {@category Assurance and credentials}

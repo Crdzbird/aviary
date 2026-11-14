@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A confidential, mutually authenticated, post quantum hybrid link between
 /// two peers. Create one with [AviaryNetwork.initiateSecureSession] or

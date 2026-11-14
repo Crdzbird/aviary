@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Single validator chain nodes and custodial key stores.
 /// {@category Ledger}

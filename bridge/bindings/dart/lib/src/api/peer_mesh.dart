@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A deterministic in-memory mesh of [NetNode]s for tests and single process
 /// networks: relays go in emission order, timeouts fire only when none pends.

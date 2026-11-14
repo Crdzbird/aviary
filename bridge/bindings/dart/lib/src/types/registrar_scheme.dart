@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The signature scheme of a registrar key: the transaction schemes.
 /// {@category Subchains and trees}

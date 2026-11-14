@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A light client that follows a header chain with certificates only.
 /// Sequential [accept], plus the overlap rule in [acceptSkipping]: a far

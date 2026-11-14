@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Record transactions and proofs that need no chain handle.
 /// {@category Records}

@@ -1,6 +1,9 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
-@Native<Size Function(Pointer<Utf8>, Size)>(symbol: 'aviary_library_path')
+@Native<Size Function(Pointer<Utf8>, Size)>(
+  symbol: 'aviary_library_path',
+  assetId: 'package:aviary_dart/aviary.dart',
+)
 external int _aviaryLibraryPath(Pointer<Utf8> out, int cap);
 
 /// Where the engine was found: explicit, asset, process, bundled or system.

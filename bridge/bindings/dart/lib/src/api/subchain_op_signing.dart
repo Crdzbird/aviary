@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Authorising registry operations as a registrar.
 /// {@category Subchains and trees}

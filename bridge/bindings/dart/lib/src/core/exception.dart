@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../common.dart';
 
 /// Raised when a native call reports an error.
 /// {@category Errors and helpers}

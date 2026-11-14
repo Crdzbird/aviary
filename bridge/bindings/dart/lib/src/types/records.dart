@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The step of a consensus round a timeout belongs to.
 /// {@category Networking}

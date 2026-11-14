@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A membership policy: issuer key, attribute schema and tier threshold.
 /// Build one with [AviaryCredentials.makeCredentialPolicy].

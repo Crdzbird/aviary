@@ -1,10 +1,10 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Proofs against a dynamic registry, and the anchor a parent takes next.
 /// {@category Subchains and trees}
 extension AviaryChildProofs on Aviary {
   /// Parses the fixed 230 byte record layout.
-  ChildRecord decodeChildRecord(Uint8List record) => _childRecordOf(record);
+  ChildRecord decodeChildRecord(Uint8List record) => childRecordOf(record);
 
   /// Checks a child proof against a 32 byte version 4 subchain root taken
   /// from a parent header the caller trusts, and returns the proven record.
@@ -14,7 +14,7 @@ extension AviaryChildProofs on Aviary {
     if (subchainRoot.length != 32) {
       throw const AviaryException('subchain root must be 32 bytes');
     }
-    return _childRecordOf(
+    return childRecordOf(
       _scoped(
         [subchainRoot, proof],
         (p) => _take(

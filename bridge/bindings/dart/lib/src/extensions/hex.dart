@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../common.dart';
 
 /// Hex rendering and comparison for byte strings such as addresses, hashes
 /// and transaction ids. Not constant time; do not compare secrets with it.
@@ -51,28 +51,4 @@ extension HexString on String {
 
   /// The UTF-8 bytes of this string.
   Uint8List get utf8Bytes => Uint8List.fromList(utf8.encode(this));
-}
-
-/// Convenience views of an account.
-/// {@category Ledger}
-extension AccountTools on Account {
-  /// The chain address in lowercase hex.
-  String get addressHex => address.hex;
-
-  /// Whether this is a hybrid post quantum account. Its secret is longer
-  /// than the 64 bytes of an Ed25519 secret.
-  bool get isHybrid => secret.length != 64;
-}
-
-int _jsonInt(Map<String, Object?> json, String key) {
-  final v = json[key];
-  if (v is int) return v;
-  if (v is num) return v.toInt();
-  return 0;
-}
-
-Uint8List _jsonHex(Map<String, Object?> json, String key) {
-  final v = json[key];
-  if (v is String) return v.hexBytes;
-  return Uint8List(0);
 }

@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Chain trees: a declared family of chains built and driven together.
 /// {@category Subchains and trees}

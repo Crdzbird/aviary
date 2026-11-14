@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Anonymous membership credentials: issuers, policies and gates.
 /// {@category Assurance and credentials}

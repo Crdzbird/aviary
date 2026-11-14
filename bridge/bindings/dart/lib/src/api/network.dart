@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Consensus over a network the app owns: nodes that return what to send and
 /// what to arm, and the authenticated session that protects each link.

@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 ChainEvent _chainEventFromJson(Map<String, Object?> json) {
   final type = json['type'];

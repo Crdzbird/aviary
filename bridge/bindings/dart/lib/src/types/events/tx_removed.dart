@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 /// A transaction left the mempool, included in a block or evicted.
 /// {@category Observability}

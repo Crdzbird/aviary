@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../common.dart';
 
 /// Whether a parent still anchors a child.
 /// {@category Subchains and trees}

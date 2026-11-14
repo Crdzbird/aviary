@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 final class _TxRemoved extends ChainEvent implements TxRemoved {
   const _TxRemoved({required this.txid, required this.mempoolSize});

@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A declared mixture of engine, state model and proposer ids plus params.
 /// Commit it with [AviaryGenesis.commitBlueprint].

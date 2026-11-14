@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// An assembled node behind the uniform propose, justify, submit flow.
 /// {@category Chains}

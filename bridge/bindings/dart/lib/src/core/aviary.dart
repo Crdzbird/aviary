@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The loaded native library and the stateless entry points. Feature
 /// surfaces are extensions on this class; stateful objects are created

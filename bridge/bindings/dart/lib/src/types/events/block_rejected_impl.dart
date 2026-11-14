@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 final class _BlockRejected extends ChainEvent implements BlockRejected {
   const _BlockRejected({required this.attemptedHeight, required this.blockId});

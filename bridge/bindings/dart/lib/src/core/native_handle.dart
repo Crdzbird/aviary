@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 final Map<String, NativeFinalizer> _finalizers = {};
 

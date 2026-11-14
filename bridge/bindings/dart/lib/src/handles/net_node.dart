@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A validator or observer running BFT consensus over a gossip mesh, with no
 /// socket and no clock of its own. Every input returns an [Outbound]: send

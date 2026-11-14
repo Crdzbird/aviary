@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A consensus engine implemented in Dart and plugged into a mixture by id.
 /// The pipeline stays native; Dart supplies the justification policy. Both

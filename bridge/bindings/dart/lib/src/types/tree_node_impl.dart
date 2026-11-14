@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 final class _TreeNode implements TreeNode {
   const _TreeNode({

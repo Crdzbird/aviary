@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Copies [inputs] into one native block for [body], then wipes and frees
 /// it: one allocation per call, and secret inputs such as keys do not linger

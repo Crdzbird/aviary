@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The parent side of a chain with a dynamic policy: registry operations,
 /// records and child proofs.
@@ -50,7 +50,7 @@ extension ChainRegistry on Chain {
   /// The current record of a child. Throws when this chain has no dynamic
   /// policy or the child was never registered.
   ChildRecord childRecord(int childChainId) =>
-      _childRecordOf(_byChild('aviary_chain_child_record', childChainId));
+      childRecordOf(_byChild('aviary_chain_child_record', childChainId));
 
   /// A proof that a child's record is committed by this parent's current
   /// subchain root.

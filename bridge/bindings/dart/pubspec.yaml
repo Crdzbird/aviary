@@ -13,6 +13,7 @@ topics:
 platforms:
   linux:
   macos:
+  web:
 environment:
   sdk: ^3.10.0
 dependencies:
@@ -22,3 +23,8 @@ dependencies:
 dev_dependencies:
   lints: ^5.0.0
   test: ^1.33.0
+# A Flutter web app serves the WebAssembly engine from these assets; the
+# web library loads it from assets/packages/aviary_dart/native/web/.
+flutter:
+  assets:
+    - native/web/

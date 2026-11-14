@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 final class _Account implements Account {
   const _Account(this.secret, this.publicKey, this.address);

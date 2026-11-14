@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 typedef _DynRegistrarC = _BR Function(Uint8, _U8, Size);
 typedef _DynRegistrarD = _BR Function(int, _U8, int);

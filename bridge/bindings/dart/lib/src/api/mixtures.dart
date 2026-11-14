@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Composable chains: mixtures, registry discovery and assembly.
 /// {@category Chains}

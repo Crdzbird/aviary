@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The security posture a chain commits to at genesis. Higher tiers only
 /// ever tighten the tier below them.

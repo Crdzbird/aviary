@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A generated account: the signing secret, public key and chain address.
 /// {@category Ledger}

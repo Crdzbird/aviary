@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Light clients that follow a header chain with certificates only.
 /// {@category Light clients}

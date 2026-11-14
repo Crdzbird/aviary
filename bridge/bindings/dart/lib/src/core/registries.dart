@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 final Map<int, ChainTree> _trees = {};
 int _nextTreeHandle = 1;

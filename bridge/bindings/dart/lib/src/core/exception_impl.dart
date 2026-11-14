@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../common.dart';
 
 final class _AviaryException implements AviaryException {
   const _AviaryException(this.message, [this.status = AviaryStatus.failure]);

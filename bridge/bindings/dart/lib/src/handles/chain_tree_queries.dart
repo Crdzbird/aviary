@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Read only views and proofs of a chain tree.
 /// {@category Subchains and trees}

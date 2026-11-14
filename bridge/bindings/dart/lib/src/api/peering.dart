@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A peer record's fields, read back from its encoding.
 /// {@category Networking}

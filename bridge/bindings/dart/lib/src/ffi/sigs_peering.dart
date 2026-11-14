@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 typedef _RecSignHybC =
     _BR Function(Uint64, Uint64, _U8, Uint8, _U8, Size, _U8, Size, _U8, Size);

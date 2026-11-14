@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Account creation with genesis funding in one step.
 /// {@category Ledger}

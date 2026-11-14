@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// One chain of a family; [children] are subchains and must be BFT.
 /// {@category Subchains and trees}

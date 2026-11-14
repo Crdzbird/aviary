@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 /// One event published by a node's event bus. Switch over the subtypes
 /// ([BlockFinalized], [BlockRejected], [TxAdmitted], [TxRemoved],

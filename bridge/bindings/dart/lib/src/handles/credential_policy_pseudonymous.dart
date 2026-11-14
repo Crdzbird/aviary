@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// The pseudonymous issuance and presentation flow of a policy.
 /// {@category Assurance and credentials}

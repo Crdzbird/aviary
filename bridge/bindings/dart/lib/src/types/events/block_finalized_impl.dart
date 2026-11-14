@@ -1,4 +1,4 @@
-part of '../../../aviary.dart';
+part of '../../aviary_native.dart';
 
 final class _BlockFinalized extends ChainEvent implements BlockFinalized {
   const _BlockFinalized({

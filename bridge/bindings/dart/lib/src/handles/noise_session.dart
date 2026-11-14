@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// A Noise_XX_25519_ChaChaPoly_SHA256 link for peers that speak Noise, with
 /// a post quantum identity proof bound to the handshake hash. The initiator

@@ -1,4 +1,4 @@
-part of '../../aviary.dart';
+part of '../aviary_native.dart';
 
 /// Turning a validator key pair into the entries the genesis, rotation and
 /// tree APIs take.
