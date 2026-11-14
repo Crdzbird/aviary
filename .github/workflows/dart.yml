@@ -27,6 +27,11 @@ jobs:
       # both web compilers. The runners ship Chrome.
       - name: Web tests in Chrome
         run: dart test -p chrome -c dart2js,dart2wasm test/web
+      # The package declares Flutter assets for the web engine, so pana scores
+      # it against the latest stable Flutter and needs one on the PATH.
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
       - name: pub.dev score
         run: |
           dart pub global activate pana
