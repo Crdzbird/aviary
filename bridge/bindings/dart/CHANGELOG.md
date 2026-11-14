@@ -2,10 +2,7 @@
 
 ## 1.1.0
 
-The bundled macOS engine is rebuilt with the functions below. The Linux
-engines are rebuilt by the Native Linux workflow once this source is pushed;
-until then a Linux build needs `AVIARY_DYLIB` pointing at an engine built
-from the same source.
+The bundled macOS and Linux engines are rebuilt with the functions below.
 
 **Web**
 
