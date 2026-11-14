@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
 - Subchains version 2 (docs/design/SUBCHAINS.md Part 2): a parent whose
   genesis commits a dynamic policy (`encodeDynamicSubchainPolicy`,
@@ -20,6 +20,8 @@
   and `ChainTree.restore`.
 - `test/dynamic_subchain.test.js` replays `vectors/subchain_v2_vectors.txt`
   call for call.
+- `cryptoBackendVersion()` now ends with `(CipherBird <revision>)`, the
+  CipherBird revision the engine was built from.
 
 ## 1.0.0
 

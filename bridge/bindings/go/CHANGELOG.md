@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
 Needs libaviary_c built from the same source.
 
@@ -14,6 +14,8 @@ Needs libaviary_c built from the same source.
   `Chain.Tip`, the opt in archive (`Chain.EnableArchive`, `ArchiveRange`,
   `ArchivedBlock`, `ArchivedCertificate`, `PruneArchive`),
   `ChainTree.Snapshot` and `RestoreChainTree`.
+- `CryptoBackendVersion()` now ends with `(CipherBird <revision>)`, the
+  CipherBird revision the engine was built from.
 
 ## 1.0.0
 

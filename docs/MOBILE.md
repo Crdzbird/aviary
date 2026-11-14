@@ -59,7 +59,19 @@ bash scripts/apple/build_dynamic_xcframework.sh
 bash scripts/android/build_so.sh lite   # self-contained .so
 bash scripts/android/build_so.sh full   # links libcipherbird.so from the cipherbird package
 bash scripts/macos/build_dylib.sh       # self-contained macOS engine for aviary_dart, npm and the jar
+bash scripts/web/build_wasm.sh          # WebAssembly engine for aviary_dart in a browser
 ```
+
+Every build says which CipherBird it bundles. Configuring prints
+`aviary: cryptolib revision = <git describe>` and writes it, with the
+library and its build time, to `cryptolib_revision.txt` in the build
+directory; the engine returns it from `aviary_crypto_backend_version`
+(`3.0.0 (CipherBird v1.4.0-13-ge3d93a2)`). A CipherBird library older than
+its checkout's last commit is a configure warning, and an error with
+`-DAVIARY_REQUIRE_FRESH_CRYPTOLIB=ON`, which `build_dylib.sh` sets: rebuild
+it in the CipherBird checkout first (`scripts/build_selfcontained.sh` for the
+host library a development build links, `scripts/ios/build_cryptolib_slice.sh
+macosx` for the archive `build_dylib.sh` merges).
 
 The Android script strips the output with `llvm-strip --strip-unneeded`. The
 lite `.so` is 8 to 9 MB per ABI; the full one is about 1 MB.
@@ -72,6 +84,7 @@ lite `.so` is 8 to 9 MB per ABI; the full one is about 1 MB.
 | Flutter `aviary` | ffiPlugin. iOS/macOS: SPM binary target, `AviaryC.framework` and `CipherBird.framework` are both embedded. Android: the loader opens `libcipherbird.so` first, then `libaviary_c.so`. |
 | Pure Dart `aviary_dart` | macOS arm64, Linux (and Windows once a binary exists): the build hook `hook/build.dart` declares `native/<os>-<arch>/` as a code asset, the Dart or Flutter build copies it next to the executable (`bundle/lib` for `dart build cli`), and the loader reopens it through `aviary_library_path`. On macOS the hook skips the asset when the app's package graph contains `aviary` or `aviary_lite`, since those plugins already link the engine. The package root lookup through `package_config.json` remains as a fallback. `AVIARY_DYLIB` overrides everything. |
 | Swift (`bridge/bindings/swift`) | SPM package with binary target xcframeworks (AviaryC + CipherBird). CipherBird ships iOS and macOS as two bundles, so run `bash scripts/apple/vendor_cipherbird.sh` once to merge them into the gitignored `Vendor/CipherBird.xcframework`. |
+| Pure Dart `aviary_dart` on the web | `package:aviary_dart/aviary.dart` exports a `dart:js_interop` library instead of the `dart:ffi` one. `Aviary.ensureInitialized()` imports `native/web/aviary.mjs`, which instantiates `aviary.wasm`; Flutter serves both from the package's assets (`assets/packages/aviary_dart/native/web/`). `self.aviaryEngineUrl` on the page or the `AVIARY_WEB_ENGINE` define points elsewhere. |
 | JVM | Foreign Function and Memory API loading `libaviary_c` (desktop uses the host dylib). |
 
 ## Linux
@@ -87,6 +100,21 @@ uploads the libraries as artifacts; the x64 and arm64 libraries from run
 The engine links CipherBird's from-source OpenSSL 3.6 because Ubuntu's 3.0
 lacks AES-256-GCM-SIV, which the sealed mempool needs. Windows has no binary yet: CipherBird's dependency build has no Windows
 port, which is the prerequisite.
+
+## Web
+
+`scripts/web/build_wasm.sh` builds `bridge/bindings/dart/native/web/aviary.mjs`
+and `aviary.wasm` with Emscripten: the aviary core as a static library, the
+CipherBird C ABI compiled from that checkout's source with the feature set
+of CipherBird's own web engine, and the wasm32 dependencies CipherBird's
+`scripts/web/build_all.sh` leaves in `third_party/web/wasm32`. Only the
+stateless functions the web library wraps are exported, so the linker keeps
+1.1 MB. `bridge/web/aviary_web.cpp` adds three entry points that take each
+64 bit argument as two 32 bit halves, because a JavaScript number holds 53
+bits. The engine is single threaded; a browser gets hashing, header hashes,
+and proof and certificate checks, not nodes or networking. The browser
+suite runs with `dart test -p chrome -c dart2js,dart2wasm test/web` in
+`bridge/bindings/dart`.
 
 ## Privacy manifests
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
 - Subchains version 2 and persistence from `aviary_dart`, re-exported:
   dynamic child registration signed by registrars, a Merkle registry with
@@ -8,6 +8,12 @@
   version 2 cross chain proofs, chain snapshots with an opt in block
   archive, and chain tree snapshots. The bundled native libraries are
   rebuilt with these functions.
+- Web: through `aviary_dart` 1.1.0 the package compiles for the web, where
+  `ensureInitialized` loads the WebAssembly engine and the stateless calls
+  (hashing, header hashes, proof and certificate checks) work in a browser.
+  Await `ensureInitialized` before `instance` on the web.
+- The engine reports the CipherBird revision it was built from in
+  `cryptoBackend()`.
 
 ## 1.0.0
 

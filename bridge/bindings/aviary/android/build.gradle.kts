@@ -1,5 +1,5 @@
 group = "com.aviary.aviary"
-version = "1.0.0"
+version = "1.1.0"
 
 plugins {
     id("com.android.library")

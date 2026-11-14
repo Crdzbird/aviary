@@ -17,7 +17,7 @@ plugins {
 }
 
 group = "com.aviary"
-version = "1.0.0"
+version = "1.1.0"
 
 android {
     namespace = "com.aviary.android"

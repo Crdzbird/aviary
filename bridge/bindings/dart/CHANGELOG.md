@@ -1,11 +1,39 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
 The bundled macOS engine is rebuilt with the functions below. The Linux
 engines are rebuilt by the Native Linux workflow once this source is pushed;
 until then a Linux build needs `AVIARY_DYLIB` pointing at an engine built
 from the same source.
+
+**Web**
+
+- `package:aviary_dart/aviary.dart` compiles to JavaScript and WebAssembly.
+  In a browser it exports the stateless part of the API over a WebAssembly
+  build of the same C++ core, so results are byte identical to every other
+  binding: `hash`, `txid`, `headerHash`, `verifyStateProof`,
+  `verifyTxInclusion`, `verifyCommit`, `blockHeader`, `headerSubchainRoot`,
+  `encodedHeaderHash`, `verifyChildProof`, `decodeChildRecord` and
+  `verifySubchainProofV2`, with `AviaryException`, `ChildRecord` and the hex
+  helpers. Other platforms are unchanged.
+- The engine ships as `native/web/aviary.mjs` and `aviary.wasm` (1.1 MB),
+  declared as Flutter assets, so a Flutter web app serves it with no setup.
+  A page can point elsewhere with `self.aviaryEngineUrl`, or a build with
+  the `AVIARY_WEB_ENGINE` define.
+- A browser cannot load WebAssembly synchronously: await
+  `Aviary.ensureInitialized()` once before `Aviary.instance`, `load` or
+  `open`, which throw an `AviaryException` until then. 64 bit arguments
+  are exact up to 2 to the 53, the largest integer a browser number holds.
+- `ChildRecord` decoding reads its 64 bit fields as two 32 bit halves, the
+  same values on every platform.
+
+**Engine**
+
+- The engine reports the CipherBird revision it was built from:
+  `cryptoBackend()` now ends with `(CipherBird <revision>)`. The bundled
+  macOS engine is rebuilt against CipherBird v1.4.0-13-ge3d93a2, which
+  carries the P-256 thread safety fix.
 
 **Packaging**
 

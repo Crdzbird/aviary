@@ -23,6 +23,10 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed .
       - run: dart analyze --fatal-infos
       - run: dart test
+      # The web library over the bundled WebAssembly engine, in Chrome, under
+      # both web compilers. The runners ship Chrome.
+      - name: Web tests in Chrome
+        run: dart test -p chrome -c dart2js,dart2wasm test/web
       - name: pub.dev score
         run: |
           dart pub global activate pana
