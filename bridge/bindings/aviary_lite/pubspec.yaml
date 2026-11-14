@@ -1,5 +1,5 @@
 name: aviary_lite
-description: "Aviary ledger for Flutter with the CipherBird engine bundled: BFT finality, composable chains, application records, subchains and light clients."
+description: "Embeddable ledger for Flutter, engine bundled: signed app records with proofs, instant BFT finality, transfers, light clients, P2P consensus, key custody and multi-chain interop."
 version: 1.1.0
 homepage: https://github.com/Crdzbird/aviary
 repository: https://github.com/Crdzbird/aviary

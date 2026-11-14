@@ -1,5 +1,5 @@
 name: aviary_dart
-description: "Dart API of the Aviary ledger over dart:ffi: BFT finality, composable chains, application records, subchains, light clients and chain trees."
+description: "Embeddable ledger engine for Dart: signed app records with proofs, instant BFT finality, transfers, light clients, P2P consensus, key custody and Ethereum, Bitcoin, Solana interop."
 version: 1.1.0
 homepage: https://github.com/Crdzbird/aviary
 repository: https://github.com/Crdzbird/aviary
