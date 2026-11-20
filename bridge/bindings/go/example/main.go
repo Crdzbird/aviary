@@ -8,8 +8,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 	"github.com/Crdzbird/CipherBird/bridge/bindings/go/cipherbird"
+	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 )
 
 func main() {

@@ -52,7 +52,7 @@ void main() {
       'genesis/tip',
     );
     var calls = 0;
-    tree.txSource = (_, __) {
+    tree.txSource = (_, _) {
       calls++;
       return [];
     };
