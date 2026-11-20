@@ -31,6 +31,8 @@ DerivedData/
 /examples/sentinel/server/sentinel-server
 /examples/interop/server/interop-server
 /bridge/bindings/go/**/aviary_demo
+/bridge/bindings/go/cmd/hybriddiff/hybriddiff
+/bridge/bindings/go/example/example
 
 # -- JVM --
 /bridge/bindings/jvm/out/
