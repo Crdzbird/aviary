@@ -21,7 +21,9 @@
   `chainSnapshotError`; a restored chain continues byte for byte. The block
   archive: `Chain.enableArchive`, `archiveRange`, `archivedBlock`,
   `archivedCertificate`, `pruneArchive`. Chain trees: `ChainTree.snapshot`
-  and `ChainTree.restore`.
+  and `ChainTree.restore`. `restoreChain` verifies every archived commit
+  certificate under the validator set in force at its height, across
+  validator rotations, and refuses a snapshot carrying a forged one.
 - `test/dynamic_subchain.test.js` replays `vectors/subchain_v2_vectors.txt`
   call for call.
 - `cryptoBackendVersion()` now ends with `(CipherBird <revision>)`, the

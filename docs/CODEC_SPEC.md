@@ -171,7 +171,10 @@ byte for byte what the restored chain would write again, is refused.
   of work = the 32 byte current target; every other built in engine = empty.
 - `archive` = the block archive: `u32 count || (u64 height || bytes(Block) ||
   bytes(CommitCertificate))*`, heights ascending and contiguous, ending at the
-  tip.
+  tip. BFT chains only. Each certificate must verify under the validator set
+  its block's header commits (the genesis set, the engine's sets, or a set an
+  archived header announces); when none of those is that set, it must equal
+  the last commit embedded in the next archived header.
 - A snapshot holds no secret key.
 
 Chain tree snapshot = `"AVTS" || u8 version(=1) || list(u64 chain_id ||

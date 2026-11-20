@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -141,6 +142,31 @@ int main() {
     CHECK(aviary_chain_restore(nullptr, 0, 0, k.pub.data(), k.pub.size(), k.sec.data(), k.sec.size(), snap.data(),
                                snap.size()) == nullptr);
     CHECK(!snapshot_error(Bytes{1, 2, 3}, snap).empty());
+
+    std::printf("== a flipped byte in any archived certificate is refused ==\n");
+    AviaryChain source = restore(genesis, k, snap);
+    int certificate_bytes = 0, accepted = 0;
+    for (std::uint64_t h = 1; h <= 3; ++h) {
+      const Bytes block = take(aviary_chain_archived_block(source, h));
+      const Bytes cert = take(aviary_chain_archived_certificate(source, h));
+      const auto stored = std::search(snap.begin(), snap.end(), block.begin(), block.end());
+      CHECK(!block.empty() && !cert.empty() && stored != snap.end());
+      const auto after = stored + static_cast<std::ptrdiff_t>(block.size());
+      const auto at = std::search(after, snap.end(), cert.begin(), cert.end());
+      CHECK(at - stored < static_cast<std::ptrdiff_t>(block.size() + 8));
+      const std::size_t offset = static_cast<std::size_t>(at - snap.begin());
+      for (std::size_t i = 0; i < cert.size(); ++i) {
+        Bytes forged = snap;
+        forged[offset + i] ^= 0x01;
+        ++certificate_bytes;
+        AviaryChain back = restore(genesis, k, forged);
+        if (back != nullptr || snapshot_error(genesis, forged).empty()) ++accepted;
+        aviary_chain_free(back);
+      }
+    }
+    std::printf("  %d certificate bytes flipped, %d accepted\n", certificate_bytes, accepted);
+    CHECK(certificate_bytes > 300 && accepted == 0);
+    aviary_chain_free(source);
 
     aviary_chain_free(second);
     aviary_chain_free(straight);

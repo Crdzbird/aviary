@@ -18,7 +18,10 @@ Needs libaviary_c built from the same source.
 - Persistence: `Chain.Snapshot`, `RestoreChain`, `ChainSnapshotError`,
   `Chain.Tip`, the opt in archive (`Chain.EnableArchive`, `ArchiveRange`,
   `ArchivedBlock`, `ArchivedCertificate`, `PruneArchive`),
-  `ChainTree.Snapshot` and `RestoreChainTree`.
+  `ChainTree.Snapshot` and `RestoreChainTree`. `RestoreChain` verifies
+  every archived commit certificate under the validator set in force at its
+  height, across validator rotations, and refuses a snapshot carrying a
+  forged one.
 - `CryptoBackendVersion()` now ends with `(CipherBird <revision>)`, the
   CipherBird revision the engine was built from.
 

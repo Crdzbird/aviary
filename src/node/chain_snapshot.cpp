@@ -4,6 +4,7 @@
 #include "aviary/bft_engine.hpp"
 #include "aviary/utxo_state.hpp"
 
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -54,6 +55,63 @@ void check_archive(const BlockStore& archive, const Bytes& encoded, const BlockH
   }
   if (expected_parent != tip.hash())
     throw std::invalid_argument("chain snapshot: archive tip is not the ledger tip");
+}
+
+using SetsByHash = std::map<Hash, consensus::ValidatorSet>;
+
+/// Every full validator set the snapshot can vouch for, keyed by hash: the
+/// genesis set, the engine's certifying and in force sets, and each set an
+/// archived header announces. A header commits the hash of the set in force
+/// at its height, so any set found here under that hash is that set.
+SetsByHash known_sets(const GenesisSpec& genesis, const consensus::BftEngine& bft, const BlockStore& archive) {
+  SetsByHash sets;
+  const auto add = [&sets](const consensus::ValidatorSet& s) { sets.emplace(s.hash(), s); };
+  add(genesis.validator_set());
+  add(bft.tip_validators());
+  add(bft.validators());
+  for (std::uint64_t h = archive.first_height(); h <= archive.tip_height(); ++h) {
+    const BlockHeader& header = archive.by_height(h).block.header;
+    if (std::optional<consensus::ValidatorSet> next = consensus::announced_validator_set(header)) add(*next);
+  }
+  return sets;
+}
+
+consensus::ConsensusData consensus_data_of(const BlockHeader& header) {
+  try {
+    return consensus::ConsensusData::decode_all(bv(header.consensus_data));
+  } catch (const std::exception&) {
+    throw std::invalid_argument("chain snapshot: an archived block carries no BFT consensus data");
+  }
+}
+
+bool embedded_by_next(const BlockStore& archive, std::uint64_t h) {
+  if (h >= archive.tip_height()) return false;
+  const consensus::ConsensusData next = consensus_data_of(archive.by_height(h + 1).block.header);
+  return next.last_commit && next.last_commit->encode() == archive.by_height(h).commit.encode();
+}
+
+/// Verifies every archived certificate (signer list, quorum power and the
+/// aggregate BLS signature) under the set its block's header commits. When
+/// that set is not in the snapshot, the certificate must instead equal the
+/// last commit the next archived header embeds, which the hash links to the
+/// verified tip authenticate.
+void check_certificates(const GenesisSpec& genesis, const consensus::BftEngine& bft, const BlockStore& archive) {
+  if (archive.empty()) return;
+  const SetsByHash sets = known_sets(genesis, bft, archive);
+  for (std::uint64_t h = archive.first_height(); h <= archive.tip_height(); ++h) {
+    const StoredBlock& sb = archive.by_height(h);
+    const auto found = sets.find(consensus_data_of(sb.block.header).validator_set_hash);
+    if (found != sets.end()) {
+      const consensus::CommitError e = consensus::verify_commit(genesis.chain_id, found->second, sb.commit);
+      if (!e.ok)
+        throw std::invalid_argument("chain snapshot: archived certificate at height " + std::to_string(h) +
+                                    " rejected: " + e.error);
+      continue;
+    }
+    if (!embedded_by_next(archive, h))
+      throw std::invalid_argument("chain snapshot: archived certificate at height " + std::to_string(h) +
+                                  " cannot be verified: its validator set is not in the snapshot");
+  }
 }
 }  // namespace
 
@@ -129,10 +187,12 @@ RestoredChain restore_chain(const GenesisSpec& genesis, std::uint32_t me, crypto
     out.archive = BlockStore::load(bv(*s.archive));
     check_archive(*out.archive, *s.archive, tip);
     const auto* bft = dynamic_cast<const consensus::BftEngine*>(out.chain.engine.get());
-    if (bft != nullptr && !out.archive->empty() &&
+    if (bft == nullptr) throw std::invalid_argument("chain snapshot: only a BFT chain keeps an archive");
+    if (!out.archive->empty() &&
         (!bft->last_commit() ||
          out.archive->by_height(tip.height).commit.encode() != bft->last_commit()->encode()))
       throw std::invalid_argument("chain snapshot: archived tip certificate is not the engine's");
+    check_certificates(genesis, *bft, *out.archive);
   }
   return out;
 }

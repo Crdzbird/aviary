@@ -54,9 +54,14 @@ Bytes snapshot_chain(const Hash& genesis_hash, const AssembledChain& chain, cons
 /// rebuilt chain would write (non canonical), disagrees with its own tip (state
 /// root, receipts, subchain registry, consensus state, certificate), or
 /// carries an archive that is not a contiguous run of this chain's blocks
-/// ending at the tip. Archived blocks are authenticated by hash linkage to the
-/// tip, whose certificate is verified; an archived certificate other than the
-/// tip's is checked for shape and target, not re-verified.
+/// ending at the tip, or that a chain other than BFT carries. Archived blocks
+/// are authenticated by hash linkage to the tip, whose certificate is
+/// verified. Every archived certificate is verified as well, under the
+/// validator set its block's header commits: the genesis set, the engine's
+/// certifying and in force sets, or a set an archived header announces. A
+/// certificate whose set is none of those (announced below the archive's
+/// first height and since rotated out) must instead equal the last commit the
+/// next archived header embeds; otherwise the snapshot is refused.
 RestoredChain restore_chain(const GenesisSpec& genesis, std::uint32_t me, crypto::KeyPair bls_key,
                             codec::ByteView snapshot, Bytes vrf_secret = {},
                             std::vector<Bytes> vrf_pubkeys = {});
