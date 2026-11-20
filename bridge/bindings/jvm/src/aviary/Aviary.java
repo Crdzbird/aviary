@@ -59,7 +59,7 @@ public final class Aviary implements AutoCloseable {
             treeSnapshot, treeRestore;
 
     public Aviary() {
-        lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), arena);
+        lib = SymbolLookup.libraryLookup(NativeLoader.resolve(), Arena.global());
         init       = h("aviary_init", FunctionDescriptor.of(JAVA_INT));
         version    = h("aviary_version", FunctionDescriptor.of(ADDRESS));
         backend    = h("aviary_crypto_backend_version", FunctionDescriptor.of(ADDRESS));
@@ -1785,5 +1785,8 @@ public final class Aviary implements AutoCloseable {
         return out;
     }
 
+    /** Frees the memory this instance allocated. The engine library stays
+     *  loaded for the life of the process: threads that called into it
+     *  still run its thread-exit cleanup when they end. */
     public void close() { arena.close(); }
 }
