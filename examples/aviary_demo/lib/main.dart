@@ -9,6 +9,12 @@ import 'dart:typed_data';
 import 'package:aviary/aviary.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'demos/demo_log_card.dart';
+import 'demos/dynamic_subchain_demo.dart';
+import 'demos/persistence_demo.dart';
+import 'demos/record_family.dart';
+import 'demos/sealing_demo.dart';
+
 void main() {
   // Isolate-backed warm-up, NOT awaited. preload() runs the one-time
   // crypto-backend init on a background isolate; we don't wait for it. The
@@ -86,6 +92,9 @@ class _DashboardState extends State<Dashboard> {
   final List<String> _mixture = [];
   final List<String> _subchain = [];
   final List<String> _tree = [];
+  List<String> _dynamic = const [];
+  List<String> _persistence = const [];
+  List<String> _sealing = const [];
 
   @override
   void initState() {
@@ -207,6 +216,29 @@ class _DashboardState extends State<Dashboard> {
     _snack(ok ? 'Light-client proof of Alice verified ok' : 'Proof failed');
   }
 
+  RecordFamily _family() {
+    final bc = _bc!;
+    final scratch = bc.createNode(0x5501);
+    final registrar = scratch.newAccount().secret;
+    scratch.dispose();
+    Uint8List seed(int b) => Uint8List(32)..fillRange(0, 32, b);
+    return RecordFamily(
+      bc,
+      registrar,
+      bc.newBLSValidator(seed(0x51)),
+      bc.newBLSValidator(seed(0x52)),
+    );
+  }
+
+  void _run(void Function(List<String>) store, List<String> Function() demo) {
+    try {
+      final log = demo();
+      setState(() => store(log));
+    } catch (e) {
+      setState(() => store(['error: $e']));
+    }
+  }
+
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
@@ -250,6 +282,47 @@ class _DashboardState extends State<Dashboard> {
           _mixtureCard(),
           _subchainCard(),
           _treeCard(),
+          DemoLogCard(
+            title: 'Dynamic subchains (registry version 2)',
+            icon: Icons.app_registration,
+            blurb:
+                'A parent registers children at runtime through registrar '
+                'signed operations and keeps one record per child in a Merkle '
+                'registry. The child record, and any record written on the '
+                'child, is provable from the parent header alone.',
+            label: 'Run dynamic subchain demo',
+            lines: _dynamic,
+            onRun: () => _run(
+              (log) => _dynamic = log,
+              () => DynamicSubchainDemo(_family()).run(),
+            ),
+          ),
+          DemoLogCard(
+            title: 'Persistence (snapshots and the block archive)',
+            icon: Icons.save,
+            blurb:
+                'Snapshot a chain, check and restore it, and the restored '
+                'chain carries on byte for byte. An opt in archive keeps '
+                'finalized blocks with their certificates until pruned.',
+            label: 'Run persistence demo',
+            lines: _persistence,
+            onRun: () => _run(
+              (log) => _persistence = log,
+              () => PersistenceDemo(_family(), _node!).run(),
+            ),
+          ),
+          DemoLogCard(
+            title: 'Passphrase sealing (Argon2id)',
+            icon: Icons.lock,
+            blurb:
+                'Accounts and threshold share cards sealed under a passphrase. '
+                'A wrong passphrase fails closed, and the Argon2id memory cost '
+                'must be whole KiB.',
+            label: 'Run sealing demo',
+            lines: _sealing,
+            onRun: () =>
+                _run((log) => _sealing = log, () => SealingDemo(_bc!).run()),
+          ),
           _verifyCard(),
           _interopCard(),
         ],

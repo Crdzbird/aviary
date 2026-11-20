@@ -43,9 +43,9 @@ else
   echo "javac not installed - skipping JVM"
 fi
 
-echo "-- 6/6  Flutter example (analyze) ------------------------------------"
+echo "-- 6/6  Flutter example (analyze, test) ------------------------------"
 if command -v flutter >/dev/null 2>&1; then
-  ( cd examples/aviary_demo && flutter pub get && flutter analyze )
+  ( cd examples/aviary_demo && flutter pub get && flutter analyze && flutter test )
 else
   echo "flutter not installed - skipping analyze"
 fi
