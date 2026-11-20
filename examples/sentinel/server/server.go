@@ -16,6 +16,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // anchorCredit is the device's on-chain balance, spent 1 unit per anchored record.
@@ -209,11 +210,11 @@ func (s *server) StreamData(stream pb.Sentinel_StreamDataServer) error {
 			AnchoredUnixMillis: rec.GetCapturedUnixMillis(),
 		}
 		d.pending = append(d.pending, rc)
+		pendingCopy := proto.Clone(rc).(*pb.AnchorReceipt)
 		d.mu.Unlock()
 
 		// Send a distinct "pending" copy now; rc itself flips to finalized later.
-		pendingCopy := *rc
-		sendCh <- &pendingCopy
+		sendCh <- pendingCopy
 	}
 
 	close(stopSealer)

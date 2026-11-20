@@ -1,7 +1,7 @@
 // Local development workspace: the Go binding, the example servers and the
 // sibling CipherBird checkout. Consumers fetching the module ignore this file;
 // they build with the pkg-config tags against installed libraries.
-go 1.24
+go 1.26.0
 
 use (
 	./bridge/bindings/go
