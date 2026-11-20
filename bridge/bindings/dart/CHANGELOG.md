@@ -28,9 +28,10 @@ The bundled macOS and Linux engines are rebuilt with the functions below.
 **Engine**
 
 - The engine reports the CipherBird revision it was built from:
-  `cryptoBackend()` now ends with `(CipherBird <revision>)`. The bundled
-  macOS engine is rebuilt against CipherBird v1.4.0-13-ge3d93a2, which
-  carries the P-256 thread safety fix.
+  `cryptoBackend()` now ends with `(CipherBird <revision>)`.
+- The bundled macOS, Linux and web engines are built against CipherBird
+  1.5.0 (commit fcf951a): its C ABI is now named `cipherbird_*`, and it
+  carries the P-256 and libcrypto thread safety fixes.
 
 **Packaging**
 

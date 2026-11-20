@@ -2,6 +2,9 @@
 
 ## 1.1.0
 
+- Built on CipherBird 1.5.0 (commit fcf951a): the binding imports
+  CipherBird's Go package from `bridge/bindings/go/cipherbird` and links
+  `libcipherbird_c`.
 Needs libaviary_c built from the same source.
 
 - Subchains version 2: `DynamicSubchainPolicy`, `Registrar`, `OpRegister`,

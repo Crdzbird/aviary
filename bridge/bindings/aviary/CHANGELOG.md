@@ -2,6 +2,10 @@
 
 ## 1.1.0
 
+- Requires `cipherbird` 1.5.0. CipherBird renamed its C ABI to
+  `cipherbird_*`, and the bundled AviaryC frameworks and Android library
+  now resolve those names against the cipherbird package's engine, which
+  `cipherbird` 1.3.0 does not export.
 - Subchains version 2 and persistence from `aviary_dart`, re-exported:
   dynamic child registration signed by registrars, a Merkle registry with
   one provable `ChildRecord` per child, closing and registrar rotation,

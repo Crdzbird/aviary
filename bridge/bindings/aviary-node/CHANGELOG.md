@@ -2,6 +2,8 @@
 
 ## 1.1.0
 
+- The prebuilt engines are built against CipherBird 1.5.0 (commit
+  fcf951a), whose C ABI is now named `cipherbird_*`.
 - Subchains version 2 (docs/design/SUBCHAINS.md Part 2): a parent whose
   genesis commits a dynamic policy (`encodeDynamicSubchainPolicy`,
   `encodeRegistrar`) registers, closes and re-keys children in any block
