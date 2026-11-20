@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.1
+
+The bundled AviaryC frameworks and Android libraries are rebuilt from
+Aviary 1.1.1 on CipherBird 1.6.0. Requires `aviary_dart` 1.1.1.
+
+- Snapshot restore verifies every archived commit certificate.
+  `restoreChain`, `restoreChainTree` and `chainSnapshotError` used to check
+  only that an archived certificate below the tip named its block, so a
+  snapshot whose certificate signature or signer bitmap had been altered
+  restored and `archivedCertificate` then returned the forged certificate.
+  Each certificate is now verified (signer list, quorum power, aggregate BLS
+  signature) under the validator set in force at its height, following
+  validator rotations. When that set is no longer in the snapshot (it was
+  announced in a block pruned from the archive and has since rotated out),
+  the certificate must equal the last commit embedded in the next archived
+  header. A snapshot that fails either check is refused.
+- A snapshot of a chain other than BFT that carries an archive is refused.
+
 ## 1.1.0
 
 - Requires `cipherbird` 1.6.0. CipherBird renamed its C ABI to

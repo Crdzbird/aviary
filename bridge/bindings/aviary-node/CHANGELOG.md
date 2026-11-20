@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.1
+
+The prebuilt engines are rebuilt from Aviary 1.1.1 on CipherBird 1.6.0.
+
+- Snapshot restore verifies every archived commit certificate.
+  `restoreChain`, `ChainTree.restore` and `chainSnapshotError` used to check
+  only that an archived certificate below the tip named its block, so a
+  snapshot whose certificate signature or signer bitmap had been altered
+  restored and `archivedCertificate` then returned the forged certificate.
+  Each certificate is now verified (signer list, quorum power, aggregate BLS
+  signature) under the validator set in force at its height, following
+  validator rotations. When that set is no longer in the snapshot (it was
+  announced in a block pruned from the archive and has since rotated out),
+  the certificate must equal the last commit embedded in the next archived
+  header. A snapshot that fails either check is refused.
+- A snapshot of a chain other than BFT that carries an archive is refused.
+
 ## 1.1.0
 
 - The prebuilt engines are built against CipherBird 1.6.0, whose C ABI is
@@ -21,9 +38,7 @@
   `chainSnapshotError`; a restored chain continues byte for byte. The block
   archive: `Chain.enableArchive`, `archiveRange`, `archivedBlock`,
   `archivedCertificate`, `pruneArchive`. Chain trees: `ChainTree.snapshot`
-  and `ChainTree.restore`. `restoreChain` verifies every archived commit
-  certificate under the validator set in force at its height, across
-  validator rotations, and refuses a snapshot carrying a forged one.
+  and `ChainTree.restore`.
 - `test/dynamic_subchain.test.js` replays `vectors/subchain_v2_vectors.txt`
   call for call.
 - `cryptoBackendVersion()` now ends with `(CipherBird <revision>)`, the

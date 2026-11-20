@@ -1,6 +1,6 @@
 name: aviary_lite
 description: "Embeddable ledger for Flutter, engine bundled: signed app records with proofs, instant BFT finality, transfers, light clients, P2P consensus, key custody and multi-chain interop."
-version: 1.1.0
+version: 1.1.1
 homepage: https://github.com/Crdzbird/aviary
 repository: https://github.com/Crdzbird/aviary
 documentation: https://github.com/Crdzbird/aviary/blob/main/bridge/bindings/aviary_lite/README.md
@@ -19,7 +19,7 @@ dependencies:
   flutter:
     sdk: flutter
   ffi: ^2.1.3
-  aviary_dart: ^1.1.0
+  aviary_dart: ^1.1.1
 
 dev_dependencies:
   flutter_test:

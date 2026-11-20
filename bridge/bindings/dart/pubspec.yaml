@@ -1,6 +1,6 @@
 name: aviary_dart
 description: "Embeddable ledger engine for Dart: signed app records with proofs, instant BFT finality, transfers, light clients, P2P consensus, key custody and Ethereum, Bitcoin, Solana interop."
-version: 1.1.0
+version: 1.1.1
 homepage: https://github.com/Crdzbird/aviary
 repository: https://github.com/Crdzbird/aviary
 documentation: https://github.com/Crdzbird/aviary/blob/main/bridge/bindings/dart/README.md

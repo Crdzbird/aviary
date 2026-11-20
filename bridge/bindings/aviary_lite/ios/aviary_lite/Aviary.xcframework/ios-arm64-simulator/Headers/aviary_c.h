@@ -1002,8 +1002,12 @@ AVIARY_API int aviary_subchain_proof_v2_verify(
  *  Not captured: transactions queued with aviary_chain_add_tx, buffered
  *  events, metrics and hooks. Restore is strict: a blob with trailing bytes,
  *  a non canonical field, another genesis, or a section that disagrees with
- *  its own tip is refused and nothing is built. Snapshots are ordinary
- *  buffers (free with aviary_buffer_free); handles stay single threaded. */
+ *  its own tip is refused and nothing is built. Every archived commit
+ *  certificate is verified under the validator set in force at its height
+ *  (see restore_chain in include/aviary/chain_snapshot.hpp for the one case
+ *  where that set is gone and the certificate is matched against the next
+ *  archived header instead). Snapshots are ordinary buffers (free with
+ *  aviary_buffer_free); handles stay single threaded. */
 
 /** This chain's current tip header (the genesis header before any block). */
 AVIARY_API AviaryBufferResult aviary_chain_tip(AviaryChain c);

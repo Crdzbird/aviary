@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.1
+
+Needs libaviary_c built from the same source.
+
+- Snapshot restore verifies every archived commit certificate.
+  `RestoreChain`, `RestoreChainTree` and `ChainSnapshotError` used to check
+  only that an archived certificate below the tip named its block, so a
+  snapshot whose certificate signature or signer bitmap had been altered
+  restored and `ArchivedCertificate` then returned the forged certificate.
+  Each certificate is now verified (signer list, quorum power, aggregate BLS
+  signature) under the validator set in force at its height, following
+  validator rotations. When that set is no longer in the snapshot (it was
+  announced in a block pruned from the archive and has since rotated out),
+  the certificate must equal the last commit embedded in the next archived
+  header. A snapshot that fails either check is refused.
+- A snapshot of a chain other than BFT that carries an archive is refused.
+
 ## 1.1.0
 
 Needs libaviary_c built from the same source.
@@ -18,10 +35,7 @@ Needs libaviary_c built from the same source.
 - Persistence: `Chain.Snapshot`, `RestoreChain`, `ChainSnapshotError`,
   `Chain.Tip`, the opt in archive (`Chain.EnableArchive`, `ArchiveRange`,
   `ArchivedBlock`, `ArchivedCertificate`, `PruneArchive`),
-  `ChainTree.Snapshot` and `RestoreChainTree`. `RestoreChain` verifies
-  every archived commit certificate under the validator set in force at its
-  height, across validator rotations, and refuses a snapshot carrying a
-  forged one.
+  `ChainTree.Snapshot` and `RestoreChainTree`.
 - `CryptoBackendVersion()` now ends with `(CipherBird <revision>)`, the
   CipherBird revision the engine was built from.
 

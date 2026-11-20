@@ -48,7 +48,7 @@ re-export this API.
 
 ```yaml
 dependencies:
-  aviary_dart: ^1.1.0
+  aviary_dart: ^1.1.1
 ```
 
 The engine ships inside the package under `native/darwin-arm64`,

@@ -48,7 +48,7 @@ bundles the engine and has no extra dependency.
 
 ```yaml
 dependencies:
-  aviary: ^1.1.0
+  aviary: ^1.1.1
 ```
 
 Android, iOS and macOS are supported. Linux desktop is not, because the
