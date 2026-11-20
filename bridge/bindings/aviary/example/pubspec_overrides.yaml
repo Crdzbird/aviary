@@ -1,5 +1,3 @@
 dependency_overrides:
   aviary_dart:
     path: ../../dart
-  cipherbird:
-    path: ../../../../../cryptolib/bridge/bindings/cipherbird

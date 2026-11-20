@@ -49,15 +49,6 @@ jobs:
         working-directory: bridge/bindings/${{ matrix.package }}
     steps:
       - uses: actions/checkout@v4
-      # aviary needs cipherbird 1.5.0, the first release with the cipherbird_*
-      # C ABI. Until it is on pub.dev the pubspec overrides take it from a
-      # sibling CipherBird checkout, pinned like the Native Linux engines.
-      - name: Sibling CipherBird checkout
-        if: matrix.package == 'aviary'
-        working-directory: ${{ github.workspace }}
-        run: |
-          git clone --filter=blob:none https://github.com/Crdzbird/CipherBird.git ../cryptolib
-          git -C ../cryptolib checkout --quiet fcf951afe4450d652aed62fc5b5588d770a23354
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

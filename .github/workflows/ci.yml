@@ -16,7 +16,7 @@ jobs:
 
       # CipherBird is what aviary links against; CIPHERBIRD_REPO
       # can point at a fork. This builds its C ABI. It sits next to aviary as
-      # cryptolib/, the sibling checkout go.work and the pubspec overrides name.
+      # cryptolib/, the sibling checkout go.work names.
       - name: Checkout cipherbird
         uses: actions/checkout@v4
         with:
