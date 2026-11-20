@@ -42,6 +42,16 @@ void main() {
       threw = true;
     }
     _expect(threw, 'wrong passphrase fails closed');
+    expect(
+      () => bc.sealAccountPassphrase(
+        public,
+        secret,
+        'backup-phrase',
+        ops: 3,
+        mem: (1 << 16) + 1,
+      ),
+      throwsA(isA<AviaryException>()),
+    );
 
     final dev = bc.hybridKemKeypair();
 

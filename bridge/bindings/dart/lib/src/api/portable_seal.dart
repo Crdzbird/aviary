@@ -17,7 +17,7 @@ extension AviaryPortableSeal on Aviary {
   }
 
   /// Tier one: seal an account under a passphrase. Zero ops and mem select
-  /// the sensitive preset.
+  /// the sensitive preset; mem must be a multiple of 1024 bytes.
   Uint8List sealAccountPassphrase(
     Uint8List public,
     Uint8List secret,

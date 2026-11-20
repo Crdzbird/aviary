@@ -46,6 +46,8 @@ int main() {
     CHECK(back.secret == acct.secret);
     CHECK_MSG(fails([&] { PortableAccount::open_passphrase(view(env), "wrong"); }),
               "wrong passphrase fails closed");
+    CHECK_MSG(fails([&] { (void)acct.seal_passphrase("backup-phrase", 3, (1u << 16) + 1); }),
+              "a memory cost that is not whole KiB is refused");
   }
 
   std::printf("== tier 2 - recipient-bound: only the device's KEM secret opens ==\n");

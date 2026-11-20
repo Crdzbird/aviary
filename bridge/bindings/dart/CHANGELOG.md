@@ -30,8 +30,13 @@ The bundled macOS and Linux engines are rebuilt with the functions below.
 - The engine reports the CipherBird revision it was built from:
   `cryptoBackend()` now ends with `(CipherBird <revision>)`.
 - The bundled macOS, Linux and web engines are built against CipherBird
-  1.5.0 (commit fcf951a): its C ABI is now named `cipherbird_*`, and it
-  carries the P-256 and libcrypto thread safety fixes.
+  1.6.0. Its C ABI is now named `cipherbird_*`, and it carries the P-256
+  and libcrypto thread safety fixes and the 1.6.0 input hardening.
+- `sealAccountPassphrase` and `sealShare`, and their `Async` forms, throw
+  an `AviaryException` for an Argon2id memory cost that is not a multiple
+  of 1024 bytes, and opening refuses an envelope that records one.
+  Argon2id counts memory in whole KiB, so such a cost was silently rounded
+  down before. Zero still selects the sensitive preset.
 
 **Packaging**
 

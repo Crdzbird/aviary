@@ -24,7 +24,8 @@ extension AviaryThreshold on Aviary {
     return out;
   }
 
-  /// Seals a share card for rest. Zero ops and mem select the sensitive preset.
+  /// Seals a share card for rest. Zero ops and mem select the sensitive
+  /// preset; mem must be a multiple of 1024 bytes.
   Uint8List sealShare(
     Uint8List card,
     String passphrase, {

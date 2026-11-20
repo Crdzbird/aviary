@@ -2,11 +2,13 @@
 
 ## 1.1.0
 
-- Built on CipherBird 1.5.0 (commit fcf951a): the binding imports
-  CipherBird's Go package from `bridge/bindings/go/cipherbird` and links
-  `libcipherbird_c`.
 Needs libaviary_c built from the same source.
 
+- Built on CipherBird 1.6.0: the binding imports CipherBird's Go package
+  from `bridge/bindings/go/cipherbird` and links `libcipherbird_c`.
+- `PortableAccount.SealPassphrase` and `ShareCard.Seal` return an error for
+  a `mem` that is not a multiple of 1024 bytes; zero still selects the
+  sensitive preset.
 - Subchains version 2: `DynamicSubchainPolicy`, `Registrar`, `OpRegister`,
   `OpClose`, `OpSetRegistrars`, `OpDigest`, `SignOp`, `AddOpApproval`,
   `Chain.ProposeSubchain`, `Chain.RegistryCounts`, `Chain.ChildRecord`,

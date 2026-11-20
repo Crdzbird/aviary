@@ -282,7 +282,8 @@ AVIARY_API void aviary_keystore_free(AviaryKeyStore ks);
 AVIARY_API AviaryBufferResult aviary_hybrid_kem_keygen(void);
 
 /** Tier 1 - passphrase (MolecularVault + Argon2id). ops/mem are Argon2id work
- *  factors; pass 0,0 for the SENSITIVE preset. Returns the sealed envelope. */
+ *  factors; pass 0,0 for the SENSITIVE preset. mem must be a multiple of 1024
+ *  bytes. Returns the sealed envelope. */
 AVIARY_API AviaryBufferResult aviary_portable_seal_passphrase(
     const uint8_t* public_key, size_t pk_len, const uint8_t* secret, size_t sk_len,
     const char* passphrase, uint64_t ops, size_t mem);
@@ -338,8 +339,9 @@ AVIARY_API AviaryBufferResult aviary_threshold_create(uint16_t n, uint16_t t);
 AVIARY_API AviaryBufferResult aviary_threshold_share_info(
     const uint8_t* card, size_t card_len);
 
-/** Seal a share card for rest (MolecularVault + Argon2id; ops=mem=0 -> SENSITIVE).
- *  The envelope binds the group key + slot, so it can't be relocated. */
+/** Seal a share card for rest (MolecularVault + Argon2id; ops=mem=0 selects SENSITIVE).
+ *  mem must be a multiple of 1024 bytes. The envelope binds the group key +
+ *  slot, so it can't be relocated. */
 AVIARY_API AviaryBufferResult aviary_threshold_share_seal(
     const uint8_t* card, size_t card_len, const char* passphrase, uint64_t ops, size_t mem);
 /** Open a sealed share card -> the card bytes. Fails closed on wrong passphrase. */

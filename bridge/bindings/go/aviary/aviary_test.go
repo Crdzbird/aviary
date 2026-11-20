@@ -463,6 +463,9 @@ func TestThresholdAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := cards[1].Seal("share-pass", 3, 1<<16+1); err == nil {
+		t.Fatal("a memory cost that is not whole KiB must be refused")
+	}
 	back, err := bc.UnsealShare(env, "share-pass")
 	if err != nil {
 		t.Fatal(err)

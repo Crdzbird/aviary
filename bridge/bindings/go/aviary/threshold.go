@@ -74,7 +74,8 @@ func (c ShareCard) Index() uint16          { i, _, _, _ := c.info(); return i }
 func (c ShareCard) GroupPublicKey() []byte { _, g, _, _ := c.info(); return g }
 func (c ShareCard) PublicShare() []byte    { _, _, p, _ := c.info(); return p }
 
-// SealShare seals the card for rest under a passphrase (ops=mem=0 -> SENSITIVE).
+// Seal seals the card for rest under a passphrase; ops=mem=0 selects SENSITIVE.
+// mem must be a multiple of 1024.
 func (c ShareCard) Seal(passphrase string, ops uint64, mem uint) ([]byte, error) {
 	ensure()
 	cp := C.CString(passphrase)

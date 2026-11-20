@@ -441,6 +441,7 @@ export function createThresholdAccount(n: number, t: number): Buffer[];
 export function shareInfo(card: Bytes): { index: number; groupPublicKey: Buffer; publicShare: Buffer };
 /** Round one of a threshold signature: keep the nonces, share the commitment. */
 export function commit(card: Bytes): { nonces: Buffer; commitment: Buffer };
+/** Seals a share card under a passphrase. Zero ops and mem select the sensitive preset; mem must be a multiple of 1024 bytes. */
 export function sealShare(card: Bytes, passphrase: string, ops?: Int, mem?: number): Buffer;
 export function unsealShare(envelope: Bytes, passphrase: string): Buffer;
 export class Ceremony {
@@ -452,6 +453,7 @@ export class Ceremony {
   free(): void;
 }
 export function hybridKemKeypair(): KeyPair;
+/** Seals an account under a passphrase. Zero ops and mem select the sensitive preset; mem must be a multiple of 1024 bytes. */
 export function sealAccountPassphrase(publicKey: Bytes, secret: Bytes, passphrase: string, ops?: Int, mem?: number): Buffer;
 export function openAccountPassphrase(envelope: Bytes, passphrase: string): KeyPair;
 export function sealAccountTo(publicKey: Bytes, secret: Bytes, recipientKemPublic: Bytes): Buffer;

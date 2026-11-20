@@ -2,9 +2,11 @@
 
 ## 1.1.0
 
-- The CipherBird engine merged into the native libraries is now 1.5.0
-  (commit fcf951a): the `cipherbird_*` C ABI and the P-256 and libcrypto
-  thread safety fixes.
+- The CipherBird engine merged into the native libraries is now 1.6.0:
+  the `cipherbird_*` C ABI, the P-256 and libcrypto thread safety fixes
+  and the 1.6.0 input hardening. Passphrase sealing (`sealShare`,
+  `sealAccountPassphrase`) refuses an Argon2id memory cost that is not a
+  multiple of 1024 bytes; zero still selects the sensitive preset.
 - Subchains version 2 and persistence from `aviary_dart`, re-exported:
   dynamic child registration signed by registrars, a Merkle registry with
   one provable `ChildRecord` per child, closing and registrar rotation,

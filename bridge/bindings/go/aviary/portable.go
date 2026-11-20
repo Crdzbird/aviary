@@ -46,7 +46,7 @@ func HybridKEMKeypair() (public, secret []byte, err error) {
 }
 
 // SealPassphrase seals the account under a passphrase (MolecularVault + Argon2id).
-// Pass ops=0, mem=0 for the SENSITIVE preset.
+// Pass ops=0, mem=0 for the SENSITIVE preset. mem must be a multiple of 1024.
 func (a PortableAccount) SealPassphrase(passphrase string, ops uint64, mem uint) ([]byte, error) {
 	ensure()
 	cp := C.CString(passphrase)
