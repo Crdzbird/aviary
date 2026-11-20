@@ -15,12 +15,13 @@ jobs:
           path: aviary
 
       # CipherBird is what aviary links against; CIPHERBIRD_REPO
-      # can point at a fork. This builds its C ABI.
+      # can point at a fork. This builds its C ABI. It sits next to aviary as
+      # cryptolib/, the sibling checkout go.work and the pubspec overrides name.
       - name: Checkout cipherbird
         uses: actions/checkout@v4
         with:
           repository: ${{ vars.CIPHERBIRD_REPO || 'Crdzbird/CipherBird' }}
-          path: cipherbird
+          path: cryptolib
 
       - name: Install native deps
         run: brew install cmake ninja libsodium liboqs blake3 openssl@3 secp256k1 go
@@ -48,7 +49,7 @@ jobs:
           java-version: '23'
 
       - name: Build cipherbird C ABI
-        working-directory: cipherbird
+        working-directory: cryptolib
         run: |
           cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build/release --target cipherbird_c
@@ -56,5 +57,5 @@ jobs:
       - name: Run aviary CI
         working-directory: aviary
         env:
-          CIPHERBIRD_ROOT: ${{ github.workspace }}/cipherbird
+          CIPHERBIRD_ROOT: ${{ github.workspace }}/cryptolib
         run: bash scripts/ci.sh
