@@ -9,7 +9,7 @@ require (
 )
 
 require (
-	github.com/Crdzbird/CipherBird/bridge/bindings/go v0.0.0-20261005192042-bffafd77df2f // indirect
+	github.com/Crdzbird/CipherBird/bridge/bindings/go v0.0.0-20261120095302-fcf951afe445 // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
