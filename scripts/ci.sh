@@ -2,14 +2,14 @@
 # Full CI gate: C++ build + tests, a sanitized pass, the Dart & Go bindings, and
 # Flutter analyze. Run locally or from .github/workflows/ci.yml.
 #
-# Prereq: cryptolib's cryptolib_c built. Override its location with CRYPTOLIB_ROOT
+# Prereq: cipherbird's cipherbird_c built. Override its location with CIPHERBIRD_ROOT
 # (default: a sibling ../cryptolib checkout).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 CMAKE_ARGS=()
-if [[ -n "${CRYPTOLIB_ROOT:-}" ]]; then CMAKE_ARGS+=("-DCRYPTOLIB_ROOT=${CRYPTOLIB_ROOT}"); fi
+if [[ -n "${CIPHERBIRD_ROOT:-}" ]]; then CMAKE_ARGS+=("-DCIPHERBIRD_ROOT=${CIPHERBIRD_ROOT}"); fi
 
 echo "-- 1/5  C++ build + tests --------------------------------------------"
 cmake -S . -B build -G "Unix Makefiles" ${CMAKE_ARGS[@]+"${CMAKE_ARGS[@]}"}

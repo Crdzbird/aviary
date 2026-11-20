@@ -1,4 +1,4 @@
-// Example: the Aviary Go binding driving a chain, alongside cryptolib's Go
+// Example: the Aviary Go binding driving a chain, alongside cipherbird's Go
 // binding for off-chain crypto - both from one dependency.
 //
 //	go run ./example
@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
-	"github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
+	"github.com/Crdzbird/CipherBird/bridge/bindings/go/cipherbird"
 )
 
 func main() {
@@ -20,13 +20,13 @@ func main() {
 	fmt.Printf("aviary %s - crypto backend %s\n\n",
 		bc.Version(), bc.CryptoBackendVersion())
 
-	// -- Off-chain crypto via cryptolib (the same backend aviary links) --
+	// -- Off-chain crypto via cipherbird (the same backend aviary links) --
 	doc := []byte("settlement-instruction:2026-06-08:EURx:1000000")
-	digest, _ := cryptolib.Blake3(doc, 32)
-	kp := cryptolib.Ed25519Keygen()
-	sig, _ := cryptolib.Ed25519Sign(digest, kp.Secret)
-	fmt.Println("cryptolib BLAKE3(doc):", hex.EncodeToString(digest))
-	fmt.Println("cryptolib Ed25519 sig valid:", cryptolib.Ed25519Verify(digest, sig, kp.Public))
+	digest, _ := cipherbird.Blake3(doc, 32)
+	kp := cipherbird.Ed25519Keygen()
+	sig, _ := cipherbird.Ed25519Sign(digest, kp.Secret)
+	fmt.Println("cipherbird BLAKE3(doc):", hex.EncodeToString(digest))
+	fmt.Println("cipherbird Ed25519 sig valid:", cipherbird.Ed25519Verify(digest, sig, kp.Public))
 
 	// -- On-chain ledger via aviary --
 	node := bc.NewNode(1)
@@ -55,7 +55,7 @@ func main() {
 	fmt.Print("metrics:\n", node.Metrics())
 
 	// Multi-chain interop address derivation.
-	secp, _ := cryptolib.RandomBytes(32)
+	secp, _ := cipherbird.RandomBytes(32)
 	secp[0] |= 1
 	fmt.Println("\ninterop addresses")
 	fmt.Println("  ethereum:", bc.EthAddress(secp))

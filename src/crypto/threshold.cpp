@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "cryptolib_c.h"
+#include "cipherbird_c.h"
 
 namespace aviary::custody {
 
@@ -14,11 +14,11 @@ codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()
 Bytes take(CryptoBufferResult r, const char* op) {
   if (r.buf.data == nullptr) {
     std::string msg = r.error ? r.error : std::string(op) + " failed";
-    if (r.error) cryptolib_str_free(r.error);
+    if (r.error) cipherbird_str_free(r.error);
     throw std::runtime_error("threshold: " + msg);
   }
   Bytes out(r.buf.data, r.buf.data + r.buf.len);
-  cryptolib_buffer_free(&r.buf);
+  cipherbird_buffer_free(&r.buf);
   return out;
 }
 
@@ -84,7 +84,7 @@ Bytes ShareCard::seal(std::string_view passphrase, std::uint64_t ops, std::size_
   const std::string aad = share_aad(group_public_key, index);
   const std::string p(passphrase);
   const Bytes sealed = take(
-      cryptolib_molecular_seal(plain.data(), plain.size(), p.c_str(),
+      cipherbird_molecular_seal(plain.data(), plain.size(), p.c_str(),
                                reinterpret_cast<const std::uint8_t*>(aad.data()), aad.size(), ops, mem),
       "share seal");
   codec::CodecWriter w;
@@ -103,7 +103,7 @@ ShareCard ShareCard::unseal(codec::ByteView envelope, std::string_view passphras
 
   const std::string aad = share_aad(group_pk, index);
   const std::string p(passphrase);
-  const Bytes plain = take(cryptolib_molecular_open(inner.data(), inner.size(), p.c_str(),
+  const Bytes plain = take(cipherbird_molecular_open(inner.data(), inner.size(), p.c_str(),
                                                     reinterpret_cast<const std::uint8_t*>(aad.data()),
                                                     aad.size()),
                            "share unseal");
@@ -117,10 +117,10 @@ ShareCard ShareCard::unseal(codec::ByteView envelope, std::string_view passphras
 // -- ThresholdAccount --------------------------------------------------------
 
 std::vector<ShareCard> ThresholdAccount::create(std::uint16_t n, std::uint16_t t) {
-  CryptoFrostKeyGen kg = cryptolib_frost_keygen(n, t);
+  CryptoFrostKeyGen kg = cipherbird_frost_keygen(n, t);
   if (kg.error != nullptr || kg.group_public_key.data == nullptr) {
     std::string msg = kg.error ? kg.error : "frost keygen failed";
-    cryptolib_frost_keygen_free(&kg);
+    cipherbird_frost_keygen_free(&kg);
     throw std::runtime_error("threshold: " + msg);
   }
 
@@ -144,7 +144,7 @@ std::vector<ShareCard> ThresholdAccount::create(std::uint16_t n, std::uint16_t t
     c.all_public_shares = pub_shares;
     cards.push_back(std::move(c));
   }
-  cryptolib_frost_keygen_free(&kg);  // zeroises the dealer's secret material
+  cipherbird_frost_keygen_free(&kg);  // zeroises the dealer's secret material
   return cards;
 }
 
@@ -152,16 +152,16 @@ std::vector<ShareCard> ThresholdAccount::create(std::uint16_t n, std::uint16_t t
 
 std::pair<SigningCeremony::Nonces, SigningCeremony::Commitment> SigningCeremony::commit(
     const ShareCard& share) {
-  CryptoFrostCommit c = cryptolib_frost_commit(share.secret_share.data(), share.secret_share.size(),
+  CryptoFrostCommit c = cipherbird_frost_commit(share.secret_share.data(), share.secret_share.size(),
                                                share.index);
   if (c.error != nullptr || c.hiding_nonce.data == nullptr) {
     std::string msg = c.error ? c.error : "frost commit failed";
-    cryptolib_frost_commit_free(&c);
+    cipherbird_frost_commit_free(&c);
     throw std::runtime_error("threshold: " + msg);
   }
   Nonces n{copy_buf(c.hiding_nonce), copy_buf(c.binding_nonce)};
   Commitment cm{share.index, copy_buf(c.hiding_commit), copy_buf(c.binding_commit)};
-  cryptolib_frost_commit_free(&c);  // zeroises the native nonce copies
+  cipherbird_frost_commit_free(&c);  // zeroises the native nonce copies
   return {std::move(n), std::move(cm)};
 }
 
@@ -188,7 +188,7 @@ SigningCeremony::SigningCeremony(Bytes group_public_key, Bytes message,
 }
 
 Bytes SigningCeremony::sign(const ShareCard& share, const Nonces& nonces) const {
-  return take(cryptolib_frost_sign(share.index, share.secret_share.data(), share.secret_share.size(),
+  return take(cipherbird_frost_sign(share.index, share.secret_share.data(), share.secret_share.size(),
                                    gpk_.data(), gpk_.size(), nonces.hiding.data(), nonces.hiding.size(),
                                    nonces.binding.data(), nonces.binding.size(), msg_.data(), msg_.size(),
                                    ids_.data(), hiding_flat_.data(), binding_flat_.data(), ids_.size()),
@@ -201,7 +201,7 @@ bool SigningCeremony::verify_share(std::uint16_t id, const Bytes& public_share,
   auto it = std::find_if(roster_.begin(), roster_.end(),
                          [&](const Commitment& c) { return c.id == id; });
   if (it == roster_.end()) return false;
-  return cryptolib_frost_verify_share(id, public_share.data(), public_share.size(), sig_share.data(),
+  return cipherbird_frost_verify_share(id, public_share.data(), public_share.size(), sig_share.data(),
                                       sig_share.size(), it->hiding.data(), it->hiding.size(),
                                       it->binding.data(), it->binding.size(), gpk_.data(), gpk_.size(),
                                       msg_.data(), msg_.size(), ids_.data(), hiding_flat_.data(),
@@ -218,7 +218,7 @@ Bytes SigningCeremony::aggregate(const std::vector<Bytes>& sig_shares) const {
     if (s.size() != 32) throw std::runtime_error("threshold: malformed signature share");
     flat.insert(flat.end(), s.begin(), s.end());
   }
-  return take(cryptolib_frost_aggregate(gpk_.data(), gpk_.size(), msg_.data(), msg_.size(), ids_.data(),
+  return take(cipherbird_frost_aggregate(gpk_.data(), gpk_.size(), msg_.data(), msg_.size(), ids_.data(),
                                         hiding_flat_.data(), binding_flat_.data(), ids_.size(),
                                         flat.data()),
               "frost aggregate");

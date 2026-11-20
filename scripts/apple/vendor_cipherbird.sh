@@ -7,7 +7,7 @@
 # Usage: bash scripts/apple/vendor_cipherbird.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-CIPHERBIRD="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}/bridge/bindings/cipherbird"
+CIPHERBIRD="${CIPHERBIRD_ROOT:-$ROOT/../cryptolib}/bridge/bindings/cipherbird"
 OUT="$ROOT/bridge/bindings/swift/Vendor/CipherBird.xcframework"
 ARGS=()
 SEEN=""

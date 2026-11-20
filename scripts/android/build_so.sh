@@ -8,10 +8,10 @@
 set -euo pipefail
 MODE="${1:-full}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
-CIPHERBIRD_JNILIBS="$CRYPTOLIB_ROOT/bridge/bindings/cipherbird/android/src/main/jniLibs"
-CIPHERBIRD_STATIC="$CRYPTOLIB_ROOT/build-android-static"
-CIPHERBIRD_DEPS="$CRYPTOLIB_ROOT/third_party/android"
+CIPHERBIRD_ROOT="${CIPHERBIRD_ROOT:-$ROOT/../cryptolib}"
+CIPHERBIRD_JNILIBS="$CIPHERBIRD_ROOT/bridge/bindings/cipherbird/android/src/main/jniLibs"
+CIPHERBIRD_STATIC="$CIPHERBIRD_ROOT/build-android-static"
+CIPHERBIRD_DEPS="$CIPHERBIRD_ROOT/third_party/android"
 case "$MODE" in
   full) PLUGIN_JNILIBS="$ROOT/bridge/bindings/aviary/android/src/main/jniLibs" ;;
   lite) PLUGIN_JNILIBS="$ROOT/bridge/bindings/aviary_lite/android/src/main/jniLibs" ;;
@@ -31,8 +31,8 @@ for abi in arm64-v8a x86_64; do
     [[ -f "$engine" ]] || { echo "missing $engine"; exit 1; }
   else
     deps="$CIPHERBIRD_DEPS/$abi/lib"
-    engine="$CIPHERBIRD_STATIC/$abi/libcryptolib_c.a"
-    [[ -f "$engine" ]] || { echo "missing $engine (build CipherBird with -DCRYPTOLIB_STATIC=ON for Android)"; exit 1; }
+    engine="$CIPHERBIRD_STATIC/$abi/libcipherbird_c.a"
+    [[ -f "$engine" ]] || { echo "missing $engine (build CipherBird with -DCIPHERBIRD_STATIC=ON for Android)"; exit 1; }
     for dep in libsodium libblake3 liboqs libcrypto libblst libsecp256k1; do
       [[ -f "$deps/$dep.a" ]] || { echo "missing $deps/$dep.a"; exit 1; }
       engine="$engine;$deps/$dep.a"
@@ -43,9 +43,9 @@ for abi in arm64-v8a x86_64; do
     -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-24 \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
-    -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" \
-    -DCRYPTOLIB_C_LIBRARY="$engine" >/dev/null
+    -DCIPHERBIRD_ROOT="$CIPHERBIRD_ROOT" \
+    -DCIPHERBIRD_C_INCLUDE_DIR="$CIPHERBIRD_ROOT/bridge" \
+    -DCIPHERBIRD_C_LIBRARY="$engine" >/dev/null
   cmake --build "$BUILD/$abi" --target aviary_c >/dev/null
   "$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-strip" --strip-unneeded "$BUILD/$abi/libaviary_c.so"
   mkdir -p "$PLUGIN_JNILIBS/$abi"

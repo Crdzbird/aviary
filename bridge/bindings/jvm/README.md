@@ -24,7 +24,7 @@ java --enable-native-access=ALL-UNNAMED -cp out:demo.jar -Daviary.path="$LIB" De
 
 The native library is resolved by `NativeLoader`: `-Daviary.path` / env
 `AVIARY_DYLIB` (dev), else a bundled `/native/<os>-<arch>/` resource, else
-the repo `build/` dir. The dev dylib's embedded rpath resolves `libcryptolib_c`
+the repo `build/` dir. The dev dylib's embedded rpath resolves `libcipherbird_c`
 automatically; the shipped engines are self contained, one library per
 platform.
 

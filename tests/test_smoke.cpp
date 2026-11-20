@@ -1,5 +1,5 @@
-// Zero-dependency smoke test (matching cryptolib's convention).
-// Proves the C++ core links cryptolib_c and computes BLAKE3 correctly.
+// Zero-dependency smoke test (matching cipherbird's convention).
+// Proves the C++ core links cipherbird_c and computes BLAKE3 correctly.
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -30,11 +30,11 @@ int main() {
 
   check(!version().empty(), "aviary::version() non-empty");
   check(!crypto_backend_version().empty(),
-        "crypto_backend_version() non-empty (cryptolib linkage live)");
-  std::printf("  ..   backend = cryptolib %s\n", crypto_backend_version().c_str());
+        "crypto_backend_version() non-empty (cipherbird linkage live)");
+  std::printf("  ..   backend = cipherbird %s\n", crypto_backend_version().c_str());
 
   // Externally-anchored golden vector: the official BLAKE3 hash of the empty
-  // input. If this matches, blake3 routed through cryptolib_c is correct.
+  // input. If this matches, blake3 routed through cipherbird_c is correct.
   const auto h_empty = crypto::blake3_256(std::vector<std::uint8_t>{});
   check(crypto::to_hex(h_empty) ==
             "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",

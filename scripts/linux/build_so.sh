@@ -8,8 +8,8 @@
 # Usage: bash scripts/linux/build_so.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
-ENGINE="$CRYPTOLIB_ROOT/build/static/libcryptolib_c.a"
+CIPHERBIRD_ROOT="${CIPHERBIRD_ROOT:-$ROOT/../cryptolib}"
+ENGINE="$CIPHERBIRD_ROOT/build/static/libcipherbird_c.a"
 [[ -f "$ENGINE" ]] || { echo "missing $ENGINE; run scripts/build_static_archive_linux.sh in the CipherBird checkout first"; exit 1; }
 case "$(uname -m)" in
   x86_64) SLOT=linux-x64;;
@@ -21,9 +21,9 @@ cmake -S "$ROOT" -B "$BUILD" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
   -DAVIARY_BUILD_TESTS=OFF \
-  -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
-  -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" \
-  -DCRYPTOLIB_C_LIBRARY="$ENGINE" \
+  -DCIPHERBIRD_ROOT="$CIPHERBIRD_ROOT" \
+  -DCIPHERBIRD_C_INCLUDE_DIR="$CIPHERBIRD_ROOT/bridge" \
+  -DCIPHERBIRD_C_LIBRARY="$ENGINE" \
   -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
   -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld -Wl,--exclude-libs,ALL -Wl,-z,defs -Wl,--icf=all" >/dev/null
 cmake --build "$BUILD" --target aviary_c

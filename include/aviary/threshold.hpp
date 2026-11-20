@@ -63,7 +63,7 @@ struct ShareCard {
 class ThresholdAccount {
  public:
   /// Deal [n] shares, any [t] of which can sign. The dealt group secret is
-  /// zeroised inside cryptolib before this returns. Throws on bad parameters.
+  /// zeroised inside cipherbird before this returns. Throws on bad parameters.
   static std::vector<ShareCard> create(std::uint16_t n, std::uint16_t t);
 };
 

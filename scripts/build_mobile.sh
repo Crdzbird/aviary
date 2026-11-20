@@ -2,11 +2,11 @@
 # Build all of aviary's native artifacts for mobile/desktop bindings:
 # the Apple xcframework (iOS device + simulator + macOS) and the Android .so.
 #
-# PREREQUISITE - cryptolib's *mobile* binaries must include the interop
+# PREREQUISITE - cipherbird's *mobile* binaries must include the interop
 # primitives (keccak256 / ripemd160 / secp256k1). If you added those to
-# cryptolib recently, regenerate them first (see docs/MOBILE.md):
+# cipherbird recently, regenerate them first (see docs/MOBILE.md):
 #   ( cd ../cryptolib && bash scripts/ios/build_all.sh && bash scripts/ios/assemble_xcframework.sh )
-#   ( cd ../cryptolib && bash scripts/android/build_all.sh )   # -> cryptolib_flutter jniLibs
+#   ( cd ../cryptolib && bash scripts/android/build_all.sh )   # -> cipherbird plugin jniLibs
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"

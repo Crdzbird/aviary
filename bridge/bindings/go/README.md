@@ -37,12 +37,12 @@ preload:
 | `bc.Init() error` | yes (once) | Optional; runs init synchronously and surfaces any error. |
 | `bc.Initialized() bool` | - | `true` once the backend is ready. |
 
-`aviary_init` -> `cryptolib_init`, which is idempotent; init runs exactly
+`aviary_init` -> `cipherbird_init`, which is idempotent; init runs exactly
 once (`sync.Once`), concurrency-safe.
 
-## Crypto backend: cryptolib (depended on, not bundled)
+## Crypto backend: cipherbird (depended on, not bundled)
 
-Aviary's crypto backend is **cryptolib**, whose Go binding is a dependency
+Aviary's crypto backend is **cipherbird**, whose Go binding is a dependency
 of this module - so the full crypto surface (hashing, AEAD, Ed25519/X25519,
 post-quantum ML-KEM/ML-DSA, BLS, vaults, keyring, EVM/Bitcoin primitives) is
 available alongside the ledger, from one `go get`:
@@ -50,15 +50,15 @@ available alongside the ledger, from one `go get`:
 ```go
 import (
     bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
-    "github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
+    "github.com/Crdzbird/CipherBird/bridge/bindings/go/cipherbird"
 )
 
-digest, _ := cryptolib.Blake3(doc, 32)      // off-chain crypto
-kp := cryptolib.Ed25519Keygen()
+digest, _ := cipherbird.Blake3(doc, 32)      // off-chain crypto
+kp := cipherbird.Ed25519Keygen()
 node := bc.NewNode(1)                         // on-chain ledger
 ```
 
-`aviary_c` links `cryptolib_c` (CipherBird); importing its Go package provides
+`aviary_c` links `cipherbird_c` (CipherBird); importing its Go package provides
 that library (the Go analog of the `aviary` Flutter package depending on
 `cipherbird`). `bc.CryptoBackendVersion()` reports the linked backend
 version (`3.0.0`), proving the link end to end.
@@ -68,19 +68,19 @@ version (`3.0.0`), proving the link end to end.
 Requires `CGO_ENABLED=1` and the prebuilt native libraries.
 
 - **Local (default)** - `cgo_local.go` links `libaviary_c` from the repo
-  `build/` dir and bakes an rpath to it; cryptolib's own Go binding bakes the
+  `build/` dir and bakes an rpath to it; cipherbird's own Go binding bakes the
   rpath to its `build/release`. So in-repo binaries run with no environment
-  setup - just check out `cryptolib` next to `aviary`.
-- **Static (`-tags "aviary_static cryptolib_static"`)** - the "just works
+  setup - just check out `cipherbird` next to `aviary`.
+- **Static (`-tags "aviary_static cipherbird_static"`)** - the "just works
   everywhere" option: links the merged `build/static/libaviary_c.a` plus
-  cryptolib's static archive. The binary has **no `libaviary_c` /
-  `libcryptolib_c` shared-library dependency** - nothing to ship, no rpath, no
+  cipherbird's static archive. The binary has **no `libaviary_c` /
+  `libcipherbird_c` shared-library dependency** - nothing to ship, no rpath, no
   `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`. Build the archives once:
 
   ```bash
-  ( cd ../cryptolib && scripts/build_static_archive.sh )   # cryptolib archive
+  ( cd ../cryptolib && scripts/build_static_archive.sh )   # cipherbird archive
   scripts/build_static_archive.sh                          # aviary archive
-  ( cd bridge/bindings/go && go build -tags "aviary_static cryptolib_static" ./... )
+  ( cd bridge/bindings/go && go build -tags "aviary_static cipherbird_static" ./... )
   ```
 - **Installed (`-tags aviary_pkgconfig`)** - resolves flags from a
   `aviary_c.pc` on `PKG_CONFIG_PATH` (template: `aviary_c.pc.in`).
@@ -88,7 +88,7 @@ Requires `CGO_ENABLED=1` and the prebuilt native libraries.
 
 ```bash
 go test ./aviary/      # unit tests + cross-binding determinism
-go run  ./example            # ledger + cryptolib crypto together
+go run  ./example            # ledger + cipherbird crypto together
 go run  ./cmd/demo           # cross-language golden-vector determinism check
 ```
 
@@ -166,12 +166,12 @@ go get github.com/Crdzbird/aviary/bridge/bindings/go@v1.0.0
 The module depends on CipherBird's Go module (`github.com/Crdzbird/CipherBird/
 bridge/bindings/go`) at a pinned pseudo version. Both bindings are cgo
 wrappers over C libraries, so a fetched copy needs those libraries available
-through pkg-config: install `libaviary_c` and `libcryptolib_c` with their
+through pkg-config: install `libaviary_c` and `libcipherbird_c` with their
 `.pc` files (`bridge/bindings/go/aviary/aviary_c.pc.in` is the template) and
 build with
 
 ```bash
-go build -tags aviary_pkgconfig,cryptolib_pkgconfig ./...
+go build -tags aviary_pkgconfig,cipherbird_pkgconfig ./...
 ```
 
 Inside this repository the root `go.work` puts the binding, the example

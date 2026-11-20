@@ -95,9 +95,9 @@ over a `PeerMesh`. Run it with `flutter run` from `example/`.
 ## How the engine is shared
 
 On iOS and macOS the app embeds both `AviaryC.framework` and
-`CipherBird.framework`; Aviary's `cryptolib_*` symbols resolve at load time
+`CipherBird.framework`; Aviary's `cipherbird_*` symbols resolve at load time
 against CipherBird. On Android the plugin loads `libcipherbird.so` before
 `libaviary_c.so`, because the CipherBird library's SONAME is still
-`libcryptolib_c.so` and the dynamic linker would not find it by its file
+`libcipherbird_c.so` and the dynamic linker would not find it by its file
 name otherwise. Both loads happen in the plugin's startup provider and in
 the Dart loader, so an app does not have to do anything.

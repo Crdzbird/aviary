@@ -2,7 +2,7 @@
 # Aviary .gitignore
 # Native libraries and platform build outputs are NOT committed - they are large
 # and machine-built. Rebuild them with the scripts in scripts/ (and the sibling
-# cryptolib checkout). See each binding's README.
+# cipherbird checkout). See each binding's README.
 # -----------------------------------------------------------------------------
 
 # -- Build output (CMake / Gradle / SPM / Flutter, at any depth) --

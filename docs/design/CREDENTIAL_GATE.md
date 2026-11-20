@@ -8,7 +8,7 @@
 > protocol decisions, not glue, and getting them wrong ships a privacy feature
 > that quietly breaks safety. This doc resolves them first.
 >
-> Author: assurance-plan Phase 3. Depends on cryptolib BBS
+> Author: assurance-plan Phase 3. Depends on cipherbird BBS
 > (`draft-irtf-cfrg-bbs-signatures`, BLS12-381-SHA-256) + OPAQUE/OPRF already in
 > the ABI. See [`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 9 and the
 > `AssuranceProfile` in [`../IMPROVEMENTS.md`](../IMPROVEMENTS.md).
@@ -28,11 +28,11 @@ The hard part - and the bulk of this doc - is that naive BBS proofs are
 slashing; the resolution is a **linkable-by-epoch pseudonym** bound into every
 proof.
 
-**Bottom line after auditing the cryptolib ABI (section 10):** it exposes only *bare*
+**Bottom line after auditing the cipherbird ABI (section 10):** it exposes only *bare*
 BBS - no pseudonym or blind-commitment primitive. So this splits into a
 **shippable-now** part (BBS wrappers + *unlinkable* submitter/gossip admission,
 Sybil-weak but safe) and a **blocked** part (the per-epoch pseudonym that gives
-real Sybil resistance), which depends on an **upstream cryptolib BBS-pseudonym
+real Sybil resistance), which depends on an **upstream cipherbird BBS-pseudonym
 primitive** - *not* on a home-grown zero-knowledge construction, which the
 project's "never reimplement crypto" rule forbids. Validator anonymity is deferred
 further, behind slashing/epoch machinery that doesn't exist yet.
@@ -70,7 +70,7 @@ architecture always promised but never built past a static allow-list.
 
 ## 2. What BBS gives us (and what it does not)
 
-From the cryptolib ABI (`cryptolib_bbs_*`, BLS12-381-SHA-256; sk 32 B, pk 96 B,
+From the cipherbird ABI (`cipherbird_bbs_*`, BLS12-381-SHA-256; sk 32 B, pk 96 B,
 signature 80 B):
 
 - `bbs_sign(sk, pk, header, msgs[])` - the **issuer** signs a *vector* of messages
@@ -146,9 +146,9 @@ piece BBS's bare `proof_gen` does **not** give directly - it proves disclosed
 *equal* signed values, not *functions* of hidden values. **This is the central
 open technical question (see section 10.1):** either (a) a BBS variant / pseudonym
 extension (`draft-irtf-cfrg-bbs-per-verifier-linkability` / BBS# "pseudonym"
-mode) if cryptolib exposes it, or (b) a construction we build over the primitives
+mode) if cipherbird exposes it, or (b) a construction we build over the primitives
 we have (OPRF-based verifiable pseudonym + a disclosed commitment attribute). The
-doc's recommendation depends on what cryptolib can provide; **we do not implement
+doc's recommendation depends on what cipherbird can provide; **we do not implement
 until section 10.1 is answered.**
 
 ### 3.3 Option C - Full identity (the fallback we already have)
@@ -212,7 +212,7 @@ member:  bbs_verify(issuer_pk, credential, attrs)          (sanity)
          store {credential, member_secret, attrs} sealed at rest
 ```
 
-*If cryptolib's BBS does not expose blind-commitment issuance*, the fallback is:
+*If cipherbird's BBS does not expose blind-commitment issuance*, the fallback is:
 the member sends `member_secret` to the issuer over a `RemoteGuard`/OPAQUE
 channel and trusts the issuer not to retain it (a weaker but common model). **This
 is open question section 10.2.** Blind issuance is strongly preferred and is why section 10.2
@@ -363,17 +363,17 @@ namespace aviary::consensus {
 ## 10. Open questions - MUST answer before implementing
 
 These are why this is a doc and not a commit. Each blocks code. **section 10.1 and section 10.2
-were audited against the current cryptolib ABI while writing this doc - findings
+were audited against the current cipherbird ABI while writing this doc - findings
 recorded inline.**
 
 1. **Verifiable pseudonym over a hidden attribute (section 3.2). - AUDITED: no native
-   support.** The cryptolib ABI exposes only **bare** BBS
+   support.** The cipherbird ABI exposes only **bare** BBS
    (`bbs_{keygen,sk_to_pk,sign,verify,proof_gen,proof_verify}`) - no
    `pseudonym`/`nym`/per-verifier-linkability entry point. So Option B is **not a
    thin wrapper**. The two paths:
   - **(a) Preferred - upstream it.** Request the BBS *pseudonym* extension
      (`draft-irtf-cfrg-bbs-per-verifier-linkability`, aka BBS# pseudonym mode) in
-     cryptolib. This puts the ZK-soundness burden where the crypto expertise is
+     cipherbird. This puts the ZK-soundness burden where the crypto expertise is
      and keeps aviary a *consumer* of vetted primitives - consistent with
      the whole architecture (we never reimplement crypto).
   - **(b) Fallback - custom construction.** OPRF *is* available
@@ -387,7 +387,7 @@ recorded inline.**
      (b) is therefore *only* viable if the equality proof is a standard,
      reviewable construction with test vectors - not something we invent.
 
-   -> **Decision: pursue (a). Do not implement Option B until cryptolib exposes a
+   -> **Decision: pursue (a). Do not implement Option B until cipherbird exposes a
      reviewed pseudonym primitive.** Option A (unlinkable) is unblocked and ships
      first.
 2. **Blind issuance (section 5). - AUDITED: no native BBS blind-commit.** The ABI signs a
@@ -396,7 +396,7 @@ recorded inline.**
    issuer in v1 unless we build blinding over OPRF (again a custom composition,
    section 10.1(b)). -> **Decision: v1 uses the trusted-issuer model** (member_secret sent
    to the issuer over a `RemoteGuard`/OPAQUE-authenticated channel; issuer must not
-   retain it), documented as a known limitation. Blind issuance follows a cryptolib
+   retain it), documented as a known limitation. Blind issuance follows a cipherbird
    BBS-blind-commit primitive, same as section 10.1(a). Acceptable for consortium
    deployments where the issuer is already the trust root; **not** acceptable if
    the threat model includes a malicious issuer - such deployments must wait for
@@ -456,7 +456,7 @@ Given the section 10 audit (bare BBS only; OPRF present; no pseudonym or blind-c
    the tx's own signature/nonce handles anti-replay, and gossip peer-scoring falls
    back to per-connection (not per-identity) limits. This is Sybil-*weak* but
    safe, private, and shippable on bare BBS **now**. Document the Sybil caveat.
-3. **Block Option B (per-epoch pseudonym -> real Sybil resistance) on cryptolib.**
+3. **Block Option B (per-epoch pseudonym -> real Sybil resistance) on cipherbird.**
    File a request for the BBS **pseudonym** extension (section 10.1(a)). Do **not** build
    a custom BBSxOPRF equality-of-discrete-logs ZK proof - that is exactly the
    "roll your own crypto" the project forbids. Option B lands as a thin wrapper the
@@ -470,10 +470,10 @@ Given the section 10 audit (bare BBS only; OPRF present; no pseudonym or blind-c
 **Net:** the audit turned "should we build this?" into a clear, staged answer.
 The shippable-now core is **BBS wrappers + Option-A unlinkable admission**; the
 headline feature (Sybil-resistant anonymous membership) is **correctly blocked on
-an upstream cryptolib primitive** rather than on a home-grown ZK protocol. This
+an upstream cipherbird primitive** rather than on a home-grown ZK protocol. This
 keeps aviary a consumer of vetted crypto and avoids the single most
-dangerous way this feature could go wrong. Next action is a **cryptolib feature
+dangerous way this feature could go wrong. Next action is a **cipherbird feature
 request for BBS pseudonyms** - **filed** as
-[`docs/CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md`](../CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md)
+[`docs/CIPHERBIRD_BBS_PSEUDONYM_REQUIREMENTS.md`](../CIPHERBIRD_BBS_PSEUDONYM_REQUIREMENTS.md)
 (section 1 pseudonyms = the Option-B blocker, section 2 blind issuance = the section 10.2
 malicious-issuer fix) - after which section 9 implements in the order of this section.

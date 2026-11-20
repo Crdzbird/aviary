@@ -15,7 +15,7 @@
 ///
 /// The profile's id is **committed into the genesis hash** (a field on
 /// [GenesisSpec]), so every node provably agrees on the posture - a node cannot
-/// silently join with a weaker configuration, exactly as cryptolib binds a suite
+/// silently join with a weaker configuration, exactly as cipherbird binds a suite
 /// id into its PQ envelopes. `from_genesis` reconstructs the profile AND checks
 /// the genesis's own parameters (its accepted signature algorithms) match what
 /// the declared level mandates, so a spec that claims a strong level but permits

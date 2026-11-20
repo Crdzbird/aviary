@@ -10,8 +10,8 @@
 #include "aviary/interop/rlp.hpp"
 
 /// EVM (Ethereum) interop: addresses and legacy (EIP-155) transaction signing
-/// (ARCHITECTURE section 11). All signing uses cryptolib's secp256k1; hashing uses
-/// cryptolib's keccak256. Read/RPC layer is separate (json_rpc).
+/// (ARCHITECTURE section 11). All signing uses cipherbird's secp256k1; hashing uses
+/// cipherbird's keccak256. Read/RPC layer is separate (json_rpc).
 namespace aviary::interop::evm {
 
 using crypto::Hash;

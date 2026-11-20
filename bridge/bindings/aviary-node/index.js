@@ -8,12 +8,12 @@
 //   const { secret, address } = node.newAccount();
 //   node.credit(address, 1_000_000n);
 //
-// Aviary's native links cryptolib's C ABI; libcryptolib_c is loaded first
+// Aviary's native links cipherbird's C ABI; libcipherbird_c is loaded first
 // (its symbols are then process-global) so libaviary_c resolves them.
 //
 // NOTE for publishing: ship a self-contained pair of dylibs (or statically link
-// cryptolib) and rewrite the install-name to @loader_path so it runs without the
-// dev build tree. During local development set AVIARY_DYLIB / CRYPTOLIB_DYLIB.
+// cipherbird) and rewrite the install-name to @loader_path so it runs without the
+// dev build tree. During local development set AVIARY_DYLIB / CIPHERBIRD_LIBRARY.
 
 'use strict';
 const fs = require('node:fs');
@@ -36,12 +36,12 @@ function resolveAviary() {
   return process.env.AVIARY_DYLIB ||
     path.join(__dirname, 'prebuilds', triple(), `libaviary_c.${ext()}`);
 }
-function resolveCryptolib() {
+function resolveCipherBird() {
   // The bundled libraries are self contained: CipherBird is linked into
   // libaviary_c on every platform. A development build of libaviary_c (named
-  // by AVIARY_DYLIB) links CipherBird dynamically; CRYPTOLIB_DYLIB loads it
+  // by AVIARY_DYLIB) links CipherBird dynamically; CIPHERBIRD_LIBRARY loads it
   // first when the library's rpath cannot find it.
-  return process.env.CRYPTOLIB_DYLIB || null;
+  return process.env.CIPHERBIRD_LIBRARY || null;
 }
 
 // -- Lazy native binding ------------------------------------------------------
@@ -53,10 +53,10 @@ let _native = null;
 function ensureLoaded() {
   if (_native) return _native;
 
-  // Load cryptolib first (best-effort) so libaviary_c's cryptolib_*
+  // Load cipherbird first (best-effort) so libaviary_c's cipherbird_*
   // imports resolve. dlopen is process-global.
-  const cryptolib = resolveCryptolib();
-  if (cryptolib) { try { koffi.load(cryptolib); } catch { /* may already be linked via rpath */ } }
+  const cipherbird = resolveCipherBird();
+  if (cipherbird) { try { koffi.load(cipherbird); } catch { /* may already be linked via rpath */ } }
   const lib = koffi.load(resolveAviary());
 
   const Buf = koffi.struct('AviaryBuffer', { data: 'void *', len: 'size_t' });

@@ -2,10 +2,10 @@
 # Build AviaryC.xcframework as a DYNAMIC-framework xcframework for the
 # Flutter plugin's Swift Package.
 #
-# Unlike the old static+merged build, aviary's cryptolib_* symbols are
+# Unlike the old static+merged build, aviary's cipherbird_* symbols are
 # left UNDEFINED (-undefined dynamic_lookup) and resolve at runtime against the
-# CryptoLibC framework that cryptolib_flutter embeds. So this build:
-#   1. compiles aviary_core.a + aviary_c.a per slice (no cryptolib),
+# CipherBirdC framework that cipherbird_flutter embeds. So this build:
+#   1. compiles aviary_core.a + aviary_c.a per slice (no cipherbird),
 #   2. wraps them in a dynamic AviaryC.framework (force-load -> all C-ABI
 #      symbols exported for DynamicLibrary.process()),
 #   3. assembles ios-arm64 + ios-arm64-simulator + macos-arm64 into one
@@ -14,8 +14,8 @@
 # Usage: ./build_dynamic_xcframework.sh [slice ...]   (default: all three)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
-TOOLCHAIN="$CRYPTOLIB_ROOT/cmake/ios.toolchain.cmake"
+CIPHERBIRD_ROOT="${CIPHERBIRD_ROOT:-$ROOT/../cryptolib}"
+TOOLCHAIN="$CIPHERBIRD_ROOT/cmake/ios.toolchain.cmake"
 PLUGIN="$ROOT/bridge/bindings/aviary"
 BUILD="$ROOT/build-apple"
 FW_NAME="AviaryC"
@@ -40,10 +40,10 @@ build_archives() {  # <slice>
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DIOS_PLATFORM="$platform" \
     -DCMAKE_BUILD_TYPE=Release \
     -DAVIARY_STATIC=ON \
-    -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
-    -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" >/dev/null
+    -DCIPHERBIRD_ROOT="$CIPHERBIRD_ROOT" \
+    -DCIPHERBIRD_C_INCLUDE_DIR="$CIPHERBIRD_ROOT/bridge" >/dev/null
   cmake --build "$BUILD/$slice" --target aviary_c >/dev/null
-  # One archive with aviary core + C ABI only (cryptolib stays external).
+  # One archive with aviary core + C ABI only (cipherbird stays external).
   libtool -static -o "$BUILD/$slice/libaviary_only.a" \
     "$BUILD/$slice/libaviary_core.a" "$BUILD/$slice/libaviary_c.a"
 }
@@ -82,8 +82,8 @@ make_framework() {  # <slice> -> echoes .framework path
     header \"aviary_c.h\"
     export *
 }"
-  # -undefined dynamic_lookup: cryptolib_* symbols resolve at load time from the
-  # CryptoLibC framework (also embedded by cryptolib_flutter).
+  # -undefined dynamic_lookup: cipherbird_* symbols resolve at load time from the
+  # CipherBirdC framework (also embedded by cipherbird_flutter).
   local common=(-dynamiclib -arch arm64 -isysroot "$sysroot" "$minflag"
                 -Wl,-force_load,"$archive" -undefined dynamic_lookup -lc++)
   if [[ "$slice" == macosx ]]; then

@@ -53,7 +53,7 @@
   profile id AND the mandated `accepted_sig_algos`, and the id is **committed
   into the genesis hash** (new `GenesisSpec::assurance_profile` field) - so every
   node provably runs the same posture, and one can't silently join with a weaker
-  config (the same suite-id-in-envelope discipline cryptolib uses).
+  config (the same suite-id-in-envelope discipline cipherbird uses).
   `from_genesis` reconstructs the profile AND rejects an inconsistent spec (a
   strong level whose accepted-signature set permits weak schemes) or an unknown
   id. `test_assurance.cpp`: tier mapping per level, the posture changing the
@@ -134,16 +134,16 @@
   `AssuranceProfile`. The doc resolves the core tension - BBS proofs are
   *unlinkable*, which breaks Sybil resistance / revocation / slashing - via a
   per-epoch verifiable pseudonym. **Audit finding (recorded in the doc):**
-  cryptolib exposes only *bare* BBS (no pseudonym / blind-commit), so this stages
+  cipherbird exposes only *bare* BBS (no pseudonym / blind-commit), so this stages
   into (1) shippable-now BBS wrappers + *unlinkable* Option-A admission
   (Sybil-weak but safe), and (2) the per-epoch pseudonym for real Sybil
-  resistance, **blocked on an upstream cryptolib BBS-pseudonym primitive** - not
+  resistance, **blocked on an upstream cipherbird BBS-pseudonym primitive** - not
   a home-grown ZK construction (the project never reimplements crypto). Validator
   anonymity deferred behind slashing/epoch machinery. **BBS-pseudonym request
-  FILED:** `docs/CRYPTOLIB_BBS_PSEUDONYM_REQUIREMENTS.md` (section 1 per-verifier
+  FILED:** `docs/CIPHERBIRD_BBS_PSEUDONYM_REQUIREMENTS.md` (section 1 per-verifier
   linkability/pseudonyms = the Option-B blocker, section 2 blind issuance = the
   malicious-issuer fix). **DONE - bare-BBS wrappers + Option A:** `crypto::bbs_*`
-  seam (keygen/sk_to_pk/sign/verify/proof_gen/proof_verify over cryptolib BBS,
+  seam (keygen/sk_to_pk/sign/verify/proof_gen/proof_verify over cipherbird BBS,
   BLS12-381-SHA-256; `test_bbs.cpp`) + `consensus::CredentialGate` unlinkable
   admission (`credential_gate.{hpp,cpp}`): `CredentialPolicy`
   (issuer pk + schema + min_tier, canonical encode/decode_all/`hash()` ready to
@@ -209,11 +209,11 @@
   working gate from genesis, and proves orthogonality (fortress+permissionless,
   standard+permissioned). Go + Dart golden vectors still replay (genesis encoding
   changed; tx/block/proof vectors unaffected); ASan-clean.
-- **Option B - cryptolib primitive shipped; crypto seam DONE (Increment 1).** The
-  filed requests landed (`Crdzbird/CryptoLib#3`/#4,
+- **Option B - cipherbird primitive shipped; crypto seam DONE (Increment 1).** The
+  filed requests landed (`Crdzbird/CipherBird#3`/#4,
   `draft-irtf-cfrg-bbs-per-verifier-linkability-02`, pseudonyms **coupled with
   blind issuance** - the seed is committed blindly so the issuer never learns it).
-  Relinked against the rebuilt cryptolib and wrapped all 9 new functions in
+  Relinked against the rebuilt cipherbird and wrapped all 9 new functions in
   `crypto::bbs_*`: `bbs_commit_with_nym` / `bbs_blind_sign_with_nym` /
   `bbs_finalize_nym_secrets` / `bbs_calculate_pseudonym` /
   `bbs_proof_gen_with_pseudonym` / `bbs_proof_verify_with_pseudonym` + standalone
@@ -223,12 +223,12 @@
   pseudonym** (Sybil-linkable within a scope), **different context -> unlinkable**,
   a fresh seed -> a different pseudonym, wrong-context / tampered-nym / wrong-blind
   all fail closed. **Gotcha (documented in the seam):** nym / entropy scalars must
-  be canonical (< the BLS12-381 order r) - cryptolib does not reduce them, so a
+  be canonical (< the BLS12-381 order r) - cipherbird does not reduce them, so a
   non-canonical scalar silently breaks the round-trip; the round-trip flow itself
-  is byte-exact against cryptolib's own reference vectors. 61 C++ suites, ASan-
+  is byte-exact against cipherbird's own reference vectors. 61 C++ suites, ASan-
   clean, Go binding still green against the new lib. **Canonical-scalar helper
-  wired (`Crdzbird/CryptoLib#5` shipped):** `crypto::bbs_hash_to_scalar(msg, dst)`
-  + `bbs_random_scalar()` wrap the two new cryptolib fns; the test now derives the
+  wired (`Crdzbird/CipherBird#5` shipped):** `crypto::bbs_hash_to_scalar(msg, dst)`
+  + `bbs_random_scalar()` wrap the two new cipherbird fns; the test now derives the
   nym seed the clean way - `nym_seed = bbs_hash_to_scalar(member_secret, dst)`
   (deterministic, canonical, so the same member -> the same per-context pseudonym)
   and takes issuer entropy from `bbs_random_scalar()` - no more high-bit clamping.
@@ -259,10 +259,10 @@
   gain the pseudonymous flow + a test that drives blind issuance -> per-(epoch,
   scope) pseudonym determinism -> Sybil cap -> cross-epoch unlinkability ->
   revocation -> the reject set. GOTCHA: the Swift demo lazy-bind-crashed because
-  the vendored `CryptoLibC.xcframework` (macOS slice) predated the new cryptolib
-  BBS symbols - fixed by rebuilding cryptolib's macOS slice
+  the vendored `CipherBirdC.xcframework` (macOS slice) predated the new cipherbird
+  BBS symbols - fixed by rebuilding cipherbird's macOS slice
   (`scripts/ios/build_all.sh macosx`) and re-vendoring it into
-  `cryptolib_flutter/{ios,macos}`; then the dynamic aviary xcframework
+  `cipherbird_flutter/{ios,macos}`; then the dynamic aviary xcframework
   rebuild picked it up. **The entire CredentialGate feature (Option A + B) is now
   end-to-end across all five bindings.**
 - **[x] Composable chains - ChainBlueprint + ComponentRegistry + ChainAssembler,
@@ -309,8 +309,8 @@
   run synchronously inside consensus, MUST be deterministic (no clock, no
   randomness) and must not re-enter the chain. 63 C++ suites, ASan-clean.
 - **[x] Noise XX transport tier - standards-based channel + PQ identity proof
- - DONE** (commit e0702a7). Consumes cryptolib's newly exposed
-  `cryptolib_noise_*` C ABI as `TransportTier::kNoiseXX`, next to the SIGMA
+ - DONE** (commit e0702a7). Consumes cipherbird's newly exposed
+  `cipherbird_noise_*` C ABI as `TransportTier::kNoiseXX`, next to the SIGMA
   `SecureSession` (kMutual) and the ratcheted `ArmoredChannel`. `crypto::Noise`
   wraps the raw Noise_XX_25519_ChaChaPoly_SHA256 state (+ `x25519_keygen`);
   `p2p::NoiseSession` runs the 3-message XX handshake (fixed version||role hello
@@ -507,7 +507,7 @@
   `ConsensusEngine&`; PosData fuzzed. Reference-grade (no fork choice / no
   finality gadget beyond the leader signature).
   **[x] VRF-PoS (grind-proof election) - DONE.** `VrfPosEngine` (`vrf_pos.hpp`)
-  is the hardened tier composed on cryptolib's ECVRF (RFC 9381), closing the
+  is the hardened tier composed on cipherbird's ECVRF (RFC 9381), closing the
   reference engine's two structural gaps: its leader is a public function of the
   height, so it is *predictable arbitrarily far ahead* (targeted DoS) and
   grindable by anyone influencing the seed. Here eligibility is a VRF proof over
@@ -559,7 +559,7 @@
   merely linked (`test_consensus_hardening.cpp`, `test_verification.cpp`).
 - **[L] `FastAggregateVerify` option.** Votes bind the validator index so BLS
   *core* `AggregateVerify` (distinct-message) applies - rogue-key-safe, no PoP,
-  no cryptolib change. A same-message `FastAggregateVerify` in cryptolib would be
+  no cipherbird change. A same-message `FastAggregateVerify` in cipherbird would be
   ~1 pairing vs N and shrink the signed message; weigh the perf win vs the new C
   ABI surface. (See the design note in the status memory.)
 - **[x] `ValidatorSet` construction validation - DONE.** The constructor now
@@ -667,7 +667,7 @@
 ## Crypto seam (M1/M2)
 
 - **[x] Custodial key management (S3) - DONE.** `aviary::custody`
-  (`keyring.hpp`) wraps cryptolib into three pieces: `Vault` (a committing-AEAD
+  (`keyring.hpp`) wraps cipherbird into three pieces: `Vault` (a committing-AEAD
   envelope-encryptor keyed by a 32-byte master, AAD-bound, stateless so a blob
   seals now and opens after reload), `Keyring` (a random master key wrapped by
   device / passphrase slots - the same master unlocks through any slot;
@@ -682,8 +682,8 @@
   binding (Go/Dart/npm/Swift/JVM) as a `KeyStore` class - custodial signing is
   `reveal(address) -> submitTransfer(secret, ...)`, verified end-to-end on all four
   runtime bindings (`alice 750 / bob 250`, wrong-passphrase rejected) + a durable
-  Go test (`TestKeyStoreCustodialSigning`). **MolecularVault upgrade (cryptolib
-  3.x):** new entries are sealed by `Vault::seal_max` - cryptolib's MolecularVault
+  Go test (`TestKeyStoreCustodialSigning`). **MolecularVault upgrade (cipherbird
+  3.x):** new entries are sealed by `Vault::seal_max` - cipherbird's MolecularVault
   cascade (XChaCha20-Poly1305  then  AES-256-GCM-SIV) under a key-committing outer
   layer, so BOTH ciphers must break before a signing secret at rest leaks. The
   store format is v2 with a per-entry seal version: legacy v1 stores (committing
@@ -694,7 +694,7 @@
   fixed domain AAD, and `import_account` reseals it under the destination store's
   master - an account moves between stores with only a passphrase. Tamper /
   wrong-passphrase / wrong-AAD all fail closed; v1-compat + migration tested.
-  **Threshold custody DONE (cryptolib FROST):** `custody::ThresholdAccount` /
+  **Threshold custody DONE (cipherbird FROST):** `custody::ThresholdAccount` /
   `SigningCeremony` (`threshold.hpp`) - t-of-n accounts via FROST(Ed25519,
   RFC 9591) where the account secret **never exists**: dealt shares sign in a
   two-round ceremony and the aggregate is a standard 64-byte Ed25519 signature,
@@ -708,7 +708,7 @@
   **Remaining:** zeroize master/secret buffers on drop; an optional `DemoNode`
   convenience that signs by address; expose export/import + threshold through
   the C ABI + bindings; distributed keygen (the dealer is trusted at creation).
-  **Portable account tiers DONE (cryptolib Suite/PQ):** `custody::PortableAccount`
+  **Portable account tiers DONE (cipherbird Suite/PQ):** `custody::PortableAccount`
   is one export value {public_key, secret} with three fail-closed, domain-AAD-
   bound tiers: **passphrase** (MolecularVault + Argon2id), **recipient-bound**
   (`crypto::pq_seal_to` - encapsulate to a device's hybrid-KEM key; only that
@@ -740,7 +740,7 @@
 
 - **[x] Expose the Ledger + BftEngine through the C ABI - DONE.** `DemoNode` (full chain: ledger+BFT+mempool+observability) is exposed via an opaque handle (`aviary_node_*`: create/credit/new_account/submit_transfer/produce_block/height/balance/nonce/state_root/drain_events/metrics/prove_account) + interop address derivation. A high-level Dart binding (`aviary.dart`) and a **Flutter example app** (`examples/aviary_demo`) drive all of it. Remaining: multi-validator nodes, EVM/BTC tx-signing over the C ABI.
 - **[M] Packaged, auto-loading binding distribution.** Bindings load
-  `libaviary_c.dylib` by path (dev only). Mirror cryptolib's packaging: a
+  `libaviary_c.dylib` by path (dev only). Mirror cipherbird's packaging: a
   pub package (bundled per-platform binary) and a Go module with a vendored/
   static lib. Currently macOS-arm64 only; rpath is an absolute local path.
 - **[M] C ABI error taxonomy.** Errors are generic ints / strings. Add stable
@@ -828,7 +828,7 @@ test. Still to do:
   impostor-key visibility. **Remaining:** identity negotiation in the `Hello`/
   peer-discovery layer (who to expect) and bridging the session to the C ABI.
 - **[x] Armored channel (PQ ratchet, hardened transport tier) - DONE.**
-  `p2p::ArmoredChannel` (`armored.hpp`) composes cryptolib's hybrid-KEM **Double
+  `p2p::ArmoredChannel` (`armored.hpp`) composes cipherbird's hybrid-KEM **Double
   Ratchet** (`crypto::Ratchet`) with a hybrid-signature identity handshake to
   give a channel that is confidential, mutually authenticated, post-quantum,
   forward-secret, **and** post-compromise-secure - a leaked message key exposes
@@ -903,7 +903,7 @@ through the C ABI (verified cross-language in Dart & Go). Deferred:
 ## Interoperability (M6 - EVM tx core done, much deferred)
 
 M6 added the interop crypto primitives (keccak256, ripemd160, secp256k1 - added
-to cryptolib, verified by KATs), RLP, and the EVM transaction + ABI core
+to cipherbird, verified by KATs), RLP, and the EVM transaction + ABI core
 (addresses + EIP-55, legacy EIP-155 sign/recover, static ABI encode/decode +
 selectors - validated against real-world vectors). Deferred:
 
@@ -968,7 +968,7 @@ selectors - validated against real-world vectors). Deferred:
 
 ## Testing, fuzzing & CI
 
-- **[x] CI - DONE (workflow + script).** `git init` done; `scripts/ci.sh` runs C++ build + ctest + ASan/UBSan + Dart/Go bindings + Flutter analyze (verified green locally); `.github/workflows/ci.yml` runs it on macOS (builds cryptolib_c, set `CRYPTOLIB_REPO`). Remaining: a timed libFuzzer run in CI, Linux matrix, caching.
+- **[x] CI - DONE (workflow + script).** `git init` done; `scripts/ci.sh` runs C++ build + ctest + ASan/UBSan + Dart/Go bindings + Flutter analyze (verified green locally); `.github/workflows/ci.yml` runs it on macOS (builds cipherbird_c, set `CIPHERBIRD_REPO`). Remaining: a timed libFuzzer run in CI, Linux matrix, caching.
 - **[M] Continuous fuzzing + corpus.** `fuzz/fuzz_codec.cpp` exists but is
   opt-in and uncorporated. Run it in CI with a seed corpus; add fuzz targets for
   the consensus and block decoders.
@@ -988,7 +988,7 @@ selectors - validated against real-world vectors). Deferred:
 
 ## Build & packaging
 
-- **[M] cryptolib consumption.** Found via sibling path + prebuilt dylib. No
+- **[M] cipherbird consumption.** Found via sibling path + prebuilt dylib. No
   `FetchContent`/version pin, no `find_package` config, no relocatable rpath
   (absolute local path baked in). (`CMakeLists.txt`; `ARCHITECTURE.md` section 17.5)
 - **[M] No install/export for aviary itself.**
@@ -1012,14 +1012,14 @@ selectors - validated against real-world vectors). Deferred:
 - Value field width -> **u128 fixed 16 bytes** (`ARCHITECTURE.md` section 17.1). Revisit
   only if a chain needs arbitrary-precision values.
 - C++ test framework -> **custom zero-dependency runner** (`tests/check.hpp`),
-  matching cryptolib (section 17.6).
-- cryptolib linkage -> **prebuilt `cryptolib_c` C ABI**, not the header-only C++
+  matching cipherbird (section 17.6).
+- cipherbird linkage -> **prebuilt `cipherbird_c` C ABI**, not the header-only C++
   API (section 3). CI-acquisition sub-question still open (above).
 - BLS same-message problem -> **bind validator index in the vote** (above), no
-  cryptolib change.
+  cipherbird change.
 
 ## Sentinel demo follow-ups (examples/sentinel)
-- Anchoring overloads `recipient = contentHash` (a 1-unit transfer). Cleaner long-term: a dedicated `anchor(hash, metadataHash)` tx body in the account state machine so anchors don't masquerade as transfers / consume balance. Spec for cryptolib/core if pursued.
+- Anchoring overloads `recipient = contentHash` (a 1-unit transfer). Cleaner long-term: a dedicated `anchor(hash, metadataHash)` tx body in the account state machine so anchors don't masquerade as transfers / consume balance. Spec for cipherbird/core if pursued.
 - StreamData seals on a fixed 1.5s ticker; make the cadence/threshold configurable and add backpressure if a device streams faster than blocks seal.
 - Credential is currently bound into the fingerprint only; no proof-of-possession challenge. Add a signed nonce challenge at ProvisionDevice for real device attestation.
 - Media bytes are sent whole over gRPC to be hashed server-side; for large video, hash client-side in chunks (Merkle of chunks) and stream only roots.
@@ -1035,7 +1035,7 @@ selectors - validated against real-world vectors). Deferred:
   `signing_bytes()` so it's committed to - a downgrade that strips the ML-DSA part
   fails, as does flipping the scheme. `verify_transaction_signature` dispatches on
   the effective algo and rejects unknown schemes. `crypto::hybrid_sig_*` wrap
-  cryptolib's hybrid_sig. `ChainSpec.accepted_sig_algos` gates which schemes a
+  cipherbird's hybrid_sig. `ChainSpec.accepted_sig_algos` gates which schemes a
   chain accepts (empty = all; `{2}` = PQ-required), enforced in the ledger.
   Tested: `tests/test_hybrid_sig.cpp` (28/28 suite green). **Q1b (next): expose
   hybrid accounts through the DemoNode + C ABI + bindings, and cross-binding
@@ -1064,7 +1064,7 @@ selectors - validated against real-world vectors). Deferred:
   `[nonces 64][commitment 66]` -> opaque `Ceremony` handle -> `sign` -> attributable
   `verify_share` -> `aggregate`). The group secret never exists on the ABI; the
   aggregate is a **standard 64-byte Ed25519 signature**, and each binding proves
-  that with its *own* Ed25519 verifier under the group key - cryptolib (Go),
+  that with its *own* Ed25519 verifier under the group key - cipherbird (Go),
   `node:crypto` SPKI-wrap (npm), `java.security` (JVM), CryptoKit
   `Curve25519.Signing` (Swift), and the shared ABI attribution check (Dart).
 - **[x] AssuranceProfile + SealedMempool through the C ABI + all five bindings.**
@@ -1082,12 +1082,12 @@ selectors - validated against real-world vectors). Deferred:
   green; 56/56 C++ suite still passes.
 
 ## pub.dev release structure: three Dart packages over CipherBird - DONE (2026-10-10)
-- **[x] cryptolib is now CipherBird.** The dependency repo is still checked out
-  at `../cryptolib` (remote Crdzbird/CipherBird); the C header and `cryptolib_*`
+- **[x] cipherbird is now CipherBird.** The dependency repo is still checked out
+  at `../cryptolib` (remote Crdzbird/CipherBird); the C header and `cipherbird_*`
   symbol prefix are unchanged. Its Flutter plugin is the `cipherbird` pub package
   (1.1.0) shipping `CipherBird.xcframework` and `libcipherbird.so` (SONAME still
-  `libcryptolib_c.so`), and its pure Dart package is `cipherbird_dart`. Build
-  scripts accept `CIPHERBIRD_ROOT` (falls back to `CRYPTOLIB_ROOT`, then the
+  `libcipherbird_c.so`), and its pure Dart package is `cipherbird_dart`. Build
+  scripts accept `CIPHERBIRD_ROOT` (falls back to `CIPHERBIRD_ROOT`, then the
   sibling checkout).
 - **[x] `aviary_dart` restructured for publishing.** The 2152-line
   `aviary_ffi.dart` became one library (`lib/aviary.dart`) with 71
@@ -1101,7 +1101,7 @@ selectors - validated against real-world vectors). Deferred:
   `package_config.json`. 12 smoke tests pass on the bundled engine.
 - **[x] Two Flutter variants with the same API.** `aviary_lite` is self
   contained: static merged `Aviary.xcframework` (aviary archives +
-  CipherBird per-slice `libcryptolib_c_merged.a`, iOS device + simulator, macOS)
+  CipherBird per-slice `libcipherbird_c_merged.a`, iOS device + simulator, macOS)
   and a self-contained stripped `libaviary_c.so` (arm64-v8a, x86_64) whose
   only NEEDED entries are libm/libdl/libc. `aviary` (renamed from
   `aviary_flutter`) depends on and re-exports `cipherbird`: dynamic
@@ -1439,7 +1439,7 @@ selectors - validated against real-world vectors). Deferred:
   linux-arm64}` (the aviary_dart libraries; `scripts/node/stage_prebuild.sh`
   copies them), an `.npmignore` so the root `.gitignore` no longer strips the
   binaries from the tarball, `repository`/`os`/`cpu` fields, a CHANGELOG and
-  LICENSE. `resolveCryptolib` prefers the `libcipherbird` sibling. All 16 tests
+  LICENSE. `resolveCipherBird` prefers the `libcipherbird` sibling. All 16 tests
   pass with no environment override; `npm pack` is 21 MB. `publish.yml` gained
   an `npm` job on `aviary-ledger-vX.Y.Z` tags using npm trusted publishing with
   provenance (enable the trusted publisher on npmjs.com after the first manual
@@ -1448,7 +1448,7 @@ selectors - validated against real-world vectors). Deferred:
   bindings/go`; it requires CipherBird's Go module at the published pseudo
   version `v0.0.0-20261005192042-bffafd77df2f` instead of a local replace.
   CipherBird's module keeps its C header outside the module, so a fetched copy
-  builds only with `-tags aviary_pkgconfig,cryptolib_pkgconfig` against
+  builds only with `-tags aviary_pkgconfig,cipherbird_pkgconfig` against
   installed libraries (documented); inside the repo the root `go.work`
   (binding, three example servers, sibling CipherBird) makes plain `go build`
   work. Tag `bridge/bindings/go/v0.1.0`.

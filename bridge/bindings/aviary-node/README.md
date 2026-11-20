@@ -37,10 +37,10 @@ it, and never requires `await`.
 
 ## Native library
 
-The native pair (`libaviary_c` + `libcryptolib_c`) ships under
+The native pair (`libaviary_c` + `libcipherbird_c`) ships under
 `prebuilds/<platform>-<arch>/`, made relocatable so they load with no setup.
 Rebuild + restage with `scripts/node/stage_prebuild.sh`. For development you can
-point at any build with `AVIARY_DYLIB` / `CRYPTOLIB_DYLIB`.
+point at any build with `AVIARY_DYLIB` / `CIPHERBIRD_LIBRARY`.
 
 ## Events, persistence, custody signing and networking
 

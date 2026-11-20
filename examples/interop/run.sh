@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Go<->Flutter interop check - start the Go server, then run the Flutter client.
 # Prereq: aviary host lib built (cd ../.. && cmake --build build) and the
-# sibling cryptolib checkout present.
+# sibling cipherbird checkout present.
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ( cd "$ROOT/server" && CGO_ENABLED=1 go run . ) &

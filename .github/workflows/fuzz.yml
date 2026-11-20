@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Crdzbird/CipherBird
-          path: cryptolib
+          path: cipherbird
 
       - name: Install build dependencies
         run: |
@@ -36,7 +36,7 @@ jobs:
           sudo apt-get install -y clang libclang-rt-18-dev cmake ninja-build git pkg-config build-essential ca-certificates libssl-dev
 
       - name: Build OpenSSL for the engine
-        working-directory: cryptolib
+        working-directory: cipherbird
         env:
           CFLAGS: -fPIC
         run: |
@@ -51,7 +51,7 @@ jobs:
       # Linux workflow does and publish it through the same pkg-config
       # directory as libcrypto.
       - name: Build libsodium for the engine
-        working-directory: cryptolib
+        working-directory: cipherbird
         run: |
           DEPS="$PWD/build/linux-deps"
           mkdir -p "$PWD/build/host-deps"
@@ -64,7 +64,7 @@ jobs:
           test "$(PKG_CONFIG_PATH="$PWD/build/pc" pkg-config --modversion libsodium)" = 1.0.22
 
       - name: Build the CipherBird static engine
-        working-directory: cryptolib
+        working-directory: cipherbird
         run: bash scripts/build_static_archive_linux.sh
 
       - name: Build the fuzz targets
@@ -73,9 +73,9 @@ jobs:
           cmake -S . -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
             -DAVIARY_BUILD_FUZZERS=ON -DAVIARY_SANITIZE=ON \
-            -DCRYPTOLIB_ROOT="$GITHUB_WORKSPACE/cryptolib" \
-            -DCRYPTOLIB_C_INCLUDE_DIR="$GITHUB_WORKSPACE/cryptolib/bridge" \
-            -DCRYPTOLIB_C_LIBRARY="$GITHUB_WORKSPACE/cryptolib/build/static/libcryptolib_c.a"
+            -DCIPHERBIRD_ROOT="$GITHUB_WORKSPACE/cipherbird" \
+            -DCIPHERBIRD_C_INCLUDE_DIR="$GITHUB_WORKSPACE/cipherbird/bridge" \
+            -DCIPHERBIRD_C_LIBRARY="$GITHUB_WORKSPACE/cipherbird/build/static/libcipherbird_c.a"
           cmake --build build-fuzz --target fuzz_codec fuzz_restore fuzz_c_abi fuzz_peering
 
       - name: Run each target for two minutes

@@ -2,7 +2,7 @@
 
 Aviary's C ABI (`libaviary_c`) compiles to every platform and is
 consumed by the language bindings. The C ABI calls the CipherBird C ABI
-(`cryptolib_*` symbols, header `bridge/cryptolib_c.h` in the CipherBird repo),
+(`cipherbird_*` symbols, header `bridge/cipherbird_c.h` in the CipherBird repo),
 so every platform build needs CipherBird's native artifact for that platform.
 
 CipherBird lives at `../cryptolib` (git remote Crdzbird/CipherBird). Set
@@ -19,7 +19,7 @@ bash scripts/ios/assemble_xcframework.sh
 bash scripts/android/build_all.sh
 ```
 
-That produces the per-slice static archives (`libcryptolib_c_merged.a`) used by
+That produces the per-slice static archives (`libcipherbird_c_merged.a`) used by
 the lite packaging, the dynamic `CipherBird.xcframework` shipped by the
 `cipherbird` pub package, and `libcipherbird.so` per Android ABI.
 
@@ -31,9 +31,9 @@ for abi in arm64-v8a x86_64; do
   cmake -S . -B build-android-static/$abi \
     -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
     -DANDROID_ABI=$abi -DANDROID_PLATFORM=android-24 \
-    -DCRYPTOLIB_STATIC=ON -DCRYPTOLIB_DEPS_ROOT=third_party/android/$abi \
-    -DCRYPTOLIB_BUILD_EXAMPLE=OFF -DCRYPTOLIB_BUILD_TESTS=OFF
-  cmake --build build-android-static/$abi --target cryptolib_c
+    -DCIPHERBIRD_STATIC=ON -DCIPHERBIRD_DEPS_ROOT=third_party/android/$abi \
+    -DCIPHERBIRD_BUILD_EXAMPLE=OFF -DCIPHERBIRD_BUILD_TESTS=OFF
+  cmake --build build-android-static/$abi --target cipherbird_c
 done
 ```
 
@@ -63,14 +63,14 @@ bash scripts/web/build_wasm.sh          # WebAssembly engine for aviary_dart in 
 ```
 
 Every build says which CipherBird it bundles. Configuring prints
-`aviary: cryptolib revision = <git describe>` and writes it, with the
-library and its build time, to `cryptolib_revision.txt` in the build
+`aviary: cipherbird revision = <git describe>` and writes it, with the
+library and its build time, to `cipherbird_revision.txt` in the build
 directory; the engine returns it from `aviary_crypto_backend_version`
 (`3.0.0 (CipherBird v1.4.0-13-ge3d93a2)`). A CipherBird library older than
 its checkout's last commit is a configure warning, and an error with
-`-DAVIARY_REQUIRE_FRESH_CRYPTOLIB=ON`, which `build_dylib.sh` sets: rebuild
+`-DAVIARY_REQUIRE_FRESH_CIPHERBIRD=ON`, which `build_dylib.sh` sets: rebuild
 it in the CipherBird checkout first (`scripts/build_selfcontained.sh` for the
-host library a development build links, `scripts/ios/build_cryptolib_slice.sh
+host library a development build links, `scripts/ios/build_cipherbird_slice.sh
 macosx` for the archive `build_dylib.sh` merges).
 
 The Android script strips the output with `llvm-strip --strip-unneeded`. The
@@ -155,6 +155,6 @@ library against the new Dart code; it goes green on the second commit.
 ## Why the build is simple
 
 `aviary_c` is pure C++ that only needs CipherBird's header to compile.
-Its `cryptolib_*` calls resolve when the final app links (iOS/macOS, or inside
+Its `cipherbird_*` calls resolve when the final app links (iOS/macOS, or inside
 the merged lite archive) or at load time from `libcipherbird.so` (full
 Android). The per-platform build compiles aviary's sources only.

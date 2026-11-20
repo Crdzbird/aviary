@@ -9,7 +9,7 @@ light-client proofs, and derive/sign cross-chain transactions.
 
 ```
 HTTP client --REST/JSON--> aviary-api (Go) --cgo--> libaviary_c
-                                                            `--> libcryptolib_c
+                                                            `--> libcipherbird_c
 ```
 
 ---
@@ -35,9 +35,9 @@ HTTP client --REST/JSON--> aviary-api (Go) --cgo--> libaviary_c
 | Go | 1.24+ |
 | cgo | **`CGO_ENABLED=1`** (default unless cross-compiling) - this service links C |
 | Toolchain | a C/C++ toolchain (clang/gcc) and `cmake`/`ninja` to build the native libs |
-| Native libs | `libaviary_c` + `libcryptolib_c` (built once; see below) |
+| Native libs | `libaviary_c` + `libcipherbird_c` (built once; see below) |
 
-> Aviary's crypto backend is **cryptolib**. Until both are published, you
+> Aviary's crypto backend is **cipherbird**. Until both are published, you
 > consume them from **sibling checkouts** via Go `replace` directives.
 
 Lay the repos out side by side:
@@ -45,7 +45,7 @@ Lay the repos out side by side:
 ```
 ~/code/
 |-- aviary/        # github.com/Crdzbird/aviary
-|-- cryptolib/           # the cryptolib repo (private/sibling)
+|-- cipherbird/           # the cipherbird repo (private/sibling)
 `-- aviary-api/    # THIS service
 ```
 
@@ -54,10 +54,10 @@ Lay the repos out side by side:
 ## 1. Build the native libraries (once)
 
 ```bash
-# cryptolib (provides libcryptolib_c)
+# cipherbird (provides libcipherbird_c)
 ( cd ../cryptolib   && cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release && cmake --build build/release )
 
-# aviary (provides libaviary_c, which links cryptolib)
+# aviary (provides libaviary_c, which links cipherbird)
 ( cd ../aviary && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build )
 ```
 
@@ -266,7 +266,7 @@ func (s *server) produceBlock(w http.ResponseWriter, r *http.Request) {
 CGO_ENABLED=1 go build -o aviary-api ./cmd/server
 ```
 
-Ship `libaviary_c` + `libcryptolib_c` alongside, or rely on the baked dev
+Ship `libaviary_c` + `libcipherbird_c` alongside, or rely on the baked dev
 rpaths / set `LD_LIBRARY_PATH`.
 
 ### Static (recommended for containers) - one self-contained binary
@@ -274,19 +274,19 @@ rpaths / set `LD_LIBRARY_PATH`.
 Build the merged static archives once, then link them in:
 
 ```bash
-( cd ../cryptolib    && scripts/build_static_archive.sh )   # build/static/libcryptolib_c.a
+( cd ../cryptolib    && scripts/build_static_archive.sh )   # build/static/libcipherbird_c.a
 ( cd ../aviary && scripts/build_static_archive.sh )   # build/static/libaviary_c.a
 
-CGO_ENABLED=1 go build -tags "aviary_static cryptolib_static" -o aviary-api ./cmd/server
+CGO_ENABLED=1 go build -tags "aviary_static cipherbird_static" -o aviary-api ./cmd/server
 ```
 
-The result has **no `libaviary_c` / `libcryptolib_c` shared-library
+The result has **no `libaviary_c` / `libcipherbird_c` shared-library
 dependency** - nothing to ship, no rpath, no `LD_LIBRARY_PATH` (only the system
 C++ runtime). Verify:
 
 ```bash
-otool -L aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ok"   # macOS
-ldd      aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ok"   # Linux
+otool -L aviary-api | grep -iE 'aviary|cipherbird' || echo "self-contained ok"   # macOS
+ldd      aviary-api | grep -iE 'aviary|cipherbird' || echo "self-contained ok"   # Linux
 ```
 
 ### Docker (multi-stage, static)
@@ -295,9 +295,9 @@ ldd      aviary-api | grep -iE 'aviary|cryptolib' || echo "self-contained ok"   
 FROM golang:1.24 AS build
 RUN apt-get update && apt-get install -y cmake ninja-build clang
 WORKDIR /src
-# COPY the three repos (aviary-api, aviary, cryptolib) side by side,
+# COPY the three repos (aviary-api, aviary, cipherbird) side by side,
 # build the static archives, then:
-RUN CGO_ENABLED=1 go build -tags "aviary_static cryptolib_static" \
+RUN CGO_ENABLED=1 go build -tags "aviary_static cipherbird_static" \
     -o /out/aviary-api ./cmd/server
 
 FROM gcc:14-slim          # provides libstdc++ for the C++ runtime

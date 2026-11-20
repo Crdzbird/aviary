@@ -6,12 +6,12 @@
 // an off-main-thread preload (Aviary.preload()).
 //
 //   - `AviaryC`  - the raw C FFI module (a DYNAMIC framework xcframework,
-//     produced by scripts/apple/build_dynamic_xcframework.sh). Its cryptolib_*
+//     produced by scripts/apple/build_dynamic_xcframework.sh). Its cipherbird_*
 //     symbols resolve at runtime against CipherBird.
 //   - `Aviary`   - the ergonomic Swift wrapper (Node, interop, preload).
 //
-// The crypto backend comes from the cryptolib Swift package (depended on, not
-// bundled). Local path until cryptolib is published.
+// The crypto backend comes from the cipherbird Swift package (depended on, not
+// bundled). Local path until cipherbird is published.
 //
 // Slices: iOS 15+ device (arm64), iOS simulator (arm64), macOS 12+ (arm64).
 //
@@ -54,13 +54,13 @@ let package = Package(
         // The Aviary C ABI as a dynamic-framework binary target.
         aviaryBinary,
         // CipherBird's dynamic framework, vendored as a binary target so
-        // Aviary's runtime cryptolib_* lookups resolve. The cipherbird
+        // Aviary's runtime cipherbird_* lookups resolve. The cipherbird
         // Flutter plugin ships iOS and macOS as two xcframeworks; run
         // scripts/apple/vendor_cipherbird.sh once to merge them into
         // Vendor/CipherBird.xcframework (gitignored).
         cipherBirdBinary,
         // Ergonomic Swift wrapper. Links CipherBird so Aviary's runtime
-        // cryptolib_* lookups resolve.
+        // cipherbird_* lookups resolve.
         .target(
             name: "Aviary",
             dependencies: [

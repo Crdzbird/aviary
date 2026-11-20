@@ -9,10 +9,10 @@
 #include <optional>
 #include <vector>
 
-/// The crypto seam (ARCHITECTURE section 3.2). Wraps cryptolib's C ABI in
+/// The crypto seam (ARCHITECTURE section 3.2). Wraps cipherbird's C ABI in
 /// domain-separated, intent-named C++ operations returning real C++ types, so
 /// the C shape (lengths, out-pointers, buffer frees) never leaks past here.
-/// Consensus and ledger code depend on this seam, never on cryptolib directly.
+/// Consensus and ledger code depend on this seam, never on cipherbird directly.
 namespace aviary::crypto {
 
 /// A 256-bit digest - the chain's canonical hash width.

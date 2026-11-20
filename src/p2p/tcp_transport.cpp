@@ -136,7 +136,7 @@ crypto::ByteView cv(const Bytes& b) { return crypto::ByteView(b.data(), b.size()
 // The ratcheted tier wraps each plaintext in a 1-byte control tag: 0x01 = a data
 // frame (consensus), 0x00 = a keepalive/priming frame (no payload). The tag lets
 // the initiator prime the responder's sending chain without injecting a bogus
-// consensus message - and cryptolib's AEAD rejects an empty plaintext, so the
+// consensus message - and cipherbird's AEAD rejects an empty plaintext, so the
 // keepalive must carry at least this byte.
 constexpr std::uint8_t kFrameData = 0x01;
 constexpr std::uint8_t kFrameKeepalive = 0x00;

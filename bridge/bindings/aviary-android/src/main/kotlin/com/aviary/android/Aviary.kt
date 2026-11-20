@@ -7,7 +7,7 @@ import kotlin.concurrent.thread
  * Aviary native-library loader + off-thread preload for Android.
  *
  * The native pair ships in this AAR's jniLibs and is loaded once, process-wide.
- * Load order matters: aviary_c depends on cryptolib_c, so cryptolib loads
+ * Load order matters: aviary_c depends on cipherbird_c, so cipherbird loads
  * first. [System.loadLibrary] performs a process-global `dlopen`, so once warm,
  * any caller (the auto-registered [AviaryStartup] provider, an explicit
  * [preload], or the first lazy [ensureLoaded]) sees the libraries mapped.
@@ -27,7 +27,7 @@ object Aviary {
         synchronized(this) {
             if (loaded.get()) return true
             return try {
-                System.loadLibrary("cryptolib_c")
+                System.loadLibrary("cipherbird_c")
                 System.loadLibrary("aviary_c")
                 loaded.set(true)
                 true

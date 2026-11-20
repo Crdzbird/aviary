@@ -12,7 +12,7 @@
 #include "aviary/crypto.hpp"
 
 /// Custodial key management (ARCHITECTURE section : Wallet / key custody). Thin, RAII
-/// wrappers over cryptolib's Vault (envelope-encrypt secrets under a master key)
+/// wrappers over cipherbird's Vault (envelope-encrypt secrets under a master key)
 /// and Keyring (protect that master key behind device / passphrase slots), plus
 /// a [KeyStore] that keeps account signing secrets encrypted at rest.
 ///
@@ -112,7 +112,7 @@ class Vault {
   /// wrong key / wrong aad.
   Bytes open(const SealedBlob& blob, std::string_view aad = "") const;
 
-  /// Max-assurance seal via cryptolib's MolecularVault: a cascade of
+  /// Max-assurance seal via cipherbird's MolecularVault: a cascade of
   /// XChaCha20-Poly1305  then  AES-256-GCM-SIV under a key-committing outer layer
   /// (self-describing versioned envelope). Both cascade layers must break
   /// before the plaintext leaks - defense in depth for long-lived signing
@@ -166,7 +166,7 @@ class KeyStore {
   /// Export one account as a PORTABLE encrypted envelope under a standalone
   /// [passphrase] (independent of this store's keyring): MolecularVault cascade
   /// keyed by Argon2id(passphrase). [ops]/[mem] are the Argon2id work factors - 
-  /// 0,0 selects cryptolib's SENSITIVE preset (slow on purpose; a backup is
+  /// 0,0 selects cipherbird's SENSITIVE preset (slow on purpose; a backup is
   /// unlocked rarely and brute-forced forever). The store must be unlocked.
   Bytes export_account(const Hash& address, std::string_view passphrase,
                        std::uint64_t ops = 0, std::size_t mem = 0) const;

@@ -32,8 +32,8 @@ endif()
 option(AVIARY_BUILD_FUZZERS "Build libFuzzer targets" OFF)
 
 # Build the C ABI as a STATIC archive (for an XCFramework / static linking into
-# an app). In this mode we do NOT link cryptolib_c - its symbols are resolved
-# when the final app links (alongside cryptolib's own static lib). Only the
+# an app). In this mode we do NOT link cipherbird_c - its symbols are resolved
+# when the final app links (alongside cipherbird's own static lib). Only the
 # header is needed. Forced on for iOS.
 option(AVIARY_STATIC "Build aviary_c as a STATIC archive" OFF)
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -72,51 +72,51 @@ else()
 endif()
 
 # -----------------------------------------------------------------------------
-# Locate the prebuilt cryptolib_c C ABI.
-# Decision (ARCHITECTURE section 3): link cryptolib's self-contained C ABI, not its
-# header-only C++ API - decouples our build from cryptolib's transitive deps.
-# Override the checkout location with -DCRYPTOLIB_ROOT=<path> if not a sibling.
+# Locate the prebuilt cipherbird_c C ABI.
+# Decision (ARCHITECTURE section 3): link cipherbird's self-contained C ABI, not its
+# header-only C++ API - decouples our build from cipherbird's transitive deps.
+# Override the checkout location with -DCIPHERBIRD_ROOT=<path> if not a sibling.
 # -----------------------------------------------------------------------------
-set(CRYPTOLIB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../cryptolib"
-    CACHE PATH "Path to the cryptolib checkout")
+set(CIPHERBIRD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../cryptolib"
+    CACHE PATH "Path to the cipherbird checkout")
 
-find_path(CRYPTOLIB_C_INCLUDE_DIR
-  NAMES cryptolib_c.h
-  HINTS "${CRYPTOLIB_ROOT}/bridge"
+find_path(CIPHERBIRD_C_INCLUDE_DIR
+  NAMES cipherbird_c.h
+  HINTS "${CIPHERBIRD_ROOT}/bridge"
   NO_DEFAULT_PATH)
 
-if(NOT CRYPTOLIB_C_INCLUDE_DIR)
-  message(FATAL_ERROR "cryptolib_c.h not found - set -DCRYPTOLIB_ROOT=<path>.")
+if(NOT CIPHERBIRD_C_INCLUDE_DIR)
+  message(FATAL_ERROR "cipherbird_c.h not found - set -DCIPHERBIRD_ROOT=<path>.")
 endif()
-message(STATUS "aviary: cryptolib_c header  = ${CRYPTOLIB_C_INCLUDE_DIR}")
+message(STATUS "aviary: cipherbird_c header  = ${CIPHERBIRD_C_INCLUDE_DIR}")
 
-# The cryptolib BINARY is only needed when we actually link it (the host SHARED
+# The cipherbird BINARY is only needed when we actually link it (the host SHARED
 # build, or an Android .so). For a STATIC archive its symbols resolve at app
-# link, so the library is optional. Pass -DCRYPTOLIB_C_LIBRARY=<path> to override
-# (e.g. point at the Android libcryptolib_c.so).
+# link, so the library is optional. Pass -DCIPHERBIRD_C_LIBRARY=<path> to override
+# (e.g. point at the Android libcipherbird_c.so).
 if(NOT AVIARY_STATIC)
-  if(NOT CRYPTOLIB_C_LIBRARY)
-    find_library(CRYPTOLIB_C_LIBRARY
-      NAMES cryptolib_c
+  if(NOT CIPHERBIRD_C_LIBRARY)
+    find_library(CIPHERBIRD_C_LIBRARY
+      NAMES cipherbird_c
       HINTS
-        "${CRYPTOLIB_ROOT}/build/selfcontained"
-        "${CRYPTOLIB_ROOT}/build/release"
-        "${CRYPTOLIB_ROOT}/build"
+        "${CIPHERBIRD_ROOT}/build/selfcontained"
+        "${CIPHERBIRD_ROOT}/build/release"
+        "${CIPHERBIRD_ROOT}/build"
       NO_DEFAULT_PATH)
   endif()
-  if(NOT CRYPTOLIB_C_LIBRARY)
-    message(FATAL_ERROR "cryptolib_c library not found - build it or pass -DCRYPTOLIB_C_LIBRARY=<path>.")
+  if(NOT CIPHERBIRD_C_LIBRARY)
+    message(FATAL_ERROR "cipherbird_c library not found - build it or pass -DCIPHERBIRD_C_LIBRARY=<path>.")
   endif()
-  list(GET CRYPTOLIB_C_LIBRARY 0 _cryptolib_first)
-  get_filename_component(CRYPTOLIB_C_LIBDIR "${_cryptolib_first}" DIRECTORY)
-  message(STATUS "aviary: cryptolib_c library = ${CRYPTOLIB_C_LIBRARY}")
+  list(GET CIPHERBIRD_C_LIBRARY 0 _cipherbird_first)
+  get_filename_component(CIPHERBIRD_C_LIBDIR "${_cipherbird_first}" DIRECTORY)
+  message(STATUS "aviary: cipherbird_c library = ${CIPHERBIRD_C_LIBRARY}")
 endif()
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/cryptolib_revision.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/cipherbird_revision.cmake")
 
 # -- Core static library ------------------------------------------------------
 add_library(aviary_core STATIC
   src/version.cpp
-  src/crypto/cryptolib_backend.cpp
+  src/crypto/cipherbird_backend.cpp
   src/crypto/keyring.cpp
   src/crypto/custody_signing.cpp
   src/crypto/threshold.cpp
@@ -182,13 +182,13 @@ add_library(aviary_core STATIC
   src/node/remote_guard.cpp
   src/node/demo_node.cpp)
 target_compile_definitions(aviary_core PRIVATE AVIARY_VERSION_STRING="${PROJECT_VERSION}"
-  AVIARY_CRYPTOLIB_REVISION="${AVIARY_CRYPTOLIB_REVISION}")
+  AVIARY_CIPHERBIRD_REVISION="${AVIARY_CIPHERBIRD_REVISION}")
 target_include_directories(aviary_core
   PUBLIC  "${CMAKE_CURRENT_SOURCE_DIR}/include"
-  PRIVATE "${CRYPTOLIB_C_INCLUDE_DIR}")
+  PRIVATE "${CIPHERBIRD_C_INCLUDE_DIR}")
 set_target_properties(aviary_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(NOT AVIARY_STATIC)
-  target_link_libraries(aviary_core PRIVATE ${CRYPTOLIB_C_LIBRARY})
+  target_link_libraries(aviary_core PRIVATE ${CIPHERBIRD_C_LIBRARY})
 endif()
 
 # The TCP transport reactor drives one node per thread; the multi-validator test
@@ -209,7 +209,7 @@ if(AVIARY_STATIC)
 else()
   add_library(aviary_c SHARED bridge/aviary_c.cpp)
   target_compile_definitions(aviary_c PRIVATE AVIARY_BUILD_SHARED)
-  set_target_properties(aviary_c PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+  set_target_properties(aviary_c PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR}")
   # On ELF targets keep the engine's internals (CipherBird and its statically
   # linked dependencies) out of the export table. This also lets the linker
   # resolve their relocations locally, which a shared object otherwise refuses
@@ -240,17 +240,17 @@ endif()
 # -- Golden-vector generator (not a test; documents how vectors are derived) --
 add_executable(print_vectors tools/print_vectors.cpp)
 target_link_libraries(print_vectors PRIVATE aviary_core)
-set_target_properties(print_vectors PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+set_target_properties(print_vectors PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR}")
 
 # -- State-commitment micro-benchmark (not a test; documents the P1 win) ------
 add_executable(bench_state tools/bench_state.cpp)
 target_link_libraries(bench_state PRIVATE aviary_core)
-set_target_properties(bench_state PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+set_target_properties(bench_state PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR}")
 
 # End to end engine throughput for the README's performance table.
 add_executable(bench_engine tools/bench_engine.cpp)
 target_link_libraries(bench_engine PRIVATE aviary_core)
-set_target_properties(bench_engine PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+set_target_properties(bench_engine PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR}")
 
 # Plain and encrypted paths through the C ABI only, so the same file runs
 # against any shipped libaviary_c (see scripts/android/bench_paths.sh).
@@ -263,10 +263,10 @@ if(NOT AVIARY_STATIC)
   add_executable(print_subchain_vectors tools/print_subchain_vectors.cpp)
   target_link_libraries(print_subchain_vectors PRIVATE aviary_c)
   target_include_directories(print_subchain_vectors PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-  set_target_properties(print_subchain_vectors PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
+  set_target_properties(print_subchain_vectors PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
 endif()
 
-# -- Tests (zero-dependency runner, matching cryptolib's convention) ----------
+# -- Tests (zero-dependency runner, matching cipherbird's convention) ----------
 enable_testing()
 
 # One executable per test file; each links the core and is registered with ctest.
@@ -274,7 +274,7 @@ function(aviary_add_test name source)
   add_executable(${name} ${source})
   target_link_libraries(${name} PRIVATE aviary_core)
   target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-  set_target_properties(${name} PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+  set_target_properties(${name} PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR}")
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
@@ -292,13 +292,13 @@ if(NOT AVIARY_STATIC)
   add_executable(test_c_abi_extras tests/test_c_abi_extras.cpp)
   target_link_libraries(test_c_abi_extras PRIVATE aviary_c)
   target_include_directories(test_c_abi_extras PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-  set_target_properties(test_c_abi_extras PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
+  set_target_properties(test_c_abi_extras PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
   add_test(NAME test_c_abi_extras COMMAND test_c_abi_extras)
   function(aviary_add_c_abi_test name source)
     add_executable(${name} ${source})
     target_link_libraries(${name} PRIVATE aviary_c)
     target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-    set_target_properties(${name} PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
+    set_target_properties(${name} PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR};${CMAKE_CURRENT_BINARY_DIR}")
     add_test(NAME ${name} COMMAND ${name})
   endfunction()
   aviary_add_c_abi_test(test_c_abi_persistence tests/test_c_abi_persistence.cpp)
@@ -384,7 +384,7 @@ if(AVIARY_BUILD_FUZZERS)
     endif()
     target_link_libraries(${name} PRIVATE ${ARGN} aviary_core)
     target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/bridge")
-    set_target_properties(${name} PROPERTIES BUILD_RPATH "${CRYPTOLIB_C_LIBDIR}")
+    set_target_properties(${name} PROPERTIES BUILD_RPATH "${CIPHERBIRD_C_LIBDIR}")
   endfunction()
   aviary_add_fuzzer(fuzz_codec fuzz/fuzz_codec.cpp)
   aviary_add_fuzzer(fuzz_restore fuzz/fuzz_restore.cpp)

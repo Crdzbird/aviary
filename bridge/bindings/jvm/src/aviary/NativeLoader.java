@@ -12,8 +12,8 @@ import java.nio.file.StandardCopyOption;
  *   2. the bundled resources /native/&lt;os&gt;-&lt;arch&gt;/ (index.txt lists every library)
  *   3. the repo build/ dir (dev fallback)
  *
- * The aviary library links cryptolib_c; on a dev build its embedded rpath
- * resolves libcryptolib_c automatically. A bundled JAR should ship both libs.
+ * The aviary library links cipherbird_c; on a dev build its embedded rpath
+ * resolves libcipherbird_c automatically. A bundled JAR should ship both libs.
  */
 public final class NativeLoader {
     private NativeLoader() {}

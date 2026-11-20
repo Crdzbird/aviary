@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Crdzbird/CipherBird/bridge/bindings/go/cryptolib"
+	"github.com/Crdzbird/CipherBird/bridge/bindings/go/cipherbird"
 	bc "github.com/Crdzbird/aviary/bridge/bindings/go/aviary"
 )
 
@@ -62,16 +62,16 @@ func TestLedgerFlowAndProof(t *testing.T) {
 }
 
 // Cross-binding determinism: aviary's BLAKE3 (via C++ core) equals
-// cryptolib's BLAKE3 (via its Go binding) - both link the same backend.
-func TestHashMatchesCryptolib(t *testing.T) {
+// cipherbird's BLAKE3 (via its Go binding) - both link the same backend.
+func TestHashMatchesCipherBird(t *testing.T) {
 	msg := []byte("aviary")
 	viaCore, err := bc.Hash(msg)
 	if err != nil {
 		t.Fatalf("bc.Hash: %v", err)
 	}
-	viaCrypto, err := cryptolib.Blake3(msg, 32)
+	viaCrypto, err := cipherbird.Blake3(msg, 32)
 	if err != nil {
-		t.Fatalf("cryptolib.Blake3: %v", err)
+		t.Fatalf("cipherbird.Blake3: %v", err)
 	}
 	if !bytes.Equal(viaCore, viaCrypto) {
 		t.Fatalf("BLAKE3 mismatch:\n core=%s\n cl=%s",
@@ -431,7 +431,7 @@ func TestThresholdAccount(t *testing.T) {
 	if len(sig) != 64 {
 		t.Fatalf("aggregate is %d bytes, want a 64-byte Ed25519 signature", len(sig))
 	}
-	if !cryptolib.Ed25519Verify(msg, sig, groupPK) {
+	if !cipherbird.Ed25519Verify(msg, sig, groupPK) {
 		t.Fatal("the aggregate is not a valid Ed25519 signature under the group key")
 	}
 
@@ -454,7 +454,7 @@ func TestThresholdAccount(t *testing.T) {
 	defer solo.Free()
 	sSolo, _ := solo.Sign(cards[1], nSolo)
 	soloSig, err := solo.Aggregate([]uint16{cards[1].Index()}, [][]byte{sSolo})
-	if err == nil && cryptolib.Ed25519Verify(msg, soloSig, groupPK) {
+	if err == nil && cipherbird.Ed25519Verify(msg, soloSig, groupPK) {
 		t.Fatal("a single share produced a valid group signature")
 	}
 

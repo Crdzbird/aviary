@@ -1,7 +1,7 @@
 # aviary-android
 
 Standalone Android library (AAR) for Aviary. Bundles the prebuilt native
-pair (`libaviary_c.so` + the `libcryptolib_c.so` it links) per ABI and an
+pair (`libaviary_c.so` + the `libcipherbird_c.so` it links) per ABI and an
 **auto-registered off-thread preload**.
 
 ```kotlin
@@ -25,7 +25,7 @@ the native libraries are warmed **off the main thread**:
 
 `System.loadLibrary` is a process-global `dlopen`, so warming on a background
 thread makes the libraries already-mapped by the time app code calls into them;
-load order is cryptolib -> aviary (aviary_c links cryptolib_c).
+load order is cipherbird -> aviary (aviary_c links cipherbird_c).
 
 ## Calling the C ABI
 

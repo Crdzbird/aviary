@@ -41,7 +41,7 @@ jobs:
           # rebuild of the same Aviary commit yields the same engine. Move this
           # tag together with the cipherbird constraint in bridge/bindings/aviary.
           ref: v1.3.0
-          path: cryptolib
+          path: cipherbird
 
       - name: Install build dependencies
         run: |
@@ -53,7 +53,7 @@ jobs:
       # position independent). The Linux archive script finds libcrypto through
       # pkg-config, so a one line .pc file points it at that build.
       - name: Build OpenSSL for the engine
-        working-directory: cryptolib
+        working-directory: cipherbird
         env:
           CFLAGS: -fPIC
         run: |
@@ -70,7 +70,7 @@ jobs:
       # the Linux archive script reads, and publish it through the same
       # pkg-config directory as libcrypto so the script picks it up.
       - name: Build libsodium for the engine
-        working-directory: cryptolib
+        working-directory: cipherbird
         run: |
           DEPS="$PWD/build/linux-deps"
           mkdir -p "$PWD/build/host-deps"
@@ -85,13 +85,13 @@ jobs:
           echo "libsodium $(PKG_CONFIG_PATH="$PWD/build/pc" pkg-config --modversion libsodium) at $DEPS/lib/libsodium.a"
 
       - name: Build the CipherBird static engine
-        working-directory: cryptolib
+        working-directory: cipherbird
         run: bash scripts/build_static_archive_linux.sh
 
       - name: Build libaviary_c.so
         working-directory: aviary
         env:
-          CRYPTOLIB_ROOT: ${{ github.workspace }}/cryptolib
+          CIPHERBIRD_ROOT: ${{ github.workspace }}/cipherbird
         run: bash scripts/linux/build_so.sh
 
       - name: Set up Dart

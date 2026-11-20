@@ -2,7 +2,7 @@
 
 > The adversary model, per-component threats with their mitigations and status,
 > the security arguments for the original constructions, and the residual-risk
-> register. Composes with cryptolib's own threat model
+> register. Composes with cipherbird's own threat model
 > ([`../cryptolib/docs/THREAT_MODEL.md`](../../cryptolib/docs/THREAT_MODEL.md)) - 
 > all cryptographic primitive security is delegated there; this document covers
 > how aviary *uses* them.
@@ -34,7 +34,7 @@ Assumed capabilities (always):
 - **Harvest-now-decrypt-later**: record traffic / signatures now to break later
   with a quantum computer - motivates the PQ-hybrid posture.
 
-Out of scope: a malicious cryptolib build; compromise of the host OS / RNG; a
+Out of scope: a malicious cipherbird build; compromise of the host OS / RNG; a
 quorum (>=1/3 power) of colluding validators; physical key extraction.
 
 ## 3. The two invariants we never break
@@ -142,14 +142,14 @@ quorum (>=1/3 power) of colluding validators; physical key extraction.
 | Escrow over-release / overflow | Release checks sufficient escrow; lock checks `u128` overflow. | [x] |
 | Attestor-federation compromise (>=1/3) | Trust assumption of the federated model. A **trustless** light-client+MPT bridge removes it. | *(deferred upgrade)* |
 | Adversarial RPC response (e.g., deep-nested JSON) | JSON parser **depth-bounded** (no stack-overflow DoS); hex/quantity parsers bounds-checked. | [x] (fixed in M7) |
-| EVM/BTC signature correctness | secp256k1 RFC6979 + low-S (cryptolib); EVM EIP-155 and BTC BIP143 signing verified **byte-exact vs spec vectors**. | [x] |
+| EVM/BTC signature correctness | secp256k1 RFC6979 + low-S (cipherbird); EVM EIP-155 and BTC BIP143 signing verified **byte-exact vs spec vectors**. | [x] |
 
 ### 4.6 Keys & crypto
 All primitive security (constant-time, side channels, KAT correctness) is
-**delegated to cryptolib**. aviary's responsibilities: domain-separated
+**delegated to cipherbird**. aviary's responsibilities: domain-separated
 hashing (distinct tags per structure), correct primitive selection per role, and
 the PQ-hybrid posture for long-lived value (hybrid Ed25519+ML-DSA signatures and
-X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
+X25519+ML-KEM-768 KEM available). Wallet custody uses cipherbird's Vault/Keyring.
 
 ## 5. M7 hardening actions (this milestone)
 
@@ -190,7 +190,7 @@ X25519+ML-KEM-768 KEM available). Wallet custody uses cryptolib's Vault/Keyring.
   state (section 4.4b); only BFT children can be anchored. Dynamic registration
   (section 4.4c) trusts the registrar quorum to choose which children exist.
 - No external **security audit** or FIPS validation of the original
-  constructions; the primitives come from cryptolib's vetted upstreams.
+  constructions; the primitives come from cipherbird's vetted upstreams.
 
 > Standard disclaimer: provided **as is**, no warranty. Consensus and bridge code
 > is high-stakes; an independent audit is required before any deployment holding

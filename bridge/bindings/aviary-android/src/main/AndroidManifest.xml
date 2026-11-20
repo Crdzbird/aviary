@@ -2,7 +2,7 @@
   <application>
     <!--
       Startup hook: Android instantiates this ContentProvider very early in app
-      launch (before the first frame), so its onCreate() warms libcryptolib_c +
+      launch (before the first frame), so its onCreate() warms libcipherbird_c +
       libaviary_c on a background thread before the first native call.
       authorities uses ${applicationId} so it is unique per host app. Not
       exported; never queried.

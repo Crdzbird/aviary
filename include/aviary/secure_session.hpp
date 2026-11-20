@@ -8,7 +8,7 @@
 
 /// A confidential, integrity-protected, post-quantum-hybrid, forward-secret,
 /// **mutually authenticated** peer session (ARCHITECTURE section 9). Built from
-/// cryptolib's hybrid KEM (X25519 + ML-KEM-768) for key agreement, SecretStream
+/// cipherbird's hybrid KEM (X25519 + ML-KEM-768) for key agreement, SecretStream
 /// for the framed encrypted transport, and a hybrid signature (Ed25519 +
 /// ML-DSA-65) over the handshake transcript for identity authentication.
 ///

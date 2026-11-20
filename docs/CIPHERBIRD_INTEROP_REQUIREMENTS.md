@@ -1,10 +1,10 @@
-# cryptolib primitives required for M6 interoperability
+# cipherbird primitives required for M6 interoperability
 
-> What aviary needs added to **cryptolib's C ABI** (`bridge/cryptolib_c.h`
+> What aviary needs added to **cipherbird's C ABI** (`bridge/cipherbird_c.h`
 > + impl) to support outbound EVM and Bitcoin interop. Solana needs nothing new
-> (Ed25519 + SHA-256 already present). Follows cryptolib's existing conventions:
+> (Ed25519 + SHA-256 already present). Follows cipherbird's existing conventions:
 > `CryptoBuffer`/`CryptoBufferResult` (malloc'd, caller frees via
-> `cryptolib_buffer_free`/`cryptolib_str_free`), `CryptoKeyPair`, verify returns
+> `cipherbird_buffer_free`/`cipherbird_str_free`), `CryptoKeyPair`, verify returns
 > `int` 1/0, inputs are borrowed const pointers.
 >
 > **Recommended upstream:** vendor **libsecp256k1** (bitcoin-core) for all EC
@@ -22,20 +22,20 @@ Ethereum the signature must be **recoverable** (carry a recovery id `v`) and
 
 ```c
 /** secp256k1 keypair. sk = 32 bytes; pk = 65 bytes uncompressed (0x04 || X || Y). */
-CRYPTO_API CryptoKeyPair cryptolib_secp256k1_keygen(void);
+CRYPTO_API CryptoKeyPair cipherbird_secp256k1_keygen(void);
 
 /** Derive the public key from a 32-byte secret key.
  *  compressed: 1 -> 33 bytes (0x02/0x03 || X), 0 -> 65 bytes (0x04 || X || Y). */
-CRYPTO_API CryptoBufferResult cryptolib_secp256k1_pubkey(
+CRYPTO_API CryptoBufferResult cipherbird_secp256k1_pubkey(
     const uint8_t* secret_key, size_t sk_len, int compressed);
 
 /** Sign a 32-byte digest. RFC6979 deterministic nonce, low-S normalized.
  *  Returns 65 bytes: r(32) || s(32) || recovery_id(1, value 0..3). */
-CRYPTO_API CryptoBufferResult cryptolib_secp256k1_sign(
+CRYPTO_API CryptoBufferResult cipherbird_secp256k1_sign(
     const uint8_t* digest32, const uint8_t* secret_key, size_t sk_len);
 
 /** Verify. sig is 64 bytes (r || s); pk is 33 or 65 bytes. Returns 1 if valid. */
-CRYPTO_API int cryptolib_secp256k1_verify(
+CRYPTO_API int cipherbird_secp256k1_verify(
     const uint8_t* digest32,
     const uint8_t* sig, size_t sig_len,
     const uint8_t* public_key, size_t pk_len);
@@ -43,7 +43,7 @@ CRYPTO_API int cryptolib_secp256k1_verify(
 /** Recover the public key (65-byte uncompressed) from a 32-byte digest and a
  *  65-byte recoverable signature (r || s || recovery_id). This is Ethereum's
  *  ecrecover and is how a sender address is derived from a signed tx. */
-CRYPTO_API CryptoBufferResult cryptolib_secp256k1_recover(
+CRYPTO_API CryptoBufferResult cipherbird_secp256k1_recover(
     const uint8_t* digest32, const uint8_t* sig65);
 ```
 
@@ -69,7 +69,7 @@ Ethereum uses **original Keccak** (padding byte `0x01`), **not** NIST SHA3-256
 
 ```c
 /** Keccak-256 (original padding). 32-byte output. NOT NIST SHA3-256. */
-CRYPTO_API CryptoBufferResult cryptolib_keccak256(const uint8_t* msg, size_t msg_len);
+CRYPTO_API CryptoBufferResult cipherbird_keccak256(const uint8_t* msg, size_t msg_len);
 ```
 
 KAT (verifiable, widely published):
@@ -83,7 +83,7 @@ event topic hashing, and EIP-55 address checksums.
 
 ```c
 /** RIPEMD-160. 20-byte output. */
-CRYPTO_API CryptoBufferResult cryptolib_ripemd160(const uint8_t* msg, size_t msg_len);
+CRYPTO_API CryptoBufferResult cipherbird_ripemd160(const uint8_t* msg, size_t msg_len);
 ```
 
 KAT:
@@ -91,11 +91,11 @@ KAT:
 - `ripemd160("abc")` = `8eb208f7e05d987a9b044a8e98c6b087f15a0bfc`
 
 Bitcoin `HASH160(x) = ripemd160(sha256(x))` composes from this + the existing
-`cryptolib_sha256`. Bitcoin `HASH256(x) = sha256(sha256(x))` already composable.
+`cipherbird_sha256`. Bitcoin `HASH256(x) = sha256(sha256(x))` already composable.
 
 ---
 
-## What aviary derives from these (no further cryptolib help needed)
+## What aviary derives from these (no further cipherbird help needed)
 
 - **Ethereum address** = last 20 bytes of `keccak256(uncompressed_pubkey[1:])`
   (drop the `0x04` prefix). EIP-55 checksum via keccak256.
@@ -105,7 +105,7 @@ Bitcoin `HASH160(x) = ripemd160(sha256(x))` composes from this + the existing
 
 ## Binding note
 
-Expose the same functions in cryptolib's **Dart** binding too if you want
+Expose the same functions in cipherbird's **Dart** binding too if you want
 client-side EVM/BTC crypto from Dart; aviary's core links the **C ABI**
 directly, so the C functions above are the only hard requirement.
 

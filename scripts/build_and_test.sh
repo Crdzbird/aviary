@@ -2,8 +2,8 @@
 # One-shot verifier for the whole stack: C++ core + C ABI, then the Dart and Go
 # bindings, all asserting the same cross-language golden vectors.
 #
-# Prereq: cryptolib's cryptolib_c built (e.g. in ../cryptolib via `make lib` or
-# scripts/build_selfcontained.sh). Override its location with CRYPTOLIB_ROOT.
+# Prereq: cipherbird's cipherbird_c built (e.g. in ../cryptolib via `make lib` or
+# scripts/build_selfcontained.sh). Override its location with CIPHERBIRD_ROOT.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,8 +11,8 @@ cd "$ROOT"
 
 echo "-- 1/3  C++ core + C ABI ---------------------------------------------"
 CMAKE_ARGS=()
-if [[ -n "${CRYPTOLIB_ROOT:-}" ]]; then
-  CMAKE_ARGS+=("-DCRYPTOLIB_ROOT=${CRYPTOLIB_ROOT}")
+if [[ -n "${CIPHERBIRD_ROOT:-}" ]]; then
+  CMAKE_ARGS+=("-DCIPHERBIRD_ROOT=${CIPHERBIRD_ROOT}")
 fi
 cmake -S . -B build -G "Unix Makefiles" ${CMAKE_ARGS[@]+"${CMAKE_ARGS[@]}"}
 cmake --build build

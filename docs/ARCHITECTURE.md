@@ -1,11 +1,11 @@
 # Aviary - Architecture & Design
 
-> A **C++** distributed-ledger core (built on **cryptolib** for all crypto), exposed
+> A **C++** distributed-ledger core (built on **cipherbird** for all crypto), exposed
 > through a **C ABI** with **Dart and Go bindings**, built to construct custom
 > chains, run them privately or permissionlessly, connect to other chains, and
 > stream/observe/verify everything along the way.
 >
-> Structure mirrors cryptolib: one C++ implementation -> one C ABI -> thin language
+> Structure mirrors cipherbird: one C++ implementation -> one C ABI -> thin language
 > packages. Consensus logic lives **once**, in C++; bindings only marshal.
 >
 > Status: **DESIGN - not yet implemented.** This document is the contract we review
@@ -20,14 +20,14 @@ a chain from parts:
 
 - a **state machine** (account *or* UTXO - chosen at genesis),
 - a **consensus engine** (BFT reference; PoS/PoW pluggable),
-- a **crypto suite** (classical, post-quantum, or hybrid - all from cryptolib),
+- a **crypto suite** (classical, post-quantum, or hybrid - all from cipherbird),
 - a **network/transport** profile (private/permissioned or permissionless),
 
 and gets a node that produces, validates, finalizes, gossips, streams, and exposes
 blocks - plus clients that verify and bridge to *other* chains.
 
 The core is **C++** and is consumed from **Dart and Go** (and any future language)
-through a single **C ABI**, exactly as cryptolib is. The bindings are thin: they
+through a single **C ABI**, exactly as cipherbird is. The bindings are thin: they
 marshal structured data in and out, and never reproduce consensus-critical logic.
 A wallet UI in Flutter, a relayer in Go, and a full node all drive the *same* C++
 engine.
@@ -44,14 +44,14 @@ engine.
 | "verification"    | Full-node validation, light-client/SPV header+proof verification, and a standalone verification API. |
 | "as safe as possible" | Safety-over-liveness consensus, post-quantum-capable signatures (hybrid), committing AEAD channels, strict determinism, adversarial test discipline. |
 | "used privately"  | Permissioned mode: known validator set, encrypted+authenticated transport (Noise XX), no public discovery required. |
-| *(multi-language)* | C++ core + C ABI + **Dart and Go** bindings (extensible to more), mirroring cryptolib. One engine, many callers. |
+| *(multi-language)* | C++ core + C ABI + **Dart and Go** bindings (extensible to more), mirroring cipherbird. One engine, many callers. |
 
 ### Non-goals (explicitly out, for now)
 
 - A production smart-contract VM. The state machine is pluggable; a VM is a *future*
   state-machine implementation, not part of the core.
 - Token economics / a launched mainnet. We build the engine, not a coin.
-- Re-implementing any cryptographic primitive. **All** crypto comes from cryptolib.
+- Re-implementing any cryptographic primitive. **All** crypto comes from cipherbird.
 
 ---
 
@@ -76,7 +76,7 @@ conflicting state. When safety and liveness conflict, the chain **halts** rather
 than forks. A halted chain recovers; a forked chain loses funds.
 
 Full threat enumeration and economic-layer analysis live in [`THREAT_MODEL.md`](THREAT_MODEL.md)
-(to be written in the security milestone, composing with cryptolib's threat model).
+(to be written in the security milestone, composing with cipherbird's threat model).
 
 ---
 
@@ -114,28 +114,28 @@ thin and the engine stays deterministic everywhere.
 
 ---
 
-## 3. Cryptographic foundation (delegated to cryptolib)
+## 3. Cryptographic foundation (delegated to cipherbird)
 
-We **do not implement crypto.** The C++ core links cryptolib's **prebuilt C ABI**
-(`cryptolib_c` - link `libcryptolib_c` + include `bridge/cryptolib_c.h`). A thin
+We **do not implement crypto.** The C++ core links cipherbird's **prebuilt C ABI**
+(`cipherbird_c` - link `libcipherbird_c` + include `bridge/cipherbird_c.h`). A thin
 internal layer (`aviary::crypto`) wraps those C functions in
 domain-separated, intent-named C++ operations (`hash_leaf`, `hash_node`,
 `hash_header`, `sign_tx`, `verify_tx`, `aggregate_votes`...) returning real C++ types.
 
-> **Linking choice (decision):** link the **self-contained `cryptolib_c` C ABI**,
-> not cryptolib's header-only C++ API. This decouples aviary's build from
-> cryptolib's transitive native-dep chain (libsodium / liboqs / blst / OpenSSL /
-> BLAKE3) - aviary needs only the prebuilt `libcryptolib_c` artifact + one
+> **Linking choice (decision):** link the **self-contained `cipherbird_c` C ABI**,
+> not cipherbird's header-only C++ API. This decouples aviary's build from
+> cipherbird's transitive native-dep chain (libsodium / liboqs / blst / OpenSSL /
+> BLAKE3) - aviary needs only the prebuilt `libcipherbird_c` artifact + one
 > header. The tradeoff is a C-typed surface (lengths + out-pointers + buffer-free
 > calls) that `aviary::crypto` immediately wraps in RAII C++ types, so the C
-> shape never leaks past the seam. cryptolib's C ABI already guarantees exception
+> shape never leaks past the seam. cipherbird's C ABI already guarantees exception
 > isolation, indistinguishable error returns, and bounds-checked length math.
 
 ### Suite pins (defaults; per-chain configurable in `ChainSpec`)
 
-| Role | Default primitive | cryptolib surface | Notes |
+| Role | Default primitive | cipherbird surface | Notes |
 |------|-------------------|-------------------|-------|
-| Block / object hash | **BLAKE3** | `cryptolib_blake3` (C ABI) | Fast tree hash; domain-separated via keyed/prefixed tags. **Gap:** not yet in the Dart binding - see section 3.1. |
+| Block / object hash | **BLAKE3** | `cipherbird_blake3` (C ABI) | Fast tree hash; domain-separated via keyed/prefixed tags. **Gap:** not yet in the Dart binding - see section 3.1. |
 | Interop / EVM-compat hash | SHA-256 | `sha256` (Dart binding ok) | For chains that must match foreign hashing. |
 | Transaction signature | **Ed25519** | `ed25519Keygen/Sign/Verify` (ok) | Default. |
 | Tx signature (long-lived value) | **Hybrid Ed25519 + ML-DSA-65** | `hybridSig*` (ok) | Secure if *either* scheme survives. Per-chain opt-in. |
@@ -146,19 +146,19 @@ domain-separated, intent-named C++ operations (`hash_leaf`, `hash_node`,
 | Wallet / key custody | **Vault + Keyring** | `vault*`, `keyring*` (ok) | Envelope encryption, device + passphrase slots, rotation, anti-downgrade. |
 | Validator key splitting | Shamir M-of-N | `shamir` (ok) | Optional: split a validator key across operators. |
 
-### 3.1 cryptolib surface used by the core
+### 3.1 cipherbird surface used by the core
 
-BLAKE3 (`cryptolib_blake3`), Ed25519 (`cryptolib_ed25519_*`), ML-DSA/SLH-DSA, hybrid
+BLAKE3 (`cipherbird_blake3`), Ed25519 (`cipherbird_ed25519_*`), ML-DSA/SLH-DSA, hybrid
 signatures, BLS sign/verify, **BLS aggregate/aggregate-verify**
-(`cryptolib_bls_aggregate(_verify)`), hybrid KEM, Noise XX, SecretStream
-(`cryptolib_stream_*`), Vault, Keyring, and Shamir are all present in the
-`cryptolib_c` C ABI, so the core calls them directly - nothing to add on the core
+(`cipherbird_bls_aggregate(_verify)`), hybrid KEM, Noise XX, SecretStream
+(`cipherbird_stream_*`), Vault, Keyring, and Shamir are all present in the
+`cipherbird_c` C ABI, so the core calls them directly - nothing to add on the core
 path.
 
-> Separately, the cryptolib **Dart** binding was extended with `blake3` (+ `_keyed`,
+> Separately, the cipherbird **Dart** binding was extended with `blake3` (+ `_keyed`,
 > `_derive_key`) and `blsAggregate`/`blsAggregateVerify`. Those are **not** on
 > aviary's core path (the core is C++), but remain useful for any client-side
-> Dart crypto (e.g. a wallet signing locally) and for cryptolib itself. Note that
+> Dart crypto (e.g. a wallet signing locally) and for cipherbird itself. Note that
 > determinism still requires consensus bytes to originate in the C++ core, so a
 > binding never canonicalizes-and-hashes on its own.
 
@@ -171,7 +171,7 @@ domain separation centralized, (b) let `ChainSpec` select a suite by name
 (Ed25519 vs hybrid vs PQ-only), and (c) make Merkle/validation logic testable
 against a deterministic fake `Hasher` without pulling the whole native-dep chain
 into every unit test. Consensus and ledger code depend on the seam, never on
-cryptolib headers directly.
+cipherbird headers directly.
 
 ---
 
@@ -356,7 +356,7 @@ engine - so the ledger never needs to know which engine is running.
 
 The entire core **is** native C++, so there is no "move this hot path to native"
 question for our own logic - hashing, signature verification, Merkle computation,
-validation, and fork choice already run at native speed, and cryptolib's primitives
+validation, and fork choice already run at native speed, and cipherbird's primitives
 are constant-time. Performance work happens *within* C++ and is **profile-driven**:
 batch signature verification, Merkle roots over large tx sets, and streaming-sync
 verification pipelines are the likely optimization targets, tuned only when a
@@ -383,7 +383,7 @@ length math, no error oracles) governs the bridge surface.
 `aviary_p2p`:
 
 - **Transport:** authenticated, encrypted channels via **Noise XX** + **hybrid KEM**
-  (cryptolib). Private mode adds a validator allow-list; permissionless mode adds
+  (cipherbird). Private mode adds a validator allow-list; permissionless mode adds
   discovery.
 - **Gossip:** block and transaction propagation with deduplication and flood
   control; eclipse-resistance via diverse peer selection.
@@ -392,7 +392,7 @@ length math, no error oracles) governs the bridge surface.
   and hard DoS limits (size caps, rate limits, per-peer accounting).
 - **Sync:**
  - *Fast/streaming sync* - stream headers, then state snapshots + blocks over
-    cryptolib **SecretStream/streaming AEAD**, verifying incrementally so a joining
+    cipherbird **SecretStream/streaming AEAD**, verifying incrementally so a joining
     node keeps up with the network without buffering whole epochs.
  - *Light/SPV sync* - headers + Merkle proofs only (section 10).
 
@@ -423,7 +423,7 @@ Two directions:
 **Outbound - talk to existing chains** (`aviary_interop`, per the skill's
 web3-interaction reference): JSON-RPC clients for **EVM** (eth JSON-RPC, ABI
 encode/decode), **Solana**, and **Bitcoin**; transaction construction, nonce/fee
-handling, on-chain reads, and event subscription. **All signing uses cryptolib**
+handling, on-chain reads, and event subscription. **All signing uses cipherbird**
 (Ed25519/secp via the appropriate scheme, key custody via Vault/Keyring). RPC
 method names, chain IDs, and library versions are **confirmed against live sources at
 implementation time**, never recalled (zero-hallucination discipline).
@@ -465,17 +465,17 @@ trie. All writes for a block commit **atomically** or not at all (section 6 step
 
 ## 14. Project layout (C++ core + C ABI + bindings)
 
-A CMake C++ project mirroring cryptolib's structure, keeping consensus-critical code
+A CMake C++ project mirroring cipherbird's structure, keeping consensus-critical code
 small and auditable:
 
 ```
 aviary/
-  CMakeLists.txt              links crypto::cryptolib; builds core + C ABI + tests
+  CMakeLists.txt              links crypto::cipherbird; builds core + C ABI + tests
   docs/                       ARCHITECTURE.md (this), THREAT_MODEL.md, CODEC_SPEC.md
   include/aviary/       public C++ headers
   src/
     codec/        canonical serialization (the C++ home of the removed Dart codec)
-    crypto/       cryptolib adapter - Hasher/Signer/Aggregator seam (section 3.2)
+    crypto/       cipherbird adapter - Hasher/Signer/Aggregator seam (section 3.2)
     core/         block/tx model, Merkle, validation pipeline, ChainSpec
     state/        StateMachine (account & UTXO) + StateStore
     consensus/    ConsensusEngine + BFT reference
@@ -522,13 +522,13 @@ the C++ tests and each binding's test suite (section 2).
 
 | M | Milestone | Exit criteria |
 |---|-----------|---------------|
-| **M0** | Foundations | This doc reviewed; **CMake C++ project scaffold linking `crypto::cryptolib`**; C ABI skeleton (`bridge/aviary_c.{h,cpp}`); empty Dart + Go binding stubs that load and call `version()`; CODEC_SPEC drafted; CI builds C++ + both bindings. |
-| **M1** | Core ledger (C++) | Canonical codec + `vectors/` golden vectors; block/tx model; Merkle; crypto seam wired to cryptolib C++; **account + UTXO** state machines behind the interface; single-node append + validate; full section 6 pipeline; determinism + fuzz suites green; **golden vectors replayed through Dart & Go bindings**. |
+| **M0** | Foundations | This doc reviewed; **CMake C++ project scaffold linking `crypto::cipherbird`**; C ABI skeleton (`bridge/aviary_c.{h,cpp}`); empty Dart + Go binding stubs that load and call `version()`; CODEC_SPEC drafted; CI builds C++ + both bindings. |
+| **M1** | Core ledger (C++) | Canonical codec + `vectors/` golden vectors; block/tx model; Merkle; crypto seam wired to cipherbird C++; **account + UTXO** state machines behind the interface; single-node append + validate; full section 6 pipeline; determinism + fuzz suites green; **golden vectors replayed through Dart & Go bindings**. |
 | **M2** | BFT consensus | `ConsensusEngine` + BFT reference; single- then multi-validator local net finalizing blocks; BLS-aggregated certificates; Byzantine-scenario tests. |
 | **M3** | Networking & sync | Noise-encrypted transport, gossip, mempool, fast/streaming sync; adversarial-peer tests. |
 | **M4** | Observability & streaming | Logs/metrics/tracing + typed event bus + live stream API (callback/stream over the C ABI); Prometheus exporter. |
 | **M5** | Verification & light client | Full verify API + SPV/light client + proof verification API, exposed through the C ABI to Dart & Go. |
-| **M6** | Interop | EVM/Solana/Bitcoin outbound clients (signing via cryptolib); then inbound light-client/bridge primitives (heaviest review). |
+| **M6** | Interop | EVM/Solana/Bitcoin outbound clients (signing via cipherbird); then inbound light-client/bridge primitives (heaviest review). |
 | **M7** | Hardening | THREAT_MODEL.md; broad fuzzing (codec + C ABI); ASan/UBSan/TSan clean; profile-driven C++ optimization; security review of consensus, codec, and the C ABI bridge. |
 
 ---
@@ -542,14 +542,14 @@ the C++ tests and each binding's test suite (section 2).
    Merkle trie (simpler, our own proof format). Affects interop proof compatibility.
 3. **Storage backend** for the default embedded `StateStore` (C++ embedded KV).
 4. **Block timestamp policy:** allowed drift window and parent-monotonicity rule.
-5. ~~cryptolib linkage~~ - **decided:** link the prebuilt `cryptolib_c` C ABI
-   (section 3). Remaining sub-question: how CI obtains the artifact - build cryptolib's
-   `cryptolib_c` target as a step vs consume a pinned prebuilt/self-contained
-   binary (cryptolib already ships `scripts/build_selfcontained.sh`).
-6. **C++ test framework:** match cryptolib's zero-dependency runner (consistency)
+5. ~~cipherbird linkage~~ - **decided:** link the prebuilt `cipherbird_c` C ABI
+   (section 3). Remaining sub-question: how CI obtains the artifact - build cipherbird's
+   `cipherbird_c` target as a step vs consume a pinned prebuilt/self-contained
+   binary (cipherbird already ships `scripts/build_selfcontained.sh`).
+6. **C++ test framework:** match cipherbird's zero-dependency runner (consistency)
    vs a framework (doctest/Catch2).
 7. **Go binding distribution:** cgo against a built shared lib vs a vendored merged
-   static archive (cryptolib already faces this; reuse its approach).
+   static archive (cipherbird already faces this; reuse its approach).
 
 These don't block writing the codec and core model; we resolve each as its module
 arrives.

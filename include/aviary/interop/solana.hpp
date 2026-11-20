@@ -8,7 +8,7 @@
 #include "aviary/crypto.hpp"
 #include "aviary/interop/rpc.hpp"
 
-/// Solana interop (ARCHITECTURE section 11). Ed25519 signing (cryptolib) + Base58
+/// Solana interop (ARCHITECTURE section 11). Ed25519 signing (cipherbird) + Base58
 /// addresses + the legacy message/transaction format. Builds a System-Program
 /// transfer end to end.
 namespace aviary::interop::solana {

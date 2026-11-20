@@ -16,7 +16,7 @@ void main() {
   //  - the native libraries are already MAPPED at app launch off the UI thread
   //    - on Android by the AviaryStartup ContentProvider, on iOS/macOS by
   //     dyld loading the embedded framework - so the lazy load is cheap, and
-  //  - preload() additionally pushes cryptolib_init off the UI isolate.
+  //  - preload() additionally pushes cipherbird_init off the UI isolate.
   // So: isolate loading, no await, no UI stall.
   Aviary.preload();
   runApp(const AviaryDemoApp());

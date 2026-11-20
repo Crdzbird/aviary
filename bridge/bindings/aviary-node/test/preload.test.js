@@ -2,7 +2,7 @@
 // in a worker; the synchronous API works with and without preload (no await).
 //
 //   AVIARY_DYLIB=/abs/libaviary_c.dylib \
-//   CRYPTOLIB_DYLIB=/abs/libcryptolib_c.dylib \
+//   CIPHERBIRD_LIBRARY=/abs/libcipherbird_c.dylib \
 //     node test/preload.test.js
 'use strict';
 const assert = require('node:assert');

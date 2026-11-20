@@ -4,7 +4,7 @@
 #include <utility>
 
 #include "aviary/codec.hpp"
-#include "cryptolib_c.h"
+#include "cipherbird_c.h"
 
 namespace aviary::custody {
 
@@ -14,11 +14,11 @@ namespace {
 Bytes take(CryptoBufferResult r, const char* op) {
   if (r.buf.data == nullptr) {
     std::string msg = r.error ? r.error : std::string(op) + " failed";
-    if (r.error) cryptolib_str_free(r.error);
+    if (r.error) cipherbird_str_free(r.error);
     throw std::runtime_error("custody: " + msg);
   }
   Bytes out(r.buf.data, r.buf.data + r.buf.len);
-  cryptolib_buffer_free(&r.buf);
+  cipherbird_buffer_free(&r.buf);
   return out;
 }
 
@@ -41,7 +41,7 @@ codec::ByteView view(const Bytes& b) { return codec::ByteView(b.data(), b.size()
 // -- Keyring -----------------------------------------------------------------
 
 Keyring Keyring::create() {
-  CryptoKeyringHandle h = cryptolib_keyring_create();
+  CryptoKeyringHandle h = cipherbird_keyring_create();
   if (h == nullptr) throw std::runtime_error("custody: keyring create failed");
   return Keyring(h);
 }
@@ -49,54 +49,54 @@ Keyring Keyring::create() {
 Keyring::Keyring(Keyring&& o) noexcept : h_(o.h_) { o.h_ = nullptr; }
 Keyring& Keyring::operator=(Keyring&& o) noexcept {
   if (this != &o) {
-    if (h_) cryptolib_keyring_free(h_);
+    if (h_) cipherbird_keyring_free(h_);
     h_ = o.h_;
     o.h_ = nullptr;
   }
   return *this;
 }
 Keyring::~Keyring() {
-  if (h_) cryptolib_keyring_free(h_);
+  if (h_) cipherbird_keyring_free(h_);
 }
 
 bool Keyring::add_device_slot(ByteView factor_key) {
-  return cryptolib_keyring_add_device_slot(h_, factor_key.data(), factor_key.size()) == 1;
+  return cipherbird_keyring_add_device_slot(h_, factor_key.data(), factor_key.size()) == 1;
 }
 
 bool Keyring::add_passphrase_slot(std::string_view passphrase, bool sensitive) {
   const std::string p(passphrase);
-  return cryptolib_keyring_add_passphrase_slot(h_, p.c_str(), sensitive ? 1 : 0) == 1;
+  return cipherbird_keyring_add_passphrase_slot(h_, p.c_str(), sensitive ? 1 : 0) == 1;
 }
 
-std::size_t Keyring::slot_count() const { return cryptolib_keyring_slot_count(h_); }
+std::size_t Keyring::slot_count() const { return cipherbird_keyring_slot_count(h_); }
 
 bool Keyring::remove_slot(std::size_t index) {
-  return cryptolib_keyring_remove_slot(h_, index) == 1;
+  return cipherbird_keyring_remove_slot(h_, index) == 1;
 }
 
 Bytes Keyring::serialise() const {
-  return take(cryptolib_keyring_serialise(h_), "keyring serialise");
+  return take(cipherbird_keyring_serialise(h_), "keyring serialise");
 }
 
 Keyring Keyring::deserialise(ByteView blob) {
   char* err = nullptr;
-  CryptoKeyringHandle h = cryptolib_keyring_deserialise(blob.data(), blob.size(), &err);
+  CryptoKeyringHandle h = cipherbird_keyring_deserialise(blob.data(), blob.size(), &err);
   if (h == nullptr) {
     std::string msg = err ? err : "keyring deserialise failed";
-    if (err) cryptolib_str_free(err);
+    if (err) cipherbird_str_free(err);
     throw std::runtime_error("custody: " + msg);
   }
   return Keyring(h);
 }
 
 Bytes Keyring::unlock_with_device(ByteView factor_key) const {
-  return take(cryptolib_keyring_unlock_with_device(h_, factor_key.data(), factor_key.size()),
+  return take(cipherbird_keyring_unlock_with_device(h_, factor_key.data(), factor_key.size()),
               "keyring unlock (device)");
 }
 
 Bytes Keyring::unlock_with_passphrase(std::string_view passphrase) const {
   const std::string p(passphrase);
-  return take(cryptolib_keyring_unlock_with_passphrase(h_, p.c_str()),
+  return take(cipherbird_keyring_unlock_with_passphrase(h_, p.c_str()),
               "keyring unlock (passphrase)");
 }
 
@@ -106,28 +106,28 @@ Vault::Vault(ByteView master_key) : master_(master_key.begin(), master_key.end()
 
 SealedBlob Vault::seal(ByteView plaintext, std::string_view aad) const {
   const auto* aadp = reinterpret_cast<const std::uint8_t*>(aad.data());
-  return take(cryptolib_committing_encrypt(plaintext.data(), plaintext.size(), master_.data(),
+  return take(cipherbird_committing_encrypt(plaintext.data(), plaintext.size(), master_.data(),
                                            master_.size(), aadp, aad.size()),
               "vault seal");
 }
 
 Bytes Vault::open(const SealedBlob& blob, std::string_view aad) const {
   const auto* aadp = reinterpret_cast<const std::uint8_t*>(aad.data());
-  return take(cryptolib_committing_decrypt(blob.data(), blob.size(), master_.data(),
+  return take(cipherbird_committing_decrypt(blob.data(), blob.size(), master_.data(),
                                            master_.size(), aadp, aad.size()),
               "vault open");
 }
 
 SealedBlob Vault::seal_max(ByteView plaintext, std::string_view aad) const {
   const auto* aadp = reinterpret_cast<const std::uint8_t*>(aad.data());
-  return take(cryptolib_molecular_seal_with_key(plaintext.data(), plaintext.size(), master_.data(),
+  return take(cipherbird_molecular_seal_with_key(plaintext.data(), plaintext.size(), master_.data(),
                                                 master_.size(), aadp, aad.size()),
               "vault seal (molecular)");
 }
 
 Bytes Vault::open_max(const SealedBlob& blob, std::string_view aad) const {
   const auto* aadp = reinterpret_cast<const std::uint8_t*>(aad.data());
-  return take(cryptolib_molecular_open_with_key(blob.data(), blob.size(), master_.data(),
+  return take(cipherbird_molecular_open_with_key(blob.data(), blob.size(), master_.data(),
                                                 master_.size(), aadp, aad.size()),
               "vault open (molecular)");
 }
@@ -167,7 +167,7 @@ Bytes PortableAccount::seal_passphrase(std::string_view passphrase, std::uint64_
   const Bytes payload = encode();
   const std::string p(passphrase);
   const auto aad = portable_aad();
-  return take(cryptolib_molecular_seal(payload.data(), payload.size(), p.c_str(), aad.data(),
+  return take(cipherbird_molecular_seal(payload.data(), payload.size(), p.c_str(), aad.data(),
                                        aad.size(), ops, mem),
               "portable seal (passphrase)");
 }
@@ -176,7 +176,7 @@ PortableAccount PortableAccount::open_passphrase(codec::ByteView envelope,
                                                  std::string_view passphrase) {
   const std::string p(passphrase);
   const auto aad = portable_aad();
-  const Bytes payload = take(cryptolib_molecular_open(envelope.data(), envelope.size(), p.c_str(),
+  const Bytes payload = take(cipherbird_molecular_open(envelope.data(), envelope.size(), p.c_str(),
                                                       aad.data(), aad.size()),
                              "portable open (passphrase)");
   return decode(view(payload));
@@ -268,7 +268,7 @@ Bytes KeyStore::export_account(const Hash& address, std::string_view passphrase,
 
   const std::string p(passphrase);
   const auto* aadp = reinterpret_cast<const std::uint8_t*>(kExportAad);
-  return take(cryptolib_molecular_seal(payload.data(), payload.size(), p.c_str(), aadp,
+  return take(cipherbird_molecular_seal(payload.data(), payload.size(), p.c_str(), aadp,
                                        std::char_traits<char>::length(kExportAad), ops, mem),
               "account export");
 }
@@ -287,7 +287,7 @@ Hash KeyStore::import_account(ByteView envelope, std::string_view passphrase) {
   if (!vault_) throw std::runtime_error("custody: key store is locked");
   const std::string p(passphrase);
   const auto* aadp = reinterpret_cast<const std::uint8_t*>(kExportAad);
-  const Bytes payload = take(cryptolib_molecular_open(envelope.data(), envelope.size(), p.c_str(),
+  const Bytes payload = take(cipherbird_molecular_open(envelope.data(), envelope.size(), p.c_str(),
                                                       aadp, std::char_traits<char>::length(kExportAad)),
                              "account import");
   codec::CodecReader r(view(payload));

@@ -1,6 +1,6 @@
 // Aviary for Android - standalone library (AAR).
 //
-// Bundles the prebuilt native pair (libaviary_c.so + the libcryptolib_c.so
+// Bundles the prebuilt native pair (libaviary_c.so + the libcipherbird_c.so
 // it links) per ABI under src/main/jniLibs/<abi>/, and an auto-registered
 // AviaryStartup ContentProvider that warms them off the main thread at
 // launch - so the first call into the native layer pays no load cost and the

@@ -7,7 +7,7 @@
 
 /// A mutually-authenticated, post-quantum, forward-secret **and** post-compromise-
 /// secure channel (ARCHITECTURE section 9, hardened transport tier). It composes two
-/// cryptolib pieces the raw ratchet cannot provide alone:
+/// cipherbird pieces the raw ratchet cannot provide alone:
 ///
 ///  - confidentiality + forward secrecy + post-compromise healing from the
 ///     hybrid-KEM Double Ratchet ([crypto::Ratchet]); and

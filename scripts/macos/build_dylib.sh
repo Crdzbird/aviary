@@ -14,8 +14,8 @@
 # Usage: bash scripts/macos/build_dylib.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-CRYPTOLIB_ROOT="${CIPHERBIRD_ROOT:-${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}}"
-ENGINE="$CRYPTOLIB_ROOT/build/ios/macosx/libcryptolib_c_merged.a"
+CIPHERBIRD_ROOT="${CIPHERBIRD_ROOT:-$ROOT/../cryptolib}"
+ENGINE="$CIPHERBIRD_ROOT/build/ios/macosx/libcipherbird_c_merged.a"
 [[ -f "$ENGINE" ]] || { echo "missing $ENGINE; run scripts/ios/build_all.sh macosx in the CipherBird checkout first"; exit 1; }
 BUILD="$ROOT/build-macos"
 cmake -S "$ROOT" -B "$BUILD" -G Ninja \
@@ -23,10 +23,10 @@ cmake -S "$ROOT" -B "$BUILD" -G Ninja \
   -DAVIARY_BUILD_TESTS=OFF \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-  -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
-  -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" \
-  -DCRYPTOLIB_C_LIBRARY="$ENGINE" \
-  -DAVIARY_REQUIRE_FRESH_CRYPTOLIB=ON \
+  -DCIPHERBIRD_ROOT="$CIPHERBIRD_ROOT" \
+  -DCIPHERBIRD_C_INCLUDE_DIR="$CIPHERBIRD_ROOT/bridge" \
+  -DCIPHERBIRD_C_LIBRARY="$ENGINE" \
+  -DAVIARY_REQUIRE_FRESH_CIPHERBIRD=ON \
   -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-dead_strip -Wl,-exported_symbol,_aviary_* -framework Security -framework CoreFoundation" >/dev/null
 cmake --build "$BUILD" --target aviary_c >/dev/null
 LIB="$BUILD/libaviary_c.dylib"
@@ -41,5 +41,5 @@ OUT="$ROOT/bridge/bindings/dart/native/darwin-arm64"
 mkdir -p "$OUT"
 rm -f "$OUT/libcipherbird.dylib"
 cp "$LIB" "$OUT/libaviary_c.dylib"
-REVISION="$(sed -n 's/^revision //p' "$BUILD/cryptolib_revision.txt")"
+REVISION="$(sed -n 's/^revision //p' "$BUILD/cipherbird_revision.txt")"
 echo "ok: $OUT/libaviary_c.dylib bundles CipherBird $REVISION ($(du -h "$OUT/libaviary_c.dylib" | cut -f1), $(nm -gU "$LIB" | grep -c ' _aviary_') exported functions)"

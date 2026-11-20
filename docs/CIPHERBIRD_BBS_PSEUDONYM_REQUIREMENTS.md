@@ -1,40 +1,40 @@
-# cryptolib BBS pseudonym + blind-issuance primitives - feature request
+# cipherbird BBS pseudonym + blind-issuance primitives - feature request
 
-> **Filed upstream** on `Crdzbird/CryptoLib`, one issue per primitive:
-> - section 1 pseudonyms -> [Crdzbird/CryptoLib#3](https://github.com/Crdzbird/CryptoLib/issues/3) (HIGH - the Option-B blocker)
-> - section 2 blind issuance -> [Crdzbird/CryptoLib#4](https://github.com/Crdzbird/CryptoLib/issues/4) (MEDIUM - the malicious-issuer fix)
+> **Filed upstream** on `Crdzbird/CipherBird`, one issue per primitive:
+> - section 1 pseudonyms -> [Crdzbird/CipherBird#3](https://github.com/Crdzbird/CipherBird/issues/3) (HIGH - the Option-B blocker)
+> - section 2 blind issuance -> [Crdzbird/CipherBird#4](https://github.com/Crdzbird/CipherBird/issues/4) (MEDIUM - the malicious-issuer fix)
 >
 > This document is the consolidated spec; keep it and the two issues in sync.
 
-> What aviary needs added to **cryptolib's C ABI** (`bridge/cryptolib_c.h`
+> What aviary needs added to **cipherbird's C ABI** (`bridge/cipherbird_c.h`
 > + impl) to unblock the **CredentialGate** anonymous-membership feature
-> (`docs/design/CREDENTIAL_GATE.md`). Follows cryptolib's existing conventions:
+> (`docs/design/CREDENTIAL_GATE.md`). Follows cipherbird's existing conventions:
 > `CryptoBuffer`/`CryptoBufferResult` (malloc'd, caller frees via
-> `cryptolib_buffer_free` / `cryptolib_str_free`), `CryptoKeyPair`, verify returns
+> `cipherbird_buffer_free` / `cipherbird_str_free`), `CryptoKeyPair`, verify returns
 > `int` 1/0, inputs are borrowed `const` pointers, message vectors cross as the
 > parallel `msgs[i]` (pointer) + `msg_lens[i]` (length) x `msg_count` arrays
-> already used by `cryptolib_bbs_*`.
+> already used by `cipherbird_bbs_*`.
 >
 > **Why this is upstream, not in aviary.** aviary's architecture rule
 > is *never reimplement crypto* - it is a consumer of vetted primitives. The two
 > asks below are standard CFRG constructions with reference vectors; building
 > either as a home-grown composition over the bare-BBS + OPRF surface would mean
 > inventing a cross-primitive equality-of-discrete-logs ZK proof, which is exactly
-> the class of thing that rule forbids. Putting these in cryptolib keeps the
+> the class of thing that rule forbids. Putting these in cipherbird keeps the
 > soundness burden where the crypto expertise is.
 >
 > **Verify the exact draft revision, message/proof byte layouts, and KAT values
 > against the current CFRG sources when implementing** - the signatures below fix
 > the *shape and semantics* aviary depends on, not the wire bytes; match
-> cryptolib's chosen suite constants and the draft you implement.
+> cipherbird's chosen suite constants and the draft you implement.
 
 ---
 
-## Background: what cryptolib exposes today
+## Background: what cipherbird exposes today
 
-The current ABI (`cryptolib_c.h` section "BBS Signatures", BLS12-381-SHA-256; sk 32 B,
+The current ABI (`cipherbird_c.h` section "BBS Signatures", BLS12-381-SHA-256; sk 32 B,
 pk 96 B, signature 80 B) is **bare BBS** - 
-`cryptolib_bbs_{keygen, sk_to_pk, sign, verify, proof_gen, proof_verify}`:
+`cipherbird_bbs_{keygen, sk_to_pk, sign, verify, proof_gen, proof_verify}`:
 multi-message signing plus zero-knowledge **selective disclosure**. That is
 enough for aviary's **Option A** (unlinkable, per-interaction credential
 presentation - shippable now on the existing surface).
@@ -42,7 +42,7 @@ presentation - shippable now on the existing surface).
 Bare BBS proofs from one credential are, by design, **mutually unlinkable**. For
 a chain that property is the *problem*: it means no Sybil resistance, no targeted
 revocation, and no accountability (see `CREDENTIAL_GATE.md` section 2, section 3). Resolving it
-without destroying selective disclosure needs two primitives cryptolib does not
+without destroying selective disclosure needs two primitives cipherbird does not
 yet expose.
 
 ---
@@ -50,7 +50,7 @@ yet expose.
 ## 1. BBS per-verifier linkability (pseudonyms) - the headline blocker
 
 **Draft:** `draft-irtf-cfrg-bbs-per-verifier-linkability` (BBS "pseudonym" mode,
-aka BBS#), layered on the base `draft-irtf-cfrg-bbs-signatures` cryptolib already
+aka BBS#), layered on the base `draft-irtf-cfrg-bbs-signatures` cipherbird already
 implements. **Confirm the current revision and its constants.**
 
 The credential is signed over a message vector that includes a dedicated,
@@ -80,7 +80,7 @@ attribute. The essential properties aviary relies on:
  *  pseudonym-secret scalar `pid` (32 B) that the credential was signed over.
  *  Lets the holder/verifier bookkeep nyms (Sybil cap, revocation) without a
  *  full proof. Returns the pseudonym as a compressed G1 point (48 B). */
-CRYPTO_API CryptoBufferResult cryptolib_bbs_calculate_pseudonym(
+CRYPTO_API CryptoBufferResult cipherbird_bbs_calculate_pseudonym(
     const uint8_t* verifier_id, size_t vid_len,
     const uint8_t* pid, size_t pid_len);
 
@@ -88,9 +88,9 @@ CRYPTO_API CryptoBufferResult cryptolib_bbs_calculate_pseudonym(
  *  `msgs` is the FULL signed vector; `pid_index` (0-based) marks which message
  *  is the pseudonym secret (it MUST NOT also appear in `disclosed_indexes`).
  *  `verifier_id` is the presentation context. Returns the proof bytes; the
- *  caller obtains the matching pseudonym via cryptolib_bbs_calculate_pseudonym
+ *  caller obtains the matching pseudonym via cipherbird_bbs_calculate_pseudonym
  *  (or, if preferred, expose a variant that returns proof || nym). */
-CRYPTO_API CryptoBufferResult cryptolib_bbs_proof_gen_with_pseudonym(
+CRYPTO_API CryptoBufferResult cipherbird_bbs_proof_gen_with_pseudonym(
     const uint8_t* pk, size_t pk_len, const uint8_t* signature, size_t sig_len,
     const uint8_t* header, size_t header_len, const uint8_t* ph, size_t ph_len,
     const uint8_t* const* msgs, const size_t* msg_lens, size_t msg_count,
@@ -103,7 +103,7 @@ CRYPTO_API CryptoBufferResult cryptolib_bbs_proof_gen_with_pseudonym(
  *  pseudonym (48 B) and `verifier_id` the context it must be bound to. Checks
  *  the proof AND that `nym` is the correct pseudonym for `verifier_id` under the
  *  signed pid. Returns 1 valid, 0 invalid. */
-CRYPTO_API int cryptolib_bbs_proof_verify_with_pseudonym(
+CRYPTO_API int cipherbird_bbs_proof_verify_with_pseudonym(
     const uint8_t* pk, size_t pk_len, const uint8_t* proof, size_t proof_len,
     const uint8_t* header, size_t header_len, const uint8_t* ph, size_t ph_len,
     const uint8_t* const* disclosed_msgs, const size_t* disclosed_lens,
@@ -135,7 +135,7 @@ safely at all.
 **Draft:** `draft-irtf-cfrg-blind-bbs-signatures`. **Confirm the current
 revision.**
 
-Today `cryptolib_bbs_sign` signs a **plaintext** message vector, so in
+Today `cipherbird_bbs_sign` signs a **plaintext** message vector, so in
 aviary's issuance flow the `member_secret` / `pid` would have to reach the
 issuer in the clear (`CREDENTIAL_GATE.md` section 5, section 10.2). That is acceptable only in
 the trusted-issuer (consortium) model. Blind issuance lets the holder **commit**
@@ -147,15 +147,15 @@ to its secret messages so the issuer signs over them **without learning them**.
 /** Holder side: commit to the messages the issuer must NOT see. Returns the
  *  commitment-with-proof blob to send to the issuer, and (separately) the
  *  secret prover blind the holder keeps to finalize/prove later. Suggest a
- *  small struct or a fixed-layout blob carrying both; match cryptolib's style. */
-CRYPTO_API CryptoBufferResult cryptolib_bbs_commit(
+ *  small struct or a fixed-layout blob carrying both; match cipherbird's style. */
+CRYPTO_API CryptoBufferResult cipherbird_bbs_commit(
     const uint8_t* const* committed_msgs, const size_t* committed_lens,
     size_t committed_count,
     /* out */ CryptoBuffer* secret_prover_blind);
 
 /** Issuer side: sign over the holder's commitment plus the issuer's own known
  *  messages -> an 80-byte signature the holder later finalizes with its blind. */
-CRYPTO_API CryptoBufferResult cryptolib_bbs_blind_sign(
+CRYPTO_API CryptoBufferResult cipherbird_bbs_blind_sign(
     const uint8_t* sk, size_t sk_len, const uint8_t* pk, size_t pk_len,
     const uint8_t* commitment_with_proof, size_t commit_len,
     const uint8_t* header, size_t header_len,
@@ -176,7 +176,7 @@ before they can adopt the gate. Land it after section 1.
 
 ## What this unblocks, and the order aviary will consume it
 
-1. **Now, no cryptolib change:** thin `crypto::bbs_*` wrappers over the six bare
+1. **Now, no cipherbird change:** thin `crypto::bbs_*` wrappers over the six bare
    functions + **Option A** unlinkable submitter/gossip admission
    (`CREDENTIAL_GATE.md` section 12.1-2). Shippable on the existing ABI.
 2. **On section 1 (pseudonyms):** **Option B** - per-epoch verifiable pseudonym ->
@@ -199,4 +199,4 @@ validator-set-change + slashing machinery first - `CREDENTIAL_GATE.md` section 3
   `bbs_verify`s and drives a valid (pseudonym-bound) `proof_gen`/`proof_verify`;
   the issuer cannot recover a committed message from the commitment.
 - Constant-time in secret inputs (`pid`, `sk`, `member_secret`), consistent with
-  the rest of cryptolib.
+  the rest of cipherbird.

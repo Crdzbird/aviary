@@ -1,4 +1,4 @@
-// Minimal zero-dependency test helper (matches cryptolib's convention).
+// Minimal zero-dependency test helper (matches cipherbird's convention).
 #pragma once
 
 #include <cstdio>

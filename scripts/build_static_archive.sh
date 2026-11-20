@@ -4,29 +4,29 @@
 # It merges aviary's core + C-ABI bridge objects into ONE .a. A consumer
 # linking it (e.g. the Go binding with `-tags aviary_static`) gets a
 # fully self-contained binary - no libaviary_c.dylib/.so to ship or locate
-# at run time. aviary's cryptolib_* symbols stay UNDEFINED here; they are
-# satisfied by cryptolib's own static archive (the cryptolib Go binding built
-# with `-tags cryptolib_static`):
+# at run time. aviary's cipherbird_* symbols stay UNDEFINED here; they are
+# satisfied by cipherbird's own static archive (the cipherbird Go binding built
+# with `-tags cipherbird_static`):
 #
 #   ( cd ../cryptolib && scripts/build_static_archive.sh )
 #   scripts/build_static_archive.sh
-#   ( cd bridge/bindings/go && go build -tags "aviary_static cryptolib_static" ./... )
+#   ( cd bridge/bindings/go && go build -tags "aviary_static cipherbird_static" ./... )
 #
 # Usage: scripts/build_static_archive.sh [out_dir]   (macOS/Linux host)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 OUT="${1:-build/static}"
-CRYPTOLIB_ROOT="${CRYPTOLIB_ROOT:-$ROOT/../cryptolib}"
+CIPHERBIRD_ROOT="${CIPHERBIRD_ROOT:-$ROOT/../cryptolib}"
 mkdir -p "$OUT"
 
-# Build aviary_c as a STATIC archive (no cryptolib linked - symbols stay
-# undefined, resolved later by cryptolib's static archive).
+# Build aviary_c as a STATIC archive (no cipherbird linked - symbols stay
+# undefined, resolved later by cipherbird's static archive).
 cmake -S . -B build-static -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DAVIARY_STATIC=ON \
-  -DCRYPTOLIB_ROOT="$CRYPTOLIB_ROOT" \
-  -DCRYPTOLIB_C_INCLUDE_DIR="$CRYPTOLIB_ROOT/bridge" >/dev/null
+  -DCIPHERBIRD_ROOT="$CIPHERBIRD_ROOT" \
+  -DCIPHERBIRD_C_INCLUDE_DIR="$CIPHERBIRD_ROOT/bridge" >/dev/null
 cmake --build build-static --target aviary_c >/dev/null
 
 CORE="build-static/libaviary_core.a"

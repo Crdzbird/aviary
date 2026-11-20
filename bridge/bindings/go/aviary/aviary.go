@@ -2,7 +2,7 @@
 //
 // It is a thin marshaling layer (ARCHITECTURE section 0): it never computes consensus
 // bytes itself - it hands data to the C++ core and returns what the core
-// produced. All hashing happens in C++. The crypto backend is cryptolib, whose
+// produced. All hashing happens in C++. The crypto backend is cipherbird, whose
 // Go binding is depended on (see crypto.go) so the full crypto surface is
 // available to consumers alongside the ledger.
 //
@@ -25,7 +25,7 @@ import (
 
 // -- Initialization (lazy + optional background warm-up) -----------------------
 //
-// aviary_init -> cryptolib_init, which is idempotent. The native lib loads
+// aviary_init -> cipherbird_init, which is idempotent. The native lib loads
 // at process start (cgo), but the one-time backend init must be run once; we do
 // it lazily on first use so callers cannot forget it.
 
@@ -39,7 +39,7 @@ func doInit() error {
 	if C.aviary_init() != 0 {
 		return errors.New("aviary: init failed")
 	}
-	// Also initialize cryptolib's Go binding so its crypto API is ready for
+	// Also initialize cipherbird's Go binding so its crypto API is ready for
 	// callers that use it alongside the ledger.
 	if err := cryptoInit(); err != nil {
 		return err
@@ -72,7 +72,7 @@ func Initialized() bool { return initialized.Load() }
 // Version returns the Aviary library version.
 func Version() string { return C.GoString(C.aviary_version()) }
 
-// CryptoBackendVersion returns the linked cryptolib version (proves linkage).
+// CryptoBackendVersion returns the linked cipherbird version (proves linkage).
 func CryptoBackendVersion() string { return C.GoString(C.aviary_crypto_backend_version()) }
 
 var emptyByte = [1]byte{}
